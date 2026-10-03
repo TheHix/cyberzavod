@@ -1,5 +1,6 @@
-# Проверка на каждый push и pull request: типы, тесты, сборка.
-# Агенты не могут «забыть» её запустить — она срабатывает сама.
+# Проверки на каждый push и pull request. CI вызывает те же make-цели, что `make check`
+# локально, поэтому агенты и люди проверяют одно и то же. Сверху CI только ставит
+# зависимости строго по lock-файлу.
 name: CI
 
 on:
@@ -7,14 +8,28 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  check:
+  web:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run check
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: make check-web
+
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: apps/api/go.mod
+          cache-dependency-path: apps/api/go.sum
+      - run: make check-api check-docker
