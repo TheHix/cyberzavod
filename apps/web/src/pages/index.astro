@@ -1,0 +1,57 @@
+---
+import BaseLayout from "@/app/layouts/BaseLayout.astro";
+import { BuildStats } from "@/widgets/build-stats";
+import { demoRecording } from "@/entities/recording";
+import { site } from "@/shared/config/site.ts";
+---
+
+<BaseLayout>
+  <main class="page">
+    <header>
+      <h1>{site.name}</h1>
+      <p class="lead">{site.description}</p>
+    </header>
+
+    <section aria-labelledby="factory-title" class="factory">
+      <h2 id="factory-title">Цех</h2>
+      <p class="muted">Здесь будет изометрический цех, который проигрывает запись сборки.</p>
+    </section>
+
+    <section aria-labelledby="stats-title">
+      <h2 id="stats-title">Сборка: {demoRecording.title}</h2>
+      <BuildStats recording={demoRecording} />
+    </section>
+
+    <footer>
+      <a href={site.repoUrl}>Код на GitHub</a>
+    </footer>
+  </main>
+</BaseLayout>
+
+<style>
+  .page {
+    display: grid;
+    gap: 2.5rem;
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 3rem 1rem;
+  }
+
+  .lead {
+    max-width: 40rem;
+    color: var(--muted);
+    font-size: 1.125rem;
+  }
+
+  .factory {
+    display: grid;
+    place-content: center;
+    min-height: 20rem;
+    border: 1px dashed var(--line);
+    text-align: center;
+  }
+
+  .muted {
+    color: var(--muted);
+  }
+</style>

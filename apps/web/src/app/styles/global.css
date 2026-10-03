@@ -1,0 +1,29 @@
+:root {
+  color-scheme: dark;
+  --bg: #0d0f12;
+  --surface: #14171c;
+  --line: #262b33;
+  --text: #e6e8eb;
+  --muted: #8a919c;
+  --accent: #ff9f1c;
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+a {
+  color: var(--accent);
+}

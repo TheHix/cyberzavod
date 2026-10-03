@@ -1,0 +1,22 @@
+{
+  "name": "@cyberzavod/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check && node --test \"src/**/*.test.ts\" && astro build"
+  },
+  "dependencies": {
+    "@astrojs/solid-js": "^7.0.2",
+    "@cyberzavod/core": "workspace:*",
+    "astro": "^7.3.5",
+    "solid-js": "^1.9.15"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@types/node": "^24.19.1",
+    "typescript": "^6.0.3"
+  }
+}
