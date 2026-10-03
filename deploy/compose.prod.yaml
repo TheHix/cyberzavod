@@ -1,0 +1,84 @@
+# Продакшен на VPS. `make server-bootstrap` кладёт этот файл в /srv/cyberzavod/compose.yaml
+# (владелец root): при выкатке клиент передаёт только sha, сам файл с клиента не принимается.
+# Переменные берутся из /srv/cyberzavod/.env: POSTGRES_PASSWORD (секрет) и TAG (sha коммита).
+#
+# Порты опубликованы только на 127.0.0.1: Docker обходит ufw, поэтому наружу
+# ничего не открываем, а трафик принимает nginx на хосте.
+name: cyberzavod
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+x-api: &api
+  image: ghcr.io/thehix/cyberzavod-api:${TAG:?не задан TAG}
+  environment:
+    DATABASE_URL: postgres://cyberzavod:${POSTGRES_PASSWORD:?не задан POSTGRES_PASSWORD}@db:5432/cyberzavod?sslmode=disable
+    API_ADDR: ":8080"
+  <<: *logging
+
+services:
+  db:
+    image: postgres:18.6-alpine
+    environment:
+      POSTGRES_DB: cyberzavod
+      POSTGRES_USER: cyberzavod
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?не задан POSTGRES_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cyberzavod -d cyberzavod"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    <<: *logging
+
+  migrate:
+    <<: *api
+    command: ["migrate"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *api
+    command: ["serve"]
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/api", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    # Больше таймаута Shutdown в API (10 с), чтобы Docker не убил процесс раньше.
+    stop_grace_period: 15s
+    restart: unless-stopped
+
+  web:
+    image: ghcr.io/thehix/cyberzavod-web:${TAG:?не задан TAG}
+    ports:
+      - "127.0.0.1:8082:8080"
+    environment:
+      # Иначе entrypoint образа пытается править конфиг и шумит в логах read-only системы.
+      NGINX_ENTRYPOINT_QUIET_LOGS: "1"
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    <<: *logging
+
+volumes:
+  db-data:

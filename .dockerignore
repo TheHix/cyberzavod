@@ -1,0 +1,11 @@
+# Контекст сборки образа сайта — корень репозитория. В образ идут только исходники.
+**/node_modules
+**/dist
+**/.astro
+.git
+.github
+.claude
+apps/api
+recordings
+*.md
+**/.env*

@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# Выкатка версии Киберзавода.
+#
+#   ssh deploy@сервер <полный sha коммита>      — из GitHub Actions
+#   sudo cyberzavod-deploy <полный sha коммита>  — вручную на сервере
+#
+# Клиент передаёт только sha. Compose-файл и .env лежат на сервере и принадлежат root,
+# поэтому владелец ключа deploy может лишь выбрать, какие образы из GHCR запустить, —
+# а их собирает CI только из main. Откат — тот же вызов со старым sha.
+set -euo pipefail
+
+readonly SELF=/usr/local/bin/cyberzavod-deploy
+readonly APP_DIR=/srv/cyberzavod
+readonly READY_URL=http://127.0.0.1:8081/api/ready
+readonly WAIT_TIMEOUT_SECONDS=120
+readonly READY_RETRIES=5
+readonly READY_RETRY_DELAY_SECONDS=2
+# Образы моложе недели не удаляются: откат на недавнюю версию обходится без повторного pull.
+readonly IMAGE_RETENTION=168h
+readonly SHORT_SHA_LENGTH=7
+readonly LOCK_FILE=/run/lock/cyberzavod-deploy.lock
+# Выкатка из CI и ручной откат не должны перемешаться; вторая ждёт первую.
+readonly LOCK_WAIT_SECONDS=300
+
+# По SSH скрипт запускается от deploy (command= в authorized_keys) и переходит в root
+# через единственное правило sudoers, которое разрешает только его.
+if [[ $EUID -ne 0 ]]; then
+  exec sudo --non-interactive "$SELF" "${SSH_ORIGINAL_COMMAND:-}"
+fi
+
+log() { echo "==> $*"; }
+short() { echo "${1:0:SHORT_SHA_LENGTH}"; }
+
+require_sha() {
+  if [[ ! "$1" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "ожидался полный sha коммита, получено: '$1'" >&2
+    exit 2
+  fi
+}
+
+current_tag() { sed -n 's/^TAG=//p' .env; }
+set_tag() { sed -i "s/^TAG=.*/TAG=$1/" .env; }
+
+# Поднимает api и web на теге из .env и ждёт, пока они станут healthy, а API увидит базу.
+start() {
+  docker compose up --detach --wait --wait-timeout "$WAIT_TIMEOUT_SECONDS" --remove-orphans api web &&
+    curl --fail --silent --show-error --output /dev/null \
+      --retry "$READY_RETRIES" --retry-delay "$READY_RETRY_DELAY_SECONDS" --retry-all-errors "$READY_URL"
+}
+
+main() {
+  local tag="${1:-}"
+  require_sha "$tag"
+
+  exec 9> "$LOCK_FILE"
+  if ! flock --wait "$LOCK_WAIT_SECONDS" 9; then
+    echo "другая выкатка идёт дольше ${LOCK_WAIT_SECONDS} с, выхожу" >&2
+    exit 3
+  fi
+
+  cd "$APP_DIR"
+
+  local previous
+  previous=$(current_tag)
+
+  # Всё, что может упасть до переключения, выполняется на новом теге через переменную
+  # окружения: .env и работающие контейнеры пока не тронуты.
+  log "скачиваю образы $(short "$tag")"
+  TAG="$tag" docker compose pull --quiet
+  log "применяю миграции"
+  TAG="$tag" docker compose run --rm migrate
+
+  log "переключаю на $(short "$tag")"
+  set_tag "$tag"
+  if ! start; then
+    if [[ -n "$previous" ]]; then
+      log "новая версия не поднялась, возвращаю $(short "$previous")"
+      set_tag "$previous"
+      start || log "предыдущая версия тоже не поднялась — нужен разбор вручную"
+    fi
+    exit 1
+  fi
+
+  docker image prune --all --force --filter "until=$IMAGE_RETENTION" > /dev/null
+  log "выкачено $(short "$tag")"
+}
+
+main "$@"
