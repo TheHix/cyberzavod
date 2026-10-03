@@ -1,6 +1,7 @@
-# Проверки на каждый push и pull request. CI вызывает те же make-цели, что `make check`
-# локально, поэтому агенты и люди проверяют одно и то же. Сверху CI только ставит
-# зависимости строго по lock-файлу.
+# Проверки на каждый push и pull request; на main после них — сборка образов и деплой.
+#
+# CI вызывает те же make-цели, что `make check` локально, поэтому агенты и люди
+# проверяют одно и то же. Сверху CI только ставит зависимости строго по lock-файлу.
 name: CI
 
 on:
@@ -10,6 +11,9 @@ on:
 
 permissions:
   contents: read
+
+env:
+  IMAGE_PREFIX: ghcr.io/thehix/cyberzavod
 
 jobs:
   web:
@@ -33,3 +37,89 @@ jobs:
           go-version-file: apps/api/go.mod
           cache-dependency-path: apps/api/go.sum
       - run: make check-api check-docker
+
+  infra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: make check-deploy
+
+  # Образы помечаются полным sha коммита: по нему версия деплоится и откатывается.
+  # Сторонние actions с правом записи в реестр закреплены по sha коммита, а не по тегу.
+  images:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [web, api, infra]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: api
+            context: apps/api
+            dockerfile: apps/api/Dockerfile
+          - image: web
+            context: .
+            dockerfile: apps/web/Dockerfile
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}:${{ github.sha }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  # Ключ deploy на сервере умеет только одно: выкатить образы указанного sha.
+  deploy:
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://cyberzavod.com
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    steps:
+      # Выкатки встают в очередь, но не в порядке коммитов: если за время сборки в main
+      # уже пришёл более новый коммит, этот выкатывать нельзя — он вернул бы старую версию.
+      - name: Коммит всё ещё последний в main
+        id: freshness
+        run: |
+          head=$(git ls-remote "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" refs/heads/main | cut -f1)
+          if [ "$head" = "$GITHUB_SHA" ]; then
+            echo "latest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::в main уже ${head:0:7}, выкатку ${GITHUB_SHA:0:7} пропускаю"
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Ключ и отпечаток сервера
+        if: steps.freshness.outputs.latest == 'true'
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Выкатка
+        if: steps.freshness.outputs.latest == 'true'
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: >-
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes
+          -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4
+          "deploy@$DEPLOY_HOST" "$GITHUB_SHA"
