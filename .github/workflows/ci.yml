@@ -1,0 +1,20 @@
+# Проверка на каждый push и pull request: типы, тесты, сборка.
+# Агенты не могут «забыть» её запустить — она срабатывает сама.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check

@@ -1,0 +1,19 @@
+{
+  "name": "cyberzavod",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "build": "rm -rf dist && mkdir -p dist && cp public/* dist/ && esbuild src/main.ts --bundle --minify --target=es2022 --outfile=dist/app.js",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.1",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}
