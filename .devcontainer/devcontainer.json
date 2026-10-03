@@ -1,0 +1,23 @@
+{
+  "name": "Киберзавод",
+  "dockerComposeFile": "compose.yaml",
+  "service": "dev",
+  "workspaceFolder": "/workspace",
+  "remoteUser": "node",
+  "postCreateCommand": "pnpm install --frozen-lockfile && (cd apps/api && go mod download)",
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
+  "waitFor": "postStartCommand",
+  "forwardPorts": [4321, 8080],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "astro-build.astro-vscode",
+        "golang.go"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      }
+    }
+  }
+}

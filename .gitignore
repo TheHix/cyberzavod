@@ -8,3 +8,4 @@ dist/
 recordings/raw/
 .claude/settings.local.json
 .astro/
+.pnpm-store/
