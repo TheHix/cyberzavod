@@ -32,7 +32,7 @@ test("неизвестный этап отклоняется", () => {
 
 test("время не может идти назад", () => {
   const bad = structuredClone(sample);
-  bad.events[3].t = 5;
+  bad.events[3]!.t = 5;
   assert.throws(() => parseRecording(bad), /время идёт назад/);
 });
 

@@ -81,9 +81,11 @@ export function parseRecording(raw: unknown): Recording {
   const events = raw.events.map(parseEvent);
   if (events[0]?.type !== "build_start") throw new RecordingError("запись должна начинаться с build_start");
   if (events.at(-1)?.type !== "build_end") throw new RecordingError("запись должна заканчиваться build_end");
-  for (let i = 1; i < events.length; i++) {
-    if (events[i].t < events[i - 1].t) throw new RecordingError(`событие #${i}: время идёт назад`);
-  }
+  let prevT = 0;
+  events.forEach((event, i) => {
+    if (event.t < prevT) throw new RecordingError(`событие #${i}: время идёт назад`);
+    prevT = event.t;
+  });
 
   return { version: 1, id: raw.id, title: raw.title, events };
 }
@@ -92,7 +94,7 @@ export function parseRecording(raw: unknown): Recording {
 export function summarize(recording: Recording): BuildStats {
   const { events } = recording;
   const stats: BuildStats = {
-    durationMs: events.at(-1)!.t - events[0].t,
+    durationMs: (events.at(-1)?.t ?? 0) - (events[0]?.t ?? 0),
     tokens: 0,
     prompts: 0,
     reworks: 0,

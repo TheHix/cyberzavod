@@ -7,3 +7,4 @@ dist/
 # Сырые журналы сборок: до проверки и публикации в репозиторий не попадают
 recordings/raw/
 .claude/settings.local.json
+.astro/
