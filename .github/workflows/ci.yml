@@ -95,10 +95,18 @@ jobs:
     steps:
       # Выкатки встают в очередь, но не в порядке коммитов: если за время сборки в main
       # уже пришёл более новый коммит, этот выкатывать нельзя — он вернул бы старую версию.
+      # Ошибка при чтении main должна ронять job, а не выглядеть как «есть коммит новее».
       - name: Коммит всё ещё последний в main
         id: freshness
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          head=$(git ls-remote "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" refs/heads/main | cut -f1)
+          head=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [[ ! "$head" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::не удалось узнать последний коммит main: '$head'"
+            exit 1
+          fi
           if [ "$head" = "$GITHUB_SHA" ]; then
             echo "latest=true" >> "$GITHUB_OUTPUT"
           else
