@@ -101,10 +101,26 @@ export function summarize(recording: Recording): BuildStats {
     ok: false,
   };
   for (const event of events) {
-    if (event.type === "usage") stats.tokens += event.tokens;
-    else if (event.type === "prompt") stats.prompts++;
-    else if (event.type === "stage_fail") stats.reworks++;
-    else if (event.type === "build_end") stats.ok = event.ok;
+    switch (event.type) {
+      case "usage":
+        stats.tokens += event.tokens;
+        break;
+      case "prompt":
+        stats.prompts++;
+        break;
+      case "stage_fail":
+        stats.reworks++;
+        break;
+      case "build_end":
+        stats.ok = event.ok;
+        break;
+      case "build_start":
+      case "stage_enter":
+        break;
+      default:
+        // Новый тип события не скомпилируется, пока его не учтут здесь.
+        event satisfies never;
+    }
   }
   return stats;
 }
