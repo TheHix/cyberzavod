@@ -16,9 +16,14 @@ func TestLoad(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
 			t.Setenv("API_ADDR", tt.addr)
 			t.Setenv("DATABASE_URL", tt.dbURL)
+
+			// Act
 			cfg, err := Load()
+
+			// Assert
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("ошибка %v, ожидалась ошибка: %v", err, tt.wantErr)
 			}
@@ -43,7 +48,10 @@ func TestLocalURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.addr, func(t *testing.T) {
+			// Act
 			got, err := LocalURL(tt.addr, "/api/health")
+
+			// Assert
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("ошибка %v, ожидалась ошибка: %v", err, tt.wantErr)
 			}
