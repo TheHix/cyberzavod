@@ -1,0 +1,54 @@
+# Локальное окружение: Postgres и API в Docker, фронт запускается отдельно через `pnpm dev`.
+# Порядок запуска как в продакшене: база готова → миграции прошли → стартует API.
+name: cyberzavod
+
+x-api: &api
+  build: ./apps/api
+  image: cyberzavod-api:dev
+  environment:
+    # Пароль только для локальной разработки; на сервере секреты лежат в .env.
+    DATABASE_URL: postgres://cyberzavod:cyberzavod@db:5432/cyberzavod?sslmode=disable
+    API_ADDR: ":8080"
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: cyberzavod
+      POSTGRES_USER: cyberzavod
+      POSTGRES_PASSWORD: cyberzavod
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cyberzavod -d cyberzavod"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  migrate:
+    <<: *api
+    command: ["migrate"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *api
+    command: ["serve"]
+    # Больше таймаута Shutdown в API (10 с), чтобы Docker не убил процесс раньше.
+    stop_grace_period: 15s
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/api", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  db-data:
