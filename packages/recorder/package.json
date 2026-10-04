@@ -1,0 +1,14 @@
+{
+  "name": "@cyberzavod/recorder",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "tsc -p . && node --test \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@cyberzavod/core": "workspace:*"
+  }
+}
