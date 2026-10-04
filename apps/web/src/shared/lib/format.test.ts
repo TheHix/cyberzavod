@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatClock, formatDate, formatDuration, formatTokens } from "./format.ts";
+import { formatClock, formatDate, formatDuration, formatModel, formatTokens } from "./format.ts";
 
 describe("formatDuration", () => {
   it("показывает только секунды, если меньше минуты", () => {
@@ -55,5 +55,18 @@ describe("formatDate", () => {
     const result = formatDate("2026-10-04T23:30:00.000Z");
 
     expect(result).toBe("4 октября 2026 г.");
+  });
+});
+
+describe("formatModel", () => {
+  it.each([
+    ["claude-opus-5-5", "Claude Opus 5.5"],
+    ["claude-haiku-4-5-20251001", "Claude Haiku 4.5"],
+    ["claude-sonnet-4-20250514", "Claude Sonnet 4"],
+    ["gpt-local", "gpt-local"],
+  ])("называет «%s» как «%s»", (id, name) => {
+    const result = formatModel(id);
+
+    expect(result).toBe(name);
   });
 });

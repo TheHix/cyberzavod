@@ -63,3 +63,19 @@ const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
 export function formatDate(startedAt: string): string {
   return dateFormatter.format(new Date(startedAt));
 }
+
+// id модели Claude: `claude-opus-5-5`; у старых — с датой выпуска, иногда без младшей версии:
+// `claude-haiku-4-5-20251001`, `claude-sonnet-4-20250514`.
+const CLAUDE_MODEL_ID = /^claude-([a-z]+)-(\d{1,2})(?:-(\d{1,2}))?(?:-\d{8})?$/;
+
+/**
+ * Превращает id модели в название для подписи; незнакомый id показывается как есть.
+ * @param {string} id Идентификатор модели: `claude-opus-5-5`.
+ * @returns {string} Название вида «Claude Opus 5.5» или «Claude Sonnet 4».
+ */
+export function formatModel(id: string): string {
+  const [, family, major, minor] = CLAUDE_MODEL_ID.exec(id) ?? [];
+  if (family === undefined || major === undefined) return id;
+  const version = minor === undefined ? major : `${major}.${minor}`;
+  return `Claude ${family.charAt(0).toUpperCase()}${family.slice(1)} ${version}`;
+}

@@ -1,7 +1,8 @@
 ---
-// Промпты человека по ходу сборки: когда пришёл, что просил и с какими требованиями.
+// Промпты человека по ходу сборки — как сообщения модели, которая их получила.
+// Главное указание видно сразу, уточнения раскрываются: без JS, через <details>.
 import type { PromptEvent, Recording } from "@cyberzavod/core";
-import { formatClock } from "@/shared/lib/format.ts";
+import { formatClock, formatModel } from "@/shared/lib/format.ts";
 
 interface Props {
   recording: Recording;
@@ -9,6 +10,8 @@ interface Props {
 
 const { recording } = Astro.props;
 const prompts = recording.events.filter((event): event is PromptEvent => event.type === "prompt");
+const recipient = (prompt: PromptEvent) =>
+  prompt.model === undefined ? "агент" : formatModel(prompt.model);
 ---
 
 {prompts.length === 0 ? (
@@ -16,18 +19,23 @@ const prompts = recording.events.filter((event): event is PromptEvent => event.t
 ) : (
   <ol class="timeline">
     {prompts.map((prompt) => (
-      <li class="prompt">
-        <span class="at">{formatClock(prompt.t)}</span>
-        <div>
+      <li class="message">
+        <p class="route">
+          <span class="at">{formatClock(prompt.t)}</span>
+          <span>человек → {recipient(prompt)}</span>
+        </p>
+        {prompt.requirements.length === 0 ? (
           <p class="goal">{prompt.goal}</p>
-          {prompt.requirements.length > 0 && (
+        ) : (
+          <details>
+            <summary class="goal">{prompt.goal}</summary>
             <ul class="requirements">
               {prompt.requirements.map((requirement) => (
                 <li>{requirement}</li>
               ))}
             </ul>
-          )}
-        </div>
+          </details>
+        )}
       </li>
     ))}
   </ol>
@@ -36,36 +44,82 @@ const prompts = recording.events.filter((event): event is PromptEvent => event.t
 <style>
   .timeline {
     display: grid;
-    gap: 1px;
+    gap: 0.75rem;
     margin: 0;
     padding: 0;
     list-style: none;
-    background: var(--line);
-    border: 1px solid var(--line);
   }
 
-  .prompt {
-    display: grid;
-    grid-template-columns: 4.5rem 1fr;
-    gap: 1rem;
-    padding: 1rem 1.25rem;
+  .message {
+    padding: 0.875rem 1.25rem 1rem;
     background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 0.5rem 0.5rem 0;
   }
 
-  .at {
+  .route {
+    display: flex;
+    gap: 0.75rem;
+    margin: 0 0 0.375rem;
     color: var(--muted);
     font-family: var(--font-mono);
+    font-size: 0.8rem;
   }
 
   .goal {
     margin: 0;
+    font-size: 1.0625rem;
     font-weight: 600;
   }
 
+  summary.goal {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    justify-content: space-between;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  summary.goal::-webkit-details-marker {
+    display: none;
+  }
+
+  summary.goal::after {
+    flex-shrink: 0;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 400;
+    content: "▸ подробнее";
+  }
+
+  details[open] > summary.goal::after {
+    content: "▾ свернуть";
+  }
+
+  /* На узком экране подпись отнимала бы ширину у текста промпта — остаётся стрелка. */
+  @media (max-width: 30rem) {
+    summary.goal::after {
+      content: "▸";
+    }
+
+    details[open] > summary.goal::after {
+      content: "▾";
+    }
+  }
+
   .requirements {
-    margin: 0.5rem 0 0;
-    padding-left: 1.25rem;
-    color: var(--muted);
+    display: grid;
+    gap: 0.375rem;
+    margin: 0.75rem 0 0;
+    padding: 0.75rem 0 0 1.25rem;
+    border-top: 1px dashed var(--line);
+  }
+
+  .requirements li::marker {
+    color: var(--accent);
   }
 
   .empty {
