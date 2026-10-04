@@ -1,0 +1,61 @@
+---
+// Список опубликованных записей: заголовок, день и главные счётчики каждой сборки.
+import { summarize, type Recording } from "@cyberzavod/core";
+import { recordingUrl } from "@/entities/recording";
+import { formatDate, formatDuration, formatTokens } from "@/shared/lib/format.ts";
+
+interface Props {
+  recordings: readonly Recording[];
+}
+
+const { recordings } = Astro.props;
+---
+
+{recordings.length === 0 ? (
+  <p class="empty">Записей пока нет.</p>
+) : (
+  <ul class="list">
+    {recordings.map((recording) => {
+      const stats = summarize(recording);
+      return (
+        <li class="card">
+          <a class="title" href={recordingUrl(recording.id)}>
+            {recording.title}
+          </a>
+          <p class="meta">
+            {formatDate(recording.startedAt)} · время {formatDuration(stats.durationMs)} · токены{" "}
+            {formatTokens(stats.tokens)} · промпты {stats.prompts}
+          </p>
+        </li>
+      );
+    })}
+  </ul>
+)}
+
+<style>
+  .list {
+    display: grid;
+    gap: 1px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+
+  .card {
+    padding: 1rem 1.25rem;
+    background: var(--surface);
+  }
+
+  .title {
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+
+  .meta,
+  .empty {
+    margin: 0.25rem 0 0;
+    color: var(--muted);
+  }
+</style>

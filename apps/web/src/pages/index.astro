@@ -1,8 +1,11 @@
 ---
 import BaseLayout from "@/app/layouts/BaseLayout.astro";
 import { BuildStats } from "@/widgets/build-stats";
-import { demoRecording } from "@/entities/recording";
+import { RecordingList } from "@/widgets/recording-list";
+import { publishedRecordings } from "@/entities/recording";
 import { site } from "@/shared/config/site.ts";
+
+const [latest] = publishedRecordings;
 ---
 
 <BaseLayout>
@@ -17,9 +20,16 @@ import { site } from "@/shared/config/site.ts";
       <p class="muted">Здесь будет изометрический цех, который проигрывает запись сборки.</p>
     </section>
 
-    <section aria-labelledby="stats-title">
-      <h2 id="stats-title">Сборка: {demoRecording.title}</h2>
-      <BuildStats recording={demoRecording} />
+    {latest && (
+      <section aria-labelledby="latest-title">
+        <h2 id="latest-title">Последняя сборка: {latest.title}</h2>
+        <BuildStats recording={latest} />
+      </section>
+    )}
+
+    <section aria-labelledby="recordings-title">
+      <h2 id="recordings-title">Записи сборок</h2>
+      <RecordingList recordings={publishedRecordings} />
     </section>
 
     <footer>

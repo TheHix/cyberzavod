@@ -1,0 +1,75 @@
+---
+// Промпты человека по ходу сборки: когда пришёл, что просил и с какими требованиями.
+import type { PromptEvent, Recording } from "@cyberzavod/core";
+import { formatClock } from "@/shared/lib/format.ts";
+
+interface Props {
+  recording: Recording;
+}
+
+const { recording } = Astro.props;
+const prompts = recording.events.filter((event): event is PromptEvent => event.type === "prompt");
+---
+
+{prompts.length === 0 ? (
+  <p class="empty">В этой сборке человек не писал промптов.</p>
+) : (
+  <ol class="timeline">
+    {prompts.map((prompt) => (
+      <li class="prompt">
+        <span class="at">{formatClock(prompt.t)}</span>
+        <div>
+          <p class="goal">{prompt.goal}</p>
+          {prompt.requirements.length > 0 && (
+            <ul class="requirements">
+              {prompt.requirements.map((requirement) => (
+                <li>{requirement}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </li>
+    ))}
+  </ol>
+)}
+
+<style>
+  .timeline {
+    display: grid;
+    gap: 1px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+
+  .prompt {
+    display: grid;
+    grid-template-columns: 4.5rem 1fr;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: var(--surface);
+  }
+
+  .at {
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+
+  .goal {
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .requirements {
+    margin: 0.5rem 0 0;
+    padding-left: 1.25rem;
+    color: var(--muted);
+  }
+
+  .empty {
+    margin: 0;
+    color: var(--muted);
+  }
+</style>
