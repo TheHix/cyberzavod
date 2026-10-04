@@ -6,6 +6,7 @@ dist/
 
 # Сырые журналы сборок: до проверки и публикации в репозиторий не попадают
 recordings/raw/
+recordings/drafts/
 .claude/settings.local.json
 .astro/
 .pnpm-store/
