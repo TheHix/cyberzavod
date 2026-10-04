@@ -21,11 +21,9 @@ invalid_inputs=(
 
 failed=0
 for input in "${invalid_inputs[@]}"; do
-  # Act
   "$SCRIPT" "$input" > /dev/null 2>&1
   code=$?
 
-  # Assert
   if [[ $code -ne $REJECTED_EXIT_CODE ]]; then
     echo "не отклонён: '$input' (код $code)" >&2
     failed=1
