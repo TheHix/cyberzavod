@@ -3,7 +3,8 @@
 
 import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
-import { fromHookPayload, isSafeSessionId } from "./raw-event.ts";
+import { fromHookPayload, isSafeSessionId } from "../raw-event.ts";
+import { RECORDINGS_DIRS } from "./paths.ts";
 
 async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
@@ -17,7 +18,9 @@ const event = fromHookPayload(payload, Date.now());
 if (event !== null) {
   const sessionId = (payload as { session_id?: unknown }).session_id;
   if (!isSafeSessionId(sessionId)) throw new Error(`недопустимый session_id: ${String(sessionId)}`);
-  const rawDir = path.join(process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), "recordings", "raw");
-  await mkdir(rawDir, { recursive: true });
-  await appendFile(path.join(rawDir, `${sessionId}.jsonl`), `${JSON.stringify(event)}\n`);
+  await mkdir(RECORDINGS_DIRS.raw, { recursive: true });
+  await appendFile(
+    path.join(RECORDINGS_DIRS.raw, `${sessionId}.jsonl`),
+    `${JSON.stringify(event)}\n`,
+  );
 }

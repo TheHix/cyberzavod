@@ -3,7 +3,7 @@
 # SSH-алиас сервера из ~/.ssh/config; пользователь с sudo.
 SERVER ?= cyberzavod
 .DEFAULT_GOAL := help
-.PHONY: help up down dev api-dev recording-draft format check check-web check-api check-docker check-deploy server-bootstrap server-cert
+.PHONY: help up down dev api-dev recording-draft recording-publish format check check-web check-api check-docker check-deploy server-bootstrap server-cert
 
 help: ## Показать команды
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-17s %s\n", $$1, $$2}'
@@ -21,7 +21,10 @@ api-dev: ## API из исходников: миграции и запуск (н�
 	cd apps/api && go run ./cmd/api migrate && go run ./cmd/api serve
 
 recording-draft: ## Черновик записи из журнала сборки (RAW=файл, по умолчанию самый свежий)
-	node packages/recorder/src/draft.ts $(RAW)
+	node packages/recorder/src/bin/draft.ts $(RAW)
+
+recording-publish: ## Опубликовать отредактированный черновик (DRAFT=файл, по умолчанию самый свежий)
+	node packages/recorder/src/bin/publish.ts $(DRAFT)
 
 format: ## Привести код к стилю: Prettier и ESLint --fix для TS, gofumpt и goimports для Go
 	pnpm format

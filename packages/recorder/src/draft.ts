@@ -1,59 +1,173 @@
-// Черновик записи из сырого журнала: `make recording-draft [RAW=recordings/raw/<сессия>.jsonl]`.
-// Без аргумента берётся самый свежий журнал. Черновик кладётся в recordings/drafts/ (вне git),
-// а промпты печатаются, чтобы перед публикацией проверить их на ключи, адреса и личное.
+// Черновик записи: события цеха, где промпты ещё рядом с тем, как их набрал человек.
+// Редактор заполняет заголовок и чистовую версию каждого промпта, человек проверяет,
+// публикация убирает исходный текст и пропускает запись через проверку ядра.
 
-import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { parseRawLog } from "./raw-event.ts";
-import { recordingId, toRecording, transcriptPaths } from "./to-recording.ts";
-import { countTokens } from "./transcript.ts";
+import {
+  parseFactoryEvent,
+  parseRecording,
+  type FactoryEvent,
+  type Recording,
+  type RecordingError,
+} from "@cyberzavod/core";
+import { findLeaks } from "./leaks.ts";
 
-const projectDir = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
-const RAW_DIR = path.join(projectDir, "recordings", "raw");
-const DRAFTS_DIR = path.join(projectDir, "recordings", "drafts");
+/** Промпт в черновике: исходный текст человека и чистовая версия для публикации. */
+export interface DraftPrompt {
+  t: number;
+  type: "draft_prompt";
+  said: string;
+  goal: string;
+  requirements: string[];
+}
 
-async function newestRawLog(): Promise<string> {
-  const files = (await readdir(RAW_DIR).catch(() => [])).filter((name) => name.endsWith(".jsonl"));
-  const withTimes = await Promise.all(
-    files.map(async (name) => ({ name, mtime: (await stat(path.join(RAW_DIR, name))).mtimeMs })),
+/** Событие черновика: событие записи или промпт, ещё не прошедший публикацию. */
+export type DraftEvent = FactoryEvent | DraftPrompt;
+
+/** Черновик записи сборки: собирается из журнала, редактируется и публикуется. */
+export interface Draft {
+  id: string;
+  startedAt: string;
+  title: string;
+  events: DraftEvent[];
+}
+
+/** Ошибка черновика: файл повреждён или текст для публикации не прошёл проверку. */
+export class DraftError extends Error {}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isStrings(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function parseDraftPrompt(raw: Record<string, unknown>, index: number): DraftPrompt {
+  const { t, said, goal, requirements } = raw;
+  if (typeof t !== "number" || typeof said !== "string" || typeof goal !== "string") {
+    throw new DraftError(`событие #${index}: у промпта должны быть t, said и goal`);
+  }
+  if (!isStrings(requirements)) {
+    throw new DraftError(`событие #${index}: requirements должны быть списком строк`);
+  }
+  return { t, type: "draft_prompt", said, goal, requirements: [...requirements] };
+}
+
+function parseDraftEvent(raw: unknown, index: number): DraftEvent {
+  if (isObject(raw) && raw.type === "draft_prompt") return parseDraftPrompt(raw, index);
+  return parseFactoryEvent(raw, index);
+}
+
+/**
+ * Проверяет черновик, прочитанный из файла: его правил редактор, поэтому доверять ему нельзя.
+ * Чистовые версии промптов могут быть ещё пустыми — их проверяет публикация.
+ * @param {unknown} raw Разобранный JSON черновика.
+ * @returns {Draft} Проверенный черновик.
+ * @throws {DraftError} Если поля черновика или его промптов не того типа.
+ * @throws {RecordingError} Если событие цеха в черновике не соответствует формату ядра.
+ */
+export function parseDraft(raw: unknown): Draft {
+  if (!isObject(raw)) throw new DraftError("черновик должен быть объектом");
+  const { id, startedAt, title, events } = raw;
+  if (typeof id !== "string" || typeof startedAt !== "string" || typeof title !== "string") {
+    throw new DraftError("у черновика должны быть id, startedAt и title");
+  }
+  if (!Array.isArray(events)) throw new DraftError("у черновика нет events");
+  return { id, startedAt, title, events: events.map(parseDraftEvent) };
+}
+
+// Промпт пересобранного черновика узнаётся по времени и исходному тексту: у той же сессии
+// они не меняются, а новый промпт ни с чем не совпадёт.
+function samePrompt(a: DraftPrompt, b: DraftPrompt): boolean {
+  return a.t === b.t && a.said === b.said;
+}
+
+function promptsOf(draft: Draft): DraftPrompt[] {
+  return draft.events.filter((event) => event.type === "draft_prompt");
+}
+
+// Отредактированным считается промпт, в котором заполнено хоть что-то из чистовой версии.
+function editedPromptsOf(draft: Draft): DraftPrompt[] {
+  return promptsOf(draft).filter((prompt) => prompt.goal !== "" || prompt.requirements.length > 0);
+}
+
+/**
+ * Переносит редактуру из прошлого черновика той же сессии в пересобранный.
+ * Новые промпты остаются пустыми.
+ * @param {Draft} previous Прошлый черновик с уже сделанной редактурой.
+ * @param {Draft} next Черновик, только что собранный из журнала.
+ * @returns {Draft} Пересобранный черновик с перенесённой редактурой.
+ */
+export function carryOverEdits(previous: Draft, next: Draft): Draft {
+  const edited = editedPromptsOf(previous);
+  const events = next.events.map((event): DraftEvent => {
+    if (event.type !== "draft_prompt") return event;
+    const earlier = edited.find((prompt) => samePrompt(prompt, event));
+    if (earlier === undefined) return event;
+    return { ...event, goal: earlier.goal, requirements: [...earlier.requirements] };
+  });
+  return { ...next, title: previous.title, events };
+}
+
+/**
+ * Находит редактуру прошлого черновика, которую не к чему перенести: такого промпта
+ * в пересобранном черновике нет, например исходный текст поправили руками.
+ * @param {Draft} previous Прошлый черновик с уже сделанной редактурой.
+ * @param {Draft} next Черновик, только что собранный из журнала.
+ * @returns {DraftPrompt[]} Отредактированные промпты прошлого черновика без пары.
+ */
+export function orphanedEdits(previous: Draft, next: Draft): DraftPrompt[] {
+  const nextPrompts = promptsOf(next);
+  return editedPromptsOf(previous).filter(
+    (prompt) => !nextPrompts.some((candidate) => samePrompt(prompt, candidate)),
   );
-  const [newest] = withTimes.sort((a, b) => b.mtime - a.mtime);
-  if (newest === undefined) {
-    throw new Error(`журналов сборок ещё нет: хуки пишут их в ${RAW_DIR} во время работы агента`);
-  }
-  return path.join(RAW_DIR, newest.name);
 }
 
-// Токены сессии и её сабагентов. Непрочитанный транскрипт — предупреждение, а не ошибка:
-// черновик полезен и без счётчика токенов.
-async function tokensFromTranscripts(paths: string[]): Promise<number | undefined> {
-  if (paths.length === 0) return undefined;
-  let total = 0;
-  for (const transcriptPath of paths) {
-    try {
-      total += countTokens(await readFile(transcriptPath, "utf8"));
-    } catch (err) {
-      console.warn(
-        `транскрипт ${transcriptPath} не прочитан, его токены не посчитаны: ${String(err)}`,
-      );
-    }
-  }
-  return total;
+function toPublishedEvent(event: DraftEvent): FactoryEvent {
+  if (event.type !== "draft_prompt") return event;
+  return { t: event.t, type: "prompt", goal: event.goal, requirements: event.requirements };
 }
 
-const rawPath = process.argv[2] ?? (await newestRawLog());
-const events = parseRawLog(await readFile(rawPath, "utf8"));
-const tokens = await tokensFromTranscripts(transcriptPaths(events));
-const id = recordingId(path.basename(rawPath, ".jsonl"), events[0]?.ts ?? Date.now());
-const recording = toRecording(events, tokens === undefined ? { id } : { id, tokens });
+function textsOf(event: FactoryEvent): string[] {
+  switch (event.type) {
+    case "prompt":
+      return [event.goal, ...event.requirements];
+    case "stage_fail":
+      return [event.reason];
+    case "build_start":
+    case "stage_enter":
+    case "usage":
+    case "build_end":
+      return [];
+    default:
+      // Новый тип события не скомпилируется, пока здесь не решат, есть ли в нём текст для сайта.
+      return event satisfies never;
+  }
+}
 
-await mkdir(DRAFTS_DIR, { recursive: true });
-const draftPath = path.join(DRAFTS_DIR, `${id}.json`);
-await writeFile(draftPath, `${JSON.stringify(recording, null, 2)}\n`);
+/**
+ * Превращает отредактированный черновик в запись для сайта: без исходных текстов промптов.
+ * @param {Draft} draft Черновик с заполненными заголовком и чистовыми версиями промптов.
+ * @returns {Recording} Запись, прошедшая проверку формата ядра.
+ * @throws {RecordingError} Если заголовок или чистовая версия промпта пусты или запись
+ *   не соответствует формату ядра.
+ * @throws {DraftError} Если в тексте для публикации похоже на адрес, ключ или личный путь.
+ */
+export function publishDraft(draft: Draft): Recording {
+  const recording = parseRecording({
+    version: 1,
+    id: draft.id,
+    startedAt: draft.startedAt,
+    title: draft.title,
+    events: draft.events.map(toPublishedEvent),
+  });
 
-console.log(`черновик: ${path.relative(projectDir, draftPath)}`);
-console.log(`событий: ${recording.events.length}, токенов: ${tokens ?? "неизвестно"}`);
-console.log("\nпромпты — проверьте перед публикацией:");
-for (const event of recording.events) {
-  if (event.type === "prompt") console.log(`  • ${event.text}`);
+  const texts = [recording.title, ...recording.events.flatMap(textsOf)];
+  const leaks = texts.flatMap((text) => findLeaks(text).map((kind) => `${kind} в «${text}»`));
+  if (leaks.length > 0) {
+    throw new DraftError(
+      `в тексте для публикации есть то, что нельзя показывать: ${leaks.join("; ")}`,
+    );
+  }
+  return recording;
 }

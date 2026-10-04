@@ -1,13 +1,8 @@
-// Сырой журнал Claude Code → запись сборки в формате ядра.
+// Сырой журнал Claude Code → черновик записи сборки.
 // Этапы выводятся из действий агента по таблицам ниже; новый признак этапа — новая строка в таблице.
 
-import {
-  parseRecording,
-  type FactoryEvent,
-  type Recording,
-  type RecordingError,
-  type Stage,
-} from "@cyberzavod/core";
+import type { Stage } from "@cyberzavod/core";
+import type { Draft, DraftEvent } from "./draft.ts";
 import type { RawEvent } from "./raw-event.ts";
 
 // Инструменты, по которым видно этап.
@@ -53,14 +48,14 @@ const SERVICE_MESSAGE_PREFIXES: readonly string[] = [
   "<system-reminder>",
 ];
 
-const MAX_TITLE_LENGTH = 80;
 const SHORT_SESSION_LENGTH = 8;
-const UNTITLED = "Сборка без промпта";
+// Длина дня `2026-10-04` в начале строки toISOString — по UTC, где бы ни собирали черновик.
+const ISO_DATE_LENGTH = 10;
 const TEST_FAILURE_REASON = "проверки не прошли";
 
-/** Данные записи, которых нет в журнале. */
-export interface RecordingMeta {
-  id: string;
+/** Данные сборки, которых нет в журнале. */
+export interface DraftMeta {
+  sessionId: string;
   tokens?: number;
 }
 
@@ -94,15 +89,6 @@ export function isHumanPrompt(text: string): boolean {
   return !SERVICE_MESSAGE_PREFIXES.some((prefix) => start.startsWith(prefix));
 }
 
-// Заголовок обрезается по символам, а не по UTF-16: эмодзи не разрезается пополам.
-function titleFrom(events: RawEvent[]): string {
-  const firstPrompt = events.find((event) => event.kind === "prompt" && isHumanPrompt(event.text));
-  if (firstPrompt?.kind !== "prompt") return UNTITLED;
-  const characters = Array.from(firstPrompt.text.trim().replace(/\s+/g, " "));
-  if (characters.length <= MAX_TITLE_LENGTH) return characters.join("");
-  return `${characters.slice(0, MAX_TITLE_LENGTH - 1).join("")}…`;
-}
-
 function agentWindowKey(
   event: Extract<RawEvent, { kind: "subagent_start" | "subagent_stop" }>,
 ): string {
@@ -110,31 +96,20 @@ function agentWindowKey(
 }
 
 /**
- * Собирает идентификатор записи из даты начала сессии (UTC) и начала её id.
- * @param {string} sessionId Id сессии Claude Code.
- * @param {number} startTs Время начала сессии в миллисекундах.
- * @returns {string} Идентификатор вида `2026-10-04-744e7547`.
- */
-export function recordingId(sessionId: string, startTs: number): string {
-  const date = new Date(startTs).toISOString().slice(0, 10);
-  return `${date}-${sessionId.slice(0, SHORT_SESSION_LENGTH)}`;
-}
-
-/**
- * Собирает запись сборки из сырого журнала: промпты человека, этапы и итог.
+ * Собирает черновик записи из сырого журнала: промпты человека, этапы и итог.
+ * Заголовок и чистовые версии промптов остаются пустыми — их заполняет редактор.
  * @param {RawEvent[]} rawEvents События журнала в любом порядке.
- * @param {RecordingMeta} meta Данные записи, которых нет в журнале.
- * @returns {Recording} Запись, прошедшая проверку формата ядра.
- * @throws {RecordingError} Если собранная запись не проходит проверку ядра, например при пустом id.
+ * @param {DraftMeta} meta Данные сборки, которых нет в журнале.
+ * @returns {Draft} Черновик с id вида `2026-10-04-744e7547`: день начала по UTC и начало
+ *   id сессии.
  */
-export function toRecording(rawEvents: RawEvent[], meta: RecordingMeta): Recording {
+export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
   const events = [...rawEvents].sort((a, b) => a.ts - b.ts);
   const startTs = events[0]?.ts ?? 0;
   const endTs = events.at(-1)?.ts ?? startTs;
   const at = (ts: number) => ts - startTs;
-  const title = titleFrom(events);
 
-  const factoryEvents: FactoryEvent[] = [{ t: 0, type: "build_start", title }];
+  const draftEvents: DraftEvent[] = [{ t: 0, type: "build_start" }];
   let currentStage: Stage | null = null;
   // Сборка считается успешной, если последний запуск проверок прошёл (или их не было).
   let lastChecksOk = true;
@@ -146,7 +121,7 @@ export function toRecording(rawEvents: RawEvent[], meta: RecordingMeta): Recordi
 
   const enterStage = (stage: Stage, ts: number) => {
     if (stage === currentStage) return;
-    factoryEvents.push({ t: at(ts), type: "stage_enter", stage });
+    draftEvents.push({ t: at(ts), type: "stage_enter", stage });
     currentStage = stage;
   };
 
@@ -154,7 +129,13 @@ export function toRecording(rawEvents: RawEvent[], meta: RecordingMeta): Recordi
     switch (event.kind) {
       case "prompt":
         if (isHumanPrompt(event.text)) {
-          factoryEvents.push({ t: at(event.ts), type: "prompt", text: event.text });
+          draftEvents.push({
+            t: at(event.ts),
+            type: "draft_prompt",
+            said: event.text,
+            goal: "",
+            requirements: [],
+          });
         }
         break;
       case "subagent_start": {
@@ -174,7 +155,7 @@ export function toRecording(rawEvents: RawEvent[], meta: RecordingMeta): Recordi
           if (stage !== "test") continue;
           lastChecksOk = event.ok;
           if (!event.ok) {
-            factoryEvents.push({
+            draftEvents.push({
               t: at(event.ts),
               type: "stage_fail",
               stage,
@@ -193,12 +174,17 @@ export function toRecording(rawEvents: RawEvent[], meta: RecordingMeta): Recordi
   }
 
   if (meta.tokens !== undefined) {
-    factoryEvents.push({ t: at(endTs), type: "usage", tokens: meta.tokens });
+    draftEvents.push({ t: at(endTs), type: "usage", tokens: meta.tokens });
   }
-  factoryEvents.push({ t: at(endTs), type: "build_end", ok: lastChecksOk });
+  draftEvents.push({ t: at(endTs), type: "build_end", ok: lastChecksOk });
 
-  // Через ту же проверку, что и записи на сайте: собранное должно быть корректной записью.
-  return parseRecording({ version: 1, id: meta.id, title, events: factoryEvents });
+  const startedAt = new Date(startTs).toISOString();
+  return {
+    id: `${startedAt.slice(0, ISO_DATE_LENGTH)}-${meta.sessionId.slice(0, SHORT_SESSION_LENGTH)}`,
+    startedAt,
+    title: "",
+    events: draftEvents,
+  };
 }
 
 /**

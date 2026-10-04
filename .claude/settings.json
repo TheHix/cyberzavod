@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/packages/recorder/src/record.ts\"",
+            "command": "node \"$CLAUDE_PROJECT_DIR/packages/recorder/src/bin/record.ts\"",
             "async": true
           }
         ]
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/packages/recorder/src/record.ts\"",
+            "command": "node \"$CLAUDE_PROJECT_DIR/packages/recorder/src/bin/record.ts\"",
             "async": true
           },
           {
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/packages/recorder/src/record.ts\"",
+            "command": "node \"$CLAUDE_PROJECT_DIR/packages/recorder/src/bin/record.ts\"",
             "async": true
           }
         ]
@@ -63,7 +63,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/packages/recorder/src/record.ts\"",
+            "command": "node \"$CLAUDE_PROJECT_DIR/packages/recorder/src/bin/record.ts\"",
             "async": true
           }
         ]
@@ -74,7 +74,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/packages/recorder/src/record.ts\"",
+            "command": "node \"$CLAUDE_PROJECT_DIR/packages/recorder/src/bin/record.ts\"",
             "async": true
           }
         ]
@@ -85,7 +85,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/packages/recorder/src/record.ts\"",
+            "command": "node \"$CLAUDE_PROJECT_DIR/packages/recorder/src/bin/record.ts\"",
             "async": true
           }
         ]
@@ -96,7 +96,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/packages/recorder/src/record.ts\"",
+            "command": "node \"$CLAUDE_PROJECT_DIR/packages/recorder/src/bin/record.ts\"",
             "async": true
           },
           {

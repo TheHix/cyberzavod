@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { FactoryEvent } from "@cyberzavod/core";
+import type { DraftEvent } from "./draft.ts";
 import type { RawEvent } from "./raw-event.ts";
-import { isHumanPrompt, recordingId, toRecording, transcriptPaths } from "./to-recording.ts";
+import { isHumanPrompt, toDraft, transcriptPaths } from "./to-draft.ts";
 
 const START = 1_000_000;
 
@@ -33,7 +33,7 @@ function typicalSession(): RawEvent[] {
   ];
 }
 
-function stagesOf(events: FactoryEvent[]): string[] {
+function stagesOf(events: DraftEvent[]): string[] {
   return events.flatMap((event) => {
     if (event.type === "stage_enter") return [event.stage];
     if (event.type === "stage_fail") return [`fail:${event.stage}`];
@@ -41,13 +41,13 @@ function stagesOf(events: FactoryEvent[]): string[] {
   });
 }
 
-describe("toRecording", () => {
+describe("toDraft", () => {
   it("проводит типичную сессию по этапам код → проверки → код → проверки → ревью → выпуск", () => {
     const raw = typicalSession();
 
-    const recording = toRecording(raw, { id: "s1" });
+    const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(recording.events)).toEqual([
+    expect(stagesOf(draft.events)).toEqual([
       "code",
       "test",
       "fail:test",
@@ -61,33 +61,38 @@ describe("toRecording", () => {
   it("отсчитывает время событий от начала сессии", () => {
     const raw = typicalSession();
 
-    const recording = toRecording(raw, { id: "s1" });
+    const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect([recording.events[0]?.t, recording.events.at(-1)?.t]).toEqual([0, 45_000]);
+    expect([draft.events[0]?.t, draft.events.at(-1)?.t]).toEqual([0, 45_000]);
   });
 
-  it("берёт первый промпт в заголовок", () => {
+  it("кладёт промпт как есть, а заголовок и чистовую версию оставляет редактору", () => {
     const raw = typicalSession();
 
-    const recording = toRecording(raw, { id: "s1" });
+    const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(recording.title).toBe("Добавь счётчик токенов");
+    expect({ title: draft.title, prompt: draft.events[1] }).toEqual({
+      title: "",
+      prompt: {
+        t: 1_000,
+        type: "draft_prompt",
+        said: "Добавь счётчик токенов",
+        goal: "",
+        requirements: [],
+      },
+    });
   });
 
-  it("обрезает длинный заголовок многоточием", () => {
-    const raw: RawEvent[] = [{ ts: START, kind: "prompt", text: "а".repeat(200) }];
+  it("собирает id из дня начала сессии по UTC и начала её id", () => {
+    const startTs = Date.UTC(2026, 9, 4, 23, 30);
+    const raw: RawEvent[] = [{ ts: startTs, kind: "session_start" }];
 
-    const recording = toRecording(raw, { id: "s1" });
+    const draft = toDraft(raw, { sessionId: "744e7547-d312-42c4" });
 
-    expect(recording.title).toBe(`${"а".repeat(79)}…`);
-  });
-
-  it("не разрезает эмодзи в обрезанном заголовке", () => {
-    const raw: RawEvent[] = [{ ts: START, kind: "prompt", text: `${"а".repeat(78)}🚀🚀🚀` }];
-
-    const recording = toRecording(raw, { id: "s1" });
-
-    expect(recording.title).toBe(`${"а".repeat(78)}🚀…`);
+    expect({ id: draft.id, startedAt: draft.startedAt }).toEqual({
+      id: "2026-10-04-744e7547",
+      startedAt: "2026-10-04T23:30:00.000Z",
+    });
   });
 
   it("считает сборку неуспешной, если последний запуск проверок упал", () => {
@@ -96,25 +101,25 @@ describe("toRecording", () => {
       { ts: START + 1_000, kind: "tool", tool: "Bash", ok: false, command: "go test ./..." },
     ];
 
-    const recording = toRecording(raw, { id: "s1" });
+    const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(recording.events.at(-1)).toEqual({ t: 1_000, type: "build_end", ok: false });
+    expect(draft.events.at(-1)).toEqual({ t: 1_000, type: "build_end", ok: false });
   });
 
   it("добавляет токены перед концом сборки", () => {
     const raw = typicalSession();
 
-    const recording = toRecording(raw, { id: "s1", tokens: 12_345 });
+    const draft = toDraft(raw, { sessionId: "s1", tokens: 12_345 });
 
-    expect(recording.events.at(-2)).toEqual({ t: 45_000, type: "usage", tokens: 12_345 });
+    expect(draft.events.at(-2)).toEqual({ t: 45_000, type: "usage", tokens: 12_345 });
   });
 
   it("сортирует события не по порядку", () => {
     const raw = typicalSession().reverse();
 
-    const recording = toRecording(raw, { id: "s1" });
+    const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(recording.events[1]?.type).toBe("prompt");
+    expect(draft.events[1]?.type).toBe("draft_prompt");
   });
 
   it("не возвращает сборку на этап тестов из-за проверок внутри ревью", () => {
@@ -126,9 +131,9 @@ describe("toRecording", () => {
       { ts: START + 4_000, kind: "tool", tool: "Bash", ok: true, command: "git commit -m x" },
     ];
 
-    const recording = toRecording(raw, { id: "s1" });
+    const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(recording.events)).toEqual(["code", "review", "ship"]);
+    expect(stagesOf(draft.events)).toEqual(["code", "review", "ship"]);
   });
 
   it("не закрывает окно ревьюера остановкой служебного сабагента без старта", () => {
@@ -140,9 +145,9 @@ describe("toRecording", () => {
       { ts: START + 4_000, kind: "subagent_stop", agent: "reviewer", agentId: "r1" },
     ];
 
-    const recording = toRecording(raw, { id: "s1" });
+    const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(recording.events)).toEqual(["code", "review"]);
+    expect(stagesOf(draft.events)).toEqual(["code", "review"]);
   });
 
   it("ведёт сборку как обычно по инструментам сабагента без своего этапа", () => {
@@ -152,9 +157,9 @@ describe("toRecording", () => {
       { ts: START + 2_000, kind: "subagent_stop", agent: "general-purpose", agentId: "g1" },
     ];
 
-    const recording = toRecording(raw, { id: "s1" });
+    const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(recording.events)).toEqual(["code"]);
+    expect(stagesOf(draft.events)).toEqual(["code"]);
   });
 
   it.each([
@@ -173,9 +178,9 @@ describe("toRecording", () => {
   ])("засчитывает упавший запуск «%s» как неудачу проверок", (command) => {
     const raw: RawEvent[] = [{ ts: START, kind: "tool", tool: "Bash", ok: false, command }];
 
-    const recording = toRecording(raw, { id: "s1" });
+    const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(recording.events)).toEqual(["test", "fail:test"]);
+    expect(stagesOf(draft.events)).toEqual(["test", "fail:test"]);
   });
 
   it.each([
@@ -188,9 +193,9 @@ describe("toRecording", () => {
   ])("не считает «%s» проверками", (command) => {
     const raw: RawEvent[] = [{ ts: START, kind: "tool", tool: "Bash", ok: false, command }];
 
-    const recording = toRecording(raw, { id: "s1" });
+    const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(recording.events)).toEqual([]);
+    expect(stagesOf(draft.events)).toEqual([]);
   });
 
   it("проходит проверки и выпуск успешной цепочкой в одной команде", () => {
@@ -198,9 +203,9 @@ describe("toRecording", () => {
       { ts: START, kind: "tool", tool: "Bash", ok: true, command: "make check && git commit -m x" },
     ];
 
-    const recording = toRecording(raw, { id: "s1" });
+    const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(recording.events)).toEqual(["test", "ship"]);
+    expect(stagesOf(draft.events)).toEqual(["test", "ship"]);
   });
 
   it("относит упавшую цепочку проверок и коммита к неудаче проверок", () => {
@@ -214,28 +219,28 @@ describe("toRecording", () => {
       },
     ];
 
-    const recording = toRecording(raw, { id: "s1" });
+    const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(recording.events)).toEqual(["test", "fail:test"]);
+    expect(stagesOf(draft.events)).toEqual(["test", "fail:test"]);
   });
 
   it("относит выход из режима планирования к этапу spec", () => {
     const raw: RawEvent[] = [{ ts: START, kind: "tool", tool: "ExitPlanMode", ok: true }];
 
-    const recording = toRecording(raw, { id: "s1" });
+    const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(recording.events)).toEqual(["spec"]);
+    expect(stagesOf(draft.events)).toEqual(["spec"]);
   });
 
   it("относит работу агента Plan к этапу spec", () => {
     const raw: RawEvent[] = [{ ts: START, kind: "subagent_start", agent: "Plan", agentId: "p1" }];
 
-    const recording = toRecording(raw, { id: "s1" });
+    const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(recording.events)).toEqual(["spec"]);
+    expect(stagesOf(draft.events)).toEqual(["spec"]);
   });
 
-  it("не пропускает служебные сообщения ни в промпты, ни в заголовок", () => {
+  it("не пропускает служебные сообщения в промпты", () => {
     const raw: RawEvent[] = [
       {
         ts: START,
@@ -250,14 +255,11 @@ describe("toRecording", () => {
       { ts: START + 2_000, kind: "prompt", text: "Сделай проигрыватель" },
     ];
 
-    const recording = toRecording(raw, { id: "s1" });
+    const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect({
-      title: recording.title,
-      promptTimes: recording.events
-        .filter((event) => event.type === "prompt")
-        .map((event) => event.t),
-    }).toEqual({ title: "Сделай проигрыватель", promptTimes: [2_000] });
+    expect(
+      draft.events.flatMap((event) => (event.type === "draft_prompt" ? [event.said] : [])),
+    ).toEqual(["Сделай проигрыватель"]);
   });
 });
 
@@ -268,16 +270,6 @@ describe("isHumanPrompt", () => {
     const results = texts.map(isHumanPrompt);
 
     expect(results).toEqual([true, false, false]);
-  });
-});
-
-describe("recordingId", () => {
-  it("собирает id из даты начала сессии и начала её id", () => {
-    const startTs = Date.UTC(2026, 9, 4, 12);
-
-    const id = recordingId("744e7547-d312-42c4", startTs);
-
-    expect(id).toBe("2026-10-04-744e7547");
   });
 });
 
