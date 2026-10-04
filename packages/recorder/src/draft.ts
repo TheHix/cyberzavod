@@ -3,11 +3,15 @@
 // публикация убирает исходный текст и пропускает запись через проверку ядра.
 
 import {
+  isListener,
+  isSpeaker,
   parseFactoryEvent,
   parseRecording,
   type FactoryEvent,
+  type Listener,
   type Recording,
   type RecordingError,
+  type Speaker,
 } from "@cyberzavod/core";
 import { findLeaks } from "./leaks.ts";
 
@@ -20,10 +24,32 @@ export interface DraftPrompt {
   requirements: string[];
   /** Модель, которая получила промпт; её определяет сборка черновика, а не редактор. */
   model?: string;
+  /**
+   * Промпт склеен с предыдущим: это «да» или «продолжай», смысл которых редактор вписал
+   * в тот промпт. В запись такой промпт не идёт.
+   */
+  joined?: boolean;
 }
 
-/** Событие черновика: событие записи или промпт, ещё не прошедший публикацию. */
-export type DraftEvent = FactoryEvent | DraftPrompt;
+/**
+ * Реплика в черновике: кто и кому сказал, исходный текст и чистовая версия для публикации.
+ * Адресатов и текст `said` определяет сборка черновика, `line` и `text` пишет редактор.
+ */
+export interface DraftMessage {
+  t: number;
+  type: "draft_message";
+  from: Speaker;
+  to: Listener;
+  said: string;
+  line: string;
+  text: string;
+}
+
+/** Событие черновика: событие записи, промпт или реплика, ещё не прошедшие публикацию. */
+export type DraftEvent = FactoryEvent | DraftPrompt | DraftMessage;
+
+/** Событие черновика, которое правит редактор: промпт или реплика. */
+export type EditableDraftEvent = DraftPrompt | DraftMessage;
 
 /** Черновик записи сборки: собирается из журнала, редактируется и публикуется. */
 export interface Draft {
@@ -45,29 +71,47 @@ function isStrings(value: unknown): value is string[] {
 }
 
 function parseDraftPrompt(raw: Record<string, unknown>, index: number): DraftPrompt {
-  const { t, said, goal, requirements, model } = raw;
+  const { t, said, goal, requirements, model, joined } = raw;
   if (typeof t !== "number" || typeof said !== "string" || typeof goal !== "string") {
     throw new DraftError(`событие #${index}: у промпта должны быть t, said и goal`);
   }
   if (!isStrings(requirements)) {
     throw new DraftError(`событие #${index}: requirements должны быть списком строк`);
   }
-  const prompt: DraftPrompt = {
+  if (model !== undefined && typeof model !== "string") {
+    throw new DraftError(`событие #${index}: model должна быть строкой`);
+  }
+  if (joined !== undefined && typeof joined !== "boolean") {
+    throw new DraftError(`событие #${index}: joined должно быть true или false`);
+  }
+  return {
     t,
     type: "draft_prompt",
     said,
     goal,
     requirements: [...requirements],
+    ...(model === undefined ? {} : { model }),
+    ...(joined === undefined ? {} : { joined }),
   };
-  if (model === undefined) return prompt;
-  if (typeof model !== "string") {
-    throw new DraftError(`событие #${index}: model должна быть строкой`);
+}
+
+function parseDraftMessage(raw: Record<string, unknown>, index: number): DraftMessage {
+  const { t, from, to, said, line, text } = raw;
+  if (typeof t !== "number" || typeof said !== "string") {
+    throw new DraftError(`событие #${index}: у реплики должны быть t и said`);
   }
-  return { ...prompt, model };
+  if (!isSpeaker(from) || !isListener(to)) {
+    throw new DraftError(`событие #${index}: у реплики должны быть from и to`);
+  }
+  if (typeof line !== "string" || typeof text !== "string") {
+    throw new DraftError(`событие #${index}: line и text реплики должны быть строками`);
+  }
+  return { t, type: "draft_message", from, to, said, line, text };
 }
 
 function parseDraftEvent(raw: unknown, index: number): DraftEvent {
   if (isObject(raw) && raw.type === "draft_prompt") return parseDraftPrompt(raw, index);
+  if (isObject(raw) && raw.type === "draft_message") return parseDraftMessage(raw, index);
   return parseFactoryEvent(raw, index);
 }
 
@@ -89,64 +133,125 @@ export function parseDraft(raw: unknown): Draft {
   return { id, startedAt, title, events: events.map(parseDraftEvent) };
 }
 
-// Промпт пересобранного черновика узнаётся по времени и исходному тексту: у той же сессии
-// они не меняются, а новый промпт ни с чем не совпадёт.
-function samePrompt(a: DraftPrompt, b: DraftPrompt): boolean {
-  return a.t === b.t && a.said === b.said;
+// Правка пересобранного черновика узнаётся по времени и исходному тексту: у той же сессии
+// они не меняются, а новое событие ни с чем не совпадёт.
+function sameSaid(a: EditableDraftEvent, b: EditableDraftEvent): boolean {
+  return a.type === b.type && a.t === b.t && a.said === b.said;
 }
 
-function promptsOf(draft: Draft): DraftPrompt[] {
-  return draft.events.filter((event) => event.type === "draft_prompt");
+function editableEventsOf(draft: Draft): EditableDraftEvent[] {
+  return draft.events.filter(
+    (event) => event.type === "draft_prompt" || event.type === "draft_message",
+  );
 }
 
-// Отредактированным считается промпт, в котором заполнено хоть что-то из чистовой версии.
-function editedPromptsOf(draft: Draft): DraftPrompt[] {
-  return promptsOf(draft).filter((prompt) => prompt.goal !== "" || prompt.requirements.length > 0);
+// Отредактированным считается промпт, в котором заполнено хоть что-то из чистовой версии
+// или который склеен с предыдущим, и реплика с заполненной строкой или текстом.
+function isEdited(event: EditableDraftEvent): boolean {
+  switch (event.type) {
+    case "draft_prompt":
+      return event.goal !== "" || event.requirements.length > 0 || event.joined === true;
+    case "draft_message":
+      return event.line !== "" || event.text !== "";
+    default:
+      return event satisfies never;
+  }
+}
+
+function editedEventsOf(draft: Draft): EditableDraftEvent[] {
+  return editableEventsOf(draft).filter(isEdited);
+}
+
+function carryOverPrompt(earlier: DraftPrompt, fresh: DraftPrompt): DraftPrompt {
+  // Старые транскрипты Claude Code удаляет: найденная раньше модель не должна пропасть.
+  const model = fresh.model ?? earlier.model;
+  return {
+    ...fresh,
+    goal: earlier.goal,
+    requirements: [...earlier.requirements],
+    ...(model === undefined ? {} : { model }),
+    ...(earlier.joined === undefined ? {} : { joined: earlier.joined }),
+  };
+}
+
+function carryOverMessage(earlier: DraftMessage, fresh: DraftMessage): DraftMessage {
+  return { ...fresh, line: earlier.line, text: earlier.text };
+}
+
+function carryOverEvent(event: DraftEvent, edited: readonly EditableDraftEvent[]): DraftEvent {
+  if (event.type !== "draft_prompt" && event.type !== "draft_message") return event;
+  const earlier = edited.find((candidate) => sameSaid(candidate, event));
+  if (earlier === undefined) return event;
+  // sameSaid проверил, что типы совпадают, а сузить пару через него компилятор не может.
+  if (event.type === "draft_prompt" && earlier.type === "draft_prompt") {
+    return carryOverPrompt(earlier, event);
+  }
+  if (event.type === "draft_message" && earlier.type === "draft_message") {
+    return carryOverMessage(earlier, event);
+  }
+  return event;
 }
 
 /**
- * Переносит редактуру из прошлого черновика той же сессии в пересобранный.
- * Новые промпты остаются пустыми.
+ * Переносит редактуру из прошлого черновика той же сессии в пересобранный: чистовые промпты,
+ * пометки «склеен» и реплики. Новые промпты и реплики остаются пустыми.
  * @param {Draft} previous Прошлый черновик с уже сделанной редактурой.
  * @param {Draft} next Черновик, только что собранный из журнала.
  * @returns {Draft} Пересобранный черновик с перенесённой редактурой.
  */
 export function carryOverEdits(previous: Draft, next: Draft): Draft {
-  const edited = editedPromptsOf(previous);
-  const events = next.events.map((event): DraftEvent => {
-    if (event.type !== "draft_prompt") return event;
-    const earlier = edited.find((prompt) => samePrompt(prompt, event));
-    if (earlier === undefined) return event;
-    // Старые транскрипты Claude Code удаляет: найденная раньше модель не должна пропасть.
-    const model = event.model ?? earlier.model;
-    return {
-      ...event,
-      goal: earlier.goal,
-      requirements: [...earlier.requirements],
-      ...(model === undefined ? {} : { model }),
-    };
-  });
+  const edited = editedEventsOf(previous);
+  const events = next.events.map((event) => carryOverEvent(event, edited));
   return { ...next, title: previous.title, events };
 }
 
 /**
- * Находит редактуру прошлого черновика, которую не к чему перенести: такого промпта
- * в пересобранном черновике нет, например исходный текст поправили руками.
+ * Находит редактуру прошлого черновика, которую не к чему перенести: такого промпта или
+ * реплики в пересобранном черновике нет, например исходный текст поправили руками.
  * @param {Draft} previous Прошлый черновик с уже сделанной редактурой.
  * @param {Draft} next Черновик, только что собранный из журнала.
- * @returns {DraftPrompt[]} Отредактированные промпты прошлого черновика без пары.
+ * @returns {EditableDraftEvent[]} Отредактированные промпты и реплики прошлого черновика
+ *   без пары.
  */
-export function orphanedEdits(previous: Draft, next: Draft): DraftPrompt[] {
-  const nextPrompts = promptsOf(next);
-  return editedPromptsOf(previous).filter(
-    (prompt) => !nextPrompts.some((candidate) => samePrompt(prompt, candidate)),
+export function orphanedEdits(previous: Draft, next: Draft): EditableDraftEvent[] {
+  const nextEvents = editableEventsOf(next);
+  return editedEventsOf(previous).filter(
+    (event) => !nextEvents.some((candidate) => sameSaid(event, candidate)),
   );
 }
 
-function toPublishedEvent(event: DraftEvent): FactoryEvent {
-  if (event.type !== "draft_prompt") return event;
-  const { t, goal, requirements, model } = event;
+function toPublishedPrompt(prompt: DraftPrompt): FactoryEvent {
+  const { t, goal, requirements, model } = prompt;
   return { t, type: "prompt", goal, requirements, ...(model === undefined ? {} : { model }) };
+}
+
+function toPublishedMessage(message: DraftMessage): FactoryEvent {
+  const { t, from, to, line, text } = message;
+  return { t, type: "message", from, to, line, text };
+}
+
+// Склеенный промпт вошёл в предыдущий несклеенный, поэтому без него ему некуда войти.
+function toPublishedEvents(events: readonly DraftEvent[]): FactoryEvent[] {
+  const published: FactoryEvent[] = [];
+  let hasPrompt = false;
+  events.forEach((event, index) => {
+    switch (event.type) {
+      case "draft_prompt":
+        if (event.joined !== true) {
+          hasPrompt = true;
+          published.push(toPublishedPrompt(event));
+        } else if (!hasPrompt) {
+          throw new DraftError(`событие #${index}: склеенному промпту нет предыдущего промпта`);
+        }
+        return;
+      case "draft_message":
+        published.push(toPublishedMessage(event));
+        return;
+      default:
+        published.push(event);
+    }
+  });
+  return published;
 }
 
 function textsOf(event: FactoryEvent): string[] {
@@ -159,6 +264,8 @@ function textsOf(event: FactoryEvent): string[] {
       ];
     case "stage_fail":
       return [event.reason];
+    case "message":
+      return [event.line, event.text];
     case "build_start":
     case "stage_enter":
     case "usage":
@@ -171,12 +278,14 @@ function textsOf(event: FactoryEvent): string[] {
 }
 
 /**
- * Превращает отредактированный черновик в запись для сайта: без исходных текстов промптов.
- * @param {Draft} draft Черновик с заполненными заголовком и чистовыми версиями промптов.
+ * Превращает отредактированный черновик в запись для сайта: без исходных текстов промптов
+ * и реплик, без склеенных промптов.
+ * @param {Draft} draft Черновик с заполненными заголовком, чистовыми промптами и репликами.
  * @returns {Recording} Запись, прошедшая проверку формата ядра.
- * @throws {RecordingError} Если заголовок или чистовая версия промпта пусты или запись
+ * @throws {RecordingError} Если заголовок, чистовой промпт или реплика пусты или запись
  *   не соответствует формату ядра.
- * @throws {DraftError} Если в тексте для публикации похоже на адрес, ключ или личный путь.
+ * @throws {DraftError} Если склеенный промпт стоит без предыдущего несклеенного или в тексте
+ *   для публикации похоже на адрес, ключ или личный путь.
  */
 export function publishDraft(draft: Draft): Recording {
   const recording = parseRecording({
@@ -184,7 +293,7 @@ export function publishDraft(draft: Draft): Recording {
     id: draft.id,
     startedAt: draft.startedAt,
     title: draft.title,
-    events: draft.events.map(toPublishedEvent),
+    events: toPublishedEvents(draft.events),
   });
 
   const texts = [recording.title, ...recording.events.flatMap(textsOf)];

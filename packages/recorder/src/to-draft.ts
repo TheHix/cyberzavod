@@ -1,10 +1,10 @@
 // Сырой журнал Claude Code → черновик записи сборки.
 // Этапы выводятся из действий агента по таблицам ниже; новый признак этапа — новая строка в таблице.
 
-import type { Stage } from "@cyberzavod/core";
-import type { Draft, DraftEvent } from "./draft.ts";
+import { CONDUCTOR, HUMAN, STAGES, type Stage } from "@cyberzavod/core";
+import type { Draft, DraftEvent, DraftMessage } from "./draft.ts";
 import type { RawEvent } from "./raw-event.ts";
-import type { ModelReply } from "./transcript.ts";
+import type { AgentAssignment, AgentReport, ModelReply, TranscriptText } from "./transcript.ts";
 
 // Инструменты, по которым видно этап.
 const TOOL_STAGES: Readonly<Record<string, Stage>> = {
@@ -74,6 +74,19 @@ export interface DraftMeta {
   tokens?: number;
   /** Ответы моделей из транскрипта сессии: по ним промпт узнаёт свою модель. */
   replies?: readonly ModelReply[];
+  /** Ответы модели из транскрипта сессии: из них берутся итоговые ответы человеку. */
+  answers?: readonly TranscriptText[];
+  /** Задания сабагентам из транскрипта сессии. */
+  assignments?: readonly AgentAssignment[];
+  /** Отчёты запусков сабагентов из их транскриптов. */
+  reports?: readonly AgentReport[];
+}
+
+// Этап станции по имени агента; Object.hasOwn — чтобы «constructor» не нашёлся в прототипе.
+function stageOfAgent(agent: string | undefined): Stage | undefined {
+  return agent !== undefined && Object.hasOwn(AGENT_STAGES, agent)
+    ? AGENT_STAGES[agent]
+    : undefined;
 }
 
 // Промпт получила модель, которая первой ответила после него.
@@ -122,9 +135,120 @@ function agentWindowKey(
   return event.agentId ?? event.agent;
 }
 
+// Этап в момент t — этап последнего входа на станцию; до первого входа деталь у постановки.
+function stageAt(events: readonly DraftEvent[], t: number): Stage {
+  let stage: Stage = STAGES[0];
+  for (const event of events) {
+    if (event.t > t) break;
+    if (event.type === "stage_enter") stage = event.stage;
+  }
+  return stage;
+}
+
+function draftMessage(
+  t: number,
+  from: DraftMessage["from"],
+  to: DraftMessage["to"],
+  said: string,
+): DraftMessage {
+  return { t, type: "draft_message", from, to, said, line: "", text: "" };
+}
+
+// Агенты запусков по id: из старта сабагента видно, чей отчёт или чьё сообщение это было.
+function agentsByIdOf(events: readonly RawEvent[]): Map<string, string> {
+  const agents = new Map<string, string>();
+  for (const event of events) {
+    if (event.kind === "subagent_start" && event.agentId !== undefined) {
+      agents.set(event.agentId, event.agent);
+    }
+  }
+  return agents;
+}
+
+// Задание станции: мастер говорит этапу агента. Агенты не из AGENT_STAGES пропускаются.
+function assignmentMessages(
+  assignments: readonly AgentAssignment[],
+  agentsById: ReadonlyMap<string, string>,
+  at: (ts: number) => number,
+): DraftMessage[] {
+  return assignments.flatMap((assignment) => {
+    const agent =
+      assignment.via === "spawn" ? assignment.agentType : agentsById.get(assignment.agentId);
+    const stage = stageOfAgent(agent);
+    return stage === undefined
+      ? []
+      : [draftMessage(at(assignment.ts), CONDUCTOR, stage, assignment.text)];
+  });
+}
+
+// Отчёт станции: рабочий этапа сдаёт работу мастеру.
+function reportMessages(
+  reports: readonly AgentReport[],
+  agentsById: ReadonlyMap<string, string>,
+  at: (ts: number) => number,
+): DraftMessage[] {
+  return reports.flatMap((report) => {
+    const stage = stageOfAgent(agentsById.get(report.agentId));
+    return stage === undefined ? [] : [draftMessage(at(report.ts), stage, CONDUCTOR, report.text)];
+  });
+}
+
+// Ход — от промпта человека до следующего промпта человека (или до конца журнала).
+interface Turn {
+  from: number;
+  to: number;
+}
+
+function turnsOf(events: readonly RawEvent[]): Turn[] {
+  const starts = events
+    .filter((event) => event.kind === "prompt" && isHumanPrompt(event.text))
+    .map((event) => event.ts);
+  return starts.map((from, index) => ({ from, to: starts[index + 1] ?? Number.POSITIVE_INFINITY }));
+}
+
+function workedStationIn(events: readonly RawEvent[], turn: Turn): boolean {
+  return events.some(
+    (event) =>
+      event.kind === "subagent_start" &&
+      event.ts >= turn.from &&
+      event.ts < turn.to &&
+      stageOfAgent(event.agent) !== undefined,
+  );
+}
+
+// Итоговый ответ хода — последний текст модели в нём. Если в ходе работала станция, отвечает
+// мастер, который раздавал работу; иначе — рабочий этапа в момент ответа.
+function answerMessages(
+  events: readonly RawEvent[],
+  answers: readonly TranscriptText[],
+  stageOnTime: (t: number) => Stage,
+  at: (ts: number) => number,
+): DraftMessage[] {
+  return turnsOf(events).flatMap((turn) => {
+    const answer = answers.findLast(({ ts }) => ts >= turn.from && ts < turn.to);
+    if (answer === undefined) return [];
+    const t = at(answer.ts);
+    const from = workedStationIn(events, turn) ? CONDUCTOR : stageOnTime(t);
+    return [draftMessage(t, from, HUMAN, answer.text)];
+  });
+}
+
+// Реплики встают после событий с тем же t: сначала происходит событие, потом о нём говорят.
+function mergeMessages(events: readonly DraftEvent[], messages: readonly DraftMessage[]) {
+  const merged: DraftEvent[] = [];
+  let pending = [...messages].sort((a, b) => a.t - b.t);
+  for (const event of events) {
+    const earlier = pending.filter((message) => message.t < event.t);
+    merged.push(...earlier, event);
+    pending = pending.slice(earlier.length);
+  }
+  return [...merged, ...pending];
+}
+
 /**
- * Собирает черновик записи из сырого журнала: промпты человека, этапы и итог.
- * Заголовок и чистовые версии промптов остаются пустыми — их заполняет редактор.
+ * Собирает черновик записи из сырого журнала: промпты человека, реплики (задания, отчёты и
+ * итоговые ответы, если переданы их тексты), этапы и итог. Заголовок, чистовые версии промптов
+ * и `line` с `text` у реплик остаются пустыми — их заполняет редактор.
  * @param {RawEvent[]} rawEvents События журнала в любом порядке.
  * @param {DraftMeta} meta Данные сборки, которых нет в журнале.
  * @returns {Draft} Черновик с id вида `2026-10-04-744e7547`: день начала по UTC и начало
@@ -135,6 +259,8 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
   const startTs = events[0]?.ts ?? 0;
   const endTs = events.at(-1)?.ts ?? startTs;
   const at = (ts: number) => ts - startTs;
+  // Время из транскрипта может выйти за журнал: реплика не должна оказаться после конца сборки.
+  const atWithinBuild = (ts: number) => Math.min(Math.max(at(ts), 0), at(endTs));
 
   const draftEvents: DraftEvent[] = [{ t: 0, type: "build_start" }];
   let currentStage: Stage | null = null;
@@ -149,7 +275,7 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
   // Вердикт станции приходит с её остановкой (терминальный Claude Code) или отдельным
   // отчётом по agent_id (десктопное приложение). Каждый запуск судится один раз; повторный
   // запуск того же агента после SendMessage — новый запуск со своим вердиктом.
-  const agentsById = new Map<string, string>();
+  const agentsStarted = new Map<string, string>();
   const judgedRuns = new Set<string>();
 
   const enterStage = (stage: Stage, ts: number) => {
@@ -159,7 +285,7 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
   };
 
   const judge = (agent: string, run: string, line: string | undefined, ts: number) => {
-    const stage = AGENT_STAGES[agent];
+    const stage = stageOfAgent(agent);
     const verdict = verdictFor(line);
     if (stage === undefined || verdict === undefined || judgedRuns.has(run)) return;
     judgedRuns.add(run);
@@ -185,9 +311,9 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
         }
         break;
       case "subagent_start": {
-        if (event.agentId !== undefined) agentsById.set(event.agentId, event.agent);
+        if (event.agentId !== undefined) agentsStarted.set(event.agentId, event.agent);
         judgedRuns.delete(agentWindowKey(event));
-        const stage = AGENT_STAGES[event.agent];
+        const stage = stageOfAgent(event.agent);
         if (stage === undefined) break;
         stagedAgentWindows.add(agentWindowKey(event));
         enterStage(stage, event.ts);
@@ -198,7 +324,7 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
         judge(event.agent, agentWindowKey(event), event.verdict, event.ts);
         break;
       case "subagent_report": {
-        const agent = agentsById.get(event.agentId);
+        const agent = agentsStarted.get(event.agentId);
         if (agent !== undefined) judge(agent, event.agentId, event.verdict, event.ts);
         break;
       }
@@ -227,17 +353,24 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
     }
   }
 
+  const agentsById = agentsByIdOf(events);
+  const messages = [
+    ...assignmentMessages(meta.assignments ?? [], agentsById, atWithinBuild),
+    ...reportMessages(meta.reports ?? [], agentsById, atWithinBuild),
+    ...answerMessages(events, meta.answers ?? [], (t) => stageAt(draftEvents, t), atWithinBuild),
+  ];
+  const chatEvents = mergeMessages(draftEvents, messages);
   if (meta.tokens !== undefined) {
-    draftEvents.push({ t: at(endTs), type: "usage", tokens: meta.tokens });
+    chatEvents.push({ t: at(endTs), type: "usage", tokens: meta.tokens });
   }
-  draftEvents.push({ t: at(endTs), type: "build_end", ok: lastChecksOk });
+  chatEvents.push({ t: at(endTs), type: "build_end", ok: lastChecksOk });
 
   const startedAt = new Date(startTs).toISOString();
   return {
     id: `${startedAt.slice(0, ISO_DATE_LENGTH)}-${meta.sessionId.slice(0, SHORT_SESSION_LENGTH)}`,
     startedAt,
     title: "",
-    events: draftEvents,
+    events: chatEvents,
   };
 }
 
@@ -273,4 +406,24 @@ export function sessionTranscriptPath(events: RawEvent[]): string | undefined {
     }
   }
   return transcriptPath;
+}
+
+/**
+ * Находит транскрипты станций пайплайна /feature: из них берутся отчёты.
+ * @param {RawEvent[]} events События журнала.
+ * @returns {string[]} Пути к транскриптам остановленных станций без повторов; служебные
+ *   сабагенты, которых нет среди станций, не попадают.
+ */
+export function stationTranscriptPaths(events: RawEvent[]): string[] {
+  const paths = new Set<string>();
+  for (const event of events) {
+    if (
+      event.kind === "subagent_stop" &&
+      event.transcriptPath !== undefined &&
+      stageOfAgent(event.agent) !== undefined
+    ) {
+      paths.add(event.transcriptPath);
+    }
+  }
+  return [...paths];
 }

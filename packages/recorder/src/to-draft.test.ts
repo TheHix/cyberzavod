@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { DraftEvent } from "./draft.ts";
 import type { RawEvent } from "./raw-event.ts";
-import { isHumanPrompt, sessionTranscriptPath, toDraft, transcriptPaths } from "./to-draft.ts";
+import {
+  isHumanPrompt,
+  sessionTranscriptPath,
+  stationTranscriptPaths,
+  toDraft,
+  transcriptPaths,
+} from "./to-draft.ts";
+import type { AgentAssignment, AgentReport, TranscriptText } from "./transcript.ts";
 
 const START = 1_000_000;
 
@@ -463,5 +470,247 @@ describe("sessionTranscriptPath", () => {
     const transcriptPath = sessionTranscriptPath(raw);
 
     expect(transcriptPath).toBe("/t/main.jsonl");
+  });
+});
+
+function chatSession(): RawEvent[] {
+  return [
+    { ts: START, kind: "session_start" },
+    { ts: START + 1_000, kind: "prompt", text: "Сделай задачу" },
+    { ts: START + 2_000, kind: "subagent_start", agent: "analyst", agentId: "a1" },
+    { ts: START + 9_000, kind: "subagent_stop", agent: "analyst", agentId: "a1" },
+    { ts: START + 10_000, kind: "subagent_start", agent: "coder", agentId: "c1" },
+    { ts: START + 20_000, kind: "subagent_start", agent: "Explore", agentId: "e1" },
+    { ts: START + 30_000, kind: "subagent_stop", agent: "coder", agentId: "c1" },
+    { ts: START + 40_000, kind: "stop" },
+  ];
+}
+
+function spawn(ts: number, agentType: string): AgentAssignment {
+  return { ts: START + ts, text: `Задание ${agentType}`, via: "spawn", agentType };
+}
+
+function report(ts: number, agentId: string): AgentReport {
+  return { ts: START + ts, agentId, text: `Отчёт ${agentId}` };
+}
+
+function answer(ts: number, text = "Итог"): TranscriptText {
+  return { ts: START + ts, text };
+}
+
+function messagesOf(draft: { events: DraftEvent[] }) {
+  return draft.events.flatMap((event) =>
+    event.type === "draft_message" ? [[event.t, event.from, event.to]] : [],
+  );
+}
+
+describe("toDraft: реплики", () => {
+  it("даёт заданию мастера этап агента, в том числе для Plan и сообщения работающему", () => {
+    const assignments: AgentAssignment[] = [
+      spawn(1_500, "analyst"),
+      spawn(1_700, "Plan"),
+      { ts: START + 15_000, text: "Доработай", via: "message", agentId: "c1" },
+    ];
+
+    const draft = toDraft(chatSession(), { sessionId: "s1", assignments });
+
+    expect(messagesOf(draft)).toEqual([
+      [1_500, "conductor", "spec"],
+      [1_700, "conductor", "spec"],
+      [15_000, "conductor", "code"],
+    ]);
+  });
+
+  it("кладёт исходный текст задания в said, а строку и текст оставляет редактору", () => {
+    const assignments = [spawn(1_500, "analyst")];
+
+    const draft = toDraft(chatSession(), { sessionId: "s1", assignments });
+
+    expect(draft.events.find((event) => event.type === "draft_message")).toEqual({
+      t: 1_500,
+      type: "draft_message",
+      from: "conductor",
+      to: "spec",
+      said: "Задание analyst",
+      line: "",
+      text: "",
+    });
+  });
+
+  it("даёт отчёту этап агента и адресата-мастера на каждый запуск", () => {
+    const reports = [report(9_000, "a1"), report(30_000, "c1"), report(31_000, "c1")];
+
+    const draft = toDraft(chatSession(), { sessionId: "s1", reports });
+
+    expect(messagesOf(draft)).toEqual([
+      [9_000, "spec", "conductor"],
+      [30_000, "code", "conductor"],
+      [31_000, "code", "conductor"],
+    ]);
+  });
+
+  it("не даёт реплик агентам не из станций", () => {
+    const assignments = [spawn(1_500, "Explore"), spawn(1_600, "general-purpose")];
+    const reports = [report(25_000, "e1"), report(26_000, "неизвестный")];
+
+    const draft = toDraft(chatSession(), { sessionId: "s1", assignments, reports });
+
+    expect(messagesOf(draft)).toEqual([]);
+  });
+
+  it("отвечает от мастера, если в ходе работала станция", () => {
+    const answers = [answer(35_000)];
+
+    const draft = toDraft(chatSession(), { sessionId: "s1", answers });
+
+    expect(messagesOf(draft)).toEqual([[35_000, "conductor", "human"]]);
+  });
+
+  it("отвечает от рабочего этапа в момент ответа, если станций в ходе не было", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "prompt", text: "Объясни" },
+      { ts: START + 2_000, kind: "tool", tool: "Edit", ok: true },
+      { ts: START + 6_000, kind: "stop" },
+    ];
+    const answers = [answer(1_000, "Ответ до правок"), answer(5_000, "Ответ после правок")];
+
+    const draft = toDraft(raw, { sessionId: "s1", answers });
+
+    expect(messagesOf(draft)).toEqual([[5_000, "code", "human"]]);
+  });
+
+  it("берёт этап постановки, пока деталь ещё не вышла со своего первого станка", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "prompt", text: "Объясни" },
+      { ts: START + 2_000, kind: "stop" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1", answers: [answer(1_000)] });
+
+    expect(messagesOf(draft)).toEqual([[1_000, "spec", "human"]]);
+  });
+
+  it("считает правило ответа по ходу, а не по сессии", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "prompt", text: "Первое" },
+      { ts: START + 1_000, kind: "subagent_start", agent: "coder", agentId: "c1" },
+      { ts: START + 2_000, kind: "subagent_stop", agent: "coder", agentId: "c1" },
+      { ts: START + 5_000, kind: "prompt", text: "Второе" },
+      { ts: START + 9_000, kind: "stop" },
+    ];
+    const answers = [answer(3_000), answer(8_000)];
+
+    const draft = toDraft(raw, { sessionId: "s1", answers });
+
+    expect(messagesOf(draft)).toEqual([
+      [3_000, "conductor", "human"],
+      [8_000, "code", "human"],
+    ]);
+  });
+
+  it("берёт из хода последний ответ и не берёт ответ без промпта человека", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "session_start" },
+      { ts: START + 1_000, kind: "prompt", text: "Вопрос" },
+      { ts: START + 9_000, kind: "stop" },
+    ];
+    const answers = [answer(500, "До промпта"), answer(2_000, "Промежуточный"), answer(4_000)];
+
+    const draft = toDraft(raw, { sessionId: "s1", answers });
+
+    expect(
+      draft.events.flatMap((event) => (event.type === "draft_message" ? [event.said] : [])),
+    ).toEqual(["Итог"]);
+  });
+
+  it("не считает ходом служебное сообщение среды", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "prompt", text: "Вопрос" },
+      { ts: START + 2_000, kind: "prompt", text: "<task-notification>готово</task-notification>" },
+      { ts: START + 9_000, kind: "stop" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1", answers: [answer(1_000), answer(3_000)] });
+
+    expect(messagesOf(draft)).toEqual([[3_000, "spec", "human"]]);
+  });
+
+  it("прижимает время реплики к границам сборки", () => {
+    const assignments = [spawn(-10_000, "analyst")];
+    const reports = [report(500_000, "a1")];
+
+    const draft = toDraft(chatSession(), { sessionId: "s1", assignments, reports });
+
+    expect(messagesOf(draft)).toEqual([
+      [0, "conductor", "spec"],
+      [40_000, "spec", "conductor"],
+    ]);
+  });
+
+  it("ставит реплику после событий с тем же временем и до токенов и конца сборки", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "tool", tool: "Edit", ok: true },
+      { ts: START + 5_000, kind: "stop" },
+    ];
+
+    const draft = toDraft(raw, {
+      sessionId: "s1",
+      tokens: 100,
+      assignments: [spawn(0, "analyst")],
+    });
+
+    expect(draft.events.map((event) => event.type)).toEqual([
+      "build_start",
+      "stage_enter",
+      "draft_message",
+      "usage",
+      "build_end",
+    ]);
+  });
+
+  it("не теряет порядок реплик одного момента: задание, отчёт, ответ", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "prompt", text: "Сделай" },
+      { ts: START + 1_000, kind: "subagent_start", agent: "coder", agentId: "c1" },
+      { ts: START + 5_000, kind: "stop" },
+    ];
+
+    const draft = toDraft(raw, {
+      sessionId: "s1",
+      tokens: 100,
+      answers: [answer(5_000)],
+      reports: [report(5_000, "c1")],
+      assignments: [spawn(5_000, "coder")],
+    });
+
+    expect(draft.events.slice(3).map((event) => event.type)).toEqual([
+      "draft_message",
+      "draft_message",
+      "draft_message",
+      "usage",
+      "build_end",
+    ]);
+    expect(messagesOf(draft)).toEqual([
+      [5_000, "conductor", "code"],
+      [5_000, "code", "conductor"],
+      [5_000, "conductor", "human"],
+    ]);
+  });
+});
+
+describe("stationTranscriptPaths", () => {
+  it("берёт транскрипты остановленных станций без повторов", () => {
+    const raw: RawEvent[] = [
+      { ts: 1, kind: "subagent_stop", agent: "analyst", transcriptPath: "/t/a.jsonl" },
+      { ts: 2, kind: "subagent_stop", agent: "analyst", transcriptPath: "/t/a.jsonl" },
+      { ts: 3, kind: "subagent_stop", agent: "Plan", transcriptPath: "/t/p.jsonl" },
+      { ts: 4, kind: "subagent_stop", agent: "Explore", transcriptPath: "/t/e.jsonl" },
+      { ts: 5, kind: "subagent_stop", agent: "coder" },
+      { ts: 6, kind: "stop", transcriptPath: "/t/session.jsonl" },
+    ];
+
+    const paths = stationTranscriptPaths(raw);
+
+    expect(paths).toEqual(["/t/a.jsonl", "/t/p.jsonl"]);
   });
 });

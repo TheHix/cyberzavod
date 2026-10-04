@@ -7,7 +7,31 @@ import {
   parseDraft,
   publishDraft,
   type Draft,
+  type DraftMessage,
+  type DraftPrompt,
+  type EditableDraftEvent,
 } from "./draft.ts";
+
+function promptsOnly(edits: EditableDraftEvent[]) {
+  return edits.flatMap((edit) => (edit.type === "draft_prompt" ? [edit] : []));
+}
+
+function messageDraft(patch: Partial<DraftMessage> = {}): DraftMessage {
+  return {
+    t: 1_500,
+    type: "draft_message",
+    from: "conductor",
+    to: "code",
+    said: "Сделай счётчик токенов, показывай над цехом",
+    line: "",
+    text: "",
+    ...patch,
+  };
+}
+
+function draftWith(...events: Draft["events"]): Draft {
+  return { ...uneditedDraft(), events: [{ t: 0, type: "build_start" }, ...events] };
+}
 
 function editedDraft(): Draft {
   return {
@@ -72,6 +96,43 @@ describe("parseDraft", () => {
     expect(act).toThrow(/model/);
   });
 
+  it("принимает реплику с ещё пустой редактурой и промпт с пометкой «склеен»", () => {
+    const joined = {
+      t: 2_000,
+      type: "draft_prompt",
+      said: "да",
+      goal: "",
+      requirements: [],
+      joined: true,
+    };
+    const raw = { ...uneditedDraft(), events: [messageDraft(), joined] };
+
+    const draft = parseDraft(raw);
+
+    expect(draft.events).toEqual([messageDraft(), joined]);
+  });
+
+  it.each([
+    ["неизвестный говорящий", { from: "human" }],
+    ["неизвестный адресат", { to: "deploy" }],
+    ["без исходного текста", { said: undefined }],
+    ["строка не строкой", { line: 5 }],
+  ])("отклоняет реплику: %s", (_name, patch) => {
+    const raw = { ...uneditedDraft(), events: [{ ...messageDraft(), ...patch }] };
+
+    const act = () => parseDraft(raw);
+
+    expect(act).toThrow(DraftError);
+  });
+
+  it("отклоняет пометку «склеен» не булевым значением", () => {
+    const event = { t: 0, type: "draft_prompt", said: "да", goal: "", requirements: [], joined: 1 };
+
+    const act = () => parseDraft({ ...uneditedDraft(), events: [event] });
+
+    expect(act).toThrow(/joined/);
+  });
+
   it("отклоняет событие цеха не по формату ядра", () => {
     const raw = { ...editedDraft(), events: [{ t: 0, type: "stage_enter", stage: "deploy" }] };
 
@@ -131,6 +192,59 @@ describe("carryOverEdits", () => {
   });
 });
 
+describe("carryOverEdits: реплики и склейка", () => {
+  const edited = messageDraft({ line: "Сделай счётчик", text: "Сделай счётчик токенов." });
+
+  it("переносит строку и текст реплики с тем же временем и исходным текстом", () => {
+    const previous = draftWith(edited);
+    const next = draftWith(messageDraft());
+
+    const draft = carryOverEdits(previous, next);
+
+    expect(draft.events[1]).toEqual(edited);
+  });
+
+  it("оставляет пустой реплику с другим исходным текстом", () => {
+    const previous = draftWith(edited);
+    const next = draftWith(messageDraft({ said: "Другой текст" }));
+
+    const draft = carryOverEdits(previous, next);
+
+    expect(draft.events).toEqual(next.events);
+  });
+
+  it("не путает реплику с промптом того же времени и текста", () => {
+    const previous = draftWith({
+      t: 1_500,
+      type: "draft_prompt",
+      said: messageDraft().said,
+      goal: "Цель",
+      requirements: [],
+    });
+    const next = draftWith(messageDraft());
+
+    const draft = carryOverEdits(previous, next);
+
+    expect(draft.events).toEqual(next.events);
+  });
+
+  it("переносит пометку «склеен» у промпта без чистовой версии", () => {
+    const joined: DraftPrompt = {
+      t: 2_000,
+      type: "draft_prompt",
+      said: "да",
+      goal: "",
+      requirements: [],
+    };
+    const previous = draftWith({ ...joined, joined: true });
+    const next = draftWith(joined);
+
+    const draft = carryOverEdits(previous, next);
+
+    expect(draft.events[1]).toMatchObject({ joined: true });
+  });
+});
+
 describe("orphanedEdits", () => {
   it("находит редактуру промпта, исходный текст которого поменялся", () => {
     const previous = editedDraft();
@@ -143,7 +257,7 @@ describe("orphanedEdits", () => {
       ],
     };
 
-    const orphaned = orphanedEdits(previous, next).map((prompt) => prompt.goal);
+    const orphaned = promptsOnly(orphanedEdits(previous, next)).map((prompt) => prompt.goal);
 
     expect(orphaned).toEqual(["Добавь счётчик токенов"]);
   });
@@ -159,9 +273,36 @@ describe("orphanedEdits", () => {
     };
     const next: Draft = { ...uneditedDraft(), events: [] };
 
-    const orphaned = orphanedEdits(previous, next).map((prompt) => prompt.requirements);
+    const orphaned = promptsOnly(orphanedEdits(previous, next)).map(
+      (prompt) => prompt.requirements,
+    );
 
     expect(orphaned).toEqual([["Показывай его над цехом"]]);
+  });
+
+  it("находит отредактированную реплику, исходный текст которой поменялся", () => {
+    const previous = draftWith(messageDraft({ line: "Сделай счётчик", text: "Текст" }));
+    const next = draftWith(messageDraft({ said: "Другой текст" }));
+
+    const orphaned = orphanedEdits(previous, next);
+
+    expect(orphaned).toEqual([messageDraft({ line: "Сделай счётчик", text: "Текст" })]);
+  });
+
+  it("находит промпт с пометкой «склеен», которого больше нет", () => {
+    const previous = draftWith({
+      t: 2_000,
+      type: "draft_prompt",
+      said: "да",
+      goal: "",
+      requirements: [],
+      joined: true,
+    });
+    const next = draftWith();
+
+    const orphaned = orphanedEdits(previous, next);
+
+    expect(orphaned).toHaveLength(1);
   });
 
   it("не считает потерей промпт, который ещё не редактировали", () => {
@@ -244,6 +385,79 @@ describe("publishDraft", () => {
       goal: "Зайти на сервер 203.0.113.7",
       requirements: [],
     };
+
+    const act = () => publishDraft(draft);
+
+    expect(act).toThrow(/IP-адрес/);
+  });
+
+  it("публикует реплику без исходного текста", () => {
+    const draft = editedDraft();
+    draft.events.splice(
+      2,
+      0,
+      messageDraft({ t: 1_500, line: "Сделай счётчик", text: "Сделай счётчик токенов." }),
+    );
+
+    const recording = publishDraft(draft);
+
+    expect(recording.events[2]).toEqual({
+      t: 1_500,
+      type: "message",
+      from: "conductor",
+      to: "code",
+      line: "Сделай счётчик",
+      text: "Сделай счётчик токенов.",
+    });
+  });
+
+  it("не публикует черновик с непроставленной репликой", () => {
+    const draft = editedDraft();
+    draft.events.splice(2, 0, messageDraft());
+
+    const act = () => publishDraft(draft);
+
+    expect(act).toThrow(/line/);
+  });
+
+  it("пропускает склеенные промпты", () => {
+    const draft = editedDraft();
+    draft.events.splice(2, 0, {
+      t: 1_800,
+      type: "draft_prompt",
+      said: "да",
+      goal: "",
+      requirements: [],
+      joined: true,
+    });
+
+    const recording = publishDraft(draft);
+
+    expect(recording.events.filter((event) => event.type === "prompt")).toHaveLength(1);
+  });
+
+  it("не публикует склеенный первый промпт", () => {
+    const draft = editedDraft();
+    draft.events.splice(1, 0, {
+      t: 500,
+      type: "draft_prompt",
+      said: "да",
+      goal: "",
+      requirements: [],
+      joined: true,
+    });
+
+    const act = () => publishDraft(draft);
+
+    expect(act).toThrow(DraftError);
+  });
+
+  it.each([
+    ["строке", { line: "Зайти на 203.0.113.7", text: "Текст" }],
+    ["тексте", { line: "Зайти", text: "Зайди на 203.0.113.7" }],
+  ])("не публикует адрес сервера в %s реплики", (_name, patch) => {
+    const draft = editedDraft();
+    draft.events.splice(2, 0, messageDraft(patch));
 
     const act = () => publishDraft(draft);
 
