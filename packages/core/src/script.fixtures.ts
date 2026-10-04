@@ -1,7 +1,7 @@
 // Общие данные для тестов сценария и кадра.
 
 import type { FactoryLayout, StationPlan } from "./layout.ts";
-import type { FactoryEvent, Recording } from "./recording.ts";
+import type { FactoryEvent, Listener, MessageEvent, Recording, Speaker } from "./recording.ts";
 import type { Pacing } from "./script.ts";
 
 // Станки в ряд через 10 единиц, проход в двух единицах от рабочих мест, бег — единица
@@ -34,6 +34,7 @@ export const LINE_LAYOUT: FactoryLayout = {
     review: stationAt(30),
     ship: stationAt(40),
   },
+  conductor: { desk: { x: 20, y: 5 }, post: { x: 20, y: 6 }, facing: -Math.PI / 2 },
 };
 
 /** Темп для тестов: без сжатия, бег — единица в секунду. */
@@ -47,6 +48,7 @@ export const PLAIN_PACING: Pacing = {
   liftMs: 200,
   turnMs: 150,
   promptMs: 1_000,
+  messageMs: 1_000,
   finaleMs: 500,
 };
 
@@ -67,4 +69,33 @@ export function reworkRecording(ok = true): Recording {
     { t: 8_000, type: "build_end", ok },
   ];
   return { version: 1, id: "test", startedAt: "2026-10-04T00:00:00.000Z", title: "Тест", events };
+}
+
+/**
+ * Реплика для тестов: строка и полный текст выводятся из момента.
+ * @param {number} t Время записи, мс.
+ * @param {Speaker} from Кто говорит.
+ * @param {Listener} to Кому адресована.
+ * @returns {MessageEvent} Реплика.
+ */
+export function messageAt(t: number, from: Speaker, to: Listener): MessageEvent {
+  return { t, type: "message", from, to, line: `Реплика ${t}`, text: `Полный текст ${t}` };
+}
+
+/**
+ * Запись для тестов с репликами: три у станка постановки с мастером (задание коду, отчёт,
+ * ответ человеку) и одна у станка кода без мастера.
+ * @returns {Recording} Запись сборки.
+ */
+export function chatRecording(): Recording {
+  const events: FactoryEvent[] = [
+    { t: 0, type: "build_start" },
+    messageAt(500, "conductor", "code"),
+    messageAt(700, "code", "conductor"),
+    messageAt(1_000, "conductor", "human"),
+    { t: 2_000, type: "stage_enter", stage: "code" },
+    messageAt(3_000, "code", "human"),
+    { t: 8_000, type: "build_end", ok: true },
+  ];
+  return { ...reworkRecording(), events };
 }

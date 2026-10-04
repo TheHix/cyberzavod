@@ -17,13 +17,22 @@ export interface StationPlan {
   readonly facing: number;
 }
 
-/** План цеха: размер пола, проход и станок каждого этапа. */
+/** Кабинет мастера: стол, место за ним и куда мастер смотрит, пока ни с кем не говорит. */
+export interface ConductorPlan {
+  readonly desk: Point;
+  readonly post: Point;
+  /** Направление взгляда мастера у стола, радианы: 0 — вправо, π/2 — вниз. */
+  readonly facing: number;
+}
+
+/** План цеха: размер пола, проход, станок каждого этапа и кабинет мастера. */
 export interface FactoryLayout {
   readonly width: number;
   readonly height: number;
   /** Линия прохода между рядами станков, y: по ней бегают, не задевая чужие места. */
   readonly aisle: number;
   readonly stations: Readonly<Record<Stage, StationPlan>>;
+  readonly conductor: ConductorPlan;
 }
 
 const FACING_UP = -Math.PI / 2;
@@ -31,7 +40,8 @@ const FACING_DOWN = Math.PI / 2;
 
 /**
  * План по умолчанию: петля на полу 16×9. Сверху слева направо — постановка, код, проверки;
- * снизу справа налево — ревью и выпуск, так деталь идёт по кругу.
+ * снизу справа налево — ревью и выпуск, так деталь идёт по кругу. Кабинет мастера — внизу слева,
+ * в стороне от маршрутов рабочих.
  */
 export const DEFAULT_LAYOUT: FactoryLayout = {
   width: 16,
@@ -44,6 +54,7 @@ export const DEFAULT_LAYOUT: FactoryLayout = {
     review: { machine: { x: 13, y: 7.4 }, post: { x: 13, y: 6.1 }, facing: FACING_DOWN },
     ship: { machine: { x: 8, y: 7.4 }, post: { x: 8, y: 6.1 }, facing: FACING_DOWN },
   },
+  conductor: { desk: { x: 3, y: 6.3 }, post: { x: 3, y: 7.4 }, facing: FACING_UP },
 };
 
 /**

@@ -1,12 +1,16 @@
-// Кадр цеха в момент сцены: где каждый рабочий, чем занят, где деталь, какой промпт висит.
+// Кадр цеха в момент сцены: где каждый рабочий и мастер, чем заняты, где деталь, какие промпт
+// и реплика висят.
 // Считается из сценария двоичным поиском, без состояния: перемотка в любую точку бесплатна,
 // а кадр стоит O(log n) от длины записи.
 
 import { pointBetween, type Point } from "./layout.ts";
 import { STAGES, type Stage, type Tally } from "./recording.ts";
+import { progressOf, turned } from "./turn.ts";
 import type {
   Activity,
+  ConductorMove,
   FactoryScript,
+  MessageCue,
   PartPlace,
   PartStatus,
   PromptCue,
@@ -37,6 +41,24 @@ export interface PromptFrame {
   readonly elapsed: number;
 }
 
+/** Реплика, которая сейчас висит над говорящим, и сколько мс она уже видна. */
+export interface MessageFrame {
+  readonly cue: MessageCue;
+  readonly elapsed: number;
+}
+
+/**
+ * Мастер в кадре; `elapsed` — сколько мс идёт реплика с его участием, для покачивания рук;
+ * вне реплик — сколько мс прошло с конца прошлой (до первой — от начала сцены).
+ */
+export interface ConductorFrame {
+  readonly position: Point;
+  readonly heading: number;
+  /** Мастер говорит сам, а не слушает отчёт. */
+  readonly talking: boolean;
+  readonly elapsed: number;
+}
+
 /** Кадр цеха в момент сцены. */
 export interface Scene {
   /** Момент сцены, мс. */
@@ -47,24 +69,14 @@ export interface Scene {
   readonly workers: readonly WorkerFrame[];
   readonly part: PartFrame;
   readonly prompt: PromptFrame | null;
+  readonly message: MessageFrame | null;
+  readonly conductor: ConductorFrame;
   readonly counts: Tally;
   readonly finished: boolean;
 }
 
 // Деталь в руках — чуть впереди рабочего, по направлению взгляда.
 const CARRY_DISTANCE = 0.45;
-
-// Доля пройденного от `start` до `end`; у мгновенного действия — сразу 1.
-function progressOf(start: number, end: number, time: number): number {
-  if (end <= start) return 1;
-  return Math.min(1, Math.max(0, (time - start) / (end - start)));
-}
-
-// Поворот по кратчайшей дуге: от 350° к 10° — через 0°, а не назад через весь круг.
-function turned(from: number, to: number, progress: number): number {
-  const delta = Math.atan2(Math.sin(to - from), Math.cos(to - from));
-  return from + delta * progress;
-}
 
 // Номер последнего элемента, начавшегося не позже момента; -1, если такого нет.
 // Элементы отсортированы по началу — так их кладёт сценарий.
@@ -150,6 +162,39 @@ function promptAt(script: FactoryScript, time: number): PromptFrame | null {
   return { cue, elapsed: time - cue.start };
 }
 
+function messageAt(script: FactoryScript, time: number): MessageFrame | null {
+  const cue = script.messages[lastStartedIndex(script.messages, time, (c) => c.start)];
+  if (cue === undefined || time >= cue.end) return null;
+  return { cue, elapsed: time - cue.start };
+}
+
+function conductorAt(script: FactoryScript, time: number): ConductorFrame {
+  const { post, facing } = script.layout.conductor;
+  const { turnMs } = script.pacing;
+  const move: ConductorMove | undefined =
+    script.conductor[lastStartedIndex(script.conductor, time, (m) => m.start)];
+  if (move === undefined) {
+    return { position: post, heading: facing, talking: false, elapsed: time };
+  }
+  if (time >= move.end) {
+    // После реплики мастер за turnMs поворачивается обратно в зал, к своему обычному месту.
+    const back = progressOf(move.end, move.end + turnMs, time);
+    return {
+      position: post,
+      heading: turned(move.heading, facing, back),
+      talking: false,
+      elapsed: time - move.end,
+    };
+  }
+  const turn = progressOf(move.start, move.start + turnMs, time);
+  return {
+    position: post,
+    heading: turn === 1 ? move.heading : turned(move.turnFrom, move.heading, turn),
+    talking: move.talking,
+    elapsed: time - move.start,
+  };
+}
+
 // Время записи между отметками идёт равномерно; пока рабочий бежит, запись стоит.
 function recordingTimeAt(script: FactoryScript, index: number, time: number): number {
   const mark = script.marks[index];
@@ -164,7 +209,7 @@ function recordingTimeAt(script: FactoryScript, index: number, time: number): nu
  * Считает кадр цеха в момент сцены.
  * @param {FactoryScript} script Сценарий цеха.
  * @param {number} time Момент сцены, мс; вне сцены прижимается к её началу или концу.
- * @returns {Scene} Кадр: рабочие, деталь, промпт, счётчики и время записи.
+ * @returns {Scene} Кадр: рабочие, мастер, деталь, промпт, реплика, счётчики и время записи.
  */
 export function sceneAt(script: FactoryScript, time: number): Scene {
   const clamped = Math.min(script.duration, Math.max(0, time));
@@ -177,6 +222,8 @@ export function sceneAt(script: FactoryScript, time: number): Scene {
     workers,
     part: partAt(script, workers, clamped),
     prompt: promptAt(script, clamped),
+    message: messageAt(script, clamped),
+    conductor: conductorAt(script, clamped),
     counts: {
       tokens: mark?.tokens ?? 0,
       prompts: mark?.prompts ?? 0,

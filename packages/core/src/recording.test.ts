@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { parseRecording, RecordingError, summarize } from "./recording.ts";
+import {
+  briefOf,
+  NO_TALLY,
+  parseRecording,
+  RecordingError,
+  summarize,
+  tally,
+} from "./recording.ts";
 
 // Запись как сырой JSON: тесты портят её как угодно, проверяет parseRecording.
 interface RawRecording {
@@ -151,5 +158,99 @@ describe("summarize", () => {
     const stats = summarize(recording);
 
     expect(stats).toEqual({ durationMs: 90, tokens: 2000, prompts: 1, reworks: 1, ok: true });
+  });
+});
+
+function messageEvent(patch: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    t: 25,
+    type: "message",
+    from: "conductor",
+    to: "code",
+    line: "Сделай счётчик",
+    text: "Сделай счётчик токенов.\n\nПоказывай его над цехом.",
+    ...patch,
+  };
+}
+
+describe("parseRecording: реплики", () => {
+  it("принимает реплику мастера станции и отчёт станции мастеру", () => {
+    const raw = validRecording();
+    raw.events.splice(3, 0, messageEvent(), messageEvent({ from: "code", to: "conductor" }));
+
+    const recording = parseRecording(raw);
+
+    expect(recording.events.filter((event) => event.type === "message")).toHaveLength(2);
+  });
+
+  it("принимает ответ человеку от мастера и от рабочего", () => {
+    const raw = validRecording();
+    raw.events.splice(
+      3,
+      0,
+      messageEvent({ to: "human" }),
+      messageEvent({ from: "ship", to: "human" }),
+    );
+
+    const recording = parseRecording(raw);
+
+    expect(recording.events[3]).toMatchObject({ from: "conductor", to: "human" });
+  });
+
+  it.each([
+    ["человек говорящий", { from: "human" }, /говорящий/],
+    ["неизвестный адресат", { to: "deploy" }, /адресат/],
+    ["многострочная строка", { line: "раз\nдва" }, /line/],
+    ["пустая строка", { line: "  " }, /line/],
+    ["пустой текст", { text: " \n " }, /text/],
+    ["текст не строка", { text: 5 }, /text/],
+  ])("отклоняет реплику: %s", (_name, patch, message) => {
+    const raw = validRecording();
+    raw.events.splice(3, 0, messageEvent(patch));
+
+    const act = () => parseRecording(raw);
+
+    expect(act).toThrow(message);
+  });
+
+  it("сохраняет переводы строк в полном тексте", () => {
+    const raw = validRecording();
+    raw.events.splice(3, 0, messageEvent());
+
+    const recording = parseRecording(raw);
+
+    expect(recording.events[3]).toMatchObject({ text: expect.stringContaining("\n\n") });
+  });
+});
+
+describe("briefOf", () => {
+  it("убирает полный текст у реплик и не трогает остальное", () => {
+    const raw = validRecording();
+    raw.events.splice(3, 0, messageEvent());
+    const recording = parseRecording(raw);
+
+    const brief = briefOf(recording);
+
+    expect(brief.events).toEqual([
+      ...recording.events.slice(0, 3),
+      { t: 25, type: "message", from: "conductor", to: "code", line: "Сделай счётчик" },
+      ...recording.events.slice(4),
+    ]);
+  });
+});
+
+describe("tally", () => {
+  it("не меняет счётчики на реплике", () => {
+    const event = {
+      t: 1,
+      type: "message",
+      from: "conductor",
+      to: "human",
+      line: "Готово",
+    } as const;
+
+    const counts = tally(NO_TALLY, event);
+
+    expect(counts).toEqual(NO_TALLY);
   });
 });

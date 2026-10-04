@@ -20,10 +20,35 @@ export interface PromptEvent {
   model?: string;
 }
 
+/** Мастер — начальник цеха, дирижёр пайплайна: выдаёт станциям задания и принимает отчёты. */
+export const CONDUCTOR = "conductor";
+
+/** Человек, которому мастер или рабочий отвечает. */
+export const HUMAN = "human";
+
+/** Кто говорит в цехе: рабочий станции или мастер. */
+export type Speaker = Stage | typeof CONDUCTOR;
+
+/** Кому адресована реплика. */
+export type Listener = Speaker | typeof HUMAN;
+
+/** Реплика: строка над говорящим в цехе и полный текст для журнала. */
+export interface MessageEvent {
+  t: number;
+  type: "message";
+  from: Speaker;
+  to: Listener;
+  /** Одна строка над говорящим в цехе. */
+  line: string;
+  /** Полный текст: абзацы через пустую строку, без разметки. */
+  text: string;
+}
+
 /** Событие записи сборки; `t` — миллисекунды от начала сборки. */
 export type FactoryEvent =
   | { t: number; type: "build_start" }
   | PromptEvent
+  | MessageEvent
   | { t: number; type: "stage_enter"; stage: Stage }
   | { t: number; type: "stage_fail"; stage: Stage; reason: string }
   | { t: number; type: "usage"; tokens: number }
@@ -38,6 +63,17 @@ export interface Recording {
   startedAt: string;
   title: string;
   events: FactoryEvent[];
+}
+
+/** Реплика без полного текста: цеху нужна только строка над говорящим. */
+export type BriefMessageEvent = Omit<MessageEvent, "text">;
+
+/** Событие записи, как его видит цех: у реплик нет полного текста. */
+export type BriefFactoryEvent = Exclude<FactoryEvent, MessageEvent> | BriefMessageEvent;
+
+/** Запись без полных текстов реплик: её получает цех, а полный текст остаётся в журнале. */
+export interface BriefRecording extends Omit<Recording, "events"> {
+  events: BriefFactoryEvent[];
 }
 
 /** Счётчики сборки на какой-то момент: токены, промпты человека и возвраты на доработку. */
@@ -72,6 +108,24 @@ function isLine(value: unknown): value is string {
   return typeof value === "string" && value.trim() !== "" && !/[\r\n]/.test(value);
 }
 
+/**
+ * Проверяет, что значение — тот, кто может говорить в цехе.
+ * @param {unknown} value Проверяемое значение.
+ * @returns {value is Speaker} true, если это этап или мастер.
+ */
+export function isSpeaker(value: unknown): value is Speaker {
+  return value === CONDUCTOR || isStage(value);
+}
+
+/**
+ * Проверяет, что значение — тот, кому можно адресовать реплику.
+ * @param {unknown} value Проверяемое значение.
+ * @returns {value is Listener} true, если это этап, мастер или человек.
+ */
+export function isListener(value: unknown): value is Listener {
+  return value === HUMAN || isSpeaker(value);
+}
+
 function isLines(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(isLine);
 }
@@ -101,6 +155,17 @@ function parsePrompt(raw: Record<string, unknown>, t: number, fail: Fail): Promp
   return { ...prompt, model };
 }
 
+function parseMessage(raw: Record<string, unknown>, t: number, fail: Fail): MessageEvent {
+  const { from, to, line, text } = raw;
+  if (!isSpeaker(from)) throw fail(`неизвестный говорящий ${String(from)}`);
+  if (!isListener(to)) throw fail(`неизвестный адресат ${String(to)}`);
+  if (!isLine(line)) throw fail("line должна быть непустой строкой без переводов строки");
+  if (typeof text !== "string" || text.trim() === "") {
+    throw fail("text должен быть непустой строкой");
+  }
+  return { t, type: "message", from, to, line, text };
+}
+
 /**
  * Проверяет одно событие записи, пришедшее извне.
  * @param {unknown} raw Разобранный JSON события.
@@ -120,6 +185,8 @@ export function parseFactoryEvent(raw: unknown, index: number): FactoryEvent {
       return { t, type };
     case "prompt":
       return parsePrompt(raw, t, fail);
+    case "message":
+      return parseMessage(raw, t, fail);
     case "stage_enter":
       if (!isStage(raw.stage)) throw fail(`неизвестный этап ${String(raw.stage)}`);
       return { t, type, stage: raw.stage };
@@ -177,10 +244,10 @@ export function parseRecording(raw: unknown): Recording {
 /**
  * Добавляет событие записи к счётчикам сборки.
  * @param {Tally} counts Счётчики до события.
- * @param {FactoryEvent} event Событие записи.
+ * @param {BriefFactoryEvent} event Событие записи.
  * @returns {Tally} Счётчики после события.
  */
-export function tally(counts: Tally, event: FactoryEvent): Tally {
+export function tally(counts: Tally, event: BriefFactoryEvent): Tally {
   switch (event.type) {
     case "usage":
       return { ...counts, tokens: counts.tokens + event.tokens };
@@ -190,6 +257,7 @@ export function tally(counts: Tally, event: FactoryEvent): Tally {
       return { ...counts, reworks: counts.reworks + 1 };
     case "build_start":
     case "stage_enter":
+    case "message":
     case "build_end":
       return counts;
     default:
@@ -200,24 +268,46 @@ export function tally(counts: Tally, event: FactoryEvent): Tally {
 
 /**
  * Итог сборки: удалась ли она по последнему событию записи.
- * @param {Recording} recording Проверенная запись сборки.
+ * @param {BriefRecording} recording Проверенная запись сборки.
  * @returns {boolean} true, если запись кончается удачным build_end.
  */
-export function succeeded(recording: Recording): boolean {
+export function succeeded(recording: BriefRecording): boolean {
   const last = recording.events.at(-1);
   return last?.type === "build_end" && last.ok;
 }
 
 /**
  * Считает счётчики сборки по её записи.
- * @param {Recording} recording Проверенная запись сборки.
+ * @param {BriefRecording} recording Проверенная запись сборки.
  * @returns {BuildStats} Длительность, токены, число промптов и возвратов, итог сборки.
  */
-export function summarize(recording: Recording): BuildStats {
+export function summarize(recording: BriefRecording): BuildStats {
   const { events } = recording;
   return {
     durationMs: (events.at(-1)?.t ?? 0) - (events[0]?.t ?? 0),
     ...events.reduce(tally, NO_TALLY),
     ok: succeeded(recording),
   };
+}
+
+/**
+ * Убирает у реплики полный текст.
+ * @param {BriefMessageEvent} event Реплика; на деле может нести и `text`.
+ * @returns {BriefMessageEvent} Новая реплика только с полями, которые нужны цеху.
+ */
+export function briefMessage(event: BriefMessageEvent): BriefMessageEvent {
+  const { t, type, from, to, line } = event;
+  return { t, type, from, to, line };
+}
+
+/**
+ * Убирает у реплик полный текст: цеху он не нужен, а в страницу с цехом попадать не должен.
+ * @param {Recording} recording Полная запись сборки.
+ * @returns {BriefRecording} Та же запись, у реплик которой нет `text`.
+ */
+export function briefOf(recording: Recording): BriefRecording {
+  const events = recording.events.map((event): BriefFactoryEvent => {
+    return event.type === "message" ? briefMessage(event) : event;
+  });
+  return { ...recording, events };
 }

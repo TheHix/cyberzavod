@@ -15,16 +15,23 @@ import {
   type Point,
 } from "./layout.ts";
 import {
+  briefMessage,
+  CONDUCTOR,
+  HUMAN,
   NO_TALLY,
   STAGES,
   succeeded,
   tally,
-  type FactoryEvent,
+  type BriefFactoryEvent,
+  type BriefMessageEvent,
+  type BriefRecording,
+  type Listener,
   type PromptEvent,
-  type Recording,
+  type Speaker,
   type Stage,
   type Tally,
 } from "./recording.ts";
+import { progressOf, turned } from "./turn.ts";
 
 /** Темп сцены: как сжимается работа и как быстро двигаются рабочие. */
 export interface Pacing {
@@ -46,6 +53,8 @@ export interface Pacing {
   readonly turnMs: number;
   /** Сколько промпт висит над рабочим, мс. */
   readonly promptMs: number;
+  /** Сколько реплика висит над говорящим, мс. */
+  readonly messageMs: number;
   /** Сколько сцена показывает итог после конца сборки, мс. */
   readonly finaleMs: number;
 }
@@ -61,6 +70,7 @@ export const DEFAULT_PACING: Pacing = {
   liftMs: 400,
   turnMs: 200,
   promptMs: 5_000,
+  messageMs: 4_000,
   finaleMs: 2_500,
 };
 
@@ -113,6 +123,26 @@ export interface PromptCue {
   readonly index: number;
 }
 
+/** Реплика над говорящим от `start` до `end` мс сцены; реплики идут по одной. */
+export interface MessageCue {
+  readonly start: number;
+  readonly end: number;
+  readonly speaker: Speaker;
+  readonly message: BriefMessageEvent;
+  /** Номер реплики в записи, с нуля. */
+  readonly index: number;
+}
+
+/** Мастер от `start` до `end` мс сцены обращён к собеседнику; `talking` — говорит он сам. */
+export interface ConductorMove {
+  readonly start: number;
+  readonly end: number;
+  readonly heading: number;
+  /** Куда мастер смотрел в начале реплики: к `heading` он поворачивается за `Pacing.turnMs`. */
+  readonly turnFrom: number;
+  readonly talking: boolean;
+}
+
 /** Отметка на шкале сцены: какое время записи ей соответствует и счётчики на этот момент. */
 export interface Mark extends Tally {
   readonly at: number;
@@ -131,6 +161,12 @@ export interface FactoryScript {
   readonly workers: Readonly<Record<Stage, readonly WorkerMove[]>>;
   readonly part: readonly PartMove[];
   readonly prompts: readonly PromptCue[];
+  readonly messages: readonly MessageCue[];
+  /**
+   * Повороты и речь мастера; вне них он стоит у стола лицом к `layout.conductor.facing`, а после
+   * реплики за `Pacing.turnMs` поворачивается к нему обратно.
+   */
+  readonly conductor: readonly ConductorMove[];
   readonly marks: readonly Mark[];
 }
 
@@ -139,17 +175,17 @@ interface Visit {
   readonly station: Stage;
   readonly from: number;
   readonly to: number;
-  readonly events: readonly FactoryEvent[];
+  readonly events: readonly BriefFactoryEvent[];
 }
 
 // Деталь начинает путь у станка постановки: с него берут заказ.
 const FIRST_STATION: Stage = "spec";
 
-function splitIntoVisits(events: readonly FactoryEvent[]): Visit[] {
+function splitIntoVisits(events: readonly BriefFactoryEvent[]): Visit[] {
   const visits: Visit[] = [];
   let station = FIRST_STATION;
   let from = events[0]?.t ?? 0;
-  let visitEvents: FactoryEvent[] = [];
+  let visitEvents: BriefFactoryEvent[] = [];
   for (const event of events) {
     if (event.type === "stage_enter" && event.stage !== station) {
       visits.push({ station, from, to: event.t, events: visitEvents });
@@ -196,10 +232,14 @@ class Director {
   readonly #homeAt = perStation(() => 0);
   readonly #part: PartMove[] = [];
   readonly #prompts: PromptCue[] = [];
+  readonly #messages: MessageCue[] = [];
+  readonly #conductor: ConductorMove[] = [];
   readonly #marks: Mark[] = [];
   #counts: Tally = NO_TALLY;
   #partStatus: PartStatus = "ok";
   #clock = 0;
+  // Когда кончилась последняя реплика: следующая не начнётся раньше.
+  #messageEnd = 0;
 
   constructor(layout: FactoryLayout, pacing: Pacing) {
     // Своя копия плана: сценарий замораживается, а план вызывающего кода остаётся его.
@@ -239,7 +279,7 @@ class Director {
   }
 
   // Что событие записи меняет на сцене, кроме счётчиков.
-  #cue(event: FactoryEvent, at: number, station: Stage): void {
+  #cue(event: BriefFactoryEvent, at: number, station: Stage): void {
     switch (event.type) {
       case "prompt":
         this.#prompts.push({
@@ -249,6 +289,9 @@ class Director {
           prompt: { ...event, requirements: [...event.requirements] },
           index: this.#prompts.length,
         });
+        return;
+      case "message":
+        this.#say(event, at);
         return;
       case "stage_fail":
         this.#partStatus = "defect";
@@ -263,6 +306,52 @@ class Director {
         // Новый тип события не скомпилируется, пока не решат, как он выглядит в цехе.
         event satisfies never;
     }
+  }
+
+  // Реплики идут по одной: если предыдущая ещё висит, эта ждёт своей очереди. Мастер, если он
+  // участвует, поворачивается к собеседнику на время реплики.
+  #say(message: BriefMessageEvent, at: number): void {
+    const start = Math.max(at, this.#messageEnd);
+    const end = start + this.#pacing.messageMs;
+    this.#messages.push({
+      start,
+      end,
+      speaker: message.from,
+      message: briefMessage(message),
+      index: this.#messages.length,
+    });
+    this.#messageEnd = end;
+    this.#turnConductor(message, start, end);
+  }
+
+  #turnConductor(message: BriefMessageEvent, start: number, end: number): void {
+    const talking = message.from === CONDUCTOR;
+    if (!talking && message.to !== CONDUCTOR) return;
+    const heading = this.#headingToward(talking ? message.to : message.from);
+    this.#conductor.push({
+      start,
+      end,
+      heading,
+      turnFrom: this.#conductorHeadingAt(start),
+      talking,
+    });
+  }
+
+  // Куда смотрит мастер в момент t: сразу после реплики — туда же, потом за turnMs он
+  // поворачивается в зал, как и в кадре; без реплик — в зал.
+  #conductorHeadingAt(t: number): number {
+    const { facing } = this.#layout.conductor;
+    const previous = this.#conductor.at(-1);
+    if (previous === undefined) return facing;
+    const back = progressOf(previous.end, previous.end + this.#pacing.turnMs, t);
+    return turned(previous.heading, facing, back);
+  }
+
+  // Мастер смотрит на пост собеседника, а при разговоре с человеком — в зал, куда глядит у стола.
+  #headingToward(interlocutor: Listener): number {
+    const { conductor, stations } = this.#layout;
+    if (interlocutor === HUMAN || interlocutor === CONDUCTOR) return conductor.facing;
+    return headingTo(conductor.post, stations[interlocutor].post);
   }
 
   // Рабочий берёт деталь со станка, несёт следующему, отдаёт из рук в руки и возвращается
@@ -328,11 +417,13 @@ class Director {
     return deepFreeze({
       layout: this.#layout,
       pacing: { ...this.#pacing },
-      duration: Math.max(at + this.#pacing.finaleMs, lastReturn),
+      duration: Math.max(at + this.#pacing.finaleMs, lastReturn, this.#messageEnd),
       finishAt: at,
       workers: this.#workers,
       part: this.#part,
       prompts: this.#prompts,
+      messages: this.#messages,
+      conductor: this.#conductor,
       marks: this.#marks,
     });
   }
@@ -370,13 +461,13 @@ function stand(
 
 /**
  * Раскладывает запись сборки на действия рабочих: кто когда работает, бежит и передаёт деталь.
- * @param {Recording} recording Проверенная запись сборки.
+ * @param {BriefRecording} recording Проверенная запись сборки.
  * @param {FactoryLayout} layout План цеха.
  * @param {Pacing} pacing Темп сцены.
  * @returns {FactoryScript} Сценарий, по которому считается кадр в любой момент.
  */
 export function buildScript(
-  recording: Recording,
+  recording: BriefRecording,
   layout: FactoryLayout = DEFAULT_LAYOUT,
   pacing: Pacing = DEFAULT_PACING,
 ): FactoryScript {

@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { Recording } from "./recording.ts";
-import { LINE_LAYOUT, PLAIN_PACING, reworkRecording, stationAt } from "./script.fixtures.ts";
+import { headingTo } from "./layout.ts";
+import {
+  chatRecording,
+  LINE_LAYOUT,
+  messageAt,
+  PLAIN_PACING,
+  reworkRecording,
+  stationAt,
+} from "./script.fixtures.ts";
 import { buildScript } from "./script.ts";
 
 function recordingOf(events: Recording["events"]): Recording {
@@ -229,5 +237,117 @@ describe("buildScript", () => {
       .filter((move) => move.activity === "work")
       .map((move) => move.end - move.start);
     expect(workTimes).toEqual([1_600, 8_000]);
+  });
+});
+
+describe("buildScript: реплики", () => {
+  const { post } = LINE_LAYOUT.conductor;
+  const toCode = headingTo(post, LINE_LAYOUT.stations.code.post);
+  const { facing } = LINE_LAYOUT.conductor;
+
+  it("ставит реплики в очередь по одной, а не друг на друга", () => {
+    const recording = chatRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect(
+      script.messages.map(({ start, end, speaker, index }) => [start, end, speaker, index]),
+    ).toEqual([
+      [500, 1_500, "conductor", 0],
+      [1_500, 2_500, "code", 1],
+      [2_500, 3_500, "conductor", 2],
+      [16_500, 17_500, "code", 3],
+    ]);
+  });
+
+  it("не кладёт в сценарий полный текст реплики", () => {
+    const recording = chatRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect(script.messages[0]?.message).not.toHaveProperty("text");
+  });
+
+  it("поворачивает мастера к станции, куда он отдал задание, и к ней же на отчёте", () => {
+    const recording = chatRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect(script.conductor.slice(0, 2)).toEqual([
+      { start: 500, end: 1_500, heading: toCode, turnFrom: facing, talking: true },
+      { start: 1_500, end: 2_500, heading: toCode, turnFrom: toCode, talking: false },
+    ]);
+  });
+
+  it("поворачивает мастера в зал, когда он говорит с человеком", () => {
+    const recording = chatRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect(script.conductor[2]).toEqual({
+      start: 2_500,
+      end: 3_500,
+      heading: facing,
+      turnFrom: toCode,
+      talking: true,
+    });
+  });
+
+  it("не двигает мастера на реплики, где его нет", () => {
+    const recording = chatRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect(script.conductor).toHaveLength(3);
+  });
+
+  it("не даёт мастеру движений в записи без реплик", () => {
+    const recording = reworkRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect({ messages: script.messages, conductor: script.conductor }).toEqual({
+      messages: [],
+      conductor: [],
+    });
+  });
+
+  it("досматривает сцену до конца последней реплики", () => {
+    const recording = recordingOf([
+      { t: 0, type: "build_start" },
+      messageAt(1_000, "conductor", "spec"),
+      { t: 1_100, type: "build_end", ok: true },
+    ]);
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect(script.duration).toBe(2_000);
+  });
+
+  it("начинает поворот после паузы от взгляда в зал, а не от прошлого собеседника", () => {
+    const recording = recordingOf([
+      { t: 0, type: "build_start" },
+      messageAt(500, "conductor", "code"),
+      messageAt(5_000, "code", "conductor"),
+      { t: 6_000, type: "build_end", ok: true },
+    ]);
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect(script.conductor[1]?.turnFrom).toBeCloseTo(facing);
+  });
+
+  it("начинает поворот с полпути, если пауза короче, чем мастер успевает вернуться в зал", () => {
+    const recording = recordingOf([
+      { t: 0, type: "build_start" },
+      messageAt(500, "conductor", "code"),
+      messageAt(1_575, "code", "conductor"),
+      { t: 2_000, type: "build_end", ok: true },
+    ]);
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    // Пауза 75 мс — половина turnMs, так что мастер вернулся в зал наполовину.
+    expect(script.conductor[1]?.turnFrom).toBeCloseTo((toCode + facing) / 2);
   });
 });
