@@ -15,14 +15,18 @@ export interface StationPlan {
   readonly post: Point;
   /** Направление взгляда рабочего за станком, радианы: 0 — вправо, π/2 — вниз. */
   readonly facing: number;
+  /** Где стоит мастер, когда говорит с рабочим: сбоку от рабочего места, вне пути детали. */
+  readonly foremanPost: Point;
 }
 
-/** Кабинет мастера: стол, место за ним и куда мастер смотрит, пока ни с кем не говорит. */
-export interface ConductorPlan {
+/** Кабинет мастера: стол, место за ним, выход и куда мастер смотрит, пока ни с кем не говорит. */
+export interface ForemanPlan {
   readonly desk: Point;
   readonly post: Point;
   /** Направление взгляда мастера у стола, радианы: 0 — вправо, π/2 — вниз. */
   readonly facing: number;
+  /** Выход из кабинета в обход стола: отсюда мастер выходит в проход. */
+  readonly door: Point;
 }
 
 /** План цеха: размер пола, проход, станок каждого этапа и кабинет мастера. */
@@ -32,29 +36,40 @@ export interface FactoryLayout {
   /** Линия прохода между рядами станков, y: по ней бегают, не задевая чужие места. */
   readonly aisle: number;
   readonly stations: Readonly<Record<Stage, StationPlan>>;
-  readonly conductor: ConductorPlan;
+  readonly foreman: ForemanPlan;
 }
 
 const FACING_UP = -Math.PI / 2;
 const FACING_DOWN = Math.PI / 2;
+// Мастер встаёт рядом с рабочим, на этом расстоянии по горизонтали от его места.
+const FOREMAN_SIDE_OFFSET = 1.5;
+
+function stationOf(machine: Point, post: Point, facing: number): StationPlan {
+  return { machine, post, facing, foremanPost: { x: post.x + FOREMAN_SIDE_OFFSET, y: post.y } };
+}
 
 /**
  * План по умолчанию: петля на полу 16×9. Сверху слева направо — постановка, код, проверки;
  * снизу справа налево — ревью и выпуск, так деталь идёт по кругу. Кабинет мастера — внизу слева,
- * в стороне от маршрутов рабочих.
+ * в стороне от маршрутов рабочих; мастер ходит к станкам и встаёт справа от рабочего.
  */
 export const DEFAULT_LAYOUT: FactoryLayout = {
   width: 16,
   height: 9,
   aisle: 4.5,
   stations: {
-    spec: { machine: { x: 3, y: 1.6 }, post: { x: 3, y: 2.9 }, facing: FACING_UP },
-    code: { machine: { x: 8, y: 1.6 }, post: { x: 8, y: 2.9 }, facing: FACING_UP },
-    test: { machine: { x: 13, y: 1.6 }, post: { x: 13, y: 2.9 }, facing: FACING_UP },
-    review: { machine: { x: 13, y: 7.4 }, post: { x: 13, y: 6.1 }, facing: FACING_DOWN },
-    ship: { machine: { x: 8, y: 7.4 }, post: { x: 8, y: 6.1 }, facing: FACING_DOWN },
+    spec: stationOf({ x: 3, y: 1.6 }, { x: 3, y: 2.9 }, FACING_UP),
+    code: stationOf({ x: 8, y: 1.6 }, { x: 8, y: 2.9 }, FACING_UP),
+    test: stationOf({ x: 13, y: 1.6 }, { x: 13, y: 2.9 }, FACING_UP),
+    review: stationOf({ x: 13, y: 7.4 }, { x: 13, y: 6.1 }, FACING_DOWN),
+    ship: stationOf({ x: 8, y: 7.4 }, { x: 8, y: 6.1 }, FACING_DOWN),
   },
-  conductor: { desk: { x: 3, y: 6.3 }, post: { x: 3, y: 7.4 }, facing: FACING_UP },
+  foreman: {
+    desk: { x: 3, y: 6.3 },
+    post: { x: 3, y: 7.4 },
+    facing: FACING_UP,
+    door: { x: 4.5, y: 7.4 },
+  },
 };
 
 /**

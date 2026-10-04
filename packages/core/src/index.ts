@@ -10,15 +10,12 @@ export {
   summarize,
   tally,
   briefOf,
-  isListener,
   isSpeaker,
-  CONDUCTOR,
-  HUMAN,
+  FOREMAN,
   NO_TALLY,
   type Tally,
   type Stage,
   type Speaker,
-  type Listener,
   type PromptEvent,
   type MessageEvent,
   type BriefMessageEvent,
@@ -30,8 +27,8 @@ export {
 } from "./recording.ts";
 export {
   DEFAULT_LAYOUT,
-  type ConductorPlan,
   type FactoryLayout,
+  type ForemanPlan,
   type Point,
   type StationPlan,
 } from "./layout.ts";
@@ -39,8 +36,9 @@ export {
   buildScript,
   DEFAULT_PACING,
   type Activity,
-  type ConductorMove,
   type FactoryScript,
+  type ForemanActivity,
+  type ForemanMove,
   type Mark,
   type MessageCue,
   type Pacing,
@@ -52,7 +50,7 @@ export {
 } from "./script.ts";
 export {
   sceneAt,
-  type ConductorFrame,
+  type ForemanFrame,
   type MessageFrame,
   type PartFrame,
   type PromptFrame,

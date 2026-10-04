@@ -8,8 +8,9 @@ import { STAGES, type Stage, type Tally } from "./recording.ts";
 import { progressOf, turned } from "./turn.ts";
 import type {
   Activity,
-  ConductorMove,
   FactoryScript,
+  ForemanActivity,
+  ForemanMove,
   MessageCue,
   PartPlace,
   PartStatus,
@@ -47,15 +48,11 @@ export interface MessageFrame {
   readonly elapsed: number;
 }
 
-/**
- * Мастер в кадре; `elapsed` — сколько мс идёт реплика с его участием, для покачивания рук;
- * вне реплик — сколько мс прошло с конца прошлой (до первой — от начала сцены).
- */
-export interface ConductorFrame {
+/** Мастер в кадре; `elapsed` — сколько мс он уже занят текущим делом, для анимации. */
+export interface ForemanFrame {
   readonly position: Point;
   readonly heading: number;
-  /** Мастер говорит сам, а не слушает отчёт. */
-  readonly talking: boolean;
+  readonly activity: ForemanActivity;
   readonly elapsed: number;
 }
 
@@ -70,7 +67,7 @@ export interface Scene {
   readonly part: PartFrame;
   readonly prompt: PromptFrame | null;
   readonly message: MessageFrame | null;
-  readonly conductor: ConductorFrame;
+  readonly foreman: ForemanFrame;
   readonly counts: Tally;
   readonly finished: boolean;
 }
@@ -168,30 +165,28 @@ function messageAt(script: FactoryScript, time: number): MessageFrame | null {
   return { cue, elapsed: time - cue.start };
 }
 
-function conductorAt(script: FactoryScript, time: number): ConductorFrame {
-  const { post, facing } = script.layout.conductor;
-  const { turnMs } = script.pacing;
-  const move: ConductorMove | undefined =
-    script.conductor[lastStartedIndex(script.conductor, time, (m) => m.start)];
+function foremanAt(script: FactoryScript, time: number): ForemanFrame {
+  const { post, facing } = script.layout.foreman;
+  const move: ForemanMove | undefined =
+    script.foreman[lastStartedIndex(script.foreman, time, (m) => m.start)];
   if (move === undefined) {
-    return { position: post, heading: facing, talking: false, elapsed: time };
+    return { position: post, heading: facing, activity: "idle", elapsed: time };
   }
   if (time >= move.end) {
-    // После реплики мастер за turnMs поворачивается обратно в зал, к своему обычному месту.
-    const back = progressOf(move.end, move.end + turnMs, time);
+    // Между действиями мастер стоит там, где кончилось последнее, лицом туда же.
     return {
-      position: post,
-      heading: turned(move.heading, facing, back),
-      talking: false,
+      position: move.to,
+      heading: move.heading,
+      activity: "idle",
       elapsed: time - move.end,
     };
   }
-  const turn = progressOf(move.start, move.start + turnMs, time);
+  const turn = progressOf(move.start, move.start + script.pacing.turnMs, time);
   return {
-    position: post,
+    position: pointBetween(move.from, move.to, progressOf(move.start, move.end, time)),
     heading: turn === 1 ? move.heading : turned(move.turnFrom, move.heading, turn),
-    talking: move.talking,
-    elapsed: time - move.start,
+    activity: move.activity,
+    elapsed: time - move.since,
   };
 }
 
@@ -223,7 +218,7 @@ export function sceneAt(script: FactoryScript, time: number): Scene {
     part: partAt(script, workers, clamped),
     prompt: promptAt(script, clamped),
     message: messageAt(script, clamped),
-    conductor: conductorAt(script, clamped),
+    foreman: foremanAt(script, clamped),
     counts: {
       tokens: mark?.tokens ?? 0,
       prompts: mark?.prompts ?? 0,

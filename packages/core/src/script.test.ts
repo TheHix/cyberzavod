@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Recording } from "./recording.ts";
 import { headingTo } from "./layout.ts";
+import type { ForemanMove } from "./script.ts";
 import {
   chatRecording,
   LINE_LAYOUT,
@@ -125,16 +126,6 @@ describe("buildScript", () => {
     expect(defects.map((move) => move.start)).toEqual([33_000, 44_800, 58_000, 58_100]);
   });
 
-  it("вешает промпт над рабочим станка, у которого деталь", () => {
-    const recording = reworkRecording();
-
-    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
-
-    expect(script.prompts).toEqual([
-      expect.objectContaining({ start: 1_000, end: 2_000, station: "spec", index: 0 }),
-    ]);
-  });
-
   it("заканчивает сцену, когда все вернулись, а итог — у последнего станка", () => {
     const recording = reworkRecording();
 
@@ -168,7 +159,7 @@ describe("buildScript", () => {
   it("проводит запись без смены этапов у одного станка", () => {
     const recording = recordingOf([
       { t: 0, type: "build_start" },
-      { t: 500, type: "prompt", goal: "Продолжай", requirements: [] },
+      { t: 500, type: "usage", tokens: 5 },
       { t: 1_000, type: "build_end", ok: true },
     ]);
 
@@ -240,24 +231,190 @@ describe("buildScript", () => {
   });
 });
 
-describe("buildScript: реплики", () => {
-  const { post } = LINE_LAYOUT.conductor;
-  const toCode = headingTo(post, LINE_LAYOUT.stations.code.post);
-  const { facing } = LINE_LAYOUT.conductor;
+// Мастер идёт из кабинета к станку постановки: до двери 2 с, в проход 4 с, по проходу 19 с
+// и к месту у станка 2 с.
+const TRIP_TO_SPEC_MS = 27_000;
+// Обратно тем же путём: 2 с от станка в проход, 19 по проходу, 4 к двери и 2 до стола.
+const TRIP_HOME_MS = 27_000;
 
-  it("ставит реплики в очередь по одной, а не друг на друга", () => {
+function talkingAt(script: { foreman: readonly ForemanMove[] }): ForemanMove[] {
+  return script.foreman.filter((move) => move.activity === "talk" || move.activity === "listen");
+}
+
+describe("buildScript: мастер", () => {
+  const { post, facing } = LINE_LAYOUT.foreman;
+  const specPost = LINE_LAYOUT.stations.spec.foremanPost;
+
+  function promptRecording(): Recording {
+    return recordingOf([
+      { t: 0, type: "build_start" },
+      { t: 500, type: "prompt", goal: "Добавь счётчик", requirements: [] },
+      messageAt(600, "spec", "foreman"),
+      { t: 1_000, type: "build_end", ok: true },
+    ]);
+  }
+
+  it("ведёт мастера из кабинета через дверь и проход к месту у станка", () => {
+    const recording = promptRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect(script.foreman.slice(0, 4).map(({ from, to }) => [from, to])).toEqual([
+      [post, { x: 22, y: 6 }],
+      [
+        { x: 22, y: 6 },
+        { x: 22, y: 2 },
+      ],
+      [
+        { x: 22, y: 2 },
+        { x: 3, y: 2 },
+      ],
+      [{ x: 3, y: 2 }, specPost],
+    ]);
+  });
+
+  it("начинает промпт, когда мастер дошёл до станка", () => {
+    const recording = promptRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect(script.prompts).toEqual([
+      expect.objectContaining({
+        start: 500 + TRIP_TO_SPEC_MS,
+        end: 1_500 + TRIP_TO_SPEC_MS,
+        station: "spec",
+        index: 0,
+      }),
+    ]);
+  });
+
+  it("говорит промпт, а ответ рабочего слушает, лицом к его посту", () => {
+    const recording = promptRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    const toPost = headingTo(specPost, LINE_LAYOUT.stations.spec.post);
+    expect(
+      talkingAt(script).map(({ activity, start, end, to, heading }) => [
+        activity,
+        start,
+        end,
+        to,
+        heading,
+      ]),
+    ).toEqual([
+      ["talk", 27_500, 28_500, specPost, toPost],
+      ["listen", 28_500, 29_500, specPost, toPost],
+    ]);
+  });
+
+  it("ждёт после разговора и уходит в кабинет тем же путём", () => {
+    const recording = promptRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    const walk = script.foreman.filter((move) => move.start >= 29_500).map((move) => move.to);
+    expect(walk).toEqual([{ x: 3, y: 2 }, { x: 22, y: 2 }, { x: 22, y: 6 }, post, post]);
+  });
+
+  it("начинает уходить через foremanLingerMs после конца разговора", () => {
+    const recording = promptRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect(script.foreman.find((move) => move.start >= 29_500)?.start).toBe(30_000);
+  });
+
+  it("у стола поворачивает мастера к столу за turnMs", () => {
+    const recording = promptRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect(script.foreman.at(-1)).toMatchObject({
+      activity: "idle",
+      start: 30_000 + TRIP_HOME_MS,
+      end: 30_000 + TRIP_HOME_MS + PLAIN_PACING.turnMs,
+      to: post,
+      heading: facing,
+    });
+  });
+
+  it("досматривает сцену до возвращения мастера и поворота у стола", () => {
+    const recording = promptRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect(script.duration).toBe(30_000 + TRIP_HOME_MS + PLAIN_PACING.turnMs);
+  });
+
+  it("идёт к новой станции напрямую, если следующий разговор начинается раньше ухода", () => {
+    const recording = recordingOf([
+      { t: 0, type: "build_start" },
+      messageAt(100, "foreman", "spec"),
+      messageAt(100, "foreman", "code"),
+      { t: 200, type: "build_end", ok: true },
+    ]);
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    const afterFirst = script.foreman.filter((move) => move.start >= 28_100);
+    expect(afterFirst.slice(0, 4).map(({ activity, start, to }) => [activity, start, to])).toEqual([
+      ["walk", 28_100, { x: 3, y: 2 }],
+      ["walk", 30_100, { x: 13, y: 2 }],
+      ["walk", 40_100, { x: 13, y: 0 }],
+      ["talk", 42_100, LINE_LAYOUT.stations.code.foremanPost],
+    ]);
+  });
+
+  it("выходит из кабинета заново, если пауза между разговорами длиннее ожидания", () => {
     const recording = chatRecording();
 
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
-    expect(
-      script.messages.map(({ start, end, speaker, index }) => [start, end, speaker, index]),
-    ).toEqual([
-      [500, 1_500, "conductor", 0],
-      [1_500, 2_500, "code", 1],
-      [2_500, 3_500, "conductor", 2],
-      [16_500, 17_500, "code", 3],
+    const turnAtDesk = script.foreman.findIndex((move) => move.activity === "idle");
+    expect(script.foreman[turnAtDesk + 1]).toMatchObject({
+      activity: "walk",
+      from: post,
+      start: script.foreman[turnAtDesk]?.end,
+    });
+  });
+
+  it("не двигает мастера в записи без промптов и реплик", () => {
+    const recording = reworkRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect({ prompts: script.prompts, messages: script.messages, foreman: script.foreman }).toEqual(
+      { prompts: [], messages: [], foreman: [] },
+    );
+  });
+});
+
+describe("buildScript: реплики", () => {
+  it("ставит промпты и реплики в одну очередь, а не друг на друга", () => {
+    const recording = chatRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    const bubbles = [...script.prompts, ...script.messages].sort((a, b) => a.start - b.start);
+    const overlaps = bubbles.filter((bubble, index) => {
+      const previous = bubbles[index - 1];
+      return previous !== undefined && bubble.start < previous.end;
+    });
+    expect({ count: bubbles.length, overlaps }).toEqual({ count: 6, overlaps: [] });
+  });
+
+  it("ставит реплику после промпта, даже если они стоят в записи рядом", () => {
+    const recording = recordingOf([
+      { t: 0, type: "build_start" },
+      { t: 500, type: "prompt", goal: "Добавь счётчик", requirements: [] },
+      messageAt(500, "spec", "foreman"),
+      { t: 1_000, type: "build_end", ok: true },
     ]);
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect([script.prompts[0]?.end, script.messages[0]?.start]).toEqual([28_500, 28_500]);
   });
 
   it("не кладёт в сценарий полный текст реплики", () => {
@@ -268,86 +425,155 @@ describe("buildScript: реплики", () => {
     expect(script.messages[0]?.message).not.toHaveProperty("text");
   });
 
-  it("поворачивает мастера к станции, куда он отдал задание, и к ней же на отчёте", () => {
+  it("не отпускает деталь, пока у станка говорят", () => {
     const recording = chatRecording();
 
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
-    expect(script.conductor.slice(0, 2)).toEqual([
-      { start: 500, end: 1_500, heading: toCode, turnFrom: facing, talking: true },
-      { start: 1_500, end: 2_500, heading: toCode, turnFrom: toCode, talking: false },
+    const [work, handoff] = script.workers.spec;
+    expect([work?.activity, work?.end, handoff?.activity, handoff?.start]).toEqual([
+      "work",
+      29_500,
+      "handoff",
+      29_500,
     ]);
   });
 
-  it("поворачивает мастера в зал, когда он говорит с человеком", () => {
-    const recording = chatRecording();
-
-    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
-
-    expect(script.conductor[2]).toEqual({
-      start: 2_500,
-      end: 3_500,
-      heading: facing,
-      turnFrom: toCode,
-      talking: true,
-    });
-  });
-
-  it("не двигает мастера на реплики, где его нет", () => {
-    const recording = chatRecording();
-
-    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
-
-    expect(script.conductor).toHaveLength(3);
-  });
-
-  it("не даёт мастеру движений в записи без реплик", () => {
-    const recording = reworkRecording();
-
-    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
-
-    expect({ messages: script.messages, conductor: script.conductor }).toEqual({
-      messages: [],
-      conductor: [],
-    });
-  });
-
-  it("досматривает сцену до конца последней реплики", () => {
+  it("звучит на месте и не двигает мастера, если реплика не между мастером и станцией", () => {
     const recording = recordingOf([
       { t: 0, type: "build_start" },
-      messageAt(1_000, "conductor", "spec"),
-      { t: 1_100, type: "build_end", ok: true },
-    ]);
-
-    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
-
-    expect(script.duration).toBe(2_000);
-  });
-
-  it("начинает поворот после паузы от взгляда в зал, а не от прошлого собеседника", () => {
-    const recording = recordingOf([
-      { t: 0, type: "build_start" },
-      messageAt(500, "conductor", "code"),
-      messageAt(5_000, "code", "conductor"),
-      { t: 6_000, type: "build_end", ok: true },
-    ]);
-
-    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
-
-    expect(script.conductor[1]?.turnFrom).toBeCloseTo(facing);
-  });
-
-  it("начинает поворот с полпути, если пауза короче, чем мастер успевает вернуться в зал", () => {
-    const recording = recordingOf([
-      { t: 0, type: "build_start" },
-      messageAt(500, "conductor", "code"),
-      messageAt(1_575, "code", "conductor"),
+      messageAt(500, "spec", "test"),
+      { t: 1_000, type: "stage_enter", stage: "code" },
       { t: 2_000, type: "build_end", ok: true },
     ]);
 
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
-    // Пауза 75 мс — половина turnMs, так что мастер вернулся в зал наполовину.
-    expect(script.conductor[1]?.turnFrom).toBeCloseTo((toCode + facing) / 2);
+    expect({
+      messages: script.messages.map(({ start, end }) => [start, end]),
+      foreman: script.foreman,
+    }).toEqual({
+      messages: [[500, 1_500]],
+      foreman: [],
+    });
+  });
+
+  it("показывает итог после конца последней реплики", () => {
+    const recording = recordingOf([
+      { t: 0, type: "build_start" },
+      messageAt(1_000, "spec", "code"),
+      { t: 1_100, type: "build_end", ok: true },
+    ]);
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect(script.duration).toBe(2_000 + PLAIN_PACING.finaleMs);
+  });
+
+  it("нумерует реплики по записи, а не по порядку звучания", () => {
+    const recording = recordingOf([
+      { t: 0, type: "build_start" },
+      { t: 100, type: "stage_enter", stage: "code" },
+      messageAt(500, "code", "test"),
+      messageAt(600, "foreman", "code"),
+      { t: 1_000, type: "stage_enter", stage: "test" },
+      { t: 2_000, type: "build_end", ok: true },
+    ]);
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect(script.messages.map(({ index }) => index)).toEqual([1, 0]);
+  });
+});
+
+describe("buildScript: обмен при передаче", () => {
+  // Рабочий кода отдаёт деталь проверкам: 2 с в проход, 10 по проходу и 1 с к месту встречи.
+  const meet = { x: 20, y: 1 };
+
+  it("звучит у места встречи по порядку записи с прихода отдающего", () => {
+    const recording = chatRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    const exchange = script.messages.filter(({ index }) => index === 2 || index === 3);
+    expect(exchange.map(({ start, end, speaker }) => [start, end, speaker])).toEqual([
+      [88_350, 89_350, "code"],
+      [89_350, 90_350, "test"],
+    ]);
+  });
+
+  it("держит отдающего и получателя на месте встречи, пока они говорят", () => {
+    const recording = chatRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    const giver = script.workers.code.find((move) => move.start === 88_350);
+    const taker = script.workers.test.find((move) => move.end === 90_450);
+    expect({ giver, taker }).toEqual({
+      giver: expect.objectContaining({
+        activity: "handoff",
+        to: meet,
+        end: 90_450,
+        carrying: true,
+      }),
+      taker: expect.objectContaining({ activity: "handoff", carrying: false }),
+    });
+  });
+
+  it("передаёт деталь из рук в руки после последней реплики", () => {
+    const recording = chatRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    const handover = script.part.find(
+      (move) => move.from.on === "hands" && move.from.station === "code" && move.to.on === "hands",
+    );
+    expect(handover).toEqual(
+      expect.objectContaining({
+        start: 90_350,
+        end: 90_450,
+        from: { on: "hands", station: "code" },
+        to: { on: "hands", station: "test" },
+      }),
+    );
+  });
+
+  it("не показывает мастера у обмена", () => {
+    const recording = chatRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    const exchangeMoves = talkingAt(script).filter(
+      (move) => move.start >= 88_350 && move.start < 90_350,
+    );
+    expect(exchangeMoves).toEqual([]);
+  });
+
+  it("устраивает обмен и при возврате с браком, и деталь идёт с браком", () => {
+    const recording = recordingOf([
+      { t: 0, type: "build_start" },
+      { t: 100, type: "stage_enter", stage: "test" },
+      messageAt(1_500, "test", "code"),
+      { t: 1_600, type: "stage_fail", stage: "test", reason: "проверки не прошли" },
+      messageAt(1_700, "code", "test"),
+      { t: 2_000, type: "stage_enter", stage: "code" },
+      { t: 3_000, type: "build_end", ok: true },
+    ]);
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    const handover = script.part.find(
+      (move) => move.from.on === "hands" && move.to.station === "code",
+    );
+    const lastExchange = script.messages.at(-1);
+    expect({
+      handover: handover?.start,
+      lastExchangeEnd: lastExchange?.end,
+      status: handover?.status,
+    }).toEqual({
+      handover: lastExchange?.end,
+      lastExchangeEnd: lastExchange?.end,
+      status: "defect",
+    });
   });
 });

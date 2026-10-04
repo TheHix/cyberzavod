@@ -1,7 +1,7 @@
 // Общие данные для тестов сценария и кадра.
 
 import type { FactoryLayout, StationPlan } from "./layout.ts";
-import type { FactoryEvent, Listener, MessageEvent, Recording, Speaker } from "./recording.ts";
+import type { FactoryEvent, MessageEvent, Recording, Speaker } from "./recording.ts";
 import type { Pacing } from "./script.ts";
 
 // Станки в ряд через 10 единиц, проход в двух единицах от рабочих мест, бег — единица
@@ -12,14 +12,20 @@ import type { Pacing } from "./script.ts";
 const AISLE = 2;
 
 /**
- * Станок для тестов: рабочее место в точке, станок на единицу дальше от прохода.
+ * Станок для тестов: рабочее место в точке, станок на единицу дальше от прохода, мастер встаёт
+ * в трёх единицах правее рабочего.
  * @param {number} x Положение по горизонтали.
  * @param {number} y Положение рабочего места по вертикали.
  * @returns {StationPlan} Станок, у которого рабочий смотрит на станок.
  */
 export function stationAt(x: number, y = 0): StationPlan {
   const toMachine = y > AISLE ? 1 : -1;
-  return { machine: { x, y: y + toMachine }, post: { x, y }, facing: (toMachine * Math.PI) / 2 };
+  return {
+    machine: { x, y: y + toMachine },
+    post: { x, y },
+    facing: (toMachine * Math.PI) / 2,
+    foremanPost: { x: x + 3, y },
+  };
 }
 
 /** План для тестов: станки в ряд через 10 единиц, проход в двух единицах от них. */
@@ -34,7 +40,12 @@ export const LINE_LAYOUT: FactoryLayout = {
     review: stationAt(30),
     ship: stationAt(40),
   },
-  conductor: { desk: { x: 20, y: 5 }, post: { x: 20, y: 6 }, facing: -Math.PI / 2 },
+  foreman: {
+    desk: { x: 20, y: 5 },
+    post: { x: 20, y: 6 },
+    facing: -Math.PI / 2,
+    door: { x: 22, y: 6 },
+  },
 };
 
 /** Темп для тестов: без сжатия, бег — единица в секунду. */
@@ -49,18 +60,18 @@ export const PLAIN_PACING: Pacing = {
   turnMs: 150,
   promptMs: 1_000,
   messageMs: 1_000,
+  foremanLingerMs: 500,
   finaleMs: 500,
 };
 
 /**
- * Запись для тестов: постановка → код → проверки с провалом → снова код.
+ * Запись для тестов без разговоров: постановка → код → проверки с провалом → снова код.
  * @param {boolean} ok Итог сборки.
  * @returns {Recording} Запись сборки.
  */
 export function reworkRecording(ok = true): Recording {
   const events: FactoryEvent[] = [
     { t: 0, type: "build_start" },
-    { t: 1_000, type: "prompt", goal: "Добавь счётчик", requirements: [] },
     { t: 2_000, type: "stage_enter", stage: "code" },
     { t: 5_000, type: "stage_enter", stage: "test" },
     { t: 6_000, type: "stage_fail", stage: "test", reason: "проверки не прошли" },
@@ -75,26 +86,29 @@ export function reworkRecording(ok = true): Recording {
  * Реплика для тестов: строка и полный текст выводятся из момента.
  * @param {number} t Время записи, мс.
  * @param {Speaker} from Кто говорит.
- * @param {Listener} to Кому адресована.
+ * @param {Speaker} to Кому адресована.
  * @returns {MessageEvent} Реплика.
  */
-export function messageAt(t: number, from: Speaker, to: Listener): MessageEvent {
+export function messageAt(t: number, from: Speaker, to: Speaker): MessageEvent {
   return { t, type: "message", from, to, line: `Реплика ${t}`, text: `Полный текст ${t}` };
 }
 
 /**
- * Запись для тестов с репликами: три у станка постановки с мастером (задание коду, отчёт,
- * ответ человеку) и одна у станка кода без мастера.
+ * Запись для тестов с репликами: промпт и «принял» рабочего у станка постановки, у станка кода
+ * мастер-слушатель и обмен кода с проверками при передаче, у станка проверок отчёт мастеру.
  * @returns {Recording} Запись сборки.
  */
 export function chatRecording(): Recording {
   const events: FactoryEvent[] = [
     { t: 0, type: "build_start" },
-    messageAt(500, "conductor", "code"),
-    messageAt(700, "code", "conductor"),
-    messageAt(1_000, "conductor", "human"),
-    { t: 2_000, type: "stage_enter", stage: "code" },
-    messageAt(3_000, "code", "human"),
+    { t: 500, type: "prompt", goal: "Добавь счётчик", requirements: [] },
+    messageAt(600, "spec", "foreman"),
+    { t: 1_000, type: "stage_enter", stage: "code" },
+    messageAt(1_500, "code", "foreman"),
+    messageAt(3_000, "code", "test"),
+    messageAt(3_500, "test", "code"),
+    { t: 4_000, type: "stage_enter", stage: "test" },
+    messageAt(5_000, "test", "foreman"),
     { t: 8_000, type: "build_end", ok: true },
   ];
   return { ...reworkRecording(), events };

@@ -20,24 +20,19 @@ export interface PromptEvent {
   model?: string;
 }
 
-/** Мастер — начальник цеха, дирижёр пайплайна: выдаёт станциям задания и принимает отчёты. */
-export const CONDUCTOR = "conductor";
+/** Мастер цеха — человек-программист: раздаёт задачи и принимает итог. */
+export const FOREMAN = "foreman";
 
-/** Человек, которому мастер или рабочий отвечает. */
-export const HUMAN = "human";
-
-/** Кто говорит в цехе: рабочий станции или мастер. */
-export type Speaker = Stage | typeof CONDUCTOR;
-
-/** Кому адресована реплика. */
-export type Listener = Speaker | typeof HUMAN;
+/** Участник разговора в цехе: рабочий станции или мастер. */
+export type Speaker = Stage | typeof FOREMAN;
 
 /** Реплика: строка над говорящим в цехе и полный текст для журнала. */
 export interface MessageEvent {
   t: number;
   type: "message";
   from: Speaker;
-  to: Listener;
+  /** Кому адресована реплика; не совпадает с `from`. */
+  to: Speaker;
   /** Одна строка над говорящим в цехе. */
   line: string;
   /** Полный текст: абзацы через пустую строку, без разметки. */
@@ -109,21 +104,12 @@ function isLine(value: unknown): value is string {
 }
 
 /**
- * Проверяет, что значение — тот, кто может говорить в цехе.
+ * Проверяет, что значение — участник разговора в цехе.
  * @param {unknown} value Проверяемое значение.
  * @returns {value is Speaker} true, если это этап или мастер.
  */
 export function isSpeaker(value: unknown): value is Speaker {
-  return value === CONDUCTOR || isStage(value);
-}
-
-/**
- * Проверяет, что значение — тот, кому можно адресовать реплику.
- * @param {unknown} value Проверяемое значение.
- * @returns {value is Listener} true, если это этап, мастер или человек.
- */
-export function isListener(value: unknown): value is Listener {
-  return value === HUMAN || isSpeaker(value);
+  return value === FOREMAN || isStage(value);
 }
 
 function isLines(value: unknown): value is string[] {
@@ -158,7 +144,8 @@ function parsePrompt(raw: Record<string, unknown>, t: number, fail: Fail): Promp
 function parseMessage(raw: Record<string, unknown>, t: number, fail: Fail): MessageEvent {
   const { from, to, line, text } = raw;
   if (!isSpeaker(from)) throw fail(`неизвестный говорящий ${String(from)}`);
-  if (!isListener(to)) throw fail(`неизвестный адресат ${String(to)}`);
+  if (!isSpeaker(to)) throw fail(`неизвестный адресат ${String(to)}`);
+  if (from === to) throw fail(`${from} не может говорить сам с собой`);
   if (!isLine(line)) throw fail("line должна быть непустой строкой без переводов строки");
   if (typeof text !== "string" || text.trim() === "") {
     throw fail("text должен быть непустой строкой");

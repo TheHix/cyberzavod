@@ -165,7 +165,7 @@ function messageEvent(patch: Record<string, unknown> = {}): Record<string, unkno
   return {
     t: 25,
     type: "message",
-    from: "conductor",
+    from: "foreman",
     to: "code",
     line: "Сделай счётчик",
     text: "Сделай счётчик токенов.\n\nПоказывай его над цехом.",
@@ -174,32 +174,30 @@ function messageEvent(patch: Record<string, unknown> = {}): Record<string, unkno
 }
 
 describe("parseRecording: реплики", () => {
-  it("принимает реплику мастера станции и отчёт станции мастеру", () => {
-    const raw = validRecording();
-    raw.events.splice(3, 0, messageEvent(), messageEvent({ from: "code", to: "conductor" }));
-
-    const recording = parseRecording(raw);
-
-    expect(recording.events.filter((event) => event.type === "message")).toHaveLength(2);
-  });
-
-  it("принимает ответ человеку от мастера и от рабочего", () => {
+  it("принимает реплику мастера станции, станции мастеру и станции станции", () => {
     const raw = validRecording();
     raw.events.splice(
       3,
       0,
-      messageEvent({ to: "human" }),
-      messageEvent({ from: "ship", to: "human" }),
+      messageEvent(),
+      messageEvent({ from: "code", to: "foreman" }),
+      messageEvent({ from: "code", to: "test" }),
     );
 
     const recording = parseRecording(raw);
 
-    expect(recording.events[3]).toMatchObject({ from: "conductor", to: "human" });
+    expect(recording.events.filter((event) => event.type === "message")).toHaveLength(3);
   });
 
   it.each([
+    ["дирижёр говорящий", { from: "conductor" }, /говорящий/],
     ["человек говорящий", { from: "human" }, /говорящий/],
+    ["неизвестный говорящий", { from: "deploy" }, /говорящий/],
+    ["дирижёр адресат", { to: "conductor" }, /адресат/],
+    ["человек адресат", { to: "human" }, /адресат/],
     ["неизвестный адресат", { to: "deploy" }, /адресат/],
+    ["рабочий говорит сам с собой", { from: "code", to: "code" }, /сам с собой/],
+    ["мастер говорит сам с собой", { from: "foreman", to: "foreman" }, /сам с собой/],
     ["многострочная строка", { line: "раз\nдва" }, /line/],
     ["пустая строка", { line: "  " }, /line/],
     ["пустой текст", { text: " \n " }, /text/],
@@ -233,7 +231,7 @@ describe("briefOf", () => {
 
     expect(brief.events).toEqual([
       ...recording.events.slice(0, 3),
-      { t: 25, type: "message", from: "conductor", to: "code", line: "Сделай счётчик" },
+      { t: 25, type: "message", from: "foreman", to: "code", line: "Сделай счётчик" },
       ...recording.events.slice(4),
     ]);
   });
@@ -244,8 +242,8 @@ describe("tally", () => {
     const event = {
       t: 1,
       type: "message",
-      from: "conductor",
-      to: "human",
+      from: "ship",
+      to: "foreman",
       line: "Готово",
     } as const;
 

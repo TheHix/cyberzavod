@@ -104,20 +104,9 @@ describe("sceneAt", () => {
   });
 
   it.each([
-    [1_500, 500],
-    [2_500, null],
-  ])("в момент %i показывает промпт, если он ещё висит: %s", (time, elapsed) => {
-    const script = reworkScript();
-
-    const scene = sceneAt(script, time);
-
-    expect(scene.prompt?.elapsed ?? null).toBe(elapsed);
-  });
-
-  it.each([
     [500, { tokens: 0, prompts: 0, reworks: 0 }],
-    [40_000, { tokens: 0, prompts: 1, reworks: 1 }],
-    [71_000, { tokens: 1_200, prompts: 1, reworks: 1 }],
+    [40_000, { tokens: 0, prompts: 0, reworks: 1 }],
+    [71_000, { tokens: 1_200, prompts: 0, reworks: 1 }],
   ])("считает счётчики на момент %i", (time, counts) => {
     const script = reworkScript();
 
@@ -151,127 +140,128 @@ describe("sceneAt", () => {
 });
 
 describe("sceneAt: мастер и реплики", () => {
-  const { post, facing } = LINE_LAYOUT.conductor;
-  const toCode = headingTo(post, LINE_LAYOUT.stations.code.post);
+  const { post, facing } = LINE_LAYOUT.foreman;
+  const specPost = LINE_LAYOUT.stations.spec.foremanPost;
+  const towardSpec = headingTo(specPost, LINE_LAYOUT.stations.spec.post);
 
+  // Мастер идёт к постановке 500–27 500, говорит промпт до 28 500, слушает «принял» до 29 500,
+  // с 30 000 возвращается: к 57 000 он у стола и поворачивается за 150 мс.
   function chatScript(): FactoryScript {
     return buildScript(chatRecording(), LINE_LAYOUT, PLAIN_PACING);
   }
 
-  it("ставит мастера у стола лицом в зал вне реплик", () => {
+  it("ставит мастера в кабинете у стола лицом к столу до первого разговора", () => {
     const script = chatScript();
 
     const scene = sceneAt(script, 100);
 
-    expect(scene.conductor).toEqual({
+    expect(scene.foreman).toEqual({
       position: post,
       heading: facing,
-      talking: false,
+      activity: "idle",
       elapsed: 100,
     });
   });
 
-  it("стоит у стола и в записи без реплик", () => {
+  it("ведёт мастера по пути из кабинета", () => {
+    const script = chatScript();
+
+    const scene = sceneAt(script, 4_500);
+
+    // От двери (22, 6) вверх в проход: с 2 500 до 6 500 по единице в секунду.
+    expect(scene.foreman).toEqual({
+      position: { x: 22, y: 4 },
+      heading: -Math.PI / 2,
+      activity: "walk",
+      elapsed: 4_000,
+    });
+  });
+
+  it.each([
+    [28_000, "talk", 500],
+    [29_000, "listen", 500],
+    [29_700, "idle", 200],
+  ] as const)("в момент %i мастер у станка постановки: %s", (time, activity, elapsed) => {
+    const script = chatScript();
+
+    const scene = sceneAt(script, time);
+
+    expect(scene.foreman).toEqual({ position: specPost, heading: towardSpec, activity, elapsed });
+  });
+
+  it("поворачивает мастера у стола плавно, а не рывком", () => {
+    const script = chatScript();
+
+    const scene = sceneAt(script, 57_075);
+
+    // К столу мастер идёт по проходу влево (π) и поворачивается вверх (−π/2) по короткой дуге.
+    expect(scene.foreman).toMatchObject({ position: post, activity: "idle" });
+    expect(scene.foreman.heading).toBeCloseTo(1.25 * Math.PI);
+  });
+
+  it("оставляет мастера у стола лицом к столу после возвращения", () => {
+    const recording = {
+      ...reworkRecording(),
+      events: [
+        { t: 0, type: "build_start" },
+        messageAt(100, "foreman", "spec"),
+        { t: 200, type: "build_end", ok: true },
+      ],
+    } satisfies Recording;
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    // Мастер говорит 27 100–28 100, с 28 600 идёт назад 27 с и поворачивается за 150 мс.
+    const scene = sceneAt(script, 55_750);
+
+    expect(scene.foreman).toMatchObject({ position: post, heading: facing, activity: "idle" });
+  });
+
+  it("стоит в кабинете и в записи без разговоров", () => {
     const script = reworkScript();
 
     const scene = sceneAt(script, 5_000);
 
-    expect(scene.conductor).toMatchObject({ position: post, heading: facing, talking: false });
+    expect(scene.foreman).toMatchObject({ position: post, heading: facing, activity: "idle" });
   });
 
-  it("поворачивает мастера к собеседнику за turnMs и держит говорящим", () => {
+  it.each([
+    [28_000, 500],
+    [28_500, null],
+    [27_000, null],
+  ])("в момент %i показывает промпт, если он ещё висит: %s", (time, elapsed) => {
     const script = chatScript();
 
-    const scene = sceneAt(script, 1_000);
+    const scene = sceneAt(script, time);
 
-    expect(scene.conductor).toEqual({
-      position: post,
-      heading: toCode,
-      talking: true,
-      elapsed: 500,
-    });
-  });
-
-  it("поворачивает мастера плавно, а не рывком", () => {
-    const script = chatScript();
-
-    const scene = sceneAt(script, 575);
-
-    // Поворот меньше полуоборота, так что половина пути — среднее направлений.
-    expect(scene.conductor.heading).toBeCloseTo((facing + toCode) / 2);
-  });
-
-  it("не считает говорящим мастера, который слушает отчёт", () => {
-    const script = chatScript();
-
-    const scene = sceneAt(script, 2_000);
-
-    expect(scene.conductor).toMatchObject({ heading: toCode, talking: false });
+    expect(scene.prompt?.elapsed ?? null).toBe(elapsed);
   });
 
   it("отдаёт текущую реплику и сколько она уже висит", () => {
     const script = chatScript();
 
-    const scene = sceneAt(script, 1_800);
+    const scene = sceneAt(script, 74_650);
 
-    expect(scene.message).toMatchObject({ cue: { index: 1, speaker: "code" }, elapsed: 300 });
+    expect(scene.message).toMatchObject({ cue: { index: 1, speaker: "code" }, elapsed: 500 });
   });
 
   it("не показывает реплику между репликами и после них", () => {
     const script = chatScript();
 
-    const scenes = [sceneAt(script, 100), sceneAt(script, 10_000), sceneAt(script, 17_500)];
+    const scenes = [sceneAt(script, 100), sceneAt(script, 50_000), sceneAt(script, 110_000)];
 
     expect(scenes.map((scene) => scene.message)).toEqual([null, null, null]);
   });
 
-  describe("с паузой между репликами", () => {
-    // Мастер даёт задание коду с 500 до 1 500, следующая реплика — отчёт кода с 5 000.
-    function pauseScript(): FactoryScript {
-      const recording = {
-        ...reworkRecording(),
-        events: [
-          { t: 0, type: "build_start" },
-          messageAt(500, "conductor", "code"),
-          messageAt(5_000, "code", "conductor"),
-          { t: 6_000, type: "build_end", ok: true },
-        ],
-      } satisfies Recording;
-      return buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+  it("не показывает промпт и реплику вместе ни в один момент сцены", () => {
+    const script = chatScript();
+    const step = 50;
+
+    const together: number[] = [];
+    for (let time = 0; time <= script.duration; time += step) {
+      const scene = sceneAt(script, time);
+      if (scene.prompt !== null && scene.message !== null) together.push(time);
     }
 
-    it("в начале паузы мастер ещё повёрнут к собеседнику", () => {
-      const script = pauseScript();
-
-      const scene = sceneAt(script, 1_500);
-
-      expect(scene.conductor.heading).toBeCloseTo(toCode);
-    });
-
-    it("за turnMs после реплики поворачивается обратно в зал", () => {
-      const script = pauseScript();
-
-      const halfway = sceneAt(script, 1_575);
-      const back = sceneAt(script, 1_650);
-
-      expect([halfway.conductor.heading, back.conductor.heading]).toEqual([
-        expect.closeTo((toCode + facing) / 2),
-        expect.closeTo(facing),
-      ]);
-    });
-
-    it("следующую реплику начинает поворачивать от взгляда в зал, без рывка", () => {
-      const script = pauseScript();
-
-      const before = sceneAt(script, 4_999);
-      const start = sceneAt(script, 5_000);
-      const halfway = sceneAt(script, 5_075);
-
-      expect([before, start, halfway].map((scene) => scene.conductor.heading)).toEqual([
-        expect.closeTo(facing),
-        expect.closeTo(facing),
-        expect.closeTo((toCode + facing) / 2),
-      ]);
-    });
+    expect(together).toEqual([]);
   });
 });

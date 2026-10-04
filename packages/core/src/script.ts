@@ -16,8 +16,7 @@ import {
 } from "./layout.ts";
 import {
   briefMessage,
-  CONDUCTOR,
-  HUMAN,
+  FOREMAN,
   NO_TALLY,
   STAGES,
   succeeded,
@@ -25,13 +24,11 @@ import {
   type BriefFactoryEvent,
   type BriefMessageEvent,
   type BriefRecording,
-  type Listener,
   type PromptEvent,
   type Speaker,
   type Stage,
   type Tally,
 } from "./recording.ts";
-import { progressOf, turned } from "./turn.ts";
 
 /** Темп сцены: как сжимается работа и как быстро двигаются рабочие. */
 export interface Pacing {
@@ -55,6 +52,8 @@ export interface Pacing {
   readonly promptMs: number;
   /** Сколько реплика висит над говорящим, мс. */
   readonly messageMs: number;
+  /** Сколько мастер стоит у станка после разговора, прежде чем уйти в кабинет, мс. */
+  readonly foremanLingerMs: number;
   /** Сколько сцена показывает итог после конца сборки, мс. */
   readonly finaleMs: number;
 }
@@ -71,6 +70,7 @@ export const DEFAULT_PACING: Pacing = {
   turnMs: 200,
   promptMs: 5_000,
   messageMs: 4_000,
+  foremanLingerMs: 5_000,
   finaleMs: 2_500,
 };
 
@@ -113,7 +113,7 @@ export interface PartMove {
   readonly status: PartStatus;
 }
 
-/** Промпт человека над рабочим, который его получил, от `start` до `end` мс сцены. */
+/** Промпт человека, который мастер говорит рабочему станции, от `start` до `end` мс сцены. */
 export interface PromptCue {
   readonly start: number;
   readonly end: number;
@@ -123,7 +123,7 @@ export interface PromptCue {
   readonly index: number;
 }
 
-/** Реплика над говорящим от `start` до `end` мс сцены; реплики идут по одной. */
+/** Реплика над говорящим от `start` до `end` мс сцены; промпты и реплики идут по одному. */
 export interface MessageCue {
   readonly start: number;
   readonly end: number;
@@ -133,14 +133,21 @@ export interface MessageCue {
   readonly index: number;
 }
 
-/** Мастер от `start` до `end` мс сцены обращён к собеседнику; `talking` — говорит он сам. */
-export interface ConductorMove {
+/** Чем занят мастер: стоит, идёт, говорит рабочему или слушает его. */
+export type ForemanActivity = "idle" | "walk" | "talk" | "listen";
+
+/** Действие мастера от `start` до `end` мс сцены: что делает, откуда и куда. */
+export interface ForemanMove {
   readonly start: number;
   readonly end: number;
+  /** Когда мастер взялся за это дело: у отрезков одного пути — начало пути. */
+  readonly since: number;
+  readonly activity: ForemanActivity;
+  readonly from: Point;
+  readonly to: Point;
   readonly heading: number;
-  /** Куда мастер смотрел в начале реплики: к `heading` он поворачивается за `Pacing.turnMs`. */
+  /** Куда мастер смотрел в начале действия: к `heading` он поворачивается за `Pacing.turnMs`. */
   readonly turnFrom: number;
-  readonly talking: boolean;
 }
 
 /** Отметка на шкале сцены: какое время записи ей соответствует и счётчики на этот момент. */
@@ -163,10 +170,10 @@ export interface FactoryScript {
   readonly prompts: readonly PromptCue[];
   readonly messages: readonly MessageCue[];
   /**
-   * Повороты и речь мастера; вне них он стоит у стола лицом к `layout.conductor.facing`, а после
-   * реплики за `Pacing.turnMs` поворачивается к нему обратно.
+   * Ходьба и разговоры мастера; вне них он стоит там, где кончилось последнее действие, а до
+   * первого — в кабинете у стола лицом к `layout.foreman.facing`.
    */
-  readonly conductor: readonly ConductorMove[];
+  readonly foreman: readonly ForemanMove[];
   readonly marks: readonly Mark[];
 }
 
@@ -176,6 +183,8 @@ interface Visit {
   readonly from: number;
   readonly to: number;
   readonly events: readonly BriefFactoryEvent[];
+  /** Реплики с рабочим следующего визита: они звучат у места передачи детали. */
+  readonly exchange: readonly BriefMessageEvent[];
 }
 
 // Деталь начинает путь у станка постановки: с него берут заказ.
@@ -188,15 +197,34 @@ function splitIntoVisits(events: readonly BriefFactoryEvent[]): Visit[] {
   let visitEvents: BriefFactoryEvent[] = [];
   for (const event of events) {
     if (event.type === "stage_enter" && event.stage !== station) {
-      visits.push({ station, from, to: event.t, events: visitEvents });
+      visits.push({ station, from, to: event.t, events: visitEvents, exchange: [] });
       station = event.stage;
       from = event.t;
       visitEvents = [];
     }
     visitEvents.push(event);
   }
-  visits.push({ station, from, to: events.at(-1)?.t ?? from, events: visitEvents });
+  visits.push({ station, from, to: events.at(-1)?.t ?? from, events: visitEvents, exchange: [] });
   return visits;
+}
+
+function isBetween(message: BriefMessageEvent, a: Stage, b: Stage): boolean {
+  return (message.from === a && message.to === b) || (message.from === b && message.to === a);
+}
+
+// Разговор отдающего с получателем звучит у места передачи, а не в работе: переносим его из
+// событий визита в обмен.
+function withExchanges(visits: readonly Visit[]): Visit[] {
+  return visits.map((visit, index) => {
+    const next = visits[index + 1];
+    if (next === undefined) return visit;
+    const exchange = visit.events.flatMap((event) =>
+      event.type === "message" && isBetween(event, visit.station, next.station) ? [event] : [],
+    );
+    const spoken = new Set<BriefFactoryEvent>(exchange);
+    const events = visit.events.filter((event) => !spoken.has(event));
+    return { ...visit, events, exchange };
+  });
 }
 
 function workDuration(recordingMs: number, pacing: Pacing): number {
@@ -221,10 +249,46 @@ function handsOf(station: Stage): PartPlace {
 // Действие рабочего без поворота: направление в начале проставляет режиссёр.
 type Action = Omit<WorkerMove, "turnFrom">;
 
+// То же для мастера.
+type ForemanAction = Omit<ForemanMove, "turnFrom">;
+
+// Отрезок пути: от точки до точки с направлением взгляда.
+interface Leg {
+  readonly start: number;
+  readonly end: number;
+  readonly from: Point;
+  readonly to: Point;
+  readonly heading: number;
+}
+
+// Время, когда пузырь висит: от начала до конца.
+interface Span {
+  readonly start: number;
+  readonly end: number;
+}
+
+// Как мастер участвует в реплике: у какой станции стоит и говорит он или слушает.
+interface ForemanTalk {
+  readonly station: Stage;
+  readonly activity: "talk" | "listen";
+}
+
+function foremanTalkIn(message: BriefMessageEvent): ForemanTalk | undefined {
+  if (message.from === FOREMAN && message.to !== FOREMAN) {
+    return { station: message.to, activity: "talk" };
+  }
+  if (message.to === FOREMAN && message.from !== FOREMAN) {
+    return { station: message.from, activity: "listen" };
+  }
+  return undefined;
+}
+
 // Режиссёр раскладывает визиты по времени сцены. Состояние живёт только внутри buildScript.
 class Director {
   readonly #layout: FactoryLayout;
   readonly #pacing: Pacing;
+  // Реплики записи по порядку: номер реплики в журнале не должен зависеть от порядка звучания.
+  readonly #recordedMessages: readonly BriefMessageEvent[];
   readonly #workers = perStation<WorkerMove[]>(() => []);
   // Куда смотрит рабочий после последнего действия — с этого начинается следующий поворот.
   readonly #headings: Record<Stage, number>;
@@ -233,19 +297,28 @@ class Director {
   readonly #part: PartMove[] = [];
   readonly #prompts: PromptCue[] = [];
   readonly #messages: MessageCue[] = [];
-  readonly #conductor: ConductorMove[] = [];
+  readonly #foreman: ForemanMove[] = [];
   readonly #marks: Mark[] = [];
   #counts: Tally = NO_TALLY;
   #partStatus: PartStatus = "ok";
   #clock = 0;
-  // Когда кончилась последняя реплика: следующая не начнётся раньше.
-  #messageEnd = 0;
+  // Когда кончился последний пузырь, промпт или реплика: следующий не начнётся раньше.
+  #speechEnd = 0;
+  // У какой станции стоит мастер; null — в кабинете.
+  #foremanStation: Stage | null = null;
+  #foremanHeading: number;
+  // Когда кончилось последнее действие мастера: новое не начнётся раньше.
+  #foremanBusyUntil = 0;
+  // Когда мастер договорил последний раз: от этого момента он ждёт, не позовут ли снова.
+  #foremanFreeAt = 0;
 
-  constructor(layout: FactoryLayout, pacing: Pacing) {
+  constructor(layout: FactoryLayout, pacing: Pacing, events: readonly BriefFactoryEvent[]) {
     // Своя копия плана: сценарий замораживается, а план вызывающего кода остаётся его.
     this.#layout = structuredClone(layout);
     this.#pacing = pacing;
+    this.#recordedMessages = events.filter((event) => event.type === "message");
     this.#headings = perStation((stage) => this.#layout.stations[stage].facing);
+    this.#foremanHeading = this.#layout.foreman.facing;
   }
 
   #act(worker: Stage, action: Action): void {
@@ -253,17 +326,23 @@ class Director {
     this.#headings[worker] = action.heading;
   }
 
+  #actForeman(action: ForemanAction): void {
+    this.#foreman.push({ ...action, turnFrom: this.#foremanHeading });
+    this.#foremanHeading = action.heading;
+    this.#foremanBusyUntil = action.end;
+  }
+
   #movePart(start: number, end: number, from: PartPlace, to: PartPlace): void {
     this.#part.push({ start, end, from, to, status: this.#partStatus });
   }
 
   // Работа у станка на весь визит; события визита ложатся на время работы пропорционально.
+  // Пока у станка говорят, работа не кончается: деталь не уходит посреди разговора.
   work(visit: Visit): number {
     const { station } = visit;
     const plan = this.#layout.stations[station];
     const start = this.#clock;
     const end = start + workDuration(visit.to - visit.from, this.#pacing);
-    this.#act(station, stand(start, end, "work", plan.post, plan.facing, false));
     this.#partStatus = "ok";
     this.#movePart(start, start, machineOf(station), machineOf(station));
 
@@ -274,24 +353,20 @@ class Director {
       this.#marks.push({ at, recordingTime: event.t, ...this.#counts });
       this.#cue(event, at, station);
     }
-    this.#marks.push({ at: end, recordingTime: visit.to, ...this.#counts });
-    return end;
+    const workEnd = Math.max(end, this.#speechEnd);
+    this.#act(station, stand(start, workEnd, "work", plan.post, plan.facing, false));
+    this.#marks.push({ at: workEnd, recordingTime: visit.to, ...this.#counts });
+    return workEnd;
   }
 
   // Что событие записи меняет на сцене, кроме счётчиков.
   #cue(event: BriefFactoryEvent, at: number, station: Stage): void {
     switch (event.type) {
       case "prompt":
-        this.#prompts.push({
-          start: at,
-          end: at + this.#pacing.promptMs,
-          station,
-          prompt: { ...event, requirements: [...event.requirements] },
-          index: this.#prompts.length,
-        });
+        this.#sayPrompt(event, at, station);
         return;
       case "message":
-        this.#say(event, at);
+        this.#sayMessage(event, at);
         return;
       case "stage_fail":
         this.#partStatus = "defect";
@@ -308,55 +383,123 @@ class Director {
     }
   }
 
-  // Реплики идут по одной: если предыдущая ещё висит, эта ждёт своей очереди. Мастер, если он
-  // участвует, поворачивается к собеседнику на время реплики.
-  #say(message: BriefMessageEvent, at: number): void {
-    const start = Math.max(at, this.#messageEnd);
-    const end = start + this.#pacing.messageMs;
-    this.#messages.push({
+  // Промпт говорит мастер рабочему станции: он приходит и говорит, когда дойдёт его очередь.
+  #sayPrompt(prompt: PromptEvent, at: number, station: Stage): void {
+    const { start, end } = this.#foremanSpeaks(station, "talk", at, this.#pacing.promptMs);
+    this.#prompts.push({
       start,
       end,
+      station,
+      prompt: { ...prompt, requirements: [...prompt.requirements] },
+      index: this.#prompts.length,
+    });
+  }
+
+  // Реплика встаёт в общую очередь. Если в ней участвует мастер, он идёт к собеседнику.
+  #sayMessage(message: BriefMessageEvent, at: number): Span {
+    const { messageMs } = this.#pacing;
+    const foremanTalk = foremanTalkIn(message);
+    const span =
+      foremanTalk === undefined
+        ? this.#queueSpeech(at, messageMs)
+        : this.#foremanSpeaks(foremanTalk.station, foremanTalk.activity, at, messageMs);
+    this.#messages.push({
+      ...span,
       speaker: message.from,
       message: briefMessage(message),
-      index: this.#messages.length,
+      index: this.#recordedMessages.indexOf(message),
     });
-    this.#messageEnd = end;
-    this.#turnConductor(message, start, end);
+    return span;
   }
 
-  #turnConductor(message: BriefMessageEvent, start: number, end: number): void {
-    const talking = message.from === CONDUCTOR;
-    if (!talking && message.to !== CONDUCTOR) return;
-    const heading = this.#headingToward(talking ? message.to : message.from);
-    this.#conductor.push({
-      start,
-      end,
-      heading,
-      turnFrom: this.#conductorHeadingAt(start),
-      talking,
+  // Пузыри идут по одному: если предыдущий ещё висит, этот ждёт своей очереди.
+  #queueSpeech(readyAt: number, duration: number): Span {
+    const start = Math.max(readyAt, this.#speechEnd);
+    const end = start + duration;
+    this.#speechEnd = end;
+    return { start, end };
+  }
+
+  // Мастер приходит к станции, ждёт очереди и стоит у рабочего лицом к его посту, пока идёт пузырь.
+  #foremanSpeaks(
+    station: Stage,
+    activity: ForemanTalk["activity"],
+    at: number,
+    duration: number,
+  ): Span {
+    const { foremanPost, post } = this.#layout.stations[station];
+    const span = this.#queueSpeech(this.#comeTo(station, at), duration);
+    this.#actForeman({
+      ...span,
+      since: span.start,
+      activity,
+      from: foremanPost,
+      to: foremanPost,
+      heading: headingTo(foremanPost, post),
     });
+    this.#foremanFreeAt = span.end;
+    return span;
   }
 
-  // Куда смотрит мастер в момент t: сразу после реплики — туда же, потом за turnMs он
-  // поворачивается в зал, как и в кадре; без реплик — в зал.
-  #conductorHeadingAt(t: number): number {
-    const { facing } = this.#layout.conductor;
-    const previous = this.#conductor.at(-1);
-    if (previous === undefined) return facing;
-    const back = progressOf(previous.end, previous.end + this.#pacing.turnMs, t);
-    return turned(previous.heading, facing, back);
+  // Мастер приходит к станции к моменту `at` и возвращает, когда он на месте. Если разговоров
+  // давно не было, он успел вернуться в кабинет и выходит оттуда; иначе идёт напрямую.
+  #comeTo(station: Stage, at: number): number {
+    const departure = this.#foremanFreeAt + this.#pacing.foremanLingerMs;
+    if (this.#foremanStation !== null && at > departure) this.#goHome(departure);
+    const start = Math.max(at, this.#foremanBusyUntil);
+    if (this.#foremanStation === station) return start;
+
+    const { aisle, stations } = this.#layout;
+    const target = stations[station].foremanPost;
+    const route =
+      this.#foremanStation === null
+        ? this.#routeFromCabinet(target)
+        : routeBetween(stations[this.#foremanStation].foremanPost, target, aisle);
+    this.#foremanStation = station;
+    return this.#walkForeman(route, start);
   }
 
-  // Мастер смотрит на пост собеседника, а при разговоре с человеком — в зал, куда глядит у стола.
-  #headingToward(interlocutor: Listener): number {
-    const { conductor, stations } = this.#layout;
-    if (interlocutor === HUMAN || interlocutor === CONDUCTOR) return conductor.facing;
-    return headingTo(conductor.post, stations[interlocutor].post);
+  // Мастер возвращается в кабинет тем же путём, каким пришёл, и у стола поворачивается к `facing`.
+  #goHome(departure: number): void {
+    if (this.#foremanStation === null) return;
+    const { post, facing } = this.#layout.foreman;
+    const route = this.#routeFromCabinet(this.#layout.stations[this.#foremanStation].foremanPost);
+    const arrived = this.#walkForeman(route.toReversed(), departure);
+    this.#actForeman({
+      start: arrived,
+      end: arrived + this.#pacing.turnMs,
+      since: arrived,
+      activity: "idle",
+      from: post,
+      to: post,
+      heading: facing,
+    });
+    this.#foremanStation = null;
+  }
+
+  // Из кабинета мастер выходит в обход стола, через дверь, а дальше идёт как рабочий.
+  #routeFromCabinet(target: Point): Point[] {
+    const { post, door } = this.#layout.foreman;
+    return withoutStandstills([post, ...routeBetween(door, target, this.#layout.aisle)]);
+  }
+
+  #walkForeman(route: readonly Point[], start: number): number {
+    const legs = legsOf(route, start, this.#pacing.walkSpeed);
+    for (const leg of legs) {
+      this.#actForeman({ ...leg, since: start, activity: "walk" });
+    }
+    return legs.at(-1)?.end ?? start;
   }
 
   // Рабочий берёт деталь со станка, несёт следующему, отдаёт из рук в руки и возвращается
   // к себе; получатель кладёт её на свой станок. Передача — перед получателем, со стороны прохода.
-  handOff(giver: Stage, taker: Stage, readyAt: number): void {
+  // Если рабочие говорили между собой, то у места встречи, и деталь переходит после разговора.
+  handOff(
+    giver: Stage,
+    taker: Stage,
+    readyAt: number,
+    exchange: readonly BriefMessageEvent[],
+  ): void {
     const { aisle } = this.#layout;
     const { handoffGap, handoffMs, liftMs, turnMs } = this.#pacing;
     const giverPlan = this.#layout.stations[giver];
@@ -370,7 +513,9 @@ class Director {
     this.#movePart(start, lifted, machineOf(giver), handsOf(giver));
 
     const arrive = this.#walk(giver, route, lifted, true);
-    const release = arrive + handoffMs;
+    let handover = arrive;
+    for (const message of exchange) handover = this.#sayMessage(message, arrive).end;
+    const release = handover + handoffMs;
     // Получатель поворачивается к подходящему заранее и встречает его лицом.
     const greet = Math.max(start, arrive - turnMs);
     const towardGiver = headingTo(takerPlan.post, meet);
@@ -379,7 +524,7 @@ class Director {
       giver,
       stand(arrive, release, "handoff", meet, headingTo(meet, takerPlan.post), true),
     );
-    this.#movePart(arrive, release, handsOf(giver), handsOf(taker));
+    this.#movePart(handover, release, handsOf(giver), handsOf(taker));
 
     const placed = release + liftMs;
     this.#act(taker, stand(release, placed, "handoff", takerPlan.post, takerPlan.facing, true));
@@ -388,42 +533,35 @@ class Director {
     this.#clock = placed;
   }
 
-  // Путь из отрезков: каждый — отдельное действие со своим направлением взгляда.
+  // Путь рабочего: каждый отрезок — отдельное действие со своим направлением взгляда.
   #walk(worker: Stage, route: readonly Point[], start: number, carrying: boolean): number {
-    let time = start;
-    for (const [index, to] of route.entries()) {
-      const from = route[index - 1];
-      if (from === undefined) continue;
-      const end = time + (distance(from, to) / this.#pacing.walkSpeed) * MS_PER_SECOND;
-      this.#act(worker, {
-        start: time,
-        end,
-        since: start,
-        activity: "walk",
-        from,
-        to,
-        heading: headingTo(from, to),
-        carrying,
-      });
-      time = end;
+    const legs = legsOf(route, start, this.#pacing.walkSpeed);
+    for (const leg of legs) {
+      this.#act(worker, { ...leg, since: start, activity: "walk", carrying });
     }
-    return time;
+    return legs.at(-1)?.end ?? start;
   }
 
   finish(station: Stage, at: number, ok: boolean): FactoryScript {
     this.#partStatus = ok ? "done" : "scrap";
     this.#movePart(at, at, machineOf(station), machineOf(station));
+    this.#goHome(this.#foremanFreeAt + this.#pacing.foremanLingerMs);
     const lastReturn = Math.max(...Object.values(this.#homeAt));
     return deepFreeze({
       layout: this.#layout,
       pacing: { ...this.#pacing },
-      duration: Math.max(at + this.#pacing.finaleMs, lastReturn, this.#messageEnd),
+      duration: Math.max(
+        at + this.#pacing.finaleMs,
+        lastReturn,
+        this.#speechEnd,
+        this.#foremanBusyUntil,
+      ),
       finishAt: at,
       workers: this.#workers,
       part: this.#part,
       prompts: this.#prompts,
       messages: this.#messages,
-      conductor: this.#conductor,
+      foreman: this.#foreman,
       marks: this.#marks,
     });
   }
@@ -438,14 +576,32 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-// Путь бегущего: со своего места в проход, по проходу и из прохода к получателю —
-// так он не пробегает сквозь чужие станки. Отрезки нулевой длины выпадают.
-function routeBetween(from: Point, to: Point, aisle: number): Point[] {
-  const corners = [from, { x: from.x, y: aisle }, { x: to.x, y: aisle }, to];
-  return corners.filter((point, index) => {
-    const previous = corners[index - 1];
+// Отрезки нулевой длины в пути выпадают: по ним никто не идёт.
+function withoutStandstills(points: readonly Point[]): Point[] {
+  return points.filter((point, index) => {
+    const previous = points[index - 1];
     return previous === undefined || distance(previous, point) > 0;
   });
+}
+
+// Путь идущего: со своего места в проход, по проходу и из прохода к цели — так он не проходит
+// сквозь чужие станки.
+function routeBetween(from: Point, to: Point, aisle: number): Point[] {
+  return withoutStandstills([from, { x: from.x, y: aisle }, { x: to.x, y: aisle }, to]);
+}
+
+// Путь из отрезков с моментами прохождения при заданной скорости.
+function legsOf(route: readonly Point[], start: number, walkSpeed: number): Leg[] {
+  const legs: Leg[] = [];
+  let time = start;
+  for (const [index, to] of route.entries()) {
+    const from = route[index - 1];
+    if (from === undefined) continue;
+    const end = time + (distance(from, to) / walkSpeed) * MS_PER_SECOND;
+    legs.push({ start: time, end, from, to, heading: headingTo(from, to) });
+    time = end;
+  }
+  return legs;
 }
 
 function stand(
@@ -460,7 +616,8 @@ function stand(
 }
 
 /**
- * Раскладывает запись сборки на действия рабочих: кто когда работает, бежит и передаёт деталь.
+ * Раскладывает запись сборки на действия рабочих и мастера: кто когда работает, бежит,
+ * передаёт деталь, говорит и слушает.
  * @param {BriefRecording} recording Проверенная запись сборки.
  * @param {FactoryLayout} layout План цеха.
  * @param {Pacing} pacing Темп сцены.
@@ -471,15 +628,15 @@ export function buildScript(
   layout: FactoryLayout = DEFAULT_LAYOUT,
   pacing: Pacing = DEFAULT_PACING,
 ): FactoryScript {
-  const director = new Director(layout, pacing);
-  const visits = splitIntoVisits(recording.events);
+  const director = new Director(layout, pacing, recording.events);
+  const visits = withExchanges(splitIntoVisits(recording.events));
   let workEnd = 0;
   let station = FIRST_STATION;
   for (const [index, visit] of visits.entries()) {
     workEnd = director.work(visit);
     station = visit.station;
     const next = visits[index + 1];
-    if (next !== undefined) director.handOff(visit.station, next.station, workEnd);
+    if (next !== undefined) director.handOff(visit.station, next.station, workEnd, visit.exchange);
   }
   return director.finish(station, workEnd, succeeded(recording));
 }
