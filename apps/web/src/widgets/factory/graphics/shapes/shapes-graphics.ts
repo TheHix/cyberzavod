@@ -12,7 +12,7 @@ import {
   type WorkerFrame,
 } from "@cyberzavod/core";
 import { Application, Container, Graphics, Sprite, Text, type Texture } from "pixi.js";
-import type { FactoryView, ScreenPoint } from "../factory-view.ts";
+import type { FactoryGraphics, ScreenPoint } from "../factory-graphics.ts";
 import { poseOf } from "./pose.ts";
 
 const FULL_TURN = Math.PI * 2;
@@ -90,8 +90,8 @@ function themeOf(element: HTMLElement): Theme {
   };
 }
 
-/** Представление цеха из фигур, нарисованных кодом. */
-export class ShapesView implements FactoryView {
+/** Графика цеха из фигур, нарисованных кодом. */
+export class ShapesGraphics implements FactoryGraphics {
   readonly #app = new Application();
   readonly #world = new Container();
   readonly #labels = new Container();
@@ -120,7 +120,8 @@ export class ShapesView implements FactoryView {
       antialias: true,
       autoDensity: true,
       resolution: Math.min(window.devicePixelRatio, MAX_RESOLUTION),
-      // Кадры рисует проигрыватель, только когда сцена идёт: свой цикл Pixi не нужен.
+      // Кадр рисуется по подписке на сцену модели, только когда она меняется: свой цикл
+      // Pixi не нужен.
       autoStart: false,
       preference: "webgl",
     });

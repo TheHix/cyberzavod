@@ -1,0 +1,75 @@
+/* Точка над рабочим; сам пузырь раскрывается от неё к середине пола. */
+.anchor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: 0;
+  height: 0;
+}
+
+.bubble {
+  position: absolute;
+  width: max-content;
+  max-width: min(22rem, 80vw);
+  padding: 0.625rem 0.875rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 0.5rem 0.5rem 0;
+  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 0.45);
+}
+
+.anchor[data-vertical="above"] .bubble {
+  bottom: 1.5rem;
+}
+
+.anchor[data-vertical="below"] .bubble {
+  top: 1.5rem;
+}
+
+.anchor[data-horizontal="start"] .bubble {
+  left: -1rem;
+}
+
+.anchor[data-horizontal="center"] .bubble {
+  left: 0;
+  transform: translateX(-50%);
+}
+
+.anchor[data-horizontal="end"] .bubble {
+  right: -1rem;
+}
+
+.route {
+  margin: 0 0 0.25rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.goal {
+  margin: 0;
+  font-weight: 600;
+}
+
+.more {
+  margin-top: 0.375rem;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.requirements {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.5rem 0 0;
+  padding-left: 1.125rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}

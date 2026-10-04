@@ -7,11 +7,11 @@ export interface ScreenPoint {
 }
 
 /**
- * Представление цеха — как выглядят пол, станки, рабочие и деталь. Проигрыватель знает
- * только этот интерфейс, поэтому графику можно заменить целиком (фигуры, спрайты, 3D),
- * не трогая ядро, проигрывание и интерфейс над цехом.
+ * Графика цеха — как выглядят пол, станки, рабочие и деталь. Модель и интерфейс над цехом
+ * знают только этот интерфейс, поэтому графику можно заменить целиком (фигуры, спрайты, 3D),
+ * не трогая ядро, модель и компоненты.
  */
-export interface FactoryView {
+export interface FactoryGraphics {
   /** Встраивает холст в контейнер и рисует неподвижный план цеха. */
   mount(container: HTMLElement, layout: FactoryLayout): Promise<void>;
   /** Рисует кадр сцены. */
@@ -25,12 +25,11 @@ export interface FactoryView {
 }
 
 /**
- * Загружает представление цеха, которое показывает сайт. Код графики приходит отдельным
- * файлом и только в браузере; чтобы сменить графику, достаточно вернуть здесь другую
- * реализацию FactoryView.
- * @returns {Promise<FactoryView>} Представление, ещё не встроенное в страницу.
+ * Загружает графику цеха, которую показывает сайт. Её код приходит отдельным файлом и только
+ * в браузере; чтобы сменить графику, достаточно вернуть здесь другую реализацию FactoryGraphics.
+ * @returns {Promise<FactoryGraphics>} Графика, ещё не встроенная в страницу.
  */
-export async function loadFactoryView(): Promise<FactoryView> {
-  const { ShapesView } = await import("./shapes/shapes-view.ts");
-  return new ShapesView();
+export async function loadFactoryGraphics(): Promise<FactoryGraphics> {
+  const { ShapesGraphics } = await import("./shapes/shapes-graphics.ts");
+  return new ShapesGraphics();
 }
