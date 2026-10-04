@@ -20,8 +20,9 @@ function messageDraft(patch: Partial<DraftMessage> = {}): DraftMessage {
   return {
     t: 1_500,
     type: "draft_message",
-    from: "conductor",
-    to: "code",
+    from: "code",
+    to: "foreman",
+    source: "assignment",
     said: "Сделай счётчик токенов, показывай над цехом",
     line: "",
     text: "",
@@ -96,6 +97,17 @@ describe("parseDraft", () => {
     expect(act).toThrow(/model/);
   });
 
+  it.each(["assignment", "report", "answer"] as const)(
+    "принимает реплику с source %s",
+    (source) => {
+      const raw = { ...uneditedDraft(), events: [messageDraft({ source })] };
+
+      const draft = parseDraft(raw);
+
+      expect(draft.events).toEqual([messageDraft({ source })]);
+    },
+  );
+
   it("принимает реплику с ещё пустой редактурой и промпт с пометкой «склеен»", () => {
     const joined = {
       t: 2_000,
@@ -115,6 +127,8 @@ describe("parseDraft", () => {
   it.each([
     ["неизвестный говорящий", { from: "human" }],
     ["неизвестный адресат", { to: "deploy" }],
+    ["неизвестный source", { source: "question" }],
+    ["без source", { source: undefined }],
     ["без исходного текста", { said: undefined }],
     ["строка не строкой", { line: 5 }],
   ])("отклоняет реплику: %s", (_name, patch) => {
@@ -202,6 +216,15 @@ describe("carryOverEdits: реплики и склейка", () => {
     const draft = carryOverEdits(previous, next);
 
     expect(draft.events[1]).toEqual(edited);
+  });
+
+  it("берёт маршрут и source из пересобранного черновика, а редактуру из прошлого", () => {
+    const previous = draftWith(edited);
+    const next = draftWith(messageDraft({ from: "test", to: "code", source: "report" }));
+
+    const draft = carryOverEdits(previous, next);
+
+    expect(draft.events[1]).toEqual({ ...edited, from: "test", to: "code", source: "report" });
   });
 
   it("оставляет пустой реплику с другим исходным текстом", () => {
@@ -391,7 +414,7 @@ describe("publishDraft", () => {
     expect(act).toThrow(/IP-адрес/);
   });
 
-  it("публикует реплику без исходного текста", () => {
+  it("публикует реплику без исходного текста и source", () => {
     const draft = editedDraft();
     draft.events.splice(
       2,
@@ -404,8 +427,8 @@ describe("publishDraft", () => {
     expect(recording.events[2]).toEqual({
       t: 1_500,
       type: "message",
-      from: "conductor",
-      to: "code",
+      from: "code",
+      to: "foreman",
       line: "Сделай счётчик",
       text: "Сделай счётчик токенов.",
     });

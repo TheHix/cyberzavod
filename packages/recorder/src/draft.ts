@@ -3,12 +3,10 @@
 // публикация убирает исходный текст и пропускает запись через проверку ядра.
 
 import {
-  isListener,
   isSpeaker,
   parseFactoryEvent,
   parseRecording,
   type FactoryEvent,
-  type Listener,
   type Recording,
   type RecordingError,
   type Speaker,
@@ -31,15 +29,28 @@ export interface DraftPrompt {
   joined?: boolean;
 }
 
+const MESSAGE_SOURCES = ["assignment", "report", "answer"] as const;
+
+/**
+ * Откуда в сессии взялась реплика: задание станции, отчёт станции или итоговый ответ человеку.
+ * Это подсказка редактору, как писать `line`; на сайт она не идёт.
+ */
+export type MessageSource = (typeof MESSAGE_SOURCES)[number];
+
+function isMessageSource(value: unknown): value is MessageSource {
+  return (MESSAGE_SOURCES as readonly unknown[]).includes(value);
+}
+
 /**
  * Реплика в черновике: кто и кому сказал, исходный текст и чистовая версия для публикации.
- * Адресатов и текст `said` определяет сборка черновика, `line` и `text` пишет редактор.
+ * Участников, `source` и текст `said` определяет сборка черновика, `line` и `text` пишет редактор.
  */
 export interface DraftMessage {
   t: number;
   type: "draft_message";
   from: Speaker;
-  to: Listener;
+  to: Speaker;
+  source: MessageSource;
   said: string;
   line: string;
   text: string;
@@ -96,17 +107,20 @@ function parseDraftPrompt(raw: Record<string, unknown>, index: number): DraftPro
 }
 
 function parseDraftMessage(raw: Record<string, unknown>, index: number): DraftMessage {
-  const { t, from, to, said, line, text } = raw;
+  const { t, from, to, source, said, line, text } = raw;
   if (typeof t !== "number" || typeof said !== "string") {
     throw new DraftError(`событие #${index}: у реплики должны быть t и said`);
   }
-  if (!isSpeaker(from) || !isListener(to)) {
+  if (!isSpeaker(from) || !isSpeaker(to)) {
     throw new DraftError(`событие #${index}: у реплики должны быть from и to`);
+  }
+  if (!isMessageSource(source)) {
+    throw new DraftError(`событие #${index}: неизвестный source ${String(source)}`);
   }
   if (typeof line !== "string" || typeof text !== "string") {
     throw new DraftError(`событие #${index}: line и text реплики должны быть строками`);
   }
-  return { t, type: "draft_message", from, to, said, line, text };
+  return { t, type: "draft_message", from, to, source, said, line, text };
 }
 
 function parseDraftEvent(raw: unknown, index: number): DraftEvent {

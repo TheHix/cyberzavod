@@ -27,6 +27,7 @@ export {
   type DraftMessage,
   type DraftPrompt,
   type EditableDraftEvent,
+  type MessageSource,
 } from "./draft.ts";
 export { findLeaks } from "./leaks.ts";
 export {

@@ -1,8 +1,8 @@
 // Сырой журнал Claude Code → черновик записи сборки.
 // Этапы выводятся из действий агента по таблицам ниже; новый признак этапа — новая строка в таблице.
 
-import { CONDUCTOR, HUMAN, STAGES, type Stage } from "@cyberzavod/core";
-import type { Draft, DraftEvent, DraftMessage } from "./draft.ts";
+import { FOREMAN, STAGES, type Speaker, type Stage } from "@cyberzavod/core";
+import type { Draft, DraftEvent, DraftMessage, MessageSource } from "./draft.ts";
 import type { RawEvent } from "./raw-event.ts";
 import type { AgentAssignment, AgentReport, ModelReply, TranscriptText } from "./transcript.ts";
 
@@ -43,14 +43,21 @@ const AGENT_STAGES: Readonly<Record<string, Stage>> = {
   reviewer: "review",
 };
 
-// Вердикты станций /feature — первая строка ответа агента. Отказ возвращает деталь с этапа
-// агента, а последний вердикт, как и последний запуск проверок, решает исход сборки.
+// Вердикты станций /feature — первая строка ответа агента, по агенту: чужое слово вердиктом
+// не считается (`НА ДОРАБОТКУ` у тестировщика), а у агентов без таблицы (analyst, coder) первая
+// строка — просто начало отчёта. Отказ возвращает деталь с этапа агента, а последний вердикт,
+// как и последний запуск проверок, решает исход сборки.
 type Verdict = { passed: true } | { passed: false; reason: string };
-const VERDICTS: Readonly<Record<string, Verdict>> = {
-  "ПРОВЕРКИ ПРОЙДЕНЫ": { passed: true },
-  ПРИНЯТО: { passed: true },
-  ДЕФЕКТ: { passed: false, reason: "тестировщик нашёл дефект" },
-  "НА ДОРАБОТКУ": { passed: false, reason: "ревью вернуло на доработку" },
+const VERDICTS: Readonly<Record<string, Readonly<Record<string, Verdict>>>> = {
+  tester: {
+    "ПРОВЕРКИ ПРОЙДЕНЫ": { passed: true },
+    ГОТОВО: { passed: true },
+    ДЕФЕКТ: { passed: false, reason: "тестировщик нашёл дефект" },
+  },
+  reviewer: {
+    ПРИНЯТО: { passed: true },
+    "НА ДОРАБОТКУ": { passed: false, reason: "ревью вернуло на доработку" },
+  },
 };
 
 // Среда Claude Code доставляет отчёты сабагентов и уведомления тем же событием, что и
@@ -124,9 +131,12 @@ export function isHumanPrompt(text: string): boolean {
   return !SERVICE_MESSAGE_PREFIXES.some((prefix) => start.startsWith(prefix));
 }
 
-// Вердикт по строке из журнала; Object.hasOwn — чтобы «constructor» не нашёлся в прототипе.
-function verdictFor(line: string | undefined): Verdict | undefined {
-  return line !== undefined && Object.hasOwn(VERDICTS, line) ? VERDICTS[line] : undefined;
+// Вердикт агента по строке из журнала; Object.hasOwn на обоих уровнях — чтобы «constructor»
+// не нашёлся в прототипе.
+function verdictFor(agent: string, line: string | undefined): Verdict | undefined {
+  if (line === undefined || !Object.hasOwn(VERDICTS, agent)) return undefined;
+  const verdicts = VERDICTS[agent];
+  return verdicts !== undefined && Object.hasOwn(verdicts, line) ? verdicts[line] : undefined;
 }
 
 function agentWindowKey(
@@ -147,11 +157,12 @@ function stageAt(events: readonly DraftEvent[], t: number): Stage {
 
 function draftMessage(
   t: number,
-  from: DraftMessage["from"],
-  to: DraftMessage["to"],
+  from: Speaker,
+  to: Speaker,
+  source: MessageSource,
   said: string,
 ): DraftMessage {
-  return { t, type: "draft_message", from, to, said, line: "", text: "" };
+  return { t, type: "draft_message", from, to, source, said, line: "", text: "" };
 }
 
 // Агенты запусков по id: из старта сабагента видно, чей отчёт или чьё сообщение это было.
@@ -165,31 +176,41 @@ function agentsByIdOf(events: readonly RawEvent[]): Map<string, string> {
   return agents;
 }
 
-// Задание станции: мастер говорит этапу агента. Агенты не из AGENT_STAGES пропускаются.
-function assignmentMessages(
+// Ремарка — всё, что прозвучало в сессии, ещё без адресата: его даёт ход, в котором она стоит.
+// `stage` — станция, чьё слово это: у задания и отчёта — станция агента, у ответа — этап
+// в момент ответа.
+type Remark =
+  | { kind: "assignment"; t: number; stage: Stage; said: string }
+  | { kind: "report"; t: number; stage: Stage; said: string }
+  | { kind: "answer"; t: number; stage: Stage; said: string };
+
+// Задание станции: рабочий агента принимает его. Агенты не из AGENT_STAGES пропускаются.
+function assignmentRemarks(
   assignments: readonly AgentAssignment[],
   agentsById: ReadonlyMap<string, string>,
   at: (ts: number) => number,
-): DraftMessage[] {
+): Remark[] {
   return assignments.flatMap((assignment) => {
     const agent =
       assignment.via === "spawn" ? assignment.agentType : agentsById.get(assignment.agentId);
     const stage = stageOfAgent(agent);
     return stage === undefined
       ? []
-      : [draftMessage(at(assignment.ts), CONDUCTOR, stage, assignment.text)];
+      : [{ kind: "assignment", t: at(assignment.ts), stage, said: assignment.text }];
   });
 }
 
-// Отчёт станции: рабочий этапа сдаёт работу мастеру.
-function reportMessages(
+// Отчёт станции: рабочий этапа сдаёт работу.
+function reportRemarks(
   reports: readonly AgentReport[],
   agentsById: ReadonlyMap<string, string>,
   at: (ts: number) => number,
-): DraftMessage[] {
+): Remark[] {
   return reports.flatMap((report) => {
     const stage = stageOfAgent(agentsById.get(report.agentId));
-    return stage === undefined ? [] : [draftMessage(at(report.ts), stage, CONDUCTOR, report.text)];
+    return stage === undefined
+      ? []
+      : [{ kind: "report", t: at(report.ts), stage, said: report.text }];
   });
 }
 
@@ -206,31 +227,65 @@ function turnsOf(events: readonly RawEvent[]): Turn[] {
   return starts.map((from, index) => ({ from, to: starts[index + 1] ?? Number.POSITIVE_INFINITY }));
 }
 
-function workedStationIn(events: readonly RawEvent[], turn: Turn): boolean {
-  return events.some(
-    (event) =>
-      event.kind === "subagent_start" &&
-      event.ts >= turn.from &&
-      event.ts < turn.to &&
-      stageOfAgent(event.agent) !== undefined,
-  );
-}
-
-// Итоговый ответ хода — последний текст модели в нём. Если в ходе работала станция, отвечает
-// мастер, который раздавал работу; иначе — рабочий этапа в момент ответа.
-function answerMessages(
+// Итоговый ответ хода — последний текст модели в нём; говорит его рабочий этапа в момент ответа.
+function answerRemarks(
   events: readonly RawEvent[],
   answers: readonly TranscriptText[],
   stageOnTime: (t: number) => Stage,
   at: (ts: number) => number,
-): DraftMessage[] {
+): Remark[] {
   return turnsOf(events).flatMap((turn) => {
     const answer = answers.findLast(({ ts }) => ts >= turn.from && ts < turn.to);
     if (answer === undefined) return [];
     const t = at(answer.ts);
-    const from = workedStationIn(events, turn) ? CONDUCTOR : stageOnTime(t);
-    return [draftMessage(t, from, HUMAN, answer.text)];
+    return [{ kind: "answer", t, stage: stageOnTime(t), said: answer.text }];
   });
+}
+
+// С кем говорит рабочий, сдавая работу или отвечая: следующему по заданию, а если после него
+// никого — мастеру. Задание той же станции не в счёт: это дополнение к её же работе.
+function recipientOfReport(remarks: readonly Remark[], index: number, stage: Stage): Speaker {
+  for (const next of remarks.slice(index + 1)) {
+    if (next.kind === "answer") return FOREMAN;
+    if (next.kind === "assignment" && next.stage !== stage) return next.stage;
+  }
+  return FOREMAN;
+}
+
+// От кого рабочий получил задание: от станции, сдавшей работу последней (не его самого),
+// а если такой нет — от мастера, который только что поставил задачу.
+function giverOfAssignment(remarks: readonly Remark[], index: number, stage: Stage): Speaker {
+  const report = remarks
+    .slice(0, index)
+    .findLast((previous) => previous.kind === "report" && previous.stage !== stage);
+  return report?.stage ?? FOREMAN;
+}
+
+// Ремарка превращается в реплику: говорит рабочий станции. Задание принимает принимающий
+// («Принял, изучу»), отчёт говорит сдающий («Держи»), ответ — мастеру.
+function messageOf(remark: Remark, remarks: readonly Remark[], index: number): DraftMessage {
+  const { kind, t, stage, said } = remark;
+  switch (kind) {
+    case "assignment":
+      return draftMessage(t, stage, giverOfAssignment(remarks, index, stage), kind, said);
+    case "report":
+      return draftMessage(t, stage, recipientOfReport(remarks, index, stage), kind, said);
+    case "answer":
+      return draftMessage(t, stage, FOREMAN, kind, said);
+    default:
+      return kind satisfies never;
+  }
+}
+
+// Ремарки делятся на ходы по промптам человека: ход длится от промпта до следующего, а то,
+// что прозвучало до первого промпта, образует свой ход.
+function messagesOf(remarks: readonly Remark[], promptTimes: readonly number[]): DraftMessage[] {
+  const turns: Remark[][] = [[], ...promptTimes.map((): Remark[] => [])];
+  for (const remark of [...remarks].sort((a, b) => a.t - b.t)) {
+    const turn = promptTimes.filter((promptTime) => promptTime <= remark.t).length;
+    turns[turn]?.push(remark);
+  }
+  return turns.flatMap((turn) => turn.map((remark, index) => messageOf(remark, turn, index)));
 }
 
 // Реплики встают после событий с тем же t: сначала происходит событие, потом о нём говорят.
@@ -286,7 +341,7 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
 
   const judge = (agent: string, run: string, line: string | undefined, ts: number) => {
     const stage = stageOfAgent(agent);
-    const verdict = verdictFor(line);
+    const verdict = verdictFor(agent, line);
     if (stage === undefined || verdict === undefined || judgedRuns.has(run)) return;
     judgedRuns.add(run);
     lastChecksOk = verdict.passed;
@@ -354,11 +409,15 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
   }
 
   const agentsById = agentsByIdOf(events);
-  const messages = [
-    ...assignmentMessages(meta.assignments ?? [], agentsById, atWithinBuild),
-    ...reportMessages(meta.reports ?? [], agentsById, atWithinBuild),
-    ...answerMessages(events, meta.answers ?? [], (t) => stageAt(draftEvents, t), atWithinBuild),
+  const remarks = [
+    ...assignmentRemarks(meta.assignments ?? [], agentsById, atWithinBuild),
+    ...reportRemarks(meta.reports ?? [], agentsById, atWithinBuild),
+    ...answerRemarks(events, meta.answers ?? [], (t) => stageAt(draftEvents, t), atWithinBuild),
   ];
+  const promptTimes = draftEvents.flatMap((event) =>
+    event.type === "draft_prompt" ? [event.t] : [],
+  );
+  const messages = messagesOf(remarks, promptTimes);
   const chatEvents = mergeMessages(draftEvents, messages);
   if (meta.tokens !== undefined) {
     chatEvents.push({ t: at(endTs), type: "usage", tokens: meta.tokens });

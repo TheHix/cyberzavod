@@ -141,7 +141,9 @@ function awaitsEditing(event: DraftEvent): event is EditableDraftEvent {
 
 function describeWaiting(event: EditableDraftEvent): string {
   const said = event.said.replace(/\s+/g, " ");
-  return event.type === "draft_prompt" ? said : `${event.from} → ${event.to}: ${said}`;
+  return event.type === "draft_prompt"
+    ? said
+    : `${event.from} → ${event.to} (${event.source}): ${said}`;
 }
 
 const rawPath = process.argv[2] ?? (await newestFile(RECORDINGS_DIRS.raw, ".jsonl"));
