@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { formatClock, formatDate, formatDuration, formatModel, formatTokens } from "./format.ts";
+import {
+  formatClock,
+  formatCount,
+  formatDate,
+  formatDuration,
+  formatModel,
+  formatTokens,
+} from "./format.ts";
 
 describe("formatDuration", () => {
   it("показывает только секунды, если меньше минуты", () => {
@@ -68,5 +75,23 @@ describe("formatModel", () => {
     const result = formatModel(id);
 
     expect(result).toBe(name);
+  });
+});
+
+describe("formatCount", () => {
+  const prompts = { one: "промпт", few: "промпта", many: "промптов" };
+
+  it.each([
+    [1, "1 промпт"],
+    [3, "3 промпта"],
+    [5, "5 промптов"],
+    [11, "11 промптов"],
+    [21, "21 промпт"],
+    [0, "0 промптов"],
+  ])("пишет %i со словом в нужной форме: %s", (count, expected) => {
+    const result = formatCount(count, prompts);
+
+    // Intl ставит неразрывные пробелы — сравниваем с обычными.
+    expect(result.replace(/\s/g, " ")).toBe(expected);
   });
 });

@@ -1,0 +1,124 @@
+/* Игровая кнопка: плашка с контуром и тенью вниз; при нажатии «вдавливается». */
+.button {
+  --button-face: var(--paper);
+
+  display: inline-flex;
+  gap: var(--space-xs);
+  align-items: center;
+  justify-content: center;
+  min-height: var(--control-size);
+  padding: 0 var(--space-l);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--text-m);
+  font-weight: 700;
+  line-height: 1.1;
+  text-decoration: none;
+  background: var(--button-face);
+  border: var(--outline);
+  border-radius: var(--radius-m);
+  box-shadow: var(--lift);
+  cursor: pointer;
+  transition:
+    transform var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    background-color var(--motion-fast) ease;
+}
+
+/* Подъём при наведении — только там, где есть мышь: на сенсорном экране он «залипает». */
+@media (hover: hover) {
+  .button:hover {
+    transform: translateY(var(--hover-shift));
+    box-shadow: var(--lift-hover);
+  }
+}
+
+.button:active {
+  transform: translateY(var(--press-shift));
+  box-shadow: var(--lift-pressed);
+}
+
+.button:disabled {
+  color: var(--ink-soft);
+  cursor: default;
+  opacity: 0.6;
+  transform: none;
+  box-shadow: var(--lift-pressed);
+}
+
+.primary {
+  --button-face: var(--sun);
+}
+
+.ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.ghost:hover,
+.ghost:active {
+  background: var(--paper-deep);
+  transform: none;
+  box-shadow: none;
+}
+
+/* Текстовая кнопка внутри содержимого: «подробнее», «свернуть». */
+.link {
+  min-height: auto;
+  padding: 0;
+  font-size: var(--text-s);
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-thickness: var(--outline-width);
+  text-underline-offset: var(--outline-width);
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.link:hover,
+.link:active {
+  color: var(--ink-soft);
+  transform: none;
+  box-shadow: none;
+}
+
+.large {
+  min-height: var(--control-size-large);
+  padding: 0 var(--space-xl);
+  font-size: var(--text-l);
+  border-radius: var(--radius-l);
+}
+
+.icon {
+  width: var(--control-size);
+  padding: 0;
+}
+
+.icon.large {
+  width: var(--control-size-large);
+}
+
+.round {
+  border-radius: var(--radius-round);
+}
+
+/* Плитка меню: иконка над подписью. На узком или низком экране сжимается. */
+.tile {
+  flex-direction: column;
+  gap: var(--space-2xs);
+  width: 100%;
+  min-height: auto;
+  padding: var(--space-s) var(--space-2xs);
+  font-size: var(--text-s);
+}
+
+@media (max-width: 48rem), (max-height: 40rem) {
+  .tile {
+    padding: var(--space-xs) var(--space-2xs);
+    font-size: var(--text-xs);
+    white-space: nowrap;
+  }
+}

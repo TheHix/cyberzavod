@@ -1,14 +1,4 @@
-:root {
-  color-scheme: dark;
-  --bg: #0d0f12;
-  --surface: #14171c;
-  --line: #262b33;
-  --text: #e6e8eb;
-  --muted: #8a919c;
-  --accent: #ff9f1c;
-  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
-}
+@import "@/shared/ui/tokens.css";
 
 *,
 *::before,
@@ -16,14 +6,43 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+}
+
+/* Весь сайт — игровое поле: страница не прокручивается, длинное содержимое — в панелях. */
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-sans);
+  overflow: hidden;
+  background: var(--floor);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--text-m);
   line-height: 1.5;
 }
 
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  line-height: 1.15;
+}
+
 a {
-  color: var(--accent);
+  color: inherit;
+}
+
+:focus-visible {
+  outline: var(--outline-width) solid var(--sky);
+  outline-offset: var(--outline-width);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

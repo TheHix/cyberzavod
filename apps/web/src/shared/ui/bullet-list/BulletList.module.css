@@ -1,0 +1,11 @@
+.list {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding-left: var(--space-l);
+  font-weight: 600;
+}
+
+.list li::marker {
+  color: var(--tangerine);
+}

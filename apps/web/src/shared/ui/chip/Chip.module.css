@@ -1,0 +1,25 @@
+/* Метка-таблетка: «человек → Claude Opus 5.5», дата, время. */
+.chip {
+  display: inline-block;
+  padding: 0 var(--space-s);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--text-s);
+  font-weight: 800;
+  line-height: 1.5;
+  white-space: nowrap;
+  border: var(--outline);
+  border-radius: var(--radius-round);
+}
+
+.sun {
+  background: var(--sun);
+}
+
+.sky {
+  background: var(--sky);
+}
+
+.paper {
+  background: var(--paper);
+}

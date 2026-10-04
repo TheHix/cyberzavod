@@ -1,0 +1,76 @@
+/* Выезжающая панель поверх цеха: нативный popover — закрывается по Esc и кликом мимо. */
+.drawer {
+  inset: var(--gutter) auto var(--gutter) calc(var(--sidebar-width) + var(--gutter) * 2);
+  width: min(var(--drawer-width), calc(100vw - var(--sidebar-width) - var(--gutter) * 3));
+  max-height: none;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  color: var(--ink);
+  background: var(--paper);
+  border: var(--outline);
+  border-radius: var(--radius-l);
+  box-shadow: var(--lift-large);
+  transition:
+    opacity var(--motion-slide) ease,
+    transform var(--motion-slide) ease,
+    overlay var(--motion-slide) allow-discrete,
+    display var(--motion-slide) allow-discrete;
+}
+
+.drawer:popover-open {
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer:not(:popover-open) {
+  opacity: 0;
+  transform: translateX(calc(-1 * var(--space-xl)));
+}
+
+@starting-style {
+  .drawer:popover-open {
+    opacity: 0;
+    transform: translateX(calc(-1 * var(--space-xl)));
+  }
+}
+
+.drawer::backdrop {
+  background: color-mix(in srgb, var(--ink) 25%, transparent);
+}
+
+.header {
+  display: flex;
+  gap: var(--space-l);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-l) var(--space-l) var(--space-l) var(--space-xl);
+  background: var(--sun);
+  border-bottom: var(--outline);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 800;
+}
+
+.body {
+  flex: 1;
+  padding: var(--space-l) var(--space-xl) var(--space-xl);
+  overflow-y: auto;
+}
+
+@media (max-width: 48rem) {
+  .drawer {
+    inset: auto var(--gutter) var(--gutter);
+    width: auto;
+    max-height: 80dvh;
+  }
+
+  .drawer:not(:popover-open),
+  .drawer:popover-open {
+    transform: none;
+  }
+}

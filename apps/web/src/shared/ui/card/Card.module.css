@@ -1,0 +1,7 @@
+/* Карточка внутри панели: запись в списке, промпт в журнале. Тише панели — без тени. */
+.card {
+  padding: var(--space-m) var(--space-l);
+  background: var(--paper-deep);
+  border: var(--outline);
+  border-radius: var(--radius-m);
+}

@@ -1,0 +1,24 @@
+/* Панель-наклейка: светлая бумага, толстый контур, тень вниз. */
+.panel {
+  padding: var(--space-l);
+  background: var(--paper);
+  border: var(--outline);
+  border-radius: var(--radius-l);
+  box-shadow: var(--lift-large);
+}
+
+/* Ярлык над содержимым: «СБОРКА», «ЖУРНАЛ». */
+.label {
+  display: inline-block;
+  margin-bottom: var(--space-m);
+  padding: var(--space-2xs) var(--space-s);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--text-s);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--sun);
+  border: var(--outline);
+  border-radius: var(--radius-round);
+}

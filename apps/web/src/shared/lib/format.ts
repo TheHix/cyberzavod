@@ -79,3 +79,25 @@ export function formatModel(id: string): string {
   const version = minor === undefined ? major : `${major}.${minor}`;
   return `Claude ${family.charAt(0).toUpperCase()}${family.slice(1)} ${version}`;
 }
+
+/** Формы слова для числа: «1 промпт», «2 промпта», «5 промптов». */
+export interface WordForms {
+  readonly one: string;
+  readonly few: string;
+  readonly many: string;
+}
+
+const pluralRules = new Intl.PluralRules("ru-RU");
+const countFormatter = new Intl.NumberFormat("ru-RU");
+
+/**
+ * Пишет число со словом в нужной форме.
+ * @param {number} count Целое число.
+ * @param {WordForms} forms Формы слова для 1, 2 и 5.
+ * @returns {string} Строка вида «5 промптов» или «2 875 954 токена».
+ */
+export function formatCount(count: number, forms: WordForms): string {
+  const category = pluralRules.select(count);
+  const word = category === "one" ? forms.one : category === "few" ? forms.few : forms.many;
+  return `${countFormatter.format(count)} ${word}`;
+}

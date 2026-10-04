@@ -1,0 +1,99 @@
+/* Токены оформления — единственное место, где заданы цвета, контуры, тени, шрифты и размеры.
+   Компоненты ui-kit, виджеты и графика цеха (она читает краски отсюда при встраивании) берут
+   значения отсюда и своих «голых» значений не заводят.
+   Стиль — яркий тайкун: насыщенные краски, толстый тёмный контур и жёсткая тень вниз,
+   как у наклейки или игровой кнопки. */
+:root {
+  color-scheme: light;
+
+  /* Краски */
+  --ink: #1d1b33;
+  --ink-soft: #57537a;
+  --paper: #fff6e0;
+  --paper-deep: #ffe7b0;
+  --floor: #7d8fe3;
+  --sun: #ffd23f;
+  --sun-deep: #f2a900;
+  --sky: #3fc1ff;
+  --tangerine: #ff8c42;
+  --mint: #4cd47b;
+  --grape: #b37bff;
+  --bubblegum: #ff5ca8;
+  --danger: #ff4d6d;
+
+  /* Краски, которые есть только у графики цеха: пол, станки, рабочие, деталь */
+  --floor-tile-alt: #8797ea;
+  --floor-grout: #6c7dd4;
+  --floor-lane: #6676cf;
+  --floor-pad: #9aa9f0;
+  --screen: #26244a;
+  --screen-glass: #e4f6ff;
+  --belt: #3b3960;
+  --lamp-on: #fff27a;
+  --skin: #f2c29b;
+  --crate: #ffb347;
+  --crate-plank: #d9822b;
+
+  /* Контур и тени: обводка вокруг всего, «приподнятые» элементы отбрасывают тень вниз */
+  --outline-width: 3px;
+  --outline: var(--outline-width) solid var(--ink);
+  --lift: 0 0.3rem 0 var(--ink);
+  --lift-hover: 0 0.42rem 0 var(--ink);
+  --lift-pressed: 0 0.08rem 0 var(--ink);
+  --lift-large: 0 0.45rem 0 var(--ink);
+  --lift-text: 0 0.15rem 0 var(--ink);
+  --radius-s: 0.6rem;
+  --radius-m: 1rem;
+  --radius-l: 1.5rem;
+  --radius-round: 999px;
+
+  /* Шрифты: заголовки и кнопки — плотный Rubik, текст — округлый Nunito */
+  --font-display: "Rubik Variable", "Rubik", system-ui, sans-serif;
+  --font-body: "Nunito Variable", "Nunito", system-ui, sans-serif;
+  --text-xs: 0.6875rem;
+  --text-s: 0.875rem;
+  --text-m: 1.0625rem;
+  --text-l: 1.375rem;
+  --text-xl: 1.875rem;
+
+  /* Отступы */
+  --space-2xs: 0.25rem;
+  --space-xs: 0.4rem;
+  --space-s: 0.6rem;
+  --space-m: 0.9rem;
+  --space-l: 1.25rem;
+  --space-xl: 1.5rem;
+
+  /* Подъём при наведении и нажатие кнопок; «уменьшить движение» их выключает */
+  --press-shift: 0.22rem;
+  --hover-shift: -2px;
+  --motion-fast: 80ms;
+  --motion-slide: 160ms;
+
+  /* Размеры раскладки и элементов управления */
+  --gutter: 1.25rem;
+  --sidebar-width: 6.75rem;
+  --hud-width: 25rem;
+  --drawer-width: 30rem;
+  --control-size: 3.25rem;
+  --control-size-large: 4.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --press-shift: 0px;
+    --hover-shift: 0px;
+    --motion-fast: 0ms;
+    --motion-slide: 0ms;
+  }
+}
+
+/* На узком или низком экране всё компактнее: кегль заголовков, отступы, элементы управления. */
+@media (max-width: 48rem), (max-height: 40rem) {
+  :root {
+    --text-xl: 1.375rem;
+    --gutter: 0.75rem;
+    --control-size: 2.75rem;
+    --control-size-large: 3.5rem;
+  }
+}

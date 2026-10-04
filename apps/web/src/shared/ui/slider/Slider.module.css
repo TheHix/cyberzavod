@@ -1,0 +1,50 @@
+.slider {
+  --track-height: 0.9rem;
+  --thumb-size: 1.6rem;
+
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  touch-action: none;
+  user-select: none;
+}
+
+.track {
+  position: relative;
+  flex: 1;
+  height: var(--track-height);
+  background: var(--paper-deep);
+  border: var(--outline);
+  border-radius: var(--radius-round);
+}
+
+.fill {
+  position: absolute;
+  height: 100%;
+  background: var(--sun);
+  border-radius: var(--radius-round);
+}
+
+/* Kobalte ставит ползунку inline transform по горизонтали; по вертикали центрируем
+   отдельным свойством translate — оно с ним не спорит. */
+.thumb {
+  top: 50%;
+  display: block;
+  width: var(--thumb-size);
+  height: var(--thumb-size);
+  background: var(--paper);
+  border: var(--outline);
+  border-radius: var(--radius-round);
+  box-shadow: var(--lift-pressed);
+  cursor: grab;
+  translate: 0 -50%;
+}
+
+.thumb:active {
+  cursor: grabbing;
+}
+
+.slider[data-disabled] {
+  opacity: 0.6;
+}
