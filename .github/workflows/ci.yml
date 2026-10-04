@@ -36,6 +36,11 @@ jobs:
         with:
           go-version-file: apps/api/go.mod
           cache-dependency-path: apps/api/go.sum
+      # Только установка: сам линтер запускает make check-api, как и локально.
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.14.0
+          install-only: true
       - run: make check-api check-docker
 
   infra:
