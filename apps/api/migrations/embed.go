@@ -4,5 +4,7 @@ package migrations
 
 import "embed"
 
+// FS — SQL-миграции, вшитые в бинарник.
+//
 //go:embed *.sql
 var FS embed.FS

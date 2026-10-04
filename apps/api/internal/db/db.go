@@ -3,6 +3,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -13,6 +14,7 @@ import (
 	"github.com/TheHix/cyberzavod/apps/api/migrations"
 )
 
+// Connect открывает пул соединений с Postgres.
 func Connect(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	pool, err := pgxpool.New(ctx, url)
 	if err != nil {
@@ -22,13 +24,17 @@ func Connect(ctx context.Context, url string) (*pgxpool.Pool, error) {
 }
 
 // Migrate применяет все миграции из папки migrations, вшитой в бинарник.
-func Migrate(ctx context.Context, url string) error {
+func Migrate(ctx context.Context, url string) (err error) {
 	cfg, err := pgxpool.ParseConfig(url)
 	if err != nil {
 		return fmt.Errorf("разбор DATABASE_URL: %w", err)
 	}
 	conn := stdlib.OpenDB(*cfg.ConnConfig)
-	defer conn.Close()
+	defer func() {
+		if closeErr := conn.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("закрытие соединения: %w", closeErr))
+		}
+	}()
 
 	// Advisory-блокировка в Postgres: два одновременных migrate не применят миграции дважды.
 	locker, err := lock.NewPostgresSessionLocker()

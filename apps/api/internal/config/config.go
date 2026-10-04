@@ -10,6 +10,7 @@ import (
 
 const defaultAddr = ":8080"
 
+// Config — настройки API, прочитанные из окружения.
 type Config struct {
 	// Addr — адрес, на котором слушает HTTP-сервер, например ":8080".
 	Addr string
@@ -17,6 +18,7 @@ type Config struct {
 	DatabaseURL string
 }
 
+// Load читает настройки из переменных окружения. DATABASE_URL обязателен.
 func Load() (Config, error) {
 	cfg := Config{
 		Addr:        Addr(),

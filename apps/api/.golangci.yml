@@ -1,0 +1,24 @@
+# Линтер Go: запускается из `make check-api` и в CI.
+version: "2"
+
+linters:
+  # errcheck, govet, ineffassign, staticcheck, unused
+  default: standard
+  enable:
+    - revive
+    - errorlint
+    - bodyclose
+    - noctx
+    - nilerr
+    - copyloopvar
+  # revive — с набором правил по умолчанию: в него входят exported (комментарий на
+  # экспортируемом, начинается с имени) и package-comments.
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/TheHix/cyberzavod

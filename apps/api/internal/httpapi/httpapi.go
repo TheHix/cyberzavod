@@ -15,11 +15,13 @@ type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
+// Deps — зависимости обработчиков API.
 type Deps struct {
 	DB     Pinger
 	Logger *slog.Logger
 }
 
+// NewHandler собирает маршруты API.
 func NewHandler(deps Deps) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", health)

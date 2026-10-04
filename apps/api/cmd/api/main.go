@@ -122,7 +122,8 @@ func healthcheck(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	// Тело ответа healthcheck не читается: ошибка закрытия ничего не меняет в результате.
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("health вернул %d", resp.StatusCode)
 	}

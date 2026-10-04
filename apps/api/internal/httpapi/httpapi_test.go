@@ -37,15 +37,12 @@ func TestRoutes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Arrange
 			handler := newTestHandler(tt.dbErr)
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(tt.method, tt.path, nil)
+			req := httptest.NewRequestWithContext(t.Context(), tt.method, tt.path, nil)
 
-			// Act
 			handler.ServeHTTP(rec, req)
 
-			// Assert
 			if rec.Code != tt.want {
 				t.Fatalf("%s %s: код %d, ожидался %d", tt.method, tt.path, rec.Code, tt.want)
 			}
