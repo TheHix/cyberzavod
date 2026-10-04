@@ -20,8 +20,9 @@ function editedDraft(): Draft {
         t: 1_000,
         type: "draft_prompt",
         said: "добавь плз счетчик токенов над цехом",
-        goal: "Добавить счётчик токенов",
-        requirements: ["Показывать над цехом"],
+        goal: "Добавь счётчик токенов",
+        requirements: ["Показывай его над цехом"],
+        model: "claude-opus-5-5",
       },
       { t: 2_000, type: "stage_enter", stage: "code" },
       { t: 3_000, type: "build_end", ok: true },
@@ -60,6 +61,17 @@ describe("parseDraft", () => {
     expect(act).toThrow(DraftError);
   });
 
+  it("отклоняет модель не строкой", () => {
+    const raw = {
+      ...editedDraft(),
+      events: [{ t: 0, type: "draft_prompt", said: "текст", goal: "", requirements: [], model: 5 }],
+    };
+
+    const act = () => parseDraft(raw);
+
+    expect(act).toThrow(/model/);
+  });
+
   it("отклоняет событие цеха не по формату ядра", () => {
     const raw = { ...editedDraft(), events: [{ t: 0, type: "stage_enter", stage: "deploy" }] };
 
@@ -77,6 +89,28 @@ describe("carryOverEdits", () => {
     const draft = carryOverEdits(previous, next);
 
     expect(draft).toEqual(editedDraft());
+  });
+
+  it("сохраняет найденную раньше модель, если транскрипта уже нет", () => {
+    const previous = editedDraft();
+    const next: Draft = {
+      ...uneditedDraft(),
+      events: [
+        { t: 0, type: "build_start" },
+        {
+          t: 1_000,
+          type: "draft_prompt",
+          said: "добавь плз счетчик токенов над цехом",
+          goal: "",
+          requirements: [],
+        },
+        { t: 3_000, type: "build_end", ok: true },
+      ],
+    };
+
+    const draft = carryOverEdits(previous, next);
+
+    expect(draft.events[1]).toMatchObject({ model: "claude-opus-5-5" });
   });
 
   it("оставляет пустым новый промпт и промпт с другим текстом", () => {
@@ -111,7 +145,7 @@ describe("orphanedEdits", () => {
 
     const orphaned = orphanedEdits(previous, next).map((prompt) => prompt.goal);
 
-    expect(orphaned).toEqual(["Добавить счётчик токенов"]);
+    expect(orphaned).toEqual(["Добавь счётчик токенов"]);
   });
 
   it("находит и редактуру, где заполнены только требования", () => {
@@ -121,13 +155,13 @@ describe("orphanedEdits", () => {
       type: "draft_prompt",
       said: "добавь плз счетчик токенов над цехом",
       goal: "",
-      requirements: ["Показывать над цехом"],
+      requirements: ["Показывай его над цехом"],
     };
     const next: Draft = { ...uneditedDraft(), events: [] };
 
     const orphaned = orphanedEdits(previous, next).map((prompt) => prompt.requirements);
 
-    expect(orphaned).toEqual([["Показывать над цехом"]]);
+    expect(orphaned).toEqual([["Показывай его над цехом"]]);
   });
 
   it("не считает потерей промпт, который ещё не редактировали", () => {
@@ -141,7 +175,7 @@ describe("orphanedEdits", () => {
 });
 
 describe("publishDraft", () => {
-  it("публикует промпты без исходного текста", () => {
+  it("публикует промпты без исходного текста, но с моделью", () => {
     const draft = editedDraft();
 
     const recording = publishDraft(draft);
@@ -149,8 +183,9 @@ describe("publishDraft", () => {
     expect(recording.events[1]).toEqual({
       t: 1_000,
       type: "prompt",
-      goal: "Добавить счётчик токенов",
-      requirements: ["Показывать над цехом"],
+      goal: "Добавь счётчик токенов",
+      requirements: ["Показывай его над цехом"],
+      model: "claude-opus-5-5",
     });
   });
 
@@ -177,6 +212,22 @@ describe("publishDraft", () => {
       type: "stage_fail",
       stage: "test",
       reason: "нет доступа к 203.0.113.7",
+    };
+
+    const act = () => publishDraft(draft);
+
+    expect(act).toThrow(/IP-адрес/);
+  });
+
+  it("проверяет на утечки и модель промпта", () => {
+    const draft = editedDraft();
+    draft.events[1] = {
+      t: 1_000,
+      type: "draft_prompt",
+      said: "текст",
+      goal: "Добавь счётчик",
+      requirements: [],
+      model: "arn:aws:bedrock:203.0.113.7",
     };
 
     const act = () => publishDraft(draft);

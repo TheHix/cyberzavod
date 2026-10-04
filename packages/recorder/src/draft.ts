@@ -18,6 +18,8 @@ export interface DraftPrompt {
   said: string;
   goal: string;
   requirements: string[];
+  /** Модель, которая получила промпт; её определяет сборка черновика, а не редактор. */
+  model?: string;
 }
 
 /** Событие черновика: событие записи или промпт, ещё не прошедший публикацию. */
@@ -43,14 +45,25 @@ function isStrings(value: unknown): value is string[] {
 }
 
 function parseDraftPrompt(raw: Record<string, unknown>, index: number): DraftPrompt {
-  const { t, said, goal, requirements } = raw;
+  const { t, said, goal, requirements, model } = raw;
   if (typeof t !== "number" || typeof said !== "string" || typeof goal !== "string") {
     throw new DraftError(`событие #${index}: у промпта должны быть t, said и goal`);
   }
   if (!isStrings(requirements)) {
     throw new DraftError(`событие #${index}: requirements должны быть списком строк`);
   }
-  return { t, type: "draft_prompt", said, goal, requirements: [...requirements] };
+  const prompt: DraftPrompt = {
+    t,
+    type: "draft_prompt",
+    said,
+    goal,
+    requirements: [...requirements],
+  };
+  if (model === undefined) return prompt;
+  if (typeof model !== "string") {
+    throw new DraftError(`событие #${index}: model должна быть строкой`);
+  }
+  return { ...prompt, model };
 }
 
 function parseDraftEvent(raw: unknown, index: number): DraftEvent {
@@ -104,7 +117,14 @@ export function carryOverEdits(previous: Draft, next: Draft): Draft {
     if (event.type !== "draft_prompt") return event;
     const earlier = edited.find((prompt) => samePrompt(prompt, event));
     if (earlier === undefined) return event;
-    return { ...event, goal: earlier.goal, requirements: [...earlier.requirements] };
+    // Старые транскрипты Claude Code удаляет: найденная раньше модель не должна пропасть.
+    const model = event.model ?? earlier.model;
+    return {
+      ...event,
+      goal: earlier.goal,
+      requirements: [...earlier.requirements],
+      ...(model === undefined ? {} : { model }),
+    };
   });
   return { ...next, title: previous.title, events };
 }
@@ -125,13 +145,18 @@ export function orphanedEdits(previous: Draft, next: Draft): DraftPrompt[] {
 
 function toPublishedEvent(event: DraftEvent): FactoryEvent {
   if (event.type !== "draft_prompt") return event;
-  return { t: event.t, type: "prompt", goal: event.goal, requirements: event.requirements };
+  const { t, goal, requirements, model } = event;
+  return { t, type: "prompt", goal, requirements, ...(model === undefined ? {} : { model }) };
 }
 
 function textsOf(event: FactoryEvent): string[] {
   switch (event.type) {
     case "prompt":
-      return [event.goal, ...event.requirements];
+      return [
+        event.goal,
+        ...event.requirements,
+        ...(event.model === undefined ? [] : [event.model]),
+      ];
     case "stage_fail":
       return [event.reason];
     case "build_start":

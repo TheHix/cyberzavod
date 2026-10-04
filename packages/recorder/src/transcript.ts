@@ -1,4 +1,4 @@
-// Подсчёт токенов по транскрипту Claude Code (JSONL). Формат транскрипта внутренний и может
+// Токены и модели по транскрипту Claude Code (JSONL). Формат транскрипта внутренний и может
 // меняться, поэтому разбор терпимый: непонятные строки пропускаются.
 //
 // Считаются входные, выходные и записанные в кеш токены. Чтения из кеша не считаются:
@@ -10,19 +10,43 @@ interface Usage {
   cache_creation_input_tokens?: number;
 }
 
-function usageOf(line: string): { messageId: string; usage: Usage } | null {
-  let entry: unknown;
+/** Ответ модели в транскрипте: когда и какая модель ответила. */
+export interface ModelReply {
+  ts: number;
+  model: string;
+}
+
+// Служебные ответы Claude Code (например, о лимите сессии) помечены моделью `<synthetic>`.
+const SERVICE_MODEL_PREFIX = "<";
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function entryOf(line: string): Record<string, unknown> | null {
   try {
-    entry = JSON.parse(line);
+    const entry: unknown = JSON.parse(line);
+    return isObject(entry) ? entry : null;
   } catch {
     return null;
   }
-  if (typeof entry !== "object" || entry === null) return null;
-  const message = (entry as { message?: unknown }).message;
-  if (typeof message !== "object" || message === null) return null;
-  const { id, usage } = message as { id?: unknown; usage?: unknown };
-  if (typeof id !== "string" || typeof usage !== "object" || usage === null) return null;
+}
+
+function usageOf(line: string): { messageId: string; usage: Usage } | null {
+  const message = entryOf(line)?.message;
+  if (!isObject(message)) return null;
+  const { id, usage } = message;
+  if (typeof id !== "string" || !isObject(usage)) return null;
   return { messageId: id, usage: usage as Usage };
+}
+
+function replyOf(line: string): ModelReply | null {
+  const entry = entryOf(line);
+  if (entry === null || !isObject(entry.message)) return null;
+  const { model } = entry.message;
+  if (typeof model !== "string" || model.startsWith(SERVICE_MODEL_PREFIX)) return null;
+  const ts = typeof entry.timestamp === "string" ? Date.parse(entry.timestamp) : Number.NaN;
+  return Number.isNaN(ts) ? null : { ts, model };
 }
 
 function tokensOf(usage: Usage): number {
@@ -49,4 +73,17 @@ export function countTokens(transcript: string): number {
   let total = 0;
   for (const usage of byMessage.values()) total += tokensOf(usage);
   return total;
+}
+
+/**
+ * Собирает ответы моделей из транскрипта по времени: по ним видно, какая модель получила промпт.
+ * @param {string} transcript Содержимое транскрипта в формате JSONL.
+ * @returns {ModelReply[]} Ответы моделей от ранних к поздним, без служебных.
+ */
+export function modelReplies(transcript: string): ModelReply[] {
+  return transcript
+    .split("\n")
+    .map(replyOf)
+    .filter((reply) => reply !== null)
+    .sort((a, b) => a.ts - b.ts);
 }

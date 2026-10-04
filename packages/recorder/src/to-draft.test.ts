@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DraftEvent } from "./draft.ts";
 import type { RawEvent } from "./raw-event.ts";
-import { isHumanPrompt, toDraft, transcriptPaths } from "./to-draft.ts";
+import { isHumanPrompt, sessionTranscriptPath, toDraft, transcriptPaths } from "./to-draft.ts";
 
 const START = 1_000_000;
 
@@ -240,6 +240,25 @@ describe("toDraft", () => {
     expect(stagesOf(draft.events)).toEqual(["spec"]);
   });
 
+  it("отдаёт промпт модели, которая первой ответила после него", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "prompt", text: "первый" },
+      { ts: START + 10_000, kind: "prompt", text: "второй" },
+      { ts: START + 20_000, kind: "prompt", text: "третий" },
+    ];
+    const replies = [
+      { ts: START - 1_000, model: "claude-haiku-4-5" },
+      { ts: START + 2_000, model: "claude-opus-5-5" },
+      { ts: START + 12_000, model: "claude-sonnet-5-5" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1", replies });
+
+    expect(
+      draft.events.flatMap((event) => (event.type === "draft_prompt" ? [event.model] : [])),
+    ).toEqual(["claude-opus-5-5", "claude-sonnet-5-5", undefined]);
+  });
+
   it("не пропускает служебные сообщения в промпты", () => {
     const raw: RawEvent[] = [
       {
@@ -284,5 +303,18 @@ describe("transcriptPaths", () => {
     const paths = transcriptPaths(raw);
 
     expect(paths).toEqual(["/t/agent.jsonl", "/t/main.jsonl"]);
+  });
+});
+
+describe("sessionTranscriptPath", () => {
+  it("берёт транскрипт остановки сессии, а не сабагента", () => {
+    const raw: RawEvent[] = [
+      { ts: 1, kind: "stop", transcriptPath: "/t/main.jsonl" },
+      { ts: 2, kind: "subagent_stop", agent: "reviewer", transcriptPath: "/t/agent.jsonl" },
+    ];
+
+    const transcriptPath = sessionTranscriptPath(raw);
+
+    expect(transcriptPath).toBe("/t/main.jsonl");
   });
 });

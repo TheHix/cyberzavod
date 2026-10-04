@@ -8,7 +8,13 @@ export {
   RawLogError,
   type RawEvent,
 } from "./raw-event.ts";
-export { isHumanPrompt, toDraft, transcriptPaths, type DraftMeta } from "./to-draft.ts";
+export {
+  isHumanPrompt,
+  sessionTranscriptPath,
+  toDraft,
+  transcriptPaths,
+  type DraftMeta,
+} from "./to-draft.ts";
 export {
   carryOverEdits,
   DraftError,
@@ -20,4 +26,4 @@ export {
   type DraftPrompt,
 } from "./draft.ts";
 export { findLeaks } from "./leaks.ts";
-export { countTokens } from "./transcript.ts";
+export { countTokens, modelReplies, type ModelReply } from "./transcript.ts";

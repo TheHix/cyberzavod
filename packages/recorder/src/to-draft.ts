@@ -4,6 +4,7 @@
 import type { Stage } from "@cyberzavod/core";
 import type { Draft, DraftEvent } from "./draft.ts";
 import type { RawEvent } from "./raw-event.ts";
+import type { ModelReply } from "./transcript.ts";
 
 // Инструменты, по которым видно этап.
 const TOOL_STAGES: Readonly<Record<string, Stage>> = {
@@ -57,6 +58,13 @@ const TEST_FAILURE_REASON = "проверки не прошли";
 export interface DraftMeta {
   sessionId: string;
   tokens?: number;
+  /** Ответы моделей из транскрипта сессии: по ним промпт узнаёт свою модель. */
+  replies?: readonly ModelReply[];
+}
+
+// Промпт получила модель, которая первой ответила после него.
+function modelAnswering(replies: readonly ModelReply[], promptTs: number): string | undefined {
+  return replies.find((reply) => reply.ts >= promptTs)?.model;
 }
 
 // Этапы распознанных команд цепочки по порядку: `make check && git commit` — проверки, затем выпуск.
@@ -129,12 +137,14 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
     switch (event.kind) {
       case "prompt":
         if (isHumanPrompt(event.text)) {
+          const model = modelAnswering(meta.replies ?? [], event.ts);
           draftEvents.push({
             t: at(event.ts),
             type: "draft_prompt",
             said: event.text,
             goal: "",
             requirements: [],
+            ...(model === undefined ? {} : { model }),
           });
         }
         break;
@@ -203,4 +213,20 @@ export function transcriptPaths(events: RawEvent[]): string[] {
     }
   }
   return [...paths];
+}
+
+/**
+ * Находит транскрипт самой сессии, без сабагентов: промпты человека получает она.
+ * @param {RawEvent[]} events События журнала.
+ * @returns {string | undefined} Путь к транскрипту или undefined, если сессия ещё не
+ *   останавливалась.
+ */
+export function sessionTranscriptPath(events: RawEvent[]): string | undefined {
+  let transcriptPath: string | undefined;
+  for (const event of events) {
+    if (event.kind === "stop" && event.transcriptPath !== undefined) {
+      transcriptPath = event.transcriptPath;
+    }
+  }
+  return transcriptPath;
 }

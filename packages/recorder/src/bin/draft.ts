@@ -6,8 +6,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { carryOverEdits, orphanedEdits, parseDraft, type Draft } from "../draft.ts";
 import { parseRawLog } from "../raw-event.ts";
-import { toDraft, transcriptPaths } from "../to-draft.ts";
-import { countTokens } from "../transcript.ts";
+import { sessionTranscriptPath, toDraft, transcriptPaths } from "../to-draft.ts";
+import { countTokens, modelReplies, type ModelReply } from "../transcript.ts";
 import { fromProject, isNotFound, newestFile, RECORDINGS_DIRS } from "./paths.ts";
 
 // Токены сессии и её сабагентов. Непрочитанный транскрипт — предупреждение, а не ошибка:
@@ -27,6 +27,17 @@ async function tokensFromTranscripts(paths: string[]): Promise<number | undefine
   }
   if (missing > 0) console.warn(`транскриптов не найдено: ${missing}, их токены не посчитаны`);
   return total;
+}
+
+// Без транскрипта черновик всё равно собирается — у промптов просто не будет модели.
+async function repliesFromTranscript(transcriptPath: string | undefined): Promise<ModelReply[]> {
+  if (transcriptPath === undefined) return [];
+  try {
+    return modelReplies(await readFile(transcriptPath, "utf8"));
+  } catch (err) {
+    console.warn(`транскрипт сессии не прочитан, модели промптов неизвестны: ${String(err)}`);
+    return [];
+  }
 }
 
 // Битый прошлый черновик не перезаписывается молча: в нём может быть несохранённая редактура.
@@ -59,7 +70,12 @@ if (rawPath === undefined) {
 }
 const rawEvents = parseRawLog(await readFile(rawPath, "utf8"));
 const tokens = await tokensFromTranscripts(transcriptPaths(rawEvents));
-const fresh = toDraft(rawEvents, { sessionId: path.basename(rawPath, ".jsonl"), tokens });
+const replies = await repliesFromTranscript(sessionTranscriptPath(rawEvents));
+const fresh = toDraft(rawEvents, {
+  sessionId: path.basename(rawPath, ".jsonl"),
+  tokens,
+  replies,
+});
 const draftPath = path.join(RECORDINGS_DIRS.drafts, `${fresh.id}.json`);
 const draft = await withEarlierEdits(fresh, draftPath);
 
