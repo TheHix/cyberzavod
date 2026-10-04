@@ -4,9 +4,11 @@
 export {
   STAGES,
   RecordingError,
+  parseFactoryEvent,
   parseRecording,
   summarize,
   type Stage,
+  type PromptEvent,
   type FactoryEvent,
   type Recording,
   type BuildStats,

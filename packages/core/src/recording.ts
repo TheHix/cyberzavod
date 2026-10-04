@@ -7,10 +7,21 @@ export const STAGES = ["spec", "code", "test", "review", "ship"] as const;
 /** Этап сборки — одна из станций цеха. */
 export type Stage = (typeof STAGES)[number];
 
+/**
+ * Промпт человека в чистовом виде: цель одной строкой и требования списком.
+ * Как промпт был набран, в запись не попадает — только то, что человек просил.
+ */
+export interface PromptEvent {
+  t: number;
+  type: "prompt";
+  goal: string;
+  requirements: string[];
+}
+
 /** Событие записи сборки; `t` — миллисекунды от начала сборки. */
 export type FactoryEvent =
-  | { t: number; type: "build_start"; title: string }
-  | { t: number; type: "prompt"; text: string }
+  | { t: number; type: "build_start" }
+  | PromptEvent
   | { t: number; type: "stage_enter"; stage: Stage }
   | { t: number; type: "stage_fail"; stage: Stage; reason: string }
   | { t: number; type: "usage"; tokens: number }
@@ -19,7 +30,10 @@ export type FactoryEvent =
 /** Запись сборки: последовательность событий, которую проигрывает цех. */
 export interface Recording {
   version: 1;
+  /** Идентификатор записи: он же имя файла и часть адреса страницы. */
   id: string;
+  /** Время начала сборки в ISO 8601 по UTC, как у `Date.prototype.toISOString`. */
+  startedAt: string;
   title: string;
   events: FactoryEvent[];
 }
@@ -44,7 +58,34 @@ function isStage(value: unknown): value is Stage {
   return (STAGES as readonly unknown[]).includes(value);
 }
 
-function parseEvent(raw: unknown, index: number): FactoryEvent {
+// Тексты записи показываются в одну строку: в заголовке, в карточке промпта.
+function isLine(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "" && !/[\r\n]/.test(value);
+}
+
+function isLines(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(isLine);
+}
+
+// id уходит в имя файла и в адрес страницы: только буквы, цифры, `_` и `-`.
+const ID_PATTERN = /^[\w-]+$/;
+
+// Строгое сравнение с toISOString отсекает и другие форматы, и несуществующие дни вроде
+// 31 февраля, которые Date.parse молча переносит на март.
+function isInstant(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const time = Date.parse(value);
+  return !Number.isNaN(time) && new Date(time).toISOString() === value;
+}
+
+/**
+ * Проверяет одно событие записи, пришедшее извне.
+ * @param {unknown} raw Разобранный JSON события.
+ * @param {number} index Номер события в записи — для сообщения об ошибке.
+ * @returns {FactoryEvent} Проверенное событие.
+ * @throws {RecordingError} Если событие не соответствует формату.
+ */
+export function parseFactoryEvent(raw: unknown, index: number): FactoryEvent {
   const fail = (why: string) => new RecordingError(`событие #${index}: ${why}`);
   if (!isObject(raw)) throw fail("не объект");
 
@@ -53,11 +94,13 @@ function parseEvent(raw: unknown, index: number): FactoryEvent {
 
   switch (type) {
     case "build_start":
-      if (typeof raw.title !== "string") throw fail("нет title");
-      return { t, type, title: raw.title };
+      return { t, type };
     case "prompt":
-      if (typeof raw.text !== "string") throw fail("нет text");
-      return { t, type, text: raw.text };
+      if (!isLine(raw.goal)) throw fail("goal должен быть непустой строкой без переводов строки");
+      if (!isLines(raw.requirements)) {
+        throw fail("requirements должны быть списком непустых строк без переводов строки");
+      }
+      return { t, type, goal: raw.goal, requirements: [...raw.requirements] };
     case "stage_enter":
       if (!isStage(raw.stage)) throw fail(`неизвестный этап ${String(raw.stage)}`);
       return { t, type, stage: raw.stage };
@@ -85,11 +128,18 @@ function parseEvent(raw: unknown, index: number): FactoryEvent {
 export function parseRecording(raw: unknown): Recording {
   if (!isObject(raw)) throw new RecordingError("запись должна быть объектом");
   if (raw.version !== 1) throw new RecordingError(`неподдерживаемая версия ${String(raw.version)}`);
-  if (typeof raw.id !== "string" || raw.id === "") throw new RecordingError("нет id");
-  if (typeof raw.title !== "string") throw new RecordingError("нет title");
+  if (typeof raw.id !== "string" || !ID_PATTERN.test(raw.id)) {
+    throw new RecordingError("id должен состоять из букв, цифр, «_» и «-»");
+  }
+  if (!isInstant(raw.startedAt)) {
+    throw new RecordingError("startedAt должно быть временем ISO 8601 по UTC, как у toISOString");
+  }
+  if (!isLine(raw.title)) {
+    throw new RecordingError("title должен быть непустой строкой без переводов строки");
+  }
   if (!Array.isArray(raw.events)) throw new RecordingError("нет events");
 
-  const events = raw.events.map(parseEvent);
+  const events = raw.events.map(parseFactoryEvent);
   if (events[0]?.type !== "build_start") {
     throw new RecordingError("запись должна начинаться с build_start");
   }
@@ -102,7 +152,7 @@ export function parseRecording(raw: unknown): Recording {
     prevT = event.t;
   });
 
-  return { version: 1, id: raw.id, title: raw.title, events };
+  return { version: 1, id: raw.id, startedAt: raw.startedAt, title: raw.title, events };
 }
 
 /**

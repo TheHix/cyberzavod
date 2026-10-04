@@ -5,10 +5,16 @@ function validRecording() {
   return {
     version: 1,
     id: "demo-1",
+    startedAt: "2026-10-04T09:52:13.000Z",
     title: "Счётчики над цехом",
     events: [
-      { t: 0, type: "build_start", title: "Счётчики над цехом" },
-      { t: 10, type: "prompt", text: "Добавь счётчик токенов" },
+      { t: 0, type: "build_start" },
+      {
+        t: 10,
+        type: "prompt",
+        goal: "Добавить счётчик токенов",
+        requirements: ["Показывать над цехом", "Разбивать число по разрядам"],
+      },
       { t: 20, type: "stage_enter", stage: "code" },
       { t: 30, type: "usage", tokens: 1200 },
       { t: 40, type: "stage_enter", stage: "test" },
@@ -45,6 +51,51 @@ describe("parseRecording", () => {
     const act = () => parseRecording(raw);
 
     expect(act).toThrow(/время идёт назад/);
+  });
+
+  it("отклоняет промпт без цели", () => {
+    const raw = validRecording();
+    raw.events[1] = { t: 10, type: "prompt", goal: " ", requirements: [] };
+
+    const act = () => parseRecording(raw);
+
+    expect(act).toThrow(/goal/);
+  });
+
+  it("отклоняет требование в несколько строк", () => {
+    const raw = validRecording();
+    raw.events[1] = { t: 10, type: "prompt", goal: "Цель", requirements: ["первое\nвторое"] };
+
+    const act = () => parseRecording(raw);
+
+    expect(act).toThrow(/requirements/);
+  });
+
+  it.each(["04.10.2026", "2026-10-04", "2026-02-31T00:00:00.000Z"])(
+    "отклоняет время начала «%s»",
+    (startedAt) => {
+      const raw = { ...validRecording(), startedAt };
+
+      const act = () => parseRecording(raw);
+
+      expect(act).toThrow(/startedAt/);
+    },
+  );
+
+  it.each(["../demo", "demo/1", ""])("отклоняет id «%s», непригодный для имени файла", (id) => {
+    const raw = { ...validRecording(), id };
+
+    const act = () => parseRecording(raw);
+
+    expect(act).toThrow(/id/);
+  });
+
+  it.each(["", "  ", "первая строка\nвторая"])("отклоняет заголовок «%s»", (title) => {
+    const raw = { ...validRecording(), title };
+
+    const act = () => parseRecording(raw);
+
+    expect(act).toThrow(/title/);
   });
 
   it("отклоняет запись без build_end", () => {
