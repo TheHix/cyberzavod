@@ -1,0 +1,79 @@
+---
+// Игровой экран: цех на всё окно, меню слева, панели записей и «о проекте» поверх.
+// Содержимое страницы — цех со своим HUD — встаёт в поле справа от меню.
+import BaseLayout from "./BaseLayout.astro";
+import { RecordingList } from "@/widgets/recording-list";
+import { Sidebar } from "@/widgets/sidebar";
+import { publishedRecordings } from "@/entities/recording";
+import { PANELS } from "@/shared/config/panels.ts";
+import { site } from "@/shared/config/site.ts";
+import { Drawer } from "@/shared/ui";
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** Есть ли на странице журнал промптов (слот drawers) — тогда он в меню. */
+  promptLog?: boolean;
+  /**
+   * Главный заголовок страницы, если его нет в содержимом: на главной HUD называет сборку
+   * заголовком второго уровня, а первый — сайт. Виден только программам чтения и поисковикам.
+   */
+  heading?: string | undefined;
+}
+
+const { title, description, promptLog = false, heading } = Astro.props;
+---
+
+<BaseLayout title={title} description={description}>
+  <div class="game">
+    <Sidebar promptLog={promptLog} />
+    <main class="field">
+      {heading && <h1 class="visually-hidden">{heading}</h1>}
+      <slot />
+    </main>
+  </div>
+
+  <Drawer id={PANELS.records} title="Записи сборок">
+    <RecordingList recordings={publishedRecordings} />
+  </Drawer>
+  <Drawer id={PANELS.about} title="О проекте">
+    <div class="about">
+      <p>{site.description}</p>
+      <p>
+        Хуки Claude Code пишут журнал сессии, из него собирается запись: этапы, промпты, время и
+        токены. Цех проигрывает её — каждый станок это этап, а рабочие передают деталь из рук в
+        руки.
+      </p>
+      <p>
+        <a href={site.repoUrl}>Код проекта на GitHub</a>
+      </p>
+    </div>
+  </Drawer>
+  <slot name="drawers" />
+</BaseLayout>
+
+<style>
+  .game {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+    gap: var(--gutter);
+    height: 100dvh;
+    padding: var(--gutter);
+  }
+
+  .field {
+    display: grid;
+    min-height: 0;
+  }
+
+  .about p {
+    margin: 0 0 var(--space-l);
+  }
+
+  @media (max-width: 48rem) {
+    .game {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+  }
+</style>

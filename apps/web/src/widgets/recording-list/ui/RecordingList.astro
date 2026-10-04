@@ -2,30 +2,38 @@
 // Список опубликованных записей: заголовок, день и главные счётчики каждой сборки.
 import { summarize, type Recording } from "@cyberzavod/core";
 import { recordingUrl } from "@/entities/recording";
-import { formatDate, formatDuration, formatTokens } from "@/shared/lib/format.ts";
+import { formatCount, formatDate, formatDuration } from "@/shared/lib/format.ts";
+import { Card, Chip, Title } from "@/shared/ui";
 
 interface Props {
   recordings: readonly Recording[];
 }
 
 const { recordings } = Astro.props;
+const TOKENS = { one: "токен", few: "токена", many: "токенов" };
+const PROMPTS = { one: "промпт", few: "промпта", many: "промптов" };
 ---
 
 {recordings.length === 0 ? (
-  <p class="empty">Записей пока нет.</p>
+  <p class="note">Записей пока нет.</p>
 ) : (
   <ul class="list">
     {recordings.map((recording) => {
       const stats = summarize(recording);
       return (
-        <li class="card">
-          <a class="title" href={recordingUrl(recording.id)}>
-            {recording.title}
-          </a>
-          <p class="meta">
-            {formatDate(recording.startedAt)} · время {formatDuration(stats.durationMs)} · токены{" "}
-            {formatTokens(stats.tokens)} · промпты {stats.prompts}
-          </p>
+        <li>
+          <Card>
+            <div class="record">
+              <Chip tone="sun">{formatDate(recording.startedAt)}</Chip>
+              <a href={recordingUrl(recording.id)}>
+                <Title as="span">{recording.title}</Title>
+              </a>
+              <p class="note">
+                {formatDuration(stats.durationMs)} · {formatCount(stats.tokens, TOKENS)} ·{" "}
+                {formatCount(stats.prompts, PROMPTS)}
+              </p>
+            </div>
+          </Card>
         </li>
       );
     })}
@@ -35,27 +43,21 @@ const { recordings } = Astro.props;
 <style>
   .list {
     display: grid;
-    gap: 1px;
+    gap: var(--space-m);
     margin: 0;
     padding: 0;
     list-style: none;
-    background: var(--line);
-    border: 1px solid var(--line);
   }
 
-  .card {
-    padding: 1rem 1.25rem;
-    background: var(--surface);
+  .record {
+    display: grid;
+    gap: var(--space-xs);
+    justify-items: start;
   }
 
-  .title {
-    font-size: 1.125rem;
-    font-weight: 600;
-  }
-
-  .meta,
-  .empty {
-    margin: 0.25rem 0 0;
-    color: var(--muted);
+  .note {
+    margin: 0;
+    color: var(--ink-soft);
+    font-weight: 700;
   }
 </style>

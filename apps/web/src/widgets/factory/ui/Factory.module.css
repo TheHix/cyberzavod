@@ -1,33 +1,55 @@
+/* Цех на всё окно: холст позади всего, поле для плана и HUD справа — сеткой поверх. */
 .factory {
   display: grid;
-  gap: 0.75rem;
-  margin: 0;
-}
-
-.floor {
-  position: relative;
-  aspect-ratio: 16 / 9;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
+  grid-template-columns: minmax(0, 1fr) var(--hud-width);
+  gap: var(--gutter);
+  min-height: 0;
 }
 
 .canvas {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  overflow: hidden;
-  border-radius: inherit;
+  z-index: 0;
 }
 
 .canvas canvas {
   display: block;
 }
 
+/* Поле: прозрачное место между меню и HUD, в него вписывается план цеха. */
+.field {
+  position: relative;
+  min-height: 0;
+}
+
 .notice {
   position: absolute;
   inset: 0;
+  z-index: 1;
   display: grid;
   place-content: center;
   margin: 0;
-  color: var(--muted);
+  color: var(--paper);
+  font-family: var(--font-display);
+  font-size: var(--text-l);
+  font-weight: 800;
+  text-shadow: var(--lift-text);
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.overlay > * {
+  pointer-events: auto;
+}
+
+@media (max-width: 48rem) {
+  .factory {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
 }

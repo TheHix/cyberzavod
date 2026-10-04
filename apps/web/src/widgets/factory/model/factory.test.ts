@@ -108,6 +108,14 @@ describe("createFactoryModel", () => {
     expect(model.$promptDetailsOpen.get()).toBe(true);
   });
 
+  it("меняет скорость проигрывания", () => {
+    const model = createFactoryModel(recordingWithPrompt());
+
+    model.setSpeed(4);
+
+    expect(model.$playback.get().speed).toBe(4);
+  });
+
   it("не раскрывает уточнения, когда промпта нет", () => {
     const model = createFactoryModel(recordingWithPrompt());
 

@@ -1,22 +1,24 @@
-import { createMemo, For, Show, type JSX } from "solid-js";
+import { createMemo, Show, type JSX } from "solid-js";
 import { recipientOf } from "@/entities/prompt";
 import { useStoreValue } from "@/shared/lib/use-store-value.ts";
-import type { FactoryGraphics } from "../graphics/factory-graphics.ts";
-import { placeBubble, type FloorSize } from "../lib/bubble-placement.ts";
+import { BulletList, Button, Chip, Title } from "@/shared/ui";
+import type { FactoryGraphics, Frame } from "../graphics/factory-graphics.ts";
+import { placeBubble } from "../lib/bubble-placement.ts";
 import { useFactoryModel } from "./model-context.ts";
 import styles from "./PromptBubble.module.css";
 
 interface Props {
   /** Графика цеха — переводит место рабочего в координаты пола; нет, пока не загрузилась. */
   graphics: FactoryGraphics | undefined;
-  floor: FloorSize;
+  /** Поле цеха, свободное от меню и HUD: пузырь раскрывается к его середине. */
+  field: Frame;
 }
 
 /**
  * Промпт над рабочим, который его получил: кому, главное указание и раскрываемые уточнения.
  * @param {Props} props Свойства компонента.
  * @param {FactoryGraphics | undefined} props.graphics Графика цеха, если уже загружена.
- * @param {FloorSize} props.floor Размер пола цеха.
+ * @param {Frame} props.field Поле цеха, свободное от меню и HUD.
  * @returns {JSX.Element} Пузырь промпта или ничего, если промпта нет.
  */
 export function PromptBubble(props: Props): JSX.Element {
@@ -29,7 +31,7 @@ export function PromptBubble(props: Props): JSX.Element {
     const point = position();
     const graphics = props.graphics;
     if (point === null || graphics === undefined) return null;
-    return placeBubble(graphics.toScreen(point), props.floor);
+    return placeBubble(graphics.toScreen(point), props.field);
   });
 
   return (
@@ -44,23 +46,18 @@ export function PromptBubble(props: Props): JSX.Element {
               data-horizontal={place().horizontal}
             >
               <div class={styles.bubble}>
-                <p class={styles.route}>человек → {recipientOf(current().prompt)}</p>
-                <p class={styles.goal}>{current().prompt.goal}</p>
+                <Chip tone="sky">человек → {recipientOf(current().prompt)}</Chip>
+                <Title>{current().prompt.goal}</Title>
                 <Show when={current().prompt.requirements.length > 0}>
-                  <button
-                    type="button"
-                    class={styles.more}
+                  <Button
+                    variant="link"
                     aria-expanded={detailsOpen()}
                     onClick={() => model.togglePromptDetails()}
                   >
                     {detailsOpen() ? "свернуть" : "подробнее"}
-                  </button>
+                  </Button>
                   <Show when={detailsOpen()}>
-                    <ul class={styles.requirements}>
-                      <For each={current().prompt.requirements}>
-                        {(requirement) => <li>{requirement}</li>}
-                      </For>
-                    </ul>
+                    <BulletList items={current().prompt.requirements} />
                   </Show>
                 </Show>
               </div>

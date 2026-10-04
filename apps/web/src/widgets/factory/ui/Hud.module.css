@@ -1,0 +1,29 @@
+.hud {
+  position: relative;
+  z-index: 1;
+  align-self: start;
+  display: grid;
+  gap: var(--space-l);
+  align-content: start;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.date {
+  margin: var(--space-2xs) 0 0;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+/* На узком или низком экране HUD — только заголовок и управление: место отдаётся цеху. */
+@media (max-width: 48rem), (max-height: 40rem) {
+  .hud {
+    gap: var(--space-m);
+    padding: var(--space-m);
+  }
+
+  .stats,
+  .date {
+    display: none;
+  }
+}

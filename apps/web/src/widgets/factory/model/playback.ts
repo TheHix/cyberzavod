@@ -1,7 +1,7 @@
 // Проигрывание сцены: где мы, идём ли и с какой скоростью. Чистые функции — их применяет
 // модель цеха (factory.ts), а часы с requestAnimationFrame живут в ui/frame-clock.ts.
 
-/** Скорости проигрывания по кругу. */
+/** Скорости проигрывания на выбор. */
 export const SPEEDS = [1, 2, 4] as const;
 
 /** Скорость проигрывания. */
@@ -59,11 +59,10 @@ export function togglePlaying(playback: Playback): Playback {
 }
 
 /**
- * Переключает скорость на следующую по кругу.
- * @param {Playback} playback Текущее состояние.
- * @returns {Playback} Состояние с новой скоростью.
+ * Узнаёт скорость по её записи — как её отдают переключатели интерфейса.
+ * @param {string} value Запись скорости: `"2"`.
+ * @returns {Speed | undefined} Скорость или undefined, если такой нет среди SPEEDS.
  */
-export function nextSpeed(playback: Playback): Playback {
-  const index = SPEEDS.indexOf(playback.speed);
-  return { ...playback, speed: SPEEDS[(index + 1) % SPEEDS.length] ?? SPEEDS[0] };
+export function speedFrom(value: string): Speed | undefined {
+  return SPEEDS.find((speed) => `${speed}` === value);
 }

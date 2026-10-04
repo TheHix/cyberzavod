@@ -1,34 +1,33 @@
 .controls {
-  display: flex;
-  gap: 0.75rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-m) var(--space-l);
   align-items: center;
 }
 
-.button {
-  min-width: 2.75rem;
-  padding: 0.375rem 0.625rem;
-  color: var(--text);
-  font-family: var(--font-mono);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 0.375rem;
-  cursor: pointer;
+/* Отступы по краям — место для ползунка в крайних положениях. */
+.timeline {
+  display: grid;
+  gap: var(--space-s);
+  padding: 0 var(--space-m);
 }
 
-.button:disabled,
-.scrubber:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
-.scrubber {
-  flex: 1;
-  min-width: 0;
-  accent-color: var(--accent);
-}
-
-.clock {
-  color: var(--muted);
-  font-family: var(--font-mono);
+.times {
+  display: flex;
+  justify-content: space-between;
+  color: var(--ink-soft);
+  font-family: var(--font-display);
+  font-size: var(--text-s);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+.speed {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: var(--space-m);
+  align-items: center;
+  justify-content: space-between;
+  color: var(--ink-soft);
+  font-weight: 700;
 }

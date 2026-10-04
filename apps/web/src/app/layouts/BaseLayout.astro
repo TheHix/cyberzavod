@@ -1,10 +1,13 @@
 ---
+// Шрифты раздаются с нашего сервера; браузер грузит только нужные начертания и алфавиты.
+import "@fontsource-variable/rubik";
+import "@fontsource-variable/nunito";
 import "@/app/styles/global.css";
 import { site } from "@/shared/config/site.ts";
 
 interface Props {
-  title?: string;
-  description?: string;
+  title?: string | undefined;
+  description?: string | undefined;
 }
 
 const { title, description = site.description } = Astro.props;

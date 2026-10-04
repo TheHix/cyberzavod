@@ -4,6 +4,7 @@
 import type { PromptEvent, Recording } from "@cyberzavod/core";
 import { recipientOf } from "@/entities/prompt";
 import { formatClock } from "@/shared/lib/format.ts";
+import { BulletList, buttonClass, Card, Chip, Title } from "@/shared/ui";
 
 interface Props {
   recording: Recording;
@@ -18,23 +19,24 @@ const prompts = recording.events.filter((event): event is PromptEvent => event.t
 ) : (
   <ol class="timeline">
     {prompts.map((prompt) => (
-      <li class="message">
-        <p class="route">
-          <span class="at">{formatClock(prompt.t)}</span>
-          <span>человек → {recipientOf(prompt)}</span>
-        </p>
-        {prompt.requirements.length === 0 ? (
-          <p class="goal">{prompt.goal}</p>
-        ) : (
-          <details>
-            <summary class="goal">{prompt.goal}</summary>
-            <ul class="requirements">
-              {prompt.requirements.map((requirement) => (
-                <li>{requirement}</li>
-              ))}
-            </ul>
-          </details>
-        )}
+      <li>
+        <Card>
+          <p class="route">
+            <Chip>{formatClock(prompt.t)}</Chip>
+            <Chip tone="sky">человек → {recipientOf(prompt)}</Chip>
+          </p>
+          {prompt.requirements.length === 0 ? (
+            <Title>{prompt.goal}</Title>
+          ) : (
+            <details class="details">
+              <summary>
+                <Title as="span">{prompt.goal}</Title>
+                <span class={`more ${buttonClass({ variant: "link" })}`}>подробнее</span>
+              </summary>
+              <BulletList items={prompt.requirements} />
+            </details>
+          )}
+        </Card>
       </li>
     ))}
   </ol>
@@ -43,86 +45,39 @@ const prompts = recording.events.filter((event): event is PromptEvent => event.t
 <style>
   .timeline {
     display: grid;
-    gap: 0.75rem;
+    gap: var(--space-m);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .message {
-    padding: 0.875rem 1.25rem 1rem;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-left: 3px solid var(--accent);
-    border-radius: 0 0.5rem 0.5rem 0;
-  }
-
   .route {
     display: flex;
-    gap: 0.75rem;
-    margin: 0 0 0.375rem;
-    color: var(--muted);
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin: 0 0 var(--space-xs);
   }
 
-  .goal {
-    margin: 0;
-    font-size: 1.0625rem;
-    font-weight: 600;
-  }
-
-  summary.goal {
-    display: flex;
-    gap: 0.5rem;
-    align-items: baseline;
-    justify-content: space-between;
+  .details summary {
+    display: grid;
+    gap: var(--space-xs);
+    justify-items: start;
+    margin-bottom: var(--space-xs);
     cursor: pointer;
     list-style: none;
   }
 
-  summary.goal::-webkit-details-marker {
+  .details summary::-webkit-details-marker {
     display: none;
   }
 
-  summary.goal::after {
-    flex-shrink: 0;
-    color: var(--accent);
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    font-weight: 400;
-    content: "▸ подробнее";
-  }
-
-  details[open] > summary.goal::after {
-    content: "▾ свернуть";
-  }
-
-  /* На узком экране подпись отнимала бы ширину у текста промпта — остаётся стрелка. */
-  @media (max-width: 30rem) {
-    summary.goal::after {
-      content: "▸";
-    }
-
-    details[open] > summary.goal::after {
-      content: "▾";
-    }
-  }
-
-  .requirements {
-    display: grid;
-    gap: 0.375rem;
-    margin: 0.75rem 0 0;
-    padding: 0.75rem 0 0 1.25rem;
-    border-top: 1px dashed var(--line);
-  }
-
-  .requirements li::marker {
-    color: var(--accent);
+  /* Раскрытый промпт сворачивается кликом по нему же — подсказка больше не нужна. */
+  .details[open] .more {
+    display: none;
   }
 
   .empty {
     margin: 0;
-    color: var(--muted);
+    color: var(--ink-soft);
   }
 </style>

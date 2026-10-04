@@ -1,12 +1,12 @@
 ---
 import type { GetStaticPaths } from "astro";
 import type { Recording } from "@cyberzavod/core";
-import BaseLayout from "@/app/layouts/BaseLayout.astro";
-import { BuildStats } from "@/widgets/build-stats";
+import GameLayout from "@/app/layouts/GameLayout.astro";
 import { Factory } from "@/widgets/factory";
 import { PromptTimeline } from "@/widgets/prompt-timeline";
 import { publishedRecordings } from "@/entities/recording";
-import { formatDate } from "@/shared/lib/format.ts";
+import { PANELS } from "@/shared/config/panels.ts";
+import { Drawer } from "@/shared/ui";
 
 export const getStaticPaths = (() =>
   publishedRecordings.map((recording) => ({
@@ -22,41 +22,9 @@ const { recording } = Astro.props;
 const description = `Как ИИ-агенты собирали «${recording.title}»: промпты человека, время и токены.`;
 ---
 
-<BaseLayout title={recording.title} description={description}>
-  <main class="page">
-    <a href="/">← Все записи</a>
-
-    <header>
-      <h1>{recording.title}</h1>
-      <p class="muted">{formatDate(recording.startedAt)}</p>
-    </header>
-
-    <Factory client:visible recording={recording} />
-
-    <BuildStats recording={recording} />
-
-    <section aria-labelledby="prompts-title">
-      <h2 id="prompts-title">Промпты</h2>
-      <PromptTimeline recording={recording} />
-    </section>
-  </main>
-</BaseLayout>
-
-<style>
-  .page {
-    display: grid;
-    gap: 2rem;
-    max-width: 60rem;
-    margin: 0 auto;
-    padding: 3rem 1rem;
-  }
-
-  h1 {
-    margin: 0;
-  }
-
-  .muted {
-    margin: 0.25rem 0 0;
-    color: var(--muted);
-  }
-</style>
+<GameLayout title={recording.title} description={description} promptLog>
+  <Factory client:load recording={recording} />
+  <Drawer slot="drawers" id={PANELS.promptLog} title="Журнал промптов">
+    <PromptTimeline recording={recording} />
+  </Drawer>
+</GameLayout>

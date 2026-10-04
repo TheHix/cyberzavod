@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advance, nextSpeed, seek, startPlayback, togglePlaying } from "./playback.ts";
+import { advance, seek, speedFrom, startPlayback, togglePlaying } from "./playback.ts";
 
 describe("advance", () => {
   it("сдвигает момент на прошедшее время с учётом скорости", () => {
@@ -67,20 +67,15 @@ describe("togglePlaying", () => {
   });
 });
 
-describe("nextSpeed", () => {
-  it("переключает на следующую скорость", () => {
-    const playback = startPlayback(10_000, false);
+describe("speedFrom", () => {
+  it.each([
+    ["2", 2],
+    ["4", 4],
+    ["3", undefined],
+    ["", undefined],
+  ])("узнаёт скорость по записи «%s»: %s", (value, expected) => {
+    const speed = speedFrom(value);
 
-    const next = nextSpeed(playback);
-
-    expect(next.speed).toBe(2);
-  });
-
-  it("после самой быстрой возвращается к обычной", () => {
-    const playback = { ...startPlayback(10_000, false), speed: 4 as const };
-
-    const next = nextSpeed(playback);
-
-    expect(next.speed).toBe(1);
+    expect(speed).toBe(expected);
   });
 });

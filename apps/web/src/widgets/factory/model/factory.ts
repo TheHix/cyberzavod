@@ -4,6 +4,8 @@
 import {
   buildScript,
   sceneAt,
+  summarize,
+  type BuildStats,
   type FactoryScript,
   type Point,
   type PromptCue,
@@ -13,11 +15,11 @@ import {
 import { atom, computed, type ReadableAtom } from "nanostores";
 import {
   advance,
-  nextSpeed,
   seek,
   startPlayback,
   togglePlaying,
   type Playback,
+  type Speed,
 } from "./playback.ts";
 
 /** Готова ли графика цеха: пока она грузится, проигрывать нечем. */
@@ -26,6 +28,8 @@ export type GraphicsStatus = "loading" | "ready" | "failed";
 /** Модель цеха: сторы состояния (имена с `$`) и действия над ним. */
 export interface FactoryModel {
   readonly script: FactoryScript;
+  /** Итоги всей сборки: время, токены, промпты, возвраты. */
+  readonly summary: BuildStats;
   readonly $status: ReadableAtom<GraphicsStatus>;
   readonly $playback: ReadableAtom<Playback>;
   /** Идёт ли сцена; меняется только при пуске и остановке — на него подписаны часы. */
@@ -50,7 +54,7 @@ export interface FactoryModel {
   pause(): void;
   /** Перематывает в момент сцены, мс. */
   seek(position: number): void;
-  cycleSpeed(): void;
+  setSpeed(speed: Speed): void;
   /** Раскрывает или сворачивает уточнения висящего промпта; раскрытие ставит паузу. */
   togglePromptDetails(): void;
 }
@@ -88,6 +92,7 @@ export function createFactoryModel(recording: Recording): FactoryModel {
 
   return {
     script,
+    summary: summarize(recording),
     $status,
     $playback,
     $playing,
@@ -105,7 +110,7 @@ export function createFactoryModel(recording: Recording): FactoryModel {
     toggle: () => update(togglePlaying),
     pause,
     seek: (position) => update((playback) => seek(playback, position)),
-    cycleSpeed: () => update(nextSpeed),
+    setSpeed: (speed) => update((playback) => ({ ...playback, speed })),
     togglePromptDetails: () => {
       if ($prompt.get() === null) return;
       const open = !$promptDetailsOpen.get();

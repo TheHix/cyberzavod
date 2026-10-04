@@ -1,61 +1,26 @@
 ---
-import BaseLayout from "@/app/layouts/BaseLayout.astro";
-import { BuildStats } from "@/widgets/build-stats";
+import GameLayout from "@/app/layouts/GameLayout.astro";
 import { Factory } from "@/widgets/factory";
-import { RecordingList } from "@/widgets/recording-list";
+import { PromptTimeline } from "@/widgets/prompt-timeline";
 import { publishedRecordings } from "@/entities/recording";
+import { PANELS } from "@/shared/config/panels.ts";
 import { site } from "@/shared/config/site.ts";
+import { Drawer, Panel } from "@/shared/ui";
 
 const [latest] = publishedRecordings;
 ---
 
-<BaseLayout>
-  <main class="page">
-    <header>
-      <h1>{site.name}</h1>
-      <p class="lead">{site.description}</p>
-    </header>
-
-    {latest && (
-      <section aria-labelledby="latest-title" class="latest">
-        <h2 id="latest-title">Последняя сборка: {latest.title}</h2>
-        <Factory client:visible recording={latest} />
-        <BuildStats recording={latest} />
-      </section>
-    )}
-
-    <section aria-labelledby="recordings-title">
-      <h2 id="recordings-title">Записи сборок</h2>
-      <RecordingList recordings={publishedRecordings} />
-    </section>
-
-    <footer>
-      <a href={site.repoUrl}>Код на GitHub</a>
-    </footer>
-  </main>
-</BaseLayout>
-
-<style>
-  .page {
-    display: grid;
-    gap: 2.5rem;
-    max-width: 60rem;
-    margin: 0 auto;
-    padding: 3rem 1rem;
-  }
-
-  .lead {
-    max-width: 40rem;
-    color: var(--muted);
-    font-size: 1.125rem;
-  }
-
-  .latest {
-    display: grid;
-    gap: 1rem;
-  }
-
-  .latest h2 {
-    margin: 0;
-  }
-</style>
+<GameLayout promptLog={latest !== undefined} heading={`${site.name} — цех ИИ-агентов`}>
+  {latest ? (
+    <Factory client:load recording={latest} titleLevel="h2" />
+  ) : (
+    <Panel label="Цех">
+      <p>Записей пока нет.</p>
+    </Panel>
+  )}
+  {latest && (
+    <Drawer slot="drawers" id={PANELS.promptLog} title="Журнал промптов">
+      <PromptTimeline recording={latest} />
+    </Drawer>
+  )}
+</GameLayout>
