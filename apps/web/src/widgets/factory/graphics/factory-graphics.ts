@@ -6,6 +6,12 @@ export interface ScreenPoint {
   readonly y: number;
 }
 
+/** Прямоугольник в координатах контейнера: поле, свободное от меню и HUD, куда встаёт план. */
+export interface Frame extends ScreenPoint {
+  readonly width: number;
+  readonly height: number;
+}
+
 /**
  * Графика цеха — как выглядят пол, станки, рабочие и деталь. Модель и интерфейс над цехом
  * знают только этот интерфейс, поэтому графику можно заменить целиком (фигуры, спрайты, 3D),
@@ -16,8 +22,11 @@ export interface FactoryGraphics {
   mount(container: HTMLElement, layout: FactoryLayout): Promise<void>;
   /** Рисует кадр сцены. */
   render(scene: Scene): void;
-  /** Подстраивается под новый размер контейнера, CSS-пиксели. */
-  resize(width: number, height: number): void;
+  /**
+   * Подстраивается под размер контейнера (CSS-пиксели): пол — на весь контейнер,
+   * план — вписан в поле `frame`.
+   */
+  resize(width: number, height: number, frame: Frame): void;
   /** Переводит точку плана в координаты контейнера — для HTML поверх холста. */
   toScreen(point: Point): ScreenPoint;
   /** Освобождает холст и память видеокарты. */
