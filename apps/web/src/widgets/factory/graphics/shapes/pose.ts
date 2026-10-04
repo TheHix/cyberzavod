@@ -1,7 +1,7 @@
 // Поза рабочего вида сверху: насколько руки вынесены вперёд, как они качаются и как
 // пружинит шаг. Считается из кадра, поэтому при перемотке поза та же, что при просмотре.
 
-import type { ConductorFrame, WorkerFrame } from "@cyberzavod/core";
+import type { ForemanFrame, WorkerFrame } from "@cyberzavod/core";
 
 /** Поза рабочего в единицах плана: `reach` — вынос рук вперёд, `swing` — разнос рук, `bob` — пружина шага. */
 export interface Pose {
@@ -28,6 +28,17 @@ function wave(elapsed: number, periodMs: number): number {
   return Math.sin((elapsed / periodMs) * FULL_TURN);
 }
 
+// Бег без детали: руки машут в такт шагу.
+function walkingPose(elapsed: number): Pose {
+  const step = wave(elapsed, STEP_MS);
+  return { reach: REACH.walk, swing: SWING.walk * step, bob: BOB.walk * Math.abs(step) };
+}
+
+// Стоящий дышит: руки опущены.
+function restingPose(elapsed: number): Pose {
+  return { reach: REACH.rest, swing: 0, bob: BOB.breath * wave(elapsed, BREATH_MS) };
+}
+
 /**
  * Поза рабочего в кадре.
  * @param {WorkerFrame} worker Рабочий в кадре.
@@ -36,35 +47,41 @@ function wave(elapsed: number, periodMs: number): number {
 export function poseOf(worker: WorkerFrame): Pose {
   switch (worker.activity) {
     case "walk": {
-      const step = wave(worker.elapsed, STEP_MS);
-      const bob = BOB.walk * Math.abs(step);
+      const pose = walkingPose(worker.elapsed);
       // С деталью руки держат её перед собой и не машут.
-      if (worker.carrying) return { reach: REACH.hold, swing: 0, bob };
-      return { reach: REACH.walk, swing: SWING.walk * step, bob };
+      return worker.carrying ? { ...pose, reach: REACH.hold, swing: 0 } : pose;
     }
     case "work":
       return { reach: REACH.work, swing: SWING.work * wave(worker.elapsed, STRIKE_MS), bob: 0 };
     case "handoff":
       return { reach: REACH.handoff, swing: 0, bob: 0 };
     case "idle":
-      return { reach: REACH.rest, swing: 0, bob: BOB.breath * wave(worker.elapsed, BREATH_MS) };
+      return restingPose(worker.elapsed);
     default:
       return worker.activity satisfies never;
   }
 }
 
 /**
- * Поза мастера в кадре: стоит спокойно, а пока говорит, покачивает руками.
- * @param {ConductorFrame} conductor Мастер в кадре.
- * @returns {Pose} Вынос и разнос рук и дыхание.
+ * Поза мастера в кадре: идёт как рабочий без детали, пока говорит — покачивает руками, а
+ * слушая и ожидая, стоит спокойно.
+ * @param {ForemanFrame} foreman Мастер в кадре.
+ * @returns {Pose} Вынос и разнос рук и пружина шага или дыхание.
  */
-export function conductorPoseOf(conductor: ConductorFrame): Pose {
-  if (!conductor.talking) {
-    return { reach: REACH.rest, swing: 0, bob: BOB.breath * wave(conductor.elapsed, BREATH_MS) };
+export function foremanPoseOf(foreman: ForemanFrame): Pose {
+  switch (foreman.activity) {
+    case "walk":
+      return walkingPose(foreman.elapsed);
+    case "talk":
+      return {
+        reach: GESTURE.reach,
+        swing: GESTURE.swing * wave(foreman.elapsed, GESTURE.periodMs),
+        bob: 0,
+      };
+    case "listen":
+    case "idle":
+      return restingPose(foreman.elapsed);
+    default:
+      return foreman.activity satisfies never;
   }
-  return {
-    reach: GESTURE.reach,
-    swing: GESTURE.swing * wave(conductor.elapsed, GESTURE.periodMs),
-    bob: 0,
-  };
 }

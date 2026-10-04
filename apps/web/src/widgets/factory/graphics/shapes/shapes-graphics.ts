@@ -8,10 +8,10 @@ import { Application, Container } from "pixi.js";
 import type { FactoryGraphics, Frame, ScreenPoint } from "../factory-graphics.ts";
 import {
   bakeActorTextures,
-  createConductor,
+  createForeman,
   createCrate,
   createWorker,
-  placeConductor,
+  placeForeman,
   placeCrate,
   placeWorker,
   type CrateSprites,
@@ -39,7 +39,7 @@ export class ShapesGraphics implements FactoryGraphics {
   readonly #world = new Container();
   readonly #workers = new Map<Stage, WorkerSprites>();
   readonly #machines = new Map<Stage, MachineSprites>();
-  #conductor: WorkerSprites | undefined;
+  #foreman: WorkerSprites | undefined;
   #crate: CrateSprites | undefined;
   #bounds: PlanBounds | undefined;
   #scale = 1;
@@ -89,17 +89,15 @@ export class ShapesGraphics implements FactoryGraphics {
       this.#world.addChild(machine.root);
       this.#machines.set(stage, machine.sprites);
     }
-    this.#world.addChild(
-      drawOffice(layout.conductor, renderer.resolution * TEXT_SHARPNESS, palette),
-    );
+    this.#world.addChild(drawOffice(layout.foreman, renderer.resolution * TEXT_SHARPNESS, palette));
     const textures = bakeActorTextures(renderer, palette);
     for (const stage of STAGES) {
       const worker = createWorker(stage, textures, palette);
       this.#world.addChild(worker.root);
       this.#workers.set(stage, worker);
     }
-    this.#conductor = createConductor(textures, palette);
-    this.#world.addChild(this.#conductor.root);
+    this.#foreman = createForeman(textures, palette);
+    this.#world.addChild(this.#foreman.root);
     this.#crate = createCrate(textures, palette);
     this.#world.addChild(this.#crate.root);
     this.#app.stage.addChild(this.#world);
@@ -116,7 +114,7 @@ export class ShapesGraphics implements FactoryGraphics {
       const sprites = this.#workers.get(worker.station);
       if (sprites !== undefined) placeWorker(sprites, worker);
     }
-    if (this.#conductor !== undefined) placeConductor(this.#conductor, scene.conductor);
+    if (this.#foreman !== undefined) placeForeman(this.#foreman, scene.foreman);
     const carrier = scene.workers.find((worker) => worker.station === scene.part.holder);
     if (this.#crate !== undefined) {
       placeCrate(this.#crate, scene.part, carrier?.heading ?? 0, scene.time);

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Recording } from "@cyberzavod/core";
-import { createFactoryModel } from "./factory.ts";
+import { createFactoryModel, type FactoryModel } from "./factory.ts";
 
-// Темп по умолчанию сжимает минуту записи в секунду сцены: постановка работает 0–2 000 мс,
-// промпт на минуте записи висит над её рабочим с 1 000 до 6 000 мс сцены. Второй промпт
-// приходит, когда деталь уже у станка кода.
+// Темп по умолчанию сжимает минуту записи в секунду сцены: постановка работает 0–2 000 мс.
+// Первый промпт мастер говорит, дойдя до станка постановки; второй приходит, когда деталь
+// уже у станка кода.
 function recordingWithPrompt(): Recording {
   return {
     version: 1,
@@ -19,6 +19,11 @@ function recordingWithPrompt(): Recording {
       { t: 240_000, type: "build_end", ok: true },
     ],
   };
+}
+
+// Момент сцены, когда висит промпт с номером `index`: чуть позже его начала.
+function duringPrompt(model: FactoryModel, index: number): number {
+  return (model.script.prompts[index]?.start ?? 0) + 100;
 }
 
 describe("createFactoryModel", () => {
@@ -59,24 +64,31 @@ describe("createFactoryModel", () => {
   it("показывает промпт, который висит в этот момент", () => {
     const model = createFactoryModel(recordingWithPrompt());
 
-    model.seek(1_500);
+    model.seek(duringPrompt(model, 0));
 
     expect(model.$prompt.get()?.prompt.goal).toBe("Добавь счётчик");
   });
 
-  it("ставит пузырь промпта над рабочим станка, у которого промпт получен", () => {
+  it("ставит пузырь промпта над мастером, который говорит его у станка", () => {
     const model = createFactoryModel(recordingWithPrompt());
-    const atCode = model.script.prompts[1]?.start ?? 0;
 
-    model.seek(atCode + 100);
+    model.seek(duringPrompt(model, 1));
 
-    expect(model.$promptPosition.get()).toEqual(model.script.layout.stations.code.post);
+    expect(model.$promptPosition.get()).toEqual(model.script.layout.stations.code.foremanPost);
+  });
+
+  it("не ищет место промпта, когда его никто не говорит", () => {
+    const model = createFactoryModel(recordingWithPrompt());
+
+    model.seek(0);
+
+    expect(model.$promptPosition.get()).toBeNull();
   });
 
   it("ставит сцену на паузу, когда раскрывают уточнения промпта", () => {
     const model = createFactoryModel(recordingWithPrompt());
     model.start(true);
-    model.seek(1_500);
+    model.seek(duringPrompt(model, 0));
 
     model.togglePromptDetails();
 
@@ -88,10 +100,10 @@ describe("createFactoryModel", () => {
 
   it("закрывает уточнения, когда промпт сменился", () => {
     const model = createFactoryModel(recordingWithPrompt());
-    model.seek(1_500);
+    model.seek(duringPrompt(model, 0));
     model.togglePromptDetails();
 
-    model.seek(7_000);
+    model.seek(duringPrompt(model, 1));
 
     expect(model.$promptDetailsOpen.get()).toBe(false);
   });
@@ -99,7 +111,7 @@ describe("createFactoryModel", () => {
   it("держит уточнения открытыми, пока висит тот же промпт", () => {
     const model = createFactoryModel(recordingWithPrompt());
     model.start(false);
-    model.seek(1_500);
+    model.seek(duringPrompt(model, 0));
     model.togglePromptDetails();
     model.toggle();
 
@@ -125,8 +137,9 @@ describe("createFactoryModel", () => {
   });
 });
 
-// Реплики на тех же минутах: мастер даёт задание коду на минуте записи — над ним у стола,
-// а рабочий кода говорит человеку в середине своего визита.
+// Реплики на тех же минутах: мастер даёт задание постановке, постановка говорит на месте
+// (адресат не следующий по передаче), а рабочий кода обменивается репликой с проверками
+// у места передачи.
 function recordingWithMessages(): Recording {
   return {
     ...recordingWithPrompt(),
@@ -135,30 +148,44 @@ function recordingWithMessages(): Recording {
       {
         t: 60_000,
         type: "message",
-        from: "conductor",
-        to: "code",
+        from: "foreman",
+        to: "spec",
         line: "Сделай счётчик",
         text: "Сделай счётчик токенов.",
+      },
+      {
+        t: 90_000,
+        type: "message",
+        from: "spec",
+        to: "test",
+        line: "Критерии на тебе",
+        text: "Критерии проверок на тебе.",
       },
       { t: 120_000, type: "stage_enter", stage: "code" },
       {
         t: 180_000,
         type: "message",
         from: "code",
-        to: "human",
-        line: "Счётчик готов",
-        text: "Счётчик токенов готов.",
+        to: "test",
+        line: "Держи, счётчик готов",
+        text: "Держи, счётчик токенов готов.",
       },
-      { t: 240_000, type: "build_end", ok: true },
+      { t: 240_000, type: "stage_enter", stage: "test" },
+      { t: 300_000, type: "build_end", ok: true },
     ],
   };
+}
+
+// Момент сцены, когда висит реплика с номером `index`: чуть позже её начала.
+function duringMessage(model: FactoryModel, index: number): number {
+  return (model.script.messages[index]?.start ?? 0) + 100;
 }
 
 describe("createFactoryModel: реплики", () => {
   it("показывает реплику, которая висит в этот момент", () => {
     const model = createFactoryModel(recordingWithMessages());
 
-    model.seek(1_500);
+    model.seek(duringMessage(model, 0));
 
     expect(model.$message.get()?.message.line).toBe("Сделай счётчик");
   });
@@ -166,7 +193,7 @@ describe("createFactoryModel: реплики", () => {
   it("не показывает реплику вне её времени", () => {
     const model = createFactoryModel(recordingWithMessages());
 
-    model.seek(100);
+    model.seek(0);
 
     expect(model.$message.get()).toBeNull();
   });
@@ -174,24 +201,33 @@ describe("createFactoryModel: реплики", () => {
   it("ставит пузырь над мастером, когда говорит он", () => {
     const model = createFactoryModel(recordingWithMessages());
 
-    model.seek(1_500);
+    model.seek(duringMessage(model, 0));
 
-    expect(model.$messagePosition.get()).toEqual(model.script.layout.conductor.post);
+    expect(model.$messagePosition.get()).toEqual(model.script.layout.stations.spec.foremanPost);
   });
 
-  it("ставит пузырь над рабочим, когда говорит он", () => {
+  it("ставит пузырь над рабочим на его месте, когда он говорит не при передаче", () => {
     const model = createFactoryModel(recordingWithMessages());
-    const atCode = model.script.messages[1]?.start ?? 0;
 
-    model.seek(atCode + 100);
+    model.seek(duringMessage(model, 1));
 
-    expect(model.$messagePosition.get()).toEqual(model.script.layout.stations.code.post);
+    expect(model.$messagePosition.get()).toEqual(model.script.layout.stations.spec.post);
+  });
+
+  it("ставит пузырь над рабочим у места встречи, когда он говорит при передаче", () => {
+    const model = createFactoryModel(recordingWithMessages());
+
+    model.seek(duringMessage(model, 2));
+
+    const giver = model.$scene.get().workers.find((worker) => worker.station === "code");
+    expect(model.$messagePosition.get()).toEqual(giver?.position);
+    expect(model.$messagePosition.get()).not.toEqual(model.script.layout.stations.code.post);
   });
 
   it("не ищет место, когда никто не говорит", () => {
     const model = createFactoryModel(recordingWithMessages());
 
-    model.seek(100);
+    model.seek(0);
 
     expect(model.$messagePosition.get()).toBeNull();
   });

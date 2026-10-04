@@ -2,7 +2,7 @@
 // меняются только координаты, поворот, масштаб и прозрачность.
 
 import type {
-  ConductorFrame,
+  ForemanFrame,
   PartFrame,
   PartStatus,
   Point,
@@ -11,7 +11,7 @@ import type {
 } from "@cyberzavod/core";
 import { Container, Graphics, Sprite, type Renderer, type Texture } from "pixi.js";
 import { shade, type Palette } from "./palette.ts";
-import { conductorPoseOf, poseOf, type Pose } from "./pose.ts";
+import { foremanPoseOf, poseOf, type Pose } from "./pose.ts";
 import { UNIT } from "./units.ts";
 
 /** Запечённые текстуры действующих лиц. */
@@ -19,7 +19,7 @@ export interface ActorTextures {
   readonly shadow: Texture;
   readonly torso: Texture;
   readonly helmet: Texture;
-  readonly conductorHelmet: Texture;
+  readonly foremanHelmet: Texture;
   readonly hand: Texture;
   readonly crate: Texture;
   readonly glow: Texture;
@@ -101,7 +101,7 @@ export function bakeActorTextures(renderer: Renderer, palette: Palette): ActorTe
     ),
     helmet: bake(drawHelmet(palette.helmet, palette)),
     // Каска мастера белая: его видно среди рабочих в жёлтых касках.
-    conductorHelmet: bake(drawHelmet(WHITE, palette)),
+    foremanHelmet: bake(drawHelmet(WHITE, palette)),
     hand: bake(
       new Graphics().circle(0, 0, HAND_RADIUS).fill(palette.skin).stroke({ width: 5, color: ink }),
     ),
@@ -181,17 +181,17 @@ export function placeWorker(sprites: WorkerSprites, worker: WorkerFrame): void {
  * @param {Palette} palette Краски цеха.
  * @returns {WorkerSprites} Мастер, ещё не поставленный на место.
  */
-export function createConductor(textures: ActorTextures, palette: Palette): WorkerSprites {
-  return createFigure(palette.conductor, textures.conductorHelmet, textures);
+export function createForeman(textures: ActorTextures, palette: Palette): WorkerSprites {
+  return createFigure(palette.foreman, textures.foremanHelmet, textures);
 }
 
 /**
- * Ставит мастера в кадр: место, поворот к собеседнику и жесты, пока он говорит.
+ * Ставит мастера в кадр: место, поворот и поза — на ходу, в речи или в покое.
  * @param {WorkerSprites} sprites Спрайты мастера.
- * @param {ConductorFrame} conductor Мастер в кадре.
+ * @param {ForemanFrame} foreman Мастер в кадре.
  */
-export function placeConductor(sprites: WorkerSprites, conductor: ConductorFrame): void {
-  placeFigure(sprites, conductor.position, conductor.heading, conductorPoseOf(conductor));
+export function placeForeman(sprites: WorkerSprites, foreman: ForemanFrame): void {
+  placeFigure(sprites, foreman.position, foreman.heading, foremanPoseOf(foreman));
 }
 
 /**

@@ -5,7 +5,7 @@
 
 import type { Point, Stage, StationPlan } from "@cyberzavod/core";
 import { Container, Graphics, Text } from "pixi.js";
-import { CONDUCTOR_LABEL, STAGE_LABELS } from "@/shared/config/stages.ts";
+import { FOREMAN_LABEL, STAGE_LABELS } from "@/shared/config/stages.ts";
 import { shade, type Palette } from "./palette.ts";
 import { UNIT } from "./units.ts";
 
@@ -28,7 +28,7 @@ export function loadPlaqueFont(): Promise<unknown> {
   const { weight, size, family } = PLAQUE_FONT;
   return document.fonts.load(
     `${weight} ${size}px "${family}"`,
-    [...Object.values(STAGE_LABELS), CONDUCTOR_LABEL].join(""),
+    [...Object.values(STAGE_LABELS), FOREMAN_LABEL].join(""),
   );
 }
 

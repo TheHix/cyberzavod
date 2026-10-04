@@ -21,7 +21,7 @@ function tokens(overrides: Record<string, string> = {}): TokenSource {
     "--skin",
     "--crate",
     "--crate-plank",
-    "--conductor",
+    "--foreman",
     "--screen",
     "--screen-glass",
     "--belt",
@@ -66,12 +66,12 @@ describe("readPalette", () => {
   });
 
   it("берёт форму мастера из токена, которого нет у этапов", () => {
-    const source = tokens({ "--conductor": "#d7263d" });
+    const source = tokens({ "--foreman": "#d7263d" });
 
     const palette = readPalette(source);
 
-    expect(Object.values(palette.stations)).not.toContain(palette.conductor);
-    expect(palette.conductor).toBe(0xd7263d);
+    expect(Object.values(palette.stations)).not.toContain(palette.foreman);
+    expect(palette.foreman).toBe(0xd7263d);
   });
 
   it("падает, если токена нет", () => {

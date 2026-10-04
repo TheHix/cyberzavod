@@ -2,9 +2,9 @@
 // и дальше не меняется; сам мастер — фигура из actors.ts, она двигается в кадре. Координаты —
 // рисунок в точках рисования относительно плана (`UNIT` на единицу).
 
-import type { ConductorPlan } from "@cyberzavod/core";
+import type { ForemanPlan } from "@cyberzavod/core";
 import { Container, Graphics } from "pixi.js";
-import { CONDUCTOR_LABEL } from "@/shared/config/stages.ts";
+import { FOREMAN_LABEL } from "@/shared/config/stages.ts";
 import { drawPlaque, LABEL_OFFSET } from "./machines.ts";
 import { shade, type Palette } from "./palette.ts";
 import { UNIT } from "./units.ts";
@@ -54,16 +54,12 @@ function drawDesk(palette: Palette): Container {
 
 /**
  * Рисует кабинет мастера: стол и табличку; координаты — в точках рисования.
- * @param {ConductorPlan} plan Где стол и место мастера.
+ * @param {ForemanPlan} plan Где стол и место мастера.
  * @param {number} textResolution Чёткость текста таблички.
  * @param {Palette} palette Краски цеха.
  * @returns {Container} Кабинет без мастера.
  */
-export function drawOffice(
-  plan: ConductorPlan,
-  textResolution: number,
-  palette: Palette,
-): Container {
+export function drawOffice(plan: ForemanPlan, textResolution: number, palette: Palette): Container {
   const desk = drawDesk(palette);
   desk.position.set(plan.desk.x * UNIT, plan.desk.y * UNIT);
 
@@ -71,7 +67,7 @@ export function drawOffice(
   // нижних станков.
   const awayFromDesk = Math.sign(plan.post.y - plan.desk.y) || 1;
   const plaque = drawPlaque(
-    CONDUCTOR_LABEL,
+    FOREMAN_LABEL,
     { x: plan.desk.x * UNIT, y: plan.post.y * UNIT + awayFromDesk * LABEL_OFFSET },
     textResolution,
     palette,

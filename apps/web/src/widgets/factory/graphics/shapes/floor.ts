@@ -72,7 +72,7 @@ function drawPads(layout: FactoryLayout, palette: Palette): Graphics {
     const { machine, post } = layout.stations[stage];
     addPad(pads, machine, post);
   }
-  addPad(pads, layout.conductor.desk, layout.conductor.post);
+  addPad(pads, layout.foreman.desk, layout.foreman.post);
   return pads
     .fill(palette.floor.pad)
     .stroke({ width: PAD_STROKE.width, color: palette.ink, alpha: PAD_STROKE.alpha });

@@ -9,8 +9,5 @@ export const STAGE_LABELS: Readonly<Record<Stage, string>> = {
   ship: "Выпуск",
 };
 
-/** Название мастера — начальника цеха (в коде `conductor`) — на табличке кабинета и в маршрутах. */
-export const CONDUCTOR_LABEL = "Мастер";
-
-/** Как называют человека в маршрутах реплик. */
-export const HUMAN_LABEL = "человек";
+/** Название мастера цеха (в коде `foreman`) — на табличке кабинета и в маршрутах реплик. */
+export const FOREMAN_LABEL = "Мастер";

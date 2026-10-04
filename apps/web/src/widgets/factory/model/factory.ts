@@ -3,7 +3,7 @@
 
 import {
   buildScript,
-  CONDUCTOR,
+  FOREMAN,
   sceneAt,
   summarize,
   type BriefRecording,
@@ -39,13 +39,13 @@ export interface FactoryModel {
   readonly $scene: ReadableAtom<Scene>;
   /** Момент записи, мс от начала сборки. */
   readonly $recordingTime: ReadableAtom<number>;
-  /** Промпт, который сейчас висит над рабочим. */
+  /** Промпт, который сейчас говорит мастер рабочему станции. */
   readonly $prompt: ReadableAtom<PromptCue | null>;
-  /** Где рабочий, получивший висящий промпт, — точка плана, над которой висит пузырь. */
+  /** Где мастер, говорящий висящий промпт, — точка плана, над которой висит пузырь. */
   readonly $promptPosition: ReadableAtom<Point | null>;
   /** Реплика, которая сейчас висит над говорящим. */
   readonly $message: ReadableAtom<MessageCue | null>;
-  /** Где говорящий — мастер у стола или рабочий, — точка плана, над которой висит реплика. */
+  /** Где говорящий — мастер или рабочий, — точка плана, над которой висит реплика. */
   readonly $messagePosition: ReadableAtom<Point | null>;
   /** Раскрыты ли уточнения висящего промпта; со сменой промпта закрываются. */
   readonly $promptDetailsOpen: ReadableAtom<boolean>;
@@ -80,19 +80,17 @@ export function createFactoryModel(recording: BriefRecording): FactoryModel {
   const $scene = computed($playback, (playback) => sceneAt(script, playback.position));
   const $recordingTime = computed($scene, (scene) => scene.recordingTime);
   const $prompt = computed($scene, (scene) => scene.prompt?.cue ?? null);
-  // Промпт висит над рабочим станка, у которого он получен.
-  const $promptPosition = computed($scene, (scene) => {
-    const cue = scene.prompt?.cue;
-    if (cue === undefined) return null;
-    return scene.workers.find((worker) => worker.station === cue.station)?.position ?? null;
-  });
+  // Промпт говорит мастер, и пузырь висит над ним, там, где он стоит у станка.
+  const $promptPosition = computed($scene, (scene) =>
+    scene.prompt === null ? null : scene.foreman.position,
+  );
 
   const $message = computed($scene, (scene) => scene.message?.cue ?? null);
-  // Мастер говорит из кабинета, рабочий — со своего места.
+  // Мастер говорит там, где он сейчас, рабочий — где стоит: у своего станка или у места встречи.
   const $messagePosition = computed($scene, (scene) => {
     const cue = scene.message?.cue;
     if (cue === undefined) return null;
-    if (cue.speaker === CONDUCTOR) return scene.conductor.position;
+    if (cue.speaker === FOREMAN) return scene.foreman.position;
     return scene.workers.find((worker) => worker.station === cue.speaker)?.position ?? null;
   });
 

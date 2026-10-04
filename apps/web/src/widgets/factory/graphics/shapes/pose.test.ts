@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Activity, ConductorFrame, WorkerFrame } from "@cyberzavod/core";
-import { conductorPoseOf, poseOf } from "./pose.ts";
+import type { Activity, ForemanActivity, ForemanFrame, WorkerFrame } from "@cyberzavod/core";
+import { foremanPoseOf, poseOf } from "./pose.ts";
 
 function workerDoing(activity: Activity, carrying = false, elapsed = 105): WorkerFrame {
   return {
@@ -50,33 +50,42 @@ describe("poseOf", () => {
   });
 });
 
-function conductorAt(talking: boolean, elapsed: number): ConductorFrame {
-  return { position: { x: 0, y: 0 }, heading: 0, talking, elapsed };
+function foremanDoing(activity: ForemanActivity, elapsed = 105): ForemanFrame {
+  return { position: { x: 0, y: 0 }, heading: 0, activity, elapsed };
 }
 
-describe("conductorPoseOf", () => {
+describe("foremanPoseOf", () => {
   it.each([
     [150, 1],
     [450, -1],
   ])("покачивает руками, пока говорит: на %i мс руки разнесены в сторону %i", (elapsed, side) => {
-    const conductor = conductorAt(true, elapsed);
+    const foreman = foremanDoing("talk", elapsed);
 
-    const pose = conductorPoseOf(conductor);
+    const pose = foremanPoseOf(foreman);
 
     expect(Math.sign(pose.swing)).toBe(side);
   });
 
-  it("не машет руками, пока слушает отчёт", () => {
-    const conductor = conductorAt(false, 150);
+  it("машет руками на ходу, как рабочий без детали", () => {
+    const foreman = foremanDoing("walk");
+    const worker = workerDoing("walk");
 
-    const pose = conductorPoseOf(conductor);
+    const pose = foremanPoseOf(foreman);
 
-    expect(pose.swing).toBe(0);
+    expect(pose).toEqual(poseOf(worker));
+  });
+
+  it.each(["listen", "idle"] as const)("стоит спокойно, дыша, когда он %s", (activity) => {
+    const foreman = foremanDoing(activity, 600);
+
+    const pose = foremanPoseOf(foreman);
+
+    expect(pose).toEqual({ reach: 0.08, swing: 0, bob: expect.closeTo(0.015) });
   });
 
   it("выносит руки вперёд только на время речи", () => {
-    const speaking = conductorPoseOf(conductorAt(true, 0));
-    const silent = conductorPoseOf(conductorAt(false, 0));
+    const speaking = foremanPoseOf(foremanDoing("talk", 0));
+    const silent = foremanPoseOf(foremanDoing("listen", 0));
 
     expect(speaking.reach).toBeGreaterThan(silent.reach);
   });

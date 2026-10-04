@@ -2,6 +2,8 @@
 .anchor {
   --bubble-max-width: 24rem;
   --bubble-distance: 2rem;
+  --tail-size: 1.1rem;
+  --tail-inset: var(--space-l);
 
   position: absolute;
   top: 0;
@@ -25,16 +27,45 @@
   box-shadow: var(--lift);
 }
 
+/* Хвостик — повёрнутый квадрат на краю пузыря, обращённом к говорящему: он закрывает контур
+   пузыря в месте стыка и рисует свой только с двух внешних сторон. */
+.bubble::after {
+  content: "";
+  position: absolute;
+  width: var(--tail-size);
+  height: var(--tail-size);
+  background: var(--paper);
+}
+
 .anchor[data-vertical="above"] .bubble {
   bottom: var(--bubble-distance);
+}
+
+.anchor[data-vertical="above"] .bubble::after {
+  bottom: calc(-1 * (var(--outline-width) + var(--tail-size) / 2));
+  border-right: var(--outline);
+  border-bottom: var(--outline);
 }
 
 .anchor[data-vertical="below"] .bubble {
   top: var(--bubble-distance);
 }
 
+.anchor[data-vertical="below"] .bubble::after {
+  top: calc(-1 * (var(--outline-width) + var(--tail-size) / 2));
+  border-top: var(--outline);
+  border-left: var(--outline);
+}
+
+/* Якорь отстоит от края пузыря на --tail-inset, а при центровке он посередине: хвостик смотрит
+   на якорь. */
 .anchor[data-horizontal="start"] .bubble {
-  left: calc(-1 * var(--space-l));
+  left: calc(-1 * var(--tail-inset));
+}
+
+.anchor[data-horizontal="start"] .bubble::after {
+  left: calc(var(--tail-inset) - var(--outline-width) - var(--tail-size) / 2);
+  transform: rotate(45deg);
 }
 
 .anchor[data-horizontal="center"] .bubble {
@@ -42,6 +73,16 @@
   transform: translateX(-50%);
 }
 
+.anchor[data-horizontal="center"] .bubble::after {
+  left: calc(50% - var(--tail-size) / 2);
+  transform: rotate(45deg);
+}
+
 .anchor[data-horizontal="end"] .bubble {
-  right: calc(-1 * var(--space-l));
+  right: calc(-1 * var(--tail-inset));
+}
+
+.anchor[data-horizontal="end"] .bubble::after {
+  right: calc(var(--tail-inset) - var(--outline-width) - var(--tail-size) / 2);
+  transform: rotate(45deg);
 }
