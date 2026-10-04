@@ -114,6 +114,73 @@ describe("fromHookPayload", () => {
     });
   });
 
+  it("сохраняет из ответа сабагента только вердикт — первую строку без оформления и точки", () => {
+    const payload = {
+      hook_event_name: "SubagentStop",
+      agent_type: "reviewer",
+      last_assistant_message: "\n**НА ДОРАБОТКУ.**\n\nsrc/a.ts:3 — имя не из предметной области",
+    };
+
+    const event = fromHookPayload(payload, TS);
+
+    expect(event).toEqual({
+      ts: TS,
+      kind: "subagent_stop",
+      agent: "reviewer",
+      verdict: "НА ДОРАБОТКУ",
+    });
+  });
+
+  it("не принимает за вердикт длинную первую строку ответа", () => {
+    const payload = {
+      hook_event_name: "SubagentStop",
+      agent_type: "general-purpose",
+      last_assistant_message: "Нашёл три места, где выбирается модель сабагента, и вот что в них",
+    };
+
+    const event = fromHookPayload(payload, TS);
+
+    expect(event).toEqual({ ts: TS, kind: "subagent_stop", agent: "general-purpose" });
+  });
+
+  it("превращает отчёт сабагента в сессию в событие с id агента и вердиктом, без текста отчёта", () => {
+    const report = [
+      '<agent-message from="a68c">',
+      "[Subagent hand-back] The text below is the final report. The report follows:",
+      "  [harness: пометка среды]",
+      "  ",
+      "  ДЕФЕКТ",
+      "  ",
+      "  тест пустого плана падает",
+      "</agent-message>",
+    ].join("\n");
+    const payload = { hook_event_name: "UserPromptSubmit", prompt: report };
+
+    const event = fromHookPayload(payload, TS);
+
+    expect(event).toEqual({ ts: TS, kind: "subagent_report", agentId: "a68c", verdict: "ДЕФЕКТ" });
+  });
+
+  it("оставляет промптом сообщение агента, которое не отчёт сабагента", () => {
+    const text = '<agent-message from="peer">\nПосмотри мой список задач\n</agent-message>';
+    const payload = { hook_event_name: "UserPromptSubmit", prompt: text };
+
+    const event = fromHookPayload(payload, TS);
+
+    expect(event).toEqual({ ts: TS, kind: "prompt", text });
+  });
+
+  it("записывает отчёт сабагента без вердикта, если не нашёл начало отчёта", () => {
+    const payload = {
+      hook_event_name: "UserPromptSubmit",
+      prompt: '<agent-message from="a68c">\n[Subagent hand-back] ПРИНЯТО\n</agent-message>',
+    };
+
+    const event = fromHookPayload(payload, TS);
+
+    expect(event).toEqual({ ts: TS, kind: "subagent_report", agentId: "a68c" });
+  });
+
   it("сохраняет транскрипт сессии при остановке", () => {
     const payload = {
       hook_event_name: "Stop",

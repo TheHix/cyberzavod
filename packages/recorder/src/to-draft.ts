@@ -33,10 +33,24 @@ const COMMAND_SEPARATOR = /\s*(?:&&|\|\||;|\||\n)\s*/;
 // Присваивания переменных перед командой: `CI=1 pnpm test`.
 const LEADING_ENV_ASSIGNMENTS = /^(?:\w+=\S*\s+)*/;
 
-// Сабагенты, по которым видно этап.
+// Сабагенты, по которым видно этап: встроенный Plan и станции пайплайна /feature
+// из .claude/agents/.
 const AGENT_STAGES: Readonly<Record<string, Stage>> = {
-  reviewer: "review",
   Plan: "spec",
+  analyst: "spec",
+  coder: "code",
+  tester: "test",
+  reviewer: "review",
+};
+
+// Вердикты станций /feature — первая строка ответа агента. Отказ возвращает деталь с этапа
+// агента, а последний вердикт, как и последний запуск проверок, решает исход сборки.
+type Verdict = { passed: true } | { passed: false; reason: string };
+const VERDICTS: Readonly<Record<string, Verdict>> = {
+  "ПРОВЕРКИ ПРОЙДЕНЫ": { passed: true },
+  ПРИНЯТО: { passed: true },
+  ДЕФЕКТ: { passed: false, reason: "тестировщик нашёл дефект" },
+  "НА ДОРАБОТКУ": { passed: false, reason: "ревью вернуло на доработку" },
 };
 
 // Среда Claude Code доставляет отчёты сабагентов и уведомления тем же событием, что и
@@ -97,6 +111,11 @@ export function isHumanPrompt(text: string): boolean {
   return !SERVICE_MESSAGE_PREFIXES.some((prefix) => start.startsWith(prefix));
 }
 
+// Вердикт по строке из журнала; Object.hasOwn — чтобы «constructor» не нашёлся в прототипе.
+function verdictFor(line: string | undefined): Verdict | undefined {
+  return line !== undefined && Object.hasOwn(VERDICTS, line) ? VERDICTS[line] : undefined;
+}
+
 function agentWindowKey(
   event: Extract<RawEvent, { kind: "subagent_start" | "subagent_stop" }>,
 ): string {
@@ -119,18 +138,35 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
 
   const draftEvents: DraftEvent[] = [{ t: 0, type: "build_start" }];
   let currentStage: Stage | null = null;
-  // Сборка считается успешной, если последний запуск проверок прошёл (или их не было).
+  // Сборка считается успешной, если последняя проверка прошла (или их не было): запуск
+  // проверок или вердикт тестировщика и ревьюера.
   let lastChecksOk = true;
   // Инструменты сабагента приходят в той же сессии и ничем не помечены. Пока работает сабагент
   // со своим этапом, этап задаёт он: make check внутри ревьюера — часть ревью, а не возврат
   // к тестам. Окна ведутся по agent_id; остановка без парного старта (служебные сабагенты
   // Claude Code) ничего не закрывает.
   const stagedAgentWindows = new Set<string>();
+  // Вердикт станции приходит с её остановкой (терминальный Claude Code) или отдельным
+  // отчётом по agent_id (десктопное приложение). Каждый запуск судится один раз; повторный
+  // запуск того же агента после SendMessage — новый запуск со своим вердиктом.
+  const agentsById = new Map<string, string>();
+  const judgedRuns = new Set<string>();
 
   const enterStage = (stage: Stage, ts: number) => {
     if (stage === currentStage) return;
     draftEvents.push({ t: at(ts), type: "stage_enter", stage });
     currentStage = stage;
+  };
+
+  const judge = (agent: string, run: string, line: string | undefined, ts: number) => {
+    const stage = AGENT_STAGES[agent];
+    const verdict = verdictFor(line);
+    if (stage === undefined || verdict === undefined || judgedRuns.has(run)) return;
+    judgedRuns.add(run);
+    lastChecksOk = verdict.passed;
+    if (!verdict.passed) {
+      draftEvents.push({ t: at(ts), type: "stage_fail", stage, reason: verdict.reason });
+    }
   };
 
   for (const event of events) {
@@ -149,6 +185,8 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
         }
         break;
       case "subagent_start": {
+        if (event.agentId !== undefined) agentsById.set(event.agentId, event.agent);
+        judgedRuns.delete(agentWindowKey(event));
         const stage = AGENT_STAGES[event.agent];
         if (stage === undefined) break;
         stagedAgentWindows.add(agentWindowKey(event));
@@ -157,7 +195,13 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
       }
       case "subagent_stop":
         stagedAgentWindows.delete(agentWindowKey(event));
+        judge(event.agent, agentWindowKey(event), event.verdict, event.ts);
         break;
+      case "subagent_report": {
+        const agent = agentsById.get(event.agentId);
+        if (agent !== undefined) judge(agent, event.agentId, event.verdict, event.ts);
+        break;
+      }
       case "tool": {
         if (stagedAgentWindows.size > 0) break;
         for (const stage of stagesReachedByTool(event)) {

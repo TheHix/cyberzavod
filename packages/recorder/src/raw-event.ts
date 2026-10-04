@@ -8,7 +8,16 @@ export type RawEvent =
   | { ts: number; kind: "prompt"; text: string }
   | { ts: number; kind: "tool"; tool: string; ok: boolean; command?: string; file?: string }
   | { ts: number; kind: "subagent_start"; agent: string; agentId?: string }
-  | { ts: number; kind: "subagent_stop"; agent: string; agentId?: string; transcriptPath?: string }
+  | {
+      ts: number;
+      kind: "subagent_stop";
+      agent: string;
+      agentId?: string;
+      transcriptPath?: string;
+      /** Первая строка ответа сабагента: у станций пайплайна /feature это вердикт. */
+      verdict?: string;
+    }
+  | { ts: number; kind: "subagent_report"; agentId: string; verdict?: string }
   | { ts: number; kind: "stop"; transcriptPath?: string };
 
 /** Ошибка формата журнала: разобранная строка не похожа на событие. */
@@ -17,6 +26,18 @@ export class RawLogError extends Error {}
 // Команды Bash обрезаются: для записи важно, что запускалось, а не полный текст.
 const MAX_COMMAND_LENGTH = 200;
 const UNKNOWN = "unknown";
+// Вердикт — короткая строка вроде «НА ДОРАБОТКУ»; длинная первая строка — уже сам отчёт.
+const MAX_VERDICT_LENGTH = 40;
+// Оформление вокруг вердикта: **ПРИНЯТО**, `ДЕФЕКТ`, # ПРИНЯТО, «НА ДОРАБОТКУ.».
+const VERDICT_MARKUP = /[*_`#]/g;
+const TRAILING_PUNCTUATION = /[.:!]+$/;
+// Пометки среды Claude Code перед отчётом сабагента — в квадратных скобках, это не вердикт.
+const HARNESS_NOTE_START = "[";
+// В десктопном приложении сабагент сдаёт работу инструментом SubagentHandback без текста
+// ответа, и отчёт приходит в сессию сообщением: <agent-message from="<agent_id>">
+// [Subagent hand-back] … The report follows: <отчёт с отступом>.
+const SUBAGENT_REPORT = /^<agent-message from="([^"]+)">\s*\[Subagent hand-back\]/;
+const REPORT_START = "The report follows:";
 // session_id уходит в имя файла журнала — пропускаются только безопасные символы.
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 
@@ -46,6 +67,16 @@ function toolEvent(payload: HookPayload, ts: number, ok: boolean): RawEvent {
   return event;
 }
 
+// Из ответа сабагента в журнал идёт только первая строка: станции пайплайна начинают
+// с неё вердикт, а остальной отчёт для записи не нужен.
+function verdictOf(reply: string | undefined): string | undefined {
+  const firstLine = reply
+    ?.split("\n")
+    .map((line) => line.replace(VERDICT_MARKUP, "").trim().replace(TRAILING_PUNCTUATION, ""))
+    .find((line) => line !== "" && !line.startsWith(HARNESS_NOTE_START));
+  return firstLine !== undefined && firstLine.length <= MAX_VERDICT_LENGTH ? firstLine : undefined;
+}
+
 // Служебные сабагенты Claude Code приходят с пустым agent_type.
 function agentName(payload: HookPayload): string {
   return stringField(payload, "agent_type") || UNKNOWN;
@@ -56,6 +87,19 @@ function agentName(payload: HookPayload): string {
 function withOptional<T extends object>(event: T, fields: Partial<T>): T {
   const present = Object.entries(fields).filter(([, value]) => value !== undefined);
   return { ...event, ...Object.fromEntries(present) };
+}
+
+// Отчёт сабагента, пришедший сообщением в сессию, — не промпт человека: из него в журнал
+// идут только id агента и вердикт.
+function subagentReport(text: string, ts: number): RawEvent | undefined {
+  const agentId = SUBAGENT_REPORT.exec(text)?.[1];
+  if (agentId === undefined) return undefined;
+  const reportStart = text.indexOf(REPORT_START);
+  const report = reportStart === -1 ? undefined : text.slice(reportStart + REPORT_START.length);
+  return withOptional<Extract<RawEvent, { kind: "subagent_report" }>>(
+    { ts, kind: "subagent_report", agentId },
+    { verdict: verdictOf(report) },
+  );
 }
 
 /**
@@ -72,7 +116,8 @@ export function fromHookPayload(payload: unknown, ts: number): RawEvent | null {
       return { ts, kind: "session_start" };
     case "UserPromptSubmit": {
       const text = stringField(payload, "prompt");
-      return text === undefined ? null : { ts, kind: "prompt", text };
+      if (text === undefined) return null;
+      return subagentReport(text, ts) ?? { ts, kind: "prompt", text };
     }
     case "PostToolUse":
       return toolEvent(payload, ts, true);
@@ -89,6 +134,7 @@ export function fromHookPayload(payload: unknown, ts: number): RawEvent | null {
         {
           agentId: stringField(payload, "agent_id"),
           transcriptPath: stringField(payload, "agent_transcript_path"),
+          verdict: verdictOf(stringField(payload, "last_assistant_message")),
         },
       );
     case "Stop":
@@ -118,6 +164,7 @@ const RAW_EVENT_SHAPES: Record<RawEvent["kind"], (value: HookPayload) => boolean
   tool: (value) => typeof value.tool === "string" && typeof value.ok === "boolean",
   subagent_start: (value) => typeof value.agent === "string",
   subagent_stop: (value) => typeof value.agent === "string",
+  subagent_report: (value) => typeof value.agentId === "string",
   stop: () => true,
 };
 

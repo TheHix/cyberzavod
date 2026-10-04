@@ -150,6 +150,147 @@ describe("toDraft", () => {
     expect(stagesOf(draft.events)).toEqual(["code", "review"]);
   });
 
+  it("возвращает деталь с этапа станции, которая вернула работу", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "coder", agentId: "c1" },
+      { ts: START + 1_000, kind: "subagent_stop", agent: "coder", agentId: "c1" },
+      { ts: START + 2_000, kind: "subagent_start", agent: "tester", agentId: "t1" },
+      {
+        ts: START + 3_000,
+        kind: "subagent_stop",
+        agent: "tester",
+        agentId: "t1",
+        verdict: "ДЕФЕКТ",
+      },
+      { ts: START + 4_000, kind: "subagent_start", agent: "coder", agentId: "c2" },
+      { ts: START + 5_000, kind: "subagent_stop", agent: "coder", agentId: "c2" },
+      { ts: START + 6_000, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
+      {
+        ts: START + 7_000,
+        kind: "subagent_stop",
+        agent: "reviewer",
+        agentId: "r1",
+        verdict: "НА ДОРАБОТКУ",
+      },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(stagesOf(draft.events)).toEqual([
+      "code",
+      "test",
+      "fail:test",
+      "code",
+      "review",
+      "fail:review",
+    ]);
+  });
+
+  it.each([
+    ["ПРИНЯТО", true],
+    ["НА ДОРАБОТКУ", false],
+  ])("по последнему вердикту ревью «%s» считает сборку успешной: %s", (verdict, ok) => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "tool", tool: "Bash", ok: false, command: "make check-web" },
+      { ts: START + 1_000, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
+      { ts: START + 2_000, kind: "subagent_stop", agent: "reviewer", agentId: "r1", verdict },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(draft.events.at(-1)).toEqual({ t: 2_000, type: "build_end", ok });
+  });
+
+  it("берёт вердикт станции из её отчёта по id агента", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
+      { ts: START + 1_000, kind: "subagent_stop", agent: "reviewer", agentId: "r1" },
+      { ts: START + 1_100, kind: "subagent_report", agentId: "r1", verdict: "НА ДОРАБОТКУ" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(stagesOf(draft.events)).toEqual(["review", "fail:review"]);
+  });
+
+  it("судит запуск станции один раз, даже если вердикт пришёл и с остановкой, и отчётом", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "tester", agentId: "t1" },
+      {
+        ts: START + 1_000,
+        kind: "subagent_stop",
+        agent: "tester",
+        agentId: "t1",
+        verdict: "ДЕФЕКТ",
+      },
+      { ts: START + 1_100, kind: "subagent_report", agentId: "t1", verdict: "ДЕФЕКТ" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(stagesOf(draft.events)).toEqual(["test", "fail:test"]);
+  });
+
+  it("не судит отчёт агента, запуск которого не попал в журнал", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "tool", tool: "Edit", ok: true },
+      { ts: START + 1_000, kind: "subagent_report", agentId: "r1", verdict: "НА ДОРАБОТКУ" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(stagesOf(draft.events)).toEqual(["code"]);
+  });
+
+  it("судит заново повторный запуск того же агента", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
+      { ts: START + 1_000, kind: "subagent_report", agentId: "r1", verdict: "НА ДОРАБОТКУ" },
+      { ts: START + 2_000, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
+      { ts: START + 3_000, kind: "subagent_report", agentId: "r1", verdict: "НА ДОРАБОТКУ" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(stagesOf(draft.events)).toEqual(["review", "fail:review", "fail:review"]);
+  });
+
+  it.each(["constructor", "Готово"])(
+    "не считает вердиктом строку «%s» и не меняет по ней итог сборки",
+    (verdict) => {
+      const raw: RawEvent[] = [
+        { ts: START, kind: "tool", tool: "Bash", ok: false, command: "make check-web" },
+        { ts: START + 1_000, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
+        { ts: START + 2_000, kind: "subagent_stop", agent: "reviewer", agentId: "r1", verdict },
+      ];
+
+      const draft = toDraft(raw, { sessionId: "s1" });
+
+      expect([stagesOf(draft.events), draft.events.at(-1)]).toEqual([
+        ["test", "fail:test", "review"],
+        { t: 2_000, type: "build_end", ok: false },
+      ]);
+    },
+  );
+
+  it("не считает вердиктом ответ сабагента без своего этапа", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "tool", tool: "Edit", ok: true },
+      { ts: START + 1_000, kind: "subagent_start", agent: "general-purpose", agentId: "g1" },
+      {
+        ts: START + 2_000,
+        kind: "subagent_stop",
+        agent: "general-purpose",
+        agentId: "g1",
+        verdict: "ДЕФЕКТ",
+      },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(stagesOf(draft.events)).toEqual(["code"]);
+  });
+
   it("ведёт сборку как обычно по инструментам сабагента без своего этапа", () => {
     const raw: RawEvent[] = [
       { ts: START, kind: "subagent_start", agent: "general-purpose", agentId: "g1" },
@@ -232,12 +373,18 @@ describe("toDraft", () => {
     expect(stagesOf(draft.events)).toEqual(["spec"]);
   });
 
-  it("относит работу агента Plan к этапу spec", () => {
-    const raw: RawEvent[] = [{ ts: START, kind: "subagent_start", agent: "Plan", agentId: "p1" }];
+  it.each([
+    ["Plan", "spec"],
+    ["analyst", "spec"],
+    ["coder", "code"],
+    ["tester", "test"],
+    ["reviewer", "review"],
+  ])("относит работу агента %s к этапу %s", (agent, stage) => {
+    const raw: RawEvent[] = [{ ts: START, kind: "subagent_start", agent, agentId: "a1" }];
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(draft.events)).toEqual(["spec"]);
+    expect(stagesOf(draft.events)).toEqual([stage]);
   });
 
   it("отдаёт промпт модели, которая первой ответила после него", () => {
