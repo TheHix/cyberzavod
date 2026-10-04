@@ -1,6 +1,7 @@
 ---
 import BaseLayout from "@/app/layouts/BaseLayout.astro";
 import { BuildStats } from "@/widgets/build-stats";
+import { Factory } from "@/widgets/factory";
 import { RecordingList } from "@/widgets/recording-list";
 import { publishedRecordings } from "@/entities/recording";
 import { site } from "@/shared/config/site.ts";
@@ -15,14 +16,10 @@ const [latest] = publishedRecordings;
       <p class="lead">{site.description}</p>
     </header>
 
-    <section aria-labelledby="factory-title" class="factory">
-      <h2 id="factory-title">Цех</h2>
-      <p class="muted">Здесь будет изометрический цех, который проигрывает запись сборки.</p>
-    </section>
-
     {latest && (
-      <section aria-labelledby="latest-title">
+      <section aria-labelledby="latest-title" class="latest">
         <h2 id="latest-title">Последняя сборка: {latest.title}</h2>
+        <Factory client:visible recording={latest} />
         <BuildStats recording={latest} />
       </section>
     )}
@@ -53,15 +50,12 @@ const [latest] = publishedRecordings;
     font-size: 1.125rem;
   }
 
-  .factory {
+  .latest {
     display: grid;
-    place-content: center;
-    min-height: 20rem;
-    border: 1px dashed var(--line);
-    text-align: center;
+    gap: 1rem;
   }
 
-  .muted {
-    color: var(--muted);
+  .latest h2 {
+    margin: 0;
   }
 </style>

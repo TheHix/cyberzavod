@@ -3,6 +3,7 @@ import type { GetStaticPaths } from "astro";
 import type { Recording } from "@cyberzavod/core";
 import BaseLayout from "@/app/layouts/BaseLayout.astro";
 import { BuildStats } from "@/widgets/build-stats";
+import { Factory } from "@/widgets/factory";
 import { PromptTimeline } from "@/widgets/prompt-timeline";
 import { publishedRecordings } from "@/entities/recording";
 import { formatDate } from "@/shared/lib/format.ts";
@@ -29,6 +30,8 @@ const description = `Как ИИ-агенты собирали «${recording.tit
       <h1>{recording.title}</h1>
       <p class="muted">{formatDate(recording.startedAt)}</p>
     </header>
+
+    <Factory client:visible recording={recording} />
 
     <BuildStats recording={recording} />
 

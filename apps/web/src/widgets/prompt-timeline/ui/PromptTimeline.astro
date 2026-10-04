@@ -2,7 +2,8 @@
 // Промпты человека по ходу сборки — как сообщения модели, которая их получила.
 // Главное указание видно сразу, уточнения раскрываются: без JS, через <details>.
 import type { PromptEvent, Recording } from "@cyberzavod/core";
-import { formatClock, formatModel } from "@/shared/lib/format.ts";
+import { recipientOf } from "@/entities/prompt";
+import { formatClock } from "@/shared/lib/format.ts";
 
 interface Props {
   recording: Recording;
@@ -10,8 +11,6 @@ interface Props {
 
 const { recording } = Astro.props;
 const prompts = recording.events.filter((event): event is PromptEvent => event.type === "prompt");
-const recipient = (prompt: PromptEvent) =>
-  prompt.model === undefined ? "агент" : formatModel(prompt.model);
 ---
 
 {prompts.length === 0 ? (
@@ -22,7 +21,7 @@ const recipient = (prompt: PromptEvent) =>
       <li class="message">
         <p class="route">
           <span class="at">{formatClock(prompt.t)}</span>
-          <span>человек → {recipient(prompt)}</span>
+          <span>человек → {recipientOf(prompt)}</span>
         </p>
         {prompt.requirements.length === 0 ? (
           <p class="goal">{prompt.goal}</p>
