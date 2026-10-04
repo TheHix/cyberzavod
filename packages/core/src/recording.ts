@@ -40,14 +40,21 @@ export interface Recording {
   events: FactoryEvent[];
 }
 
-/** Счётчики сборки, которые показываются над цехом. */
-export interface BuildStats {
-  durationMs: number;
+/** Счётчики сборки на какой-то момент: токены, промпты человека и возвраты на доработку. */
+export interface Tally {
   tokens: number;
   prompts: number;
   reworks: number;
+}
+
+/** Счётчики сборки, которые показываются над цехом. */
+export interface BuildStats extends Tally {
+  durationMs: number;
   ok: boolean;
 }
+
+/** Счётчики до первого события. */
+export const NO_TALLY: Tally = { tokens: 0, prompts: 0, reworks: 0 };
 
 /** Ошибка формата записи: запись пришла извне и не прошла проверку. */
 export class RecordingError extends Error {}
@@ -168,40 +175,49 @@ export function parseRecording(raw: unknown): Recording {
 }
 
 /**
+ * Добавляет событие записи к счётчикам сборки.
+ * @param {Tally} counts Счётчики до события.
+ * @param {FactoryEvent} event Событие записи.
+ * @returns {Tally} Счётчики после события.
+ */
+export function tally(counts: Tally, event: FactoryEvent): Tally {
+  switch (event.type) {
+    case "usage":
+      return { ...counts, tokens: counts.tokens + event.tokens };
+    case "prompt":
+      return { ...counts, prompts: counts.prompts + 1 };
+    case "stage_fail":
+      return { ...counts, reworks: counts.reworks + 1 };
+    case "build_start":
+    case "stage_enter":
+    case "build_end":
+      return counts;
+    default:
+      // Новый тип события не скомпилируется, пока его не учтут здесь.
+      return event satisfies never;
+  }
+}
+
+/**
+ * Итог сборки: удалась ли она по последнему событию записи.
+ * @param {Recording} recording Проверенная запись сборки.
+ * @returns {boolean} true, если запись кончается удачным build_end.
+ */
+export function succeeded(recording: Recording): boolean {
+  const last = recording.events.at(-1);
+  return last?.type === "build_end" && last.ok;
+}
+
+/**
  * Считает счётчики сборки по её записи.
  * @param {Recording} recording Проверенная запись сборки.
  * @returns {BuildStats} Длительность, токены, число промптов и возвратов, итог сборки.
  */
 export function summarize(recording: Recording): BuildStats {
   const { events } = recording;
-  const stats: BuildStats = {
+  return {
     durationMs: (events.at(-1)?.t ?? 0) - (events[0]?.t ?? 0),
-    tokens: 0,
-    prompts: 0,
-    reworks: 0,
-    ok: false,
+    ...events.reduce(tally, NO_TALLY),
+    ok: succeeded(recording),
   };
-  for (const event of events) {
-    switch (event.type) {
-      case "usage":
-        stats.tokens += event.tokens;
-        break;
-      case "prompt":
-        stats.prompts++;
-        break;
-      case "stage_fail":
-        stats.reworks++;
-        break;
-      case "build_end":
-        stats.ok = event.ok;
-        break;
-      case "build_start":
-      case "stage_enter":
-        break;
-      default:
-        // Новый тип события не скомпилируется, пока его не учтут здесь.
-        event satisfies never;
-    }
-  }
-  return stats;
 }
