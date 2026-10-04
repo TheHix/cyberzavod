@@ -8,7 +8,7 @@ export const STAGES = ["spec", "code", "test", "review", "ship"] as const;
 export type Stage = (typeof STAGES)[number];
 
 /**
- * Промпт человека в чистовом виде: цель одной строкой и требования списком.
+ * Промпт человека в чистовом виде: главное указание одной строкой и уточнения списком.
  * Как промпт был набран, в запись не попадает — только то, что человек просил.
  */
 export interface PromptEvent {
@@ -16,6 +16,8 @@ export interface PromptEvent {
   type: "prompt";
   goal: string;
   requirements: string[];
+  /** Модель, которая получила промпт, — id вроде `claude-opus-5-5`; нет, если неизвестна. */
+  model?: string;
 }
 
 /** Событие записи сборки; `t` — миллисекунды от начала сборки. */
@@ -78,6 +80,20 @@ function isInstant(value: unknown): value is string {
   return !Number.isNaN(time) && new Date(time).toISOString() === value;
 }
 
+type Fail = (why: string) => RecordingError;
+
+function parsePrompt(raw: Record<string, unknown>, t: number, fail: Fail): PromptEvent {
+  const { goal, requirements, model } = raw;
+  if (!isLine(goal)) throw fail("goal должен быть непустой строкой без переводов строки");
+  if (!isLines(requirements)) {
+    throw fail("requirements должны быть списком непустых строк без переводов строки");
+  }
+  const prompt: PromptEvent = { t, type: "prompt", goal, requirements: [...requirements] };
+  if (model === undefined) return prompt;
+  if (!isLine(model)) throw fail("model должна быть непустой строкой без переводов строки");
+  return { ...prompt, model };
+}
+
 /**
  * Проверяет одно событие записи, пришедшее извне.
  * @param {unknown} raw Разобранный JSON события.
@@ -86,7 +102,7 @@ function isInstant(value: unknown): value is string {
  * @throws {RecordingError} Если событие не соответствует формату.
  */
 export function parseFactoryEvent(raw: unknown, index: number): FactoryEvent {
-  const fail = (why: string) => new RecordingError(`событие #${index}: ${why}`);
+  const fail: Fail = (why) => new RecordingError(`событие #${index}: ${why}`);
   if (!isObject(raw)) throw fail("не объект");
 
   const { t, type } = raw;
@@ -96,11 +112,7 @@ export function parseFactoryEvent(raw: unknown, index: number): FactoryEvent {
     case "build_start":
       return { t, type };
     case "prompt":
-      if (!isLine(raw.goal)) throw fail("goal должен быть непустой строкой без переводов строки");
-      if (!isLines(raw.requirements)) {
-        throw fail("requirements должны быть списком непустых строк без переводов строки");
-      }
-      return { t, type, goal: raw.goal, requirements: [...raw.requirements] };
+      return parsePrompt(raw, t, fail);
     case "stage_enter":
       if (!isStage(raw.stage)) throw fail(`неизвестный этап ${String(raw.stage)}`);
       return { t, type, stage: raw.stage };

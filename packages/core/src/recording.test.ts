@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { parseRecording, RecordingError, summarize } from "./recording.ts";
 
-function validRecording() {
+// Запись как сырой JSON: тесты портят её как угодно, проверяет parseRecording.
+interface RawRecording {
+  version: number;
+  id: string;
+  startedAt: string;
+  title: string;
+  events: Record<string, unknown>[];
+}
+
+function validRecording(): RawRecording {
   return {
     version: 1,
     id: "demo-1",
@@ -12,8 +21,9 @@ function validRecording() {
       {
         t: 10,
         type: "prompt",
-        goal: "Добавить счётчик токенов",
-        requirements: ["Показывать над цехом", "Разбивать число по разрядам"],
+        goal: "Добавь счётчик токенов",
+        requirements: ["Показывай его над цехом", "Разбивай число по разрядам"],
+        model: "claude-opus-5-5",
       },
       { t: 20, type: "stage_enter", stage: "code" },
       { t: 30, type: "usage", tokens: 1200 },
@@ -60,6 +70,32 @@ describe("parseRecording", () => {
     const act = () => parseRecording(raw);
 
     expect(act).toThrow(/goal/);
+  });
+
+  it("сохраняет модель, получившую промпт", () => {
+    const raw = validRecording();
+
+    const recording = parseRecording(raw);
+
+    expect(recording.events[1]).toMatchObject({ model: "claude-opus-5-5" });
+  });
+
+  it("принимает промпт без модели", () => {
+    const raw = validRecording();
+    raw.events[1] = { t: 10, type: "prompt", goal: "Цель", requirements: [] };
+
+    const recording = parseRecording(raw);
+
+    expect(recording.events[1]).not.toHaveProperty("model");
+  });
+
+  it("отклоняет пустую модель", () => {
+    const raw = validRecording();
+    raw.events[1] = { t: 10, type: "prompt", goal: "Цель", requirements: [], model: "" };
+
+    const act = () => parseRecording(raw);
+
+    expect(act).toThrow(/model/);
   });
 
   it("отклоняет требование в несколько строк", () => {
