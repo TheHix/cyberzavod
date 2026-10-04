@@ -2,6 +2,7 @@
 // Из полезной нагрузки хука берётся только то, что нужно для записи, — без содержимого
 // файлов и ответов инструментов, чтобы в журнал не попадало лишнее.
 
+/** Событие сырого журнала сборки; `ts` — время по часам машины в миллисекундах. */
 export type RawEvent =
   | { ts: number; kind: "session_start" }
   | { ts: number; kind: "prompt"; text: string }
@@ -10,6 +11,7 @@ export type RawEvent =
   | { ts: number; kind: "subagent_stop"; agent: string; agentId?: string; transcriptPath?: string }
   | { ts: number; kind: "stop"; transcriptPath?: string };
 
+/** Ошибка формата журнала: разобранная строка не похожа на событие. */
 export class RawLogError extends Error {}
 
 // Команды Bash обрезаются: для записи важно, что запускалось, а не полный текст.
@@ -31,7 +33,12 @@ function stringField(payload: HookPayload, key: string): string | undefined {
 
 function toolEvent(payload: HookPayload, ts: number, ok: boolean): RawEvent {
   const input = isPayload(payload.tool_input) ? payload.tool_input : {};
-  const event: RawEvent = { ts, kind: "tool", tool: stringField(payload, "tool_name") ?? UNKNOWN, ok };
+  const event: RawEvent = {
+    ts,
+    kind: "tool",
+    tool: stringField(payload, "tool_name") ?? UNKNOWN,
+    ok,
+  };
   const command = stringField(input, "command");
   if (command !== undefined) event.command = command.slice(0, MAX_COMMAND_LENGTH);
   const file = stringField(input, "file_path") ?? stringField(input, "notebook_path");
@@ -51,7 +58,12 @@ function withOptional<T extends object>(event: T, fields: Partial<T>): T {
   return { ...event, ...Object.fromEntries(present) };
 }
 
-// Возвращает событие журнала или null, если хук для записи не нужен.
+/**
+ * Превращает полезную нагрузку хука Claude Code в событие журнала.
+ * @param {unknown} payload JSON, который хук получил на stdin.
+ * @param {number} ts Время события в миллисекундах.
+ * @returns {RawEvent | null} Событие журнала или null, если хук для записи не нужен.
+ */
 export function fromHookPayload(payload: unknown, ts: number): RawEvent | null {
   if (!isPayload(payload)) return null;
 
@@ -74,7 +86,10 @@ export function fromHookPayload(payload: unknown, ts: number): RawEvent | null {
     case "SubagentStop":
       return withOptional<Extract<RawEvent, { kind: "subagent_stop" }>>(
         { ts, kind: "subagent_stop", agent: agentName(payload) },
-        { agentId: stringField(payload, "agent_id"), transcriptPath: stringField(payload, "agent_transcript_path") },
+        {
+          agentId: stringField(payload, "agent_id"),
+          transcriptPath: stringField(payload, "agent_transcript_path"),
+        },
       );
     case "Stop":
       return withOptional<Extract<RawEvent, { kind: "stop" }>>(
@@ -86,13 +101,18 @@ export function fromHookPayload(payload: unknown, ts: number): RawEvent | null {
   }
 }
 
+/**
+ * Проверяет, что id сессии можно использовать в имени файла журнала.
+ * @param {unknown} value Значение session_id из полезной нагрузки хука.
+ * @returns {value is string} true, если id можно подставить в имя файла журнала.
+ */
 export function isSafeSessionId(value: unknown): value is string {
   return typeof value === "string" && SESSION_ID_PATTERN.test(value);
 }
 
 // Проверка обязательных полей каждого вида события. Тип требует запись для каждого вида:
 // новый вид в RawEvent не скомпилируется, пока здесь не опишут его проверку.
-const RAW_EVENT_SHAPES: { [Kind in RawEvent["kind"]]: (value: HookPayload) => boolean } = {
+const RAW_EVENT_SHAPES: Record<RawEvent["kind"], (value: HookPayload) => boolean> = {
   session_start: () => true,
   prompt: (value) => typeof value.text === "string",
   tool: (value) => typeof value.tool === "string" && typeof value.ok === "boolean",
@@ -106,12 +126,19 @@ function isRawEventKind(kind: string): kind is RawEvent["kind"] {
 }
 
 function isRawEvent(value: unknown): value is RawEvent {
-  if (!isPayload(value) || typeof value.ts !== "number" || typeof value.kind !== "string") return false;
+  if (!isPayload(value) || typeof value.ts !== "number" || typeof value.kind !== "string") {
+    return false;
+  }
   return isRawEventKind(value.kind) && RAW_EVENT_SHAPES[value.kind](value);
 }
 
-// Строки JSONL журнала → события. Строка, которая не разбирается как JSON, — оборванная
-// асинхронная запись, её пропускаем. Разобранная строка не той формы — ошибка с номером строки.
+/**
+ * Читает журнал сборки. Строка, которая не разбирается как JSON, — оборванная асинхронная
+ * запись, она пропускается.
+ * @param {string} content Содержимое журнала в формате JSONL.
+ * @returns {RawEvent[]} События журнала по порядку строк.
+ * @throws {RawLogError} Если разобранная строка не является событием журнала.
+ */
 export function parseRawLog(content: string): RawEvent[] {
   const events: RawEvent[] = [];
   content.split("\n").forEach((line, index) => {

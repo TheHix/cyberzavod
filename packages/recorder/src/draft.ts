@@ -14,14 +14,14 @@ const DRAFTS_DIR = path.join(projectDir, "recordings", "drafts");
 
 async function newestRawLog(): Promise<string> {
   const files = (await readdir(RAW_DIR).catch(() => [])).filter((name) => name.endsWith(".jsonl"));
-  if (files.length === 0) {
-    throw new Error(`журналов сборок ещё нет: хуки пишут их в ${RAW_DIR} во время работы агента`);
-  }
   const withTimes = await Promise.all(
     files.map(async (name) => ({ name, mtime: (await stat(path.join(RAW_DIR, name))).mtimeMs })),
   );
-  withTimes.sort((a, b) => b.mtime - a.mtime);
-  return path.join(RAW_DIR, withTimes[0]!.name);
+  const [newest] = withTimes.sort((a, b) => b.mtime - a.mtime);
+  if (newest === undefined) {
+    throw new Error(`журналов сборок ещё нет: хуки пишут их в ${RAW_DIR} во время работы агента`);
+  }
+  return path.join(RAW_DIR, newest.name);
 }
 
 // Токены сессии и её сабагентов. Непрочитанный транскрипт — предупреждение, а не ошибка:
@@ -33,7 +33,9 @@ async function tokensFromTranscripts(paths: string[]): Promise<number | undefine
     try {
       total += countTokens(await readFile(transcriptPath, "utf8"));
     } catch (err) {
-      console.warn(`транскрипт ${transcriptPath} не прочитан, его токены не посчитаны: ${String(err)}`);
+      console.warn(
+        `транскрипт ${transcriptPath} не прочитан, его токены не посчитаны: ${String(err)}`,
+      );
     }
   }
   return total;

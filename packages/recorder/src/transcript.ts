@@ -26,12 +26,21 @@ function usageOf(line: string): { messageId: string; usage: Usage } | null {
 }
 
 function tokensOf(usage: Usage): number {
-  return (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0);
+  return (
+    (usage.input_tokens ?? 0) +
+    (usage.output_tokens ?? 0) +
+    (usage.cache_creation_input_tokens ?? 0)
+  );
 }
 
-// Одно сообщение модели может встречаться в транскрипте несколько раз (по частям ответа) —
-// учитывается последний вариант для каждого id.
+/**
+ * Считает токены по транскрипту сессии Claude Code.
+ * @param {string} transcript Содержимое транскрипта в формате JSONL.
+ * @returns {number} Сумма входных, выходных и записанных в кеш токенов.
+ */
 export function countTokens(transcript: string): number {
+  // Одно сообщение модели встречается в транскрипте несколько раз (по частям ответа) —
+  // учитывается последний вариант для каждого id.
   const byMessage = new Map<string, Usage>();
   for (const line of transcript.split("\n")) {
     const parsed = usageOf(line);

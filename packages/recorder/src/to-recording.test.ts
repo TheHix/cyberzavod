@@ -1,8 +1,7 @@
-import { test } from "node:test";
-import assert from "node:assert/strict";
+import { describe, expect, it } from "vitest";
 import type { FactoryEvent } from "@cyberzavod/core";
 import type { RawEvent } from "./raw-event.ts";
-import { recordingId, toRecording, transcriptPaths } from "./to-recording.ts";
+import { isHumanPrompt, recordingId, toRecording, transcriptPaths } from "./to-recording.ts";
 
 const START = 1_000_000;
 
@@ -14,10 +13,22 @@ function typicalSession(): RawEvent[] {
     { ts: START + 9_000, kind: "tool", tool: "Edit", ok: true, file: "/a.ts" },
     { ts: START + 12_000, kind: "tool", tool: "Bash", ok: false, command: "make check-web" },
     { ts: START + 15_000, kind: "tool", tool: "Edit", ok: true, file: "/a.ts" },
-    { ts: START + 18_000, kind: "tool", tool: "Bash", ok: true, command: "make check-web check-api" },
-    { ts: START + 20_000, kind: "subagent_start", agent: "reviewer" },
-    { ts: START + 40_000, kind: "subagent_stop", agent: "reviewer" },
-    { ts: START + 42_000, kind: "tool", tool: "Bash", ok: true, command: "git commit -m 'feat: …'" },
+    {
+      ts: START + 18_000,
+      kind: "tool",
+      tool: "Bash",
+      ok: true,
+      command: "make check-web check-api",
+    },
+    { ts: START + 20_000, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
+    { ts: START + 40_000, kind: "subagent_stop", agent: "reviewer", agentId: "r1" },
+    {
+      ts: START + 42_000,
+      kind: "tool",
+      tool: "Bash",
+      ok: true,
+      command: "git commit -m 'feat: …'",
+    },
     { ts: START + 45_000, kind: "stop" },
   ];
 }
@@ -30,209 +41,256 @@ function stagesOf(events: FactoryEvent[]): string[] {
   });
 }
 
-test("типичная сессия проходит этапы код → проверки → код → проверки → ревью → выпуск", () => {
-  // Arrange
-  const raw = typicalSession();
+describe("toRecording", () => {
+  it("проводит типичную сессию по этапам код → проверки → код → проверки → ревью → выпуск", () => {
+    const raw = typicalSession();
 
-  // Act
-  const recording = toRecording(raw, { id: "s1" });
+    const recording = toRecording(raw, { id: "s1" });
 
-  // Assert
-  assert.deepEqual(stagesOf(recording.events), ["code", "test", "fail:test", "code", "test", "review", "ship"]);
+    expect(stagesOf(recording.events)).toEqual([
+      "code",
+      "test",
+      "fail:test",
+      "code",
+      "test",
+      "review",
+      "ship",
+    ]);
+  });
+
+  it("отсчитывает время событий от начала сессии", () => {
+    const raw = typicalSession();
+
+    const recording = toRecording(raw, { id: "s1" });
+
+    expect([recording.events[0]?.t, recording.events.at(-1)?.t]).toEqual([0, 45_000]);
+  });
+
+  it("берёт первый промпт в заголовок", () => {
+    const raw = typicalSession();
+
+    const recording = toRecording(raw, { id: "s1" });
+
+    expect(recording.title).toBe("Добавь счётчик токенов");
+  });
+
+  it("обрезает длинный заголовок многоточием", () => {
+    const raw: RawEvent[] = [{ ts: START, kind: "prompt", text: "а".repeat(200) }];
+
+    const recording = toRecording(raw, { id: "s1" });
+
+    expect(recording.title).toBe(`${"а".repeat(79)}…`);
+  });
+
+  it("не разрезает эмодзи в обрезанном заголовке", () => {
+    const raw: RawEvent[] = [{ ts: START, kind: "prompt", text: `${"а".repeat(78)}🚀🚀🚀` }];
+
+    const recording = toRecording(raw, { id: "s1" });
+
+    expect(recording.title).toBe(`${"а".repeat(78)}🚀…`);
+  });
+
+  it("считает сборку неуспешной, если последний запуск проверок упал", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "prompt", text: "почини" },
+      { ts: START + 1_000, kind: "tool", tool: "Bash", ok: false, command: "go test ./..." },
+    ];
+
+    const recording = toRecording(raw, { id: "s1" });
+
+    expect(recording.events.at(-1)).toEqual({ t: 1_000, type: "build_end", ok: false });
+  });
+
+  it("добавляет токены перед концом сборки", () => {
+    const raw = typicalSession();
+
+    const recording = toRecording(raw, { id: "s1", tokens: 12_345 });
+
+    expect(recording.events.at(-2)).toEqual({ t: 45_000, type: "usage", tokens: 12_345 });
+  });
+
+  it("сортирует события не по порядку", () => {
+    const raw = typicalSession().reverse();
+
+    const recording = toRecording(raw, { id: "s1" });
+
+    expect(recording.events[1]?.type).toBe("prompt");
+  });
+
+  it("не возвращает сборку на этап тестов из-за проверок внутри ревью", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "tool", tool: "Edit", ok: true },
+      { ts: START + 1_000, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
+      { ts: START + 2_000, kind: "tool", tool: "Bash", ok: false, command: "make check" },
+      { ts: START + 3_000, kind: "subagent_stop", agent: "reviewer", agentId: "r1" },
+      { ts: START + 4_000, kind: "tool", tool: "Bash", ok: true, command: "git commit -m x" },
+    ];
+
+    const recording = toRecording(raw, { id: "s1" });
+
+    expect(stagesOf(recording.events)).toEqual(["code", "review", "ship"]);
+  });
+
+  it("не закрывает окно ревьюера остановкой служебного сабагента без старта", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "tool", tool: "Edit", ok: true },
+      { ts: START + 1_000, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
+      { ts: START + 2_000, kind: "subagent_stop", agent: "unknown", agentId: "service-1" },
+      { ts: START + 3_000, kind: "tool", tool: "Bash", ok: false, command: "make check" },
+      { ts: START + 4_000, kind: "subagent_stop", agent: "reviewer", agentId: "r1" },
+    ];
+
+    const recording = toRecording(raw, { id: "s1" });
+
+    expect(stagesOf(recording.events)).toEqual(["code", "review"]);
+  });
+
+  it("ведёт сборку как обычно по инструментам сабагента без своего этапа", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "general-purpose", agentId: "g1" },
+      { ts: START + 1_000, kind: "tool", tool: "Edit", ok: true },
+      { ts: START + 2_000, kind: "subagent_stop", agent: "general-purpose", agentId: "g1" },
+    ];
+
+    const recording = toRecording(raw, { id: "s1" });
+
+    expect(stagesOf(recording.events)).toEqual(["code"]);
+  });
+
+  it.each([
+    "make check-web check-api",
+    "pnpm lint",
+    "pnpm -r run check",
+    "pnpm --filter @cyberzavod/core check",
+    "pnpm exec vitest run",
+    "npx eslint .",
+    "go test ./...",
+    "golangci-lint run ./...",
+    "node --test",
+    "cd apps/api && go test ./...",
+    "CI=1 pnpm test",
+    "cd apps/api\ngo test ./...",
+  ])("засчитывает упавший запуск «%s» как неудачу проверок", (command) => {
+    const raw: RawEvent[] = [{ ts: START, kind: "tool", tool: "Bash", ok: false, command }];
+
+    const recording = toRecording(raw, { id: "s1" });
+
+    expect(stagesOf(recording.events)).toEqual(["test", "fail:test"]);
+  });
+
+  it.each([
+    "cat eslint.config.js",
+    "cat apps/web/vitest.config.ts",
+    "grep -rn vitest packages",
+    "pnpm add -D eslint-plugin-jsdoc",
+    "ls node_modules/@vitest/eslint-plugin",
+    "echo make check",
+  ])("не считает «%s» проверками", (command) => {
+    const raw: RawEvent[] = [{ ts: START, kind: "tool", tool: "Bash", ok: false, command }];
+
+    const recording = toRecording(raw, { id: "s1" });
+
+    expect(stagesOf(recording.events)).toEqual([]);
+  });
+
+  it("проходит проверки и выпуск успешной цепочкой в одной команде", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "tool", tool: "Bash", ok: true, command: "make check && git commit -m x" },
+    ];
+
+    const recording = toRecording(raw, { id: "s1" });
+
+    expect(stagesOf(recording.events)).toEqual(["test", "ship"]);
+  });
+
+  it("относит упавшую цепочку проверок и коммита к неудаче проверок", () => {
+    const raw: RawEvent[] = [
+      {
+        ts: START,
+        kind: "tool",
+        tool: "Bash",
+        ok: false,
+        command: "make check && git commit -m x",
+      },
+    ];
+
+    const recording = toRecording(raw, { id: "s1" });
+
+    expect(stagesOf(recording.events)).toEqual(["test", "fail:test"]);
+  });
+
+  it("относит выход из режима планирования к этапу spec", () => {
+    const raw: RawEvent[] = [{ ts: START, kind: "tool", tool: "ExitPlanMode", ok: true }];
+
+    const recording = toRecording(raw, { id: "s1" });
+
+    expect(stagesOf(recording.events)).toEqual(["spec"]);
+  });
+
+  it("относит работу агента Plan к этапу spec", () => {
+    const raw: RawEvent[] = [{ ts: START, kind: "subagent_start", agent: "Plan", agentId: "p1" }];
+
+    const recording = toRecording(raw, { id: "s1" });
+
+    expect(stagesOf(recording.events)).toEqual(["spec"]);
+  });
+
+  it("не пропускает служебные сообщения ни в промпты, ни в заголовок", () => {
+    const raw: RawEvent[] = [
+      {
+        ts: START,
+        kind: "prompt",
+        text: "[Subagent hand-back] The text below is the final report…",
+      },
+      {
+        ts: START + 1_000,
+        kind: "prompt",
+        text: "  <task-notification>готово</task-notification>",
+      },
+      { ts: START + 2_000, kind: "prompt", text: "Сделай проигрыватель" },
+    ];
+
+    const recording = toRecording(raw, { id: "s1" });
+
+    expect({
+      title: recording.title,
+      promptTimes: recording.events
+        .filter((event) => event.type === "prompt")
+        .map((event) => event.t),
+    }).toEqual({ title: "Сделай проигрыватель", promptTimes: [2_000] });
+  });
 });
 
-test("время событий отсчитывается от начала сессии", () => {
-  // Arrange
-  const raw = typicalSession();
+describe("isHumanPrompt", () => {
+  it("отличает сообщение человека от служебного", () => {
+    const texts = ["Сделай цех", "[SYSTEM NOTIFICATION - NOT USER INPUT]", "<system-reminder>…"];
 
-  // Act
-  const recording = toRecording(raw, { id: "s1" });
+    const results = texts.map(isHumanPrompt);
 
-  // Assert
-  assert.equal(recording.events[0]?.t, 0);
-  assert.equal(recording.events.at(-1)?.t, 45_000);
+    expect(results).toEqual([true, false, false]);
+  });
 });
 
-test("заголовок — первый промпт", () => {
-  // Arrange
-  const raw = typicalSession();
+describe("recordingId", () => {
+  it("собирает id из даты начала сессии и начала её id", () => {
+    const startTs = Date.UTC(2026, 9, 4, 12);
 
-  // Act
-  const recording = toRecording(raw, { id: "s1" });
+    const id = recordingId("744e7547-d312-42c4", startTs);
 
-  // Assert
-  assert.equal(recording.title, "Добавь счётчик токенов");
+    expect(id).toBe("2026-10-04-744e7547");
+  });
 });
 
-test("длинный промпт в заголовке обрезается многоточием", () => {
-  // Arrange
-  const raw: RawEvent[] = [{ ts: START, kind: "prompt", text: "а".repeat(200) }];
+describe("transcriptPaths", () => {
+  it("собирает транскрипты остановок сессии и сабагентов без повторов", () => {
+    const raw: RawEvent[] = [
+      { ts: 1, kind: "subagent_stop", agent: "reviewer", transcriptPath: "/t/agent.jsonl" },
+      { ts: 2, kind: "stop", transcriptPath: "/t/main.jsonl" },
+      { ts: 3, kind: "stop", transcriptPath: "/t/main.jsonl" },
+    ];
 
-  // Act
-  const recording = toRecording(raw, { id: "s1" });
+    const paths = transcriptPaths(raw);
 
-  // Assert
-  assert.equal(recording.title.length, 80);
-  assert.ok(recording.title.endsWith("…"));
-});
-
-test("сборка неуспешна, если последний запуск проверок упал", () => {
-  // Arrange
-  const raw: RawEvent[] = [
-    { ts: START, kind: "prompt", text: "почини" },
-    { ts: START + 1_000, kind: "tool", tool: "Bash", ok: false, command: "go test ./..." },
-  ];
-
-  // Act
-  const recording = toRecording(raw, { id: "s1" });
-
-  // Assert
-  assert.deepEqual(recording.events.at(-1), { t: 1_000, type: "build_end", ok: false });
-});
-
-test("токены из транскрипта попадают в запись перед концом сборки", () => {
-  // Arrange
-  const raw = typicalSession();
-
-  // Act
-  const recording = toRecording(raw, { id: "s1", tokens: 12_345 });
-
-  // Assert
-  assert.deepEqual(recording.events.at(-2), { t: 45_000, type: "usage", tokens: 12_345 });
-});
-
-test("события не по порядку сортируются по времени", () => {
-  // Arrange
-  const raw = typicalSession().reverse();
-
-  // Act
-  const recording = toRecording(raw, { id: "s1" });
-
-  // Assert
-  assert.equal(recording.events[1]?.type, "prompt");
-});
-
-test("проверки внутри работы ревьюера не возвращают сборку на этап тестов", () => {
-  // Arrange
-  const raw: RawEvent[] = [
-    { ts: START, kind: "tool", tool: "Edit", ok: true },
-    { ts: START + 1_000, kind: "subagent_start", agent: "reviewer" },
-    { ts: START + 2_000, kind: "tool", tool: "Bash", ok: false, command: "make check" },
-    { ts: START + 3_000, kind: "subagent_stop", agent: "reviewer" },
-    { ts: START + 4_000, kind: "tool", tool: "Bash", ok: true, command: "git commit -m x" },
-  ];
-
-  // Act
-  const recording = toRecording(raw, { id: "s1" });
-
-  // Assert
-  assert.deepEqual(stagesOf(recording.events), ["code", "review", "ship"]);
-  assert.deepEqual(recording.events.at(-1), { t: 4_000, type: "build_end", ok: true });
-});
-
-test("выход из режима планирования — этап spec", () => {
-  // Arrange
-  const raw: RawEvent[] = [{ ts: START, kind: "tool", tool: "ExitPlanMode", ok: true }];
-
-  // Act
-  const recording = toRecording(raw, { id: "s1" });
-
-  // Assert
-  assert.deepEqual(stagesOf(recording.events), ["spec"]);
-});
-
-test("работа агента Plan — этап spec", () => {
-  // Arrange
-  const raw: RawEvent[] = [{ ts: START, kind: "subagent_start", agent: "Plan", agentId: "p1" }];
-
-  // Act
-  const recording = toRecording(raw, { id: "s1" });
-
-  // Assert
-  assert.deepEqual(stagesOf(recording.events), ["spec"]);
-});
-
-test("остановка служебного сабагента без старта не закрывает окно ревьюера", () => {
-  // Arrange
-  const raw: RawEvent[] = [
-    { ts: START, kind: "tool", tool: "Edit", ok: true },
-    { ts: START + 1_000, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
-    { ts: START + 2_000, kind: "subagent_stop", agent: "unknown", agentId: "service-1" },
-    { ts: START + 3_000, kind: "tool", tool: "Bash", ok: false, command: "make check" },
-    { ts: START + 4_000, kind: "subagent_stop", agent: "reviewer", agentId: "r1" },
-  ];
-
-  // Act
-  const recording = toRecording(raw, { id: "s1" });
-
-  // Assert
-  assert.deepEqual(stagesOf(recording.events), ["code", "review"]);
-});
-
-test("инструменты сабагента без своего этапа ведут сборку как обычно", () => {
-  // Arrange
-  const raw: RawEvent[] = [
-    { ts: START, kind: "subagent_start", agent: "general-purpose", agentId: "g1" },
-    { ts: START + 1_000, kind: "tool", tool: "Edit", ok: true },
-    { ts: START + 2_000, kind: "subagent_stop", agent: "general-purpose", agentId: "g1" },
-  ];
-
-  // Act
-  const recording = toRecording(raw, { id: "s1" });
-
-  // Assert
-  assert.deepEqual(stagesOf(recording.events), ["code"]);
-});
-
-test("эмодзи в обрезанном заголовке не разрезается", () => {
-  // Arrange
-  const raw: RawEvent[] = [{ ts: START, kind: "prompt", text: `${"а".repeat(78)}🚀🚀🚀` }];
-
-  // Act
-  const recording = toRecording(raw, { id: "s1" });
-
-  // Assert
-  assert.equal(recording.title, `${"а".repeat(78)}🚀…`);
-});
-
-test("id записи — дата начала сессии и начало её id", () => {
-  // Act
-  const id = recordingId("744e7547-d312-42c4", Date.UTC(2026, 9, 4, 12));
-
-  // Assert
-  assert.equal(id, "2026-10-04-744e7547");
-});
-
-test("транскрипты собираются из остановок сессии и сабагентов без повторов", () => {
-  // Arrange
-  const raw: RawEvent[] = [
-    { ts: 1, kind: "subagent_stop", agent: "reviewer", transcriptPath: "/t/agent.jsonl" },
-    { ts: 2, kind: "stop", transcriptPath: "/t/main.jsonl" },
-    { ts: 3, kind: "stop", transcriptPath: "/t/main.jsonl" },
-  ];
-
-  // Act
-  const paths = transcriptPaths(raw);
-
-  // Assert
-  assert.deepEqual(paths, ["/t/agent.jsonl", "/t/main.jsonl"]);
-});
-
-test("отчёт сабагента и уведомления не считаются промптами и не идут в заголовок", () => {
-  // Arrange
-  const raw: RawEvent[] = [
-    { ts: START, kind: "prompt", text: "[Subagent hand-back] The text below is the final report…" },
-    { ts: START + 1_000, kind: "prompt", text: "  <task-notification>готово</task-notification>" },
-    { ts: START + 2_000, kind: "prompt", text: "Сделай проигрыватель" },
-  ];
-
-  // Act
-  const recording = toRecording(raw, { id: "s1" });
-
-  // Assert
-  assert.equal(recording.title, "Сделай проигрыватель");
-  assert.deepEqual(
-    recording.events.filter((event) => event.type === "prompt").map((event) => event.t),
-    [2_000],
-  );
+    expect(paths).toEqual(["/t/agent.jsonl", "/t/main.jsonl"]);
+  });
 });
