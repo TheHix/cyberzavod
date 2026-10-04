@@ -8,10 +8,24 @@
   },
   "scripts": {
     "dev": "pnpm --filter @cyberzavod/web dev",
+    "lint": "prettier --check . && eslint . --max-warnings 0",
+    "format": "prettier --write . && eslint --fix . && prettier --write .",
     "check": "pnpm -r run check"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^24.19.1",
-    "typescript": "^6.0.3"
+    "@vitest/eslint-plugin": "^1.6.27",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-astro": "^3.2.1",
+    "eslint-plugin-jsdoc": "^65.1.0",
+    "eslint-plugin-solid": "^0.18.1",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.9",
+    "prettier-plugin-astro": "^1.1.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.3"
   }
 }

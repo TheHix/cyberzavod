@@ -1,0 +1,15 @@
+# Prettier отвечает за код TypeScript, Astro, CSS и JSON. Go форматирует gofumpt,
+# shell, YAML и документацию — руками и ревьюером, чтобы не плодить шумные диффы.
+**/node_modules
+**/dist
+**/.astro
+pnpm-lock.yaml
+recordings
+apps/api
+deploy
+.devcontainer
+.claude
+.github
+*.md
+*.yaml
+*.yml

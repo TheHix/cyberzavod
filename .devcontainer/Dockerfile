@@ -19,6 +19,19 @@ COPY --from=go /usr/local/go /usr/local/go
 ENV PATH=/usr/local/go/bin:/home/node/go/bin:$PATH \
     GOTOOLCHAIN=local
 
+# golangci-lint — та же версия, что в CI; архив сверяется с контрольной суммой релиза.
+ARG GOLANGCI_LINT_VERSION=2.14.0
+ARG GOLANGCI_LINT_SHA256_AMD64=ab90aeb7b066f92a33415b638a50fe5344bbb75a0d32ad30cc248d88f81032ab
+ARG GOLANGCI_LINT_SHA256_ARM64=ee7ec5f3453d15ddf106fae5a4d6c71737712348a979d1fe9cd52ec7ea299bae
+RUN set -eu; arch=$(dpkg --print-architecture); \
+  case "$arch" in amd64) sum=$GOLANGCI_LINT_SHA256_AMD64 ;; arm64) sum=$GOLANGCI_LINT_SHA256_ARM64 ;; *) exit 1 ;; esac; \
+  archive="golangci-lint-${GOLANGCI_LINT_VERSION}-linux-${arch}.tar.gz"; \
+  curl -fsSLo "/tmp/$archive" "https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION}/$archive"; \
+  echo "$sum  /tmp/$archive" | sha256sum -c -; \
+  tar -xzf "/tmp/$archive" -C /tmp; \
+  install -m 0755 "/tmp/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-${arch}/golangci-lint" /usr/local/bin/; \
+  rm -rf /tmp/golangci-lint-*
+
 # pnpm берётся из поля packageManager корневого package.json через corepack.
 RUN corepack enable
 

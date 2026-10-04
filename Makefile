@@ -3,7 +3,7 @@
 # SSH-алиас сервера из ~/.ssh/config; пользователь с sudo.
 SERVER ?= cyberzavod
 .DEFAULT_GOAL := help
-.PHONY: help up down dev api-dev recording-draft check check-web check-api check-docker check-deploy server-bootstrap server-cert
+.PHONY: help up down dev api-dev recording-draft format check check-web check-api check-docker check-deploy server-bootstrap server-cert
 
 help: ## Показать команды
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-17s %s\n", $$1, $$2}'
@@ -23,13 +23,21 @@ api-dev: ## API из исходников: миграции и запуск (н�
 recording-draft: ## Черновик записи из журнала сборки (RAW=файл, по умолчанию самый свежий)
 	node packages/recorder/src/draft.ts $(RAW)
 
+format: ## Привести код к стилю: Prettier и ESLint --fix для TS, gofumpt и goimports для Go
+	pnpm format
+	cd apps/api && golangci-lint fmt ./...
+
 check: check-web check-api check-docker check-deploy ## Все проверки: то же, что запускает CI
 
-check-web: ## Типы, тесты и сборка фронта и ядра
+check-web: ## Стиль, типы, тесты и сборка фронта и пакетов
+	pnpm lint
 	pnpm -r run check
 
-check-api: ## go vet, тесты и сборка API
-	cd apps/api && go vet ./... && go test ./... && go build -o /dev/null ./cmd/api
+# Тест хука форматирования Go — здесь, а не в check-deploy: хуку нужны Go и golangci-lint,
+# а они есть везде, где запускается check-api (CI-job api, dev-контейнер).
+check-api: ## golangci-lint, тесты и сборка API, тест хука форматирования Go
+	cd apps/api && golangci-lint run ./... && go test ./... && go build -o /dev/null ./cmd/api
+	.claude/hooks/format-go.test.sh
 
 check-docker: ## Сборка Docker-образов API и сайта
 	docker build -q -t cyberzavod-api:check apps/api >/dev/null
@@ -44,7 +52,8 @@ check-deploy: ## Деплой, dev-контейнер и хуки: compose, shel
 		/mnt/deploy/check-nginx.sh /mnt/deploy/server/bootstrap.sh /mnt/deploy/server/cyberzavod-deploy \
 		/mnt/deploy/server/cyberzavod-deploy.test.sh /mnt/deploy/server/cyberzavod-backup \
 		/mnt/.devcontainer/init-firewall.sh /mnt/.claude/hooks/lib.sh /mnt/.claude/hooks/turn-start.sh \
-		/mnt/.claude/hooks/stop-gate.sh /mnt/.claude/hooks/stop-gate.test.sh /mnt/.claude/hooks/format-go.sh
+		/mnt/.claude/hooks/stop-gate.sh /mnt/.claude/hooks/stop-gate.test.sh /mnt/.claude/hooks/format-go.sh \
+		/mnt/.claude/hooks/format-go.test.sh
 	docker run --rm -v "$(CURDIR)/deploy/server:/s:ro" bash:5 /s/cyberzavod-deploy.test.sh
 	.claude/hooks/stop-gate.test.sh
 	deploy/check-nginx.sh
