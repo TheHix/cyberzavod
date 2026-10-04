@@ -1,35 +1,31 @@
-import { test } from "node:test";
-import assert from "node:assert/strict";
+import { describe, expect, it } from "vitest";
 import { formatDuration, formatTokens } from "./format.ts";
 
-test("длительность меньше минуты — только секунды", () => {
-  // Act
-  const result = formatDuration(42_400);
+describe("formatDuration", () => {
+  it("показывает только секунды, если меньше минуты", () => {
+    const result = formatDuration(42_400);
 
-  // Assert
-  assert.equal(result, "42 с");
+    expect(result).toBe("42 с");
+  });
+
+  it("дополняет секунды нулём, если есть минуты", () => {
+    const result = formatDuration(125_000);
+
+    expect(result).toBe("2 мин 05 с");
+  });
+
+  it("округляет 59,6 с до целой минуты, а не до «60 с»", () => {
+    const result = formatDuration(59_600);
+
+    expect(result).toBe("1 мин 00 с");
+  });
 });
 
-test("длительность с минутами — секунды с ведущим нулём", () => {
-  // Act
-  const result = formatDuration(125_000);
+describe("formatTokens", () => {
+  it("разбивает число по разрядам", () => {
+    const result = formatTokens(1_234_567);
 
-  // Assert
-  assert.equal(result, "2 мин 05 с");
-});
-
-test("59,6 с округляются до целой минуты, а не до «60 с»", () => {
-  // Act
-  const result = formatDuration(59_600);
-
-  // Assert
-  assert.equal(result, "1 мин 00 с");
-});
-
-test("токены разбиваются по разрядам", () => {
-  // Act
-  const result = formatTokens(1_234_567);
-
-  // Assert: Intl ставит неразрывные пробелы, сравниваем с обычными
-  assert.equal(result.replace(/\s/g, " "), "1 234 567");
+    // Intl ставит неразрывные пробелы — сравниваем с обычными.
+    expect(result.replace(/\s/g, " ")).toBe("1 234 567");
+  });
 });

@@ -1,6 +1,6 @@
 import { parseRecording, type Recording } from "@cyberzavod/core";
 
-// Учебная запись, пока настоящих сборок нет. Проходит ту же проверку, что и реальные.
+/** Учебная запись, пока настоящих сборок нет. Проходит ту же проверку, что и реальные. */
 export const demoRecording: Recording = parseRecording({
   version: 1,
   id: "demo",

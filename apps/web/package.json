@@ -6,7 +6,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "check": "astro check && node --test \"src/**/*.test.ts\" && astro build"
+    "check": "astro check && vitest run && astro build"
   },
   "dependencies": {
     "@astrojs/solid-js": "^7.0.2",
