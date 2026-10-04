@@ -29,6 +29,8 @@ export default defineConfig(
     ...solid,
     languageOptions: { ...solid.languageOptions, globals: globals.browser },
   },
+  // Код сайта работает в браузере: DOM-типы нужны и в .ts — например, для JSDoc.
+  { files: ["apps/web/src/**/*.ts"], languageOptions: { globals: globals.browser } },
   astro.configs.recommended,
   {
     files: ["**/*.{ts,tsx}"],
