@@ -6,6 +6,6 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "check": "tsc -p . && node --test \"src/**/*.test.ts\""
+    "check": "tsc -p . && vitest run"
   }
 }

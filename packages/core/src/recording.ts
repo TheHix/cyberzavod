@@ -1,10 +1,13 @@
 // Формат записи сборки. Цех на сайте проигрывает запись по этим событиям,
 // поэтому всё, что видно на экране, должно выводиться отсюда.
 
+/** Этапы сборки по порядку: постановка, код, проверки, ревью, выпуск. */
 export const STAGES = ["spec", "code", "test", "review", "ship"] as const;
+
+/** Этап сборки — одна из станций цеха. */
 export type Stage = (typeof STAGES)[number];
 
-// t — миллисекунды от начала сборки.
+/** Событие записи сборки; `t` — миллисекунды от начала сборки. */
 export type FactoryEvent =
   | { t: number; type: "build_start"; title: string }
   | { t: number; type: "prompt"; text: string }
@@ -13,6 +16,7 @@ export type FactoryEvent =
   | { t: number; type: "usage"; tokens: number }
   | { t: number; type: "build_end"; ok: boolean };
 
+/** Запись сборки: последовательность событий, которую проигрывает цех. */
 export interface Recording {
   version: 1;
   id: string;
@@ -20,6 +24,7 @@ export interface Recording {
   events: FactoryEvent[];
 }
 
+/** Счётчики сборки, которые показываются над цехом. */
 export interface BuildStats {
   durationMs: number;
   tokens: number;
@@ -28,6 +33,7 @@ export interface BuildStats {
   ok: boolean;
 }
 
+/** Ошибка формата записи: запись пришла извне и не прошла проверку. */
 export class RecordingError extends Error {}
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -70,7 +76,12 @@ function parseEvent(raw: unknown, index: number): FactoryEvent {
   }
 }
 
-// Проверяет запись, пришедшую извне (JSON-файл), и возвращает типизированную.
+/**
+ * Проверяет запись, пришедшую извне, и возвращает её типизированной.
+ * @param {unknown} raw Разобранный JSON записи.
+ * @returns {Recording} Проверенная запись.
+ * @throws {RecordingError} Если запись не соответствует формату.
+ */
 export function parseRecording(raw: unknown): Recording {
   if (!isObject(raw)) throw new RecordingError("запись должна быть объектом");
   if (raw.version !== 1) throw new RecordingError(`неподдерживаемая версия ${String(raw.version)}`);
@@ -79,8 +90,12 @@ export function parseRecording(raw: unknown): Recording {
   if (!Array.isArray(raw.events)) throw new RecordingError("нет events");
 
   const events = raw.events.map(parseEvent);
-  if (events[0]?.type !== "build_start") throw new RecordingError("запись должна начинаться с build_start");
-  if (events.at(-1)?.type !== "build_end") throw new RecordingError("запись должна заканчиваться build_end");
+  if (events[0]?.type !== "build_start") {
+    throw new RecordingError("запись должна начинаться с build_start");
+  }
+  if (events.at(-1)?.type !== "build_end") {
+    throw new RecordingError("запись должна заканчиваться build_end");
+  }
   let prevT = 0;
   events.forEach((event, i) => {
     if (event.t < prevT) throw new RecordingError(`событие #${i}: время идёт назад`);
@@ -90,7 +105,11 @@ export function parseRecording(raw: unknown): Recording {
   return { version: 1, id: raw.id, title: raw.title, events };
 }
 
-// Счётчики сборки, которые показываются над цехом.
+/**
+ * Считает счётчики сборки по её записи.
+ * @param {Recording} recording Проверенная запись сборки.
+ * @returns {BuildStats} Длительность, токены, число промптов и возвратов, итог сборки.
+ */
 export function summarize(recording: Recording): BuildStats {
   const { events } = recording;
   const stats: BuildStats = {

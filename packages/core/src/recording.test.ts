@@ -1,6 +1,5 @@
-import { test } from "node:test";
-import assert from "node:assert/strict";
-import { parseRecording, summarize, RecordingError } from "./recording.ts";
+import { describe, expect, it } from "vitest";
+import { parseRecording, RecordingError, summarize } from "./recording.ts";
 
 function validRecording() {
   return {
@@ -21,49 +20,49 @@ function validRecording() {
   };
 }
 
-test("корректная запись разбирается и считается", () => {
-  // Arrange
-  const raw = validRecording();
+describe("parseRecording", () => {
+  it("принимает корректную запись", () => {
+    const raw = validRecording();
 
-  // Act
-  const stats = summarize(parseRecording(raw));
+    const recording = parseRecording(raw);
 
-  // Assert
-  assert.deepEqual(stats, { durationMs: 90, tokens: 2000, prompts: 1, reworks: 1, ok: true });
+    expect(recording.events).toHaveLength(raw.events.length);
+  });
+
+  it("отклоняет неизвестный этап", () => {
+    const raw = validRecording();
+    raw.events[2] = { t: 20, type: "stage_enter", stage: "deploy" };
+
+    const act = () => parseRecording(raw);
+
+    expect(act).toThrow(RecordingError);
+  });
+
+  it("не даёт времени идти назад", () => {
+    const raw = validRecording();
+    raw.events[3] = { t: 5, type: "usage", tokens: 1200 };
+
+    const act = () => parseRecording(raw);
+
+    expect(act).toThrow(/время идёт назад/);
+  });
+
+  it("отклоняет запись без build_end", () => {
+    const raw = validRecording();
+    raw.events.pop();
+
+    const act = () => parseRecording(raw);
+
+    expect(act).toThrow(/build_end/);
+  });
 });
 
-test("неизвестный этап отклоняется", () => {
-  // Arrange
-  const raw = validRecording();
-  raw.events[2] = { t: 20, type: "stage_enter", stage: "deploy" };
+describe("summarize", () => {
+  it("считает длительность, токены, промпты и возвраты", () => {
+    const recording = parseRecording(validRecording());
 
-  // Act
-  const act = () => parseRecording(raw);
+    const stats = summarize(recording);
 
-  // Assert
-  assert.throws(act, RecordingError);
-});
-
-test("время не может идти назад", () => {
-  // Arrange
-  const raw = validRecording();
-  raw.events[3]!.t = 5;
-
-  // Act
-  const act = () => parseRecording(raw);
-
-  // Assert
-  assert.throws(act, /время идёт назад/);
-});
-
-test("запись без build_end отклоняется", () => {
-  // Arrange
-  const raw = validRecording();
-  raw.events.pop();
-
-  // Act
-  const act = () => parseRecording(raw);
-
-  // Assert
-  assert.throws(act, /build_end/);
+    expect(stats).toEqual({ durationMs: 90, tokens: 2000, prompts: 1, reworks: 1, ok: true });
+  });
 });
