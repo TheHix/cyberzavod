@@ -1,5 +1,5 @@
 import { createSignal, onCleanup, onMount, Show, untrack, type JSX } from "solid-js";
-import type { Recording } from "@cyberzavod/core";
+import type { BriefRecording } from "@cyberzavod/core";
 import { useStoreValue } from "@/shared/lib/use-store-value.ts";
 import {
   loadFactoryGraphics,
@@ -9,12 +9,13 @@ import {
 import { createFactoryModel, type FactoryModel } from "../model/factory.ts";
 import { startFrameClock } from "./frame-clock.ts";
 import { Hud } from "./Hud.tsx";
+import { MessageBubble } from "./MessageBubble.tsx";
 import { FactoryModelProvider } from "./model-context.ts";
 import { PromptBubble } from "./PromptBubble.tsx";
 import styles from "./Factory.module.css";
 
 interface Props {
-  recording: Recording;
+  recording: BriefRecording;
   /** Уровень заголовка с названием сборки; по умолчанию — главный заголовок страницы. */
   titleLevel?: "h1" | "h2" | undefined;
 }
@@ -63,9 +64,10 @@ function fieldWithin(host: HTMLElement, field: HTMLElement): Frame {
 
 /**
  * Живой цех на весь экран: проигрывает запись сборки — рабочие у станков, бег с деталью,
- * промпты над рабочими, HUD сборки справа. Графика грузится только в браузере.
+ * кабинет мастера, промпты и реплики над говорящими, HUD сборки справа. Графика грузится только
+ * в браузере.
  * @param {Props} props Свойства компонента.
- * @param {Recording} props.recording Запись сборки, которую проигрывает цех.
+ * @param {BriefRecording} props.recording Запись сборки, которую проигрывает цех.
  * @param {"h1" | "h2"} [props.titleLevel] Уровень заголовка с названием сборки.
  * @returns {JSX.Element} Цех с HUD.
  */
@@ -80,7 +82,7 @@ export function Factory(props: Props): JSX.Element {
   let fieldElement!: HTMLDivElement;
 
   // Сначала графика подстраивается под размер, потом размер видят компоненты: иначе
-  // пузырь промпта на паузе встал бы по старому масштабу.
+  // пузырь на паузе встал бы по старому масштабу.
   const fitToScreen = () => {
     const frame = fieldWithin(canvasHost, fieldElement);
     graphics()?.resize(canvasHost.clientWidth, canvasHost.clientHeight, frame);
@@ -121,7 +123,7 @@ export function Factory(props: Props): JSX.Element {
   return (
     <FactoryModelProvider value={model}>
       <div class={styles.factory}>
-        {/* Картинка — только холст: пузырь промпта рядом, его читают и программы чтения. */}
+        {/* Картинка — только холст: пузыри промпта и реплики рядом, их читают программы чтения */}
         <div
           ref={(element) => (canvasHost = element)}
           class={styles.canvas}
@@ -139,6 +141,7 @@ export function Factory(props: Props): JSX.Element {
         <Hud recording={props.recording} titleLevel={props.titleLevel ?? "h1"} />
         <div class={styles.overlay}>
           <PromptBubble graphics={graphics()} field={field()} />
+          <MessageBubble graphics={graphics()} field={field()} />
         </div>
       </div>
     </FactoryModelProvider>

@@ -5,6 +5,7 @@
 
 import type { Point, Stage, StationPlan } from "@cyberzavod/core";
 import { Container, Graphics, Text } from "pixi.js";
+import { CONDUCTOR_LABEL, STAGE_LABELS } from "@/shared/config/stages.ts";
 import { shade, type Palette } from "./palette.ts";
 import { UNIT } from "./units.ts";
 
@@ -14,27 +15,20 @@ export interface MachineSprites {
   readonly lampOn: Container;
 }
 
-const STATION_LABELS: Readonly<Record<Stage, string>> = {
-  spec: "Постановка",
-  code: "Код",
-  test: "Проверки",
-  review: "Ревью",
-  ship: "Выпуск",
-};
-
 /** Шрифт табличек — шрифт заголовков сайта. */
 export const PLAQUE_FONT = { family: "Rubik Variable", weight: "800", size: 30 } as const;
 
 /**
- * Загружает шрифт табличек со всеми их буквами: шрифт разбит по алфавитам, и без текста
- * браузер загрузил бы только латиницу, а таблички — кириллические.
+ * Загружает шрифт табличек со всеми их буквами (названия этапов и кабинета мастера): шрифт
+ * разбит по алфавитам, и без текста браузер загрузил бы только латиницу, а таблички —
+ * кириллические.
  * @returns {Promise<unknown>} Готово, когда шрифт с кириллицей загружен.
  */
 export function loadPlaqueFont(): Promise<unknown> {
   const { weight, size, family } = PLAQUE_FONT;
   return document.fonts.load(
     `${weight} ${size}px "${family}"`,
-    Object.values(STATION_LABELS).join(""),
+    [...Object.values(STAGE_LABELS), CONDUCTOR_LABEL].join(""),
   );
 }
 
@@ -45,8 +39,11 @@ const DETAIL_OUTLINE = 5;
 const SHADOW = { offset: 12, alpha: 0.22 } as const;
 const LAMP_SIZE = { radius: 14, halo: 32, haloAlpha: 0.4 } as const;
 const PLAQUE = { padX: 18, padY: 8, radius: 14, outline: 5, shadow: 6 } as const;
-// Подпись — со стороны, противоположной рабочему, на таком расстоянии от центра станка.
-const LABEL_OFFSET = 1.05 * UNIT;
+/**
+ * На каком расстоянии от центра станка стоит табличка, точки рисования. Табличка — за станком,
+ * со стороны, противоположной рабочему; такой же отступ у таблички кабинета мастера.
+ */
+export const LABEL_OFFSET = 1.05 * UNIT;
 /** Насколько табличка уходит от центра станка, точки рисования: по нему считаются границы цеха. */
 export const PLAQUE_REACH = LABEL_OFFSET + PLAQUE_FONT.size / 2 + PLAQUE.padY + PLAQUE.shadow;
 const FRONT_SHADE = -0.35;
@@ -192,7 +189,20 @@ function drawLampOn(palette: Palette): Container {
   return lamp;
 }
 
-function drawPlaque(text: string, at: Point, resolution: number, palette: Palette): Container {
+/**
+ * Рисует табличку с надписью шрифтом табличек.
+ * @param {string} text Надпись.
+ * @param {Point} at Центр таблички, точки рисования.
+ * @param {number} resolution Чёткость текста.
+ * @param {Palette} palette Краски цеха.
+ * @returns {Container} Табличка с тенью.
+ */
+export function drawPlaque(
+  text: string,
+  at: Point,
+  resolution: number,
+  palette: Palette,
+): Container {
   const label = new Text({
     text,
     anchor: 0.5,
@@ -242,7 +252,7 @@ export function drawMachine(
   // Табличка — со стороны, противоположной рабочему; если они на одной высоте — над станком.
   const awayFromWorker = Math.sign(plan.machine.y - plan.post.y) || -1;
   const plaque = drawPlaque(
-    STATION_LABELS[stage],
+    STAGE_LABELS[stage],
     { x: plan.machine.x * UNIT, y: plan.machine.y * UNIT + awayFromWorker * LABEL_OFFSET },
     textResolution,
     palette,

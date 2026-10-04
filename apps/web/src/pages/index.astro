@@ -1,7 +1,8 @@
 ---
+import { briefOf } from "@cyberzavod/core";
 import GameLayout from "@/app/layouts/GameLayout.astro";
 import { Factory } from "@/widgets/factory";
-import { PromptTimeline } from "@/widgets/prompt-timeline";
+import { BuildJournal } from "@/widgets/build-journal";
 import { publishedRecordings } from "@/entities/recording";
 import { PANELS } from "@/shared/config/panels.ts";
 import { site } from "@/shared/config/site.ts";
@@ -10,17 +11,17 @@ import { Drawer, Panel } from "@/shared/ui";
 const [latest] = publishedRecordings;
 ---
 
-<GameLayout promptLog={latest !== undefined} heading={`${site.name} — цех ИИ-агентов`}>
+<GameLayout journal={latest !== undefined} heading={`${site.name} — цех ИИ-агентов`}>
   {latest ? (
-    <Factory client:load recording={latest} titleLevel="h2" />
+    <Factory client:load recording={briefOf(latest)} titleLevel="h2" />
   ) : (
     <Panel label="Цех">
       <p>Записей пока нет.</p>
     </Panel>
   )}
   {latest && (
-    <Drawer slot="drawers" id={PANELS.promptLog} title="Журнал промптов">
-      <PromptTimeline recording={latest} />
+    <Drawer slot="drawers" id={PANELS.journal} title="Журнал сборки">
+      <BuildJournal recording={latest} />
     </Drawer>
   )}
 </GameLayout>

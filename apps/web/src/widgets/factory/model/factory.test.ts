@@ -124,3 +124,75 @@ describe("createFactoryModel", () => {
     expect(model.$promptDetailsOpen.get()).toBe(false);
   });
 });
+
+// Реплики на тех же минутах: мастер даёт задание коду на минуте записи — над ним у стола,
+// а рабочий кода говорит человеку в середине своего визита.
+function recordingWithMessages(): Recording {
+  return {
+    ...recordingWithPrompt(),
+    events: [
+      { t: 0, type: "build_start" },
+      {
+        t: 60_000,
+        type: "message",
+        from: "conductor",
+        to: "code",
+        line: "Сделай счётчик",
+        text: "Сделай счётчик токенов.",
+      },
+      { t: 120_000, type: "stage_enter", stage: "code" },
+      {
+        t: 180_000,
+        type: "message",
+        from: "code",
+        to: "human",
+        line: "Счётчик готов",
+        text: "Счётчик токенов готов.",
+      },
+      { t: 240_000, type: "build_end", ok: true },
+    ],
+  };
+}
+
+describe("createFactoryModel: реплики", () => {
+  it("показывает реплику, которая висит в этот момент", () => {
+    const model = createFactoryModel(recordingWithMessages());
+
+    model.seek(1_500);
+
+    expect(model.$message.get()?.message.line).toBe("Сделай счётчик");
+  });
+
+  it("не показывает реплику вне её времени", () => {
+    const model = createFactoryModel(recordingWithMessages());
+
+    model.seek(100);
+
+    expect(model.$message.get()).toBeNull();
+  });
+
+  it("ставит пузырь над мастером, когда говорит он", () => {
+    const model = createFactoryModel(recordingWithMessages());
+
+    model.seek(1_500);
+
+    expect(model.$messagePosition.get()).toEqual(model.script.layout.conductor.post);
+  });
+
+  it("ставит пузырь над рабочим, когда говорит он", () => {
+    const model = createFactoryModel(recordingWithMessages());
+    const atCode = model.script.messages[1]?.start ?? 0;
+
+    model.seek(atCode + 100);
+
+    expect(model.$messagePosition.get()).toEqual(model.script.layout.stations.code.post);
+  });
+
+  it("не ищет место, когда никто не говорит", () => {
+    const model = createFactoryModel(recordingWithMessages());
+
+    model.seek(100);
+
+    expect(model.$messagePosition.get()).toBeNull();
+  });
+});

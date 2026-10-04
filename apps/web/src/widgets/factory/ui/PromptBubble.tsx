@@ -1,11 +1,10 @@
-import { createMemo, Show, type JSX } from "solid-js";
+import { Show, type JSX } from "solid-js";
 import { recipientOf } from "@/entities/prompt";
 import { useStoreValue } from "@/shared/lib/use-store-value.ts";
 import { BulletList, Button, Chip, Title } from "@/shared/ui";
 import type { FactoryGraphics, Frame } from "../graphics/factory-graphics.ts";
-import { placeBubble } from "../lib/bubble-placement.ts";
 import { useFactoryModel } from "./model-context.ts";
-import styles from "./PromptBubble.module.css";
+import { SpeechBubble } from "./SpeechBubble.tsx";
 
 interface Props {
   /** Графика цеха — переводит место рабочего в координаты пола; нет, пока не загрузилась. */
@@ -27,43 +26,25 @@ export function PromptBubble(props: Props): JSX.Element {
   const position = useStoreValue(model.$promptPosition);
   const detailsOpen = useStoreValue(model.$promptDetailsOpen);
 
-  const placement = createMemo(() => {
-    const point = position();
-    const graphics = props.graphics;
-    if (point === null || graphics === undefined) return null;
-    return placeBubble(graphics.toScreen(point), props.field);
-  });
-
   return (
     <Show when={cue()}>
       {(current) => (
-        <Show when={placement()}>
-          {(place) => (
-            <div
-              class={styles.anchor}
-              style={{ transform: `translate(${place().x}px, ${place().y}px)` }}
-              data-vertical={place().vertical}
-              data-horizontal={place().horizontal}
+        <SpeechBubble graphics={props.graphics} field={props.field} position={position()}>
+          <Chip tone="sky">человек → {recipientOf(current().prompt)}</Chip>
+          <Title>{current().prompt.goal}</Title>
+          <Show when={current().prompt.requirements.length > 0}>
+            <Button
+              variant="link"
+              aria-expanded={detailsOpen()}
+              onClick={() => model.togglePromptDetails()}
             >
-              <div class={styles.bubble}>
-                <Chip tone="sky">человек → {recipientOf(current().prompt)}</Chip>
-                <Title>{current().prompt.goal}</Title>
-                <Show when={current().prompt.requirements.length > 0}>
-                  <Button
-                    variant="link"
-                    aria-expanded={detailsOpen()}
-                    onClick={() => model.togglePromptDetails()}
-                  >
-                    {detailsOpen() ? "свернуть" : "подробнее"}
-                  </Button>
-                  <Show when={detailsOpen()}>
-                    <BulletList items={current().prompt.requirements} />
-                  </Show>
-                </Show>
-              </div>
-            </div>
-          )}
-        </Show>
+              {detailsOpen() ? "свернуть" : "подробнее"}
+            </Button>
+            <Show when={detailsOpen()}>
+              <BulletList items={current().prompt.requirements} />
+            </Show>
+          </Show>
+        </SpeechBubble>
       )}
     </Show>
   );

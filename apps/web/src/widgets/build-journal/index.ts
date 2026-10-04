@@ -1,1 +1,1 @@
-export { default as PromptTimeline } from "./ui/PromptTimeline.astro";
+export { default as BuildJournal } from "./ui/BuildJournal.astro";

@@ -18,6 +18,8 @@ export interface Palette {
     readonly mark: number;
     readonly pad: number;
   };
+  /** Цвет формы мастера: свой, не совпадающий с цветом ни одного этапа. */
+  readonly conductor: number;
   readonly skin: number;
   readonly helmet: number;
   readonly crate: { readonly wood: number; readonly plank: number };
@@ -79,6 +81,7 @@ export function readPalette(tokens: TokenSource): Palette {
       mark: color("--sun"),
       pad: color("--floor-pad"),
     },
+    conductor: color("--conductor"),
     skin: color("--skin"),
     helmet: color("--sun"),
     crate: { wood: color("--crate"), plank: color("--crate-plank") },

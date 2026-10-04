@@ -10,17 +10,17 @@ import { GithubMark } from "./GithubMark.tsx";
 import styles from "./Sidebar.module.css";
 
 interface Props {
-  /** Есть ли на странице журнал промптов — тогда в меню его кнопка. */
-  promptLog: boolean;
+  /** Есть ли на странице журнал сборки — тогда в меню его кнопка. */
+  journal: boolean;
 }
 
 const ICON_STROKE = 2.5;
 
 /**
- * Меню сайта слева: логотип, цех, панели записей, журнала и «о проекте», ссылка на код.
+ * Меню сайта слева: логотип, цех, панели записей, журнала сборки и «о проекте», ссылка на код.
  * Работает без JavaScript: панели открываются нативным popover.
  * @param {Props} props Свойства компонента.
- * @param {boolean} props.promptLog Показывать ли кнопку журнала промптов.
+ * @param {boolean} props.journal Показывать ли кнопку журнала сборки.
  * @returns {JSX.Element} Боковое меню.
  */
 export function Sidebar(props: Props): JSX.Element {
@@ -49,9 +49,9 @@ export function Sidebar(props: Props): JSX.Element {
             Записи
           </Button>
         </li>
-        <Show when={props.promptLog}>
+        <Show when={props.journal}>
           <li>
-            <Button layout="tile" popovertarget={PANELS.promptLog}>
+            <Button layout="tile" popovertarget={PANELS.journal}>
               <MessageSquareText stroke-width={ICON_STROKE} />
               Журнал
             </Button>

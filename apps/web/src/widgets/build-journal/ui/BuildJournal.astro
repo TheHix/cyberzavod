@@ -1,44 +1,77 @@
 ---
-// Промпты человека по ходу сборки — как сообщения модели, которая их получила.
-// Главное указание видно сразу, уточнения раскрываются: без JS, через <details>.
-import type { PromptEvent, Recording } from "@cyberzavod/core";
+// Журнал сборки: промпты человека и реплики цеха одним списком по времени. Промпт — как
+// сообщение модели, которая его получила: главное указание видно сразу, уточнения раскрываются
+// без JS через <details>. Реплика раскрыта целиком: строка из цеха и полный текст абзацами.
+import type { MessageEvent, PromptEvent, Recording } from "@cyberzavod/core";
 import { recipientOf } from "@/entities/prompt";
+import { messageAnchor, paragraphsOf, routeOf } from "@/entities/message";
 import { formatClock } from "@/shared/lib/format.ts";
 import { BulletList, buttonClass, Card, Chip, Title } from "@/shared/ui";
 
 interface Props {
+  /** Полная запись: в журнале, в отличие от цеха, есть полные тексты реплик. */
   recording: Recording;
 }
 
+type Entry =
+  | { kind: "prompt"; prompt: PromptEvent }
+  | { kind: "message"; message: MessageEvent; index: number };
+
 const { recording } = Astro.props;
-const prompts = recording.events.filter((event): event is PromptEvent => event.type === "prompt");
+
+// Номер реплики в журнале — тот же, что у реплики в цехе: по нему «подробнее» находит запись.
+const entries: Entry[] = [];
+let messageIndex = 0;
+for (const event of recording.events) {
+  if (event.type === "prompt") entries.push({ kind: "prompt", prompt: event });
+  if (event.type === "message") {
+    entries.push({ kind: "message", message: event, index: messageIndex++ });
+  }
+}
 ---
 
-{prompts.length === 0 ? (
-  <p class="empty">В этой сборке человек не писал промптов.</p>
+{entries.length === 0 ? (
+  <p class="empty">В этой сборке нет промптов и реплик.</p>
 ) : (
   <ol class="timeline">
-    {prompts.map((prompt) => (
-      <li>
-        <Card>
-          <p class="route">
-            <Chip>{formatClock(prompt.t)}</Chip>
-            <Chip tone="sky">человек → {recipientOf(prompt)}</Chip>
-          </p>
-          {prompt.requirements.length === 0 ? (
-            <Title>{prompt.goal}</Title>
-          ) : (
-            <details class="details">
-              <summary>
-                <Title as="span">{prompt.goal}</Title>
-                <span class={`more ${buttonClass({ variant: "link" })}`}>подробнее</span>
-              </summary>
-              <BulletList items={prompt.requirements} />
-            </details>
-          )}
-        </Card>
-      </li>
-    ))}
+    {entries.map((entry) =>
+      entry.kind === "prompt" ? (
+        <li>
+          <Card>
+            <p class="route">
+              <Chip>{formatClock(entry.prompt.t)}</Chip>
+              <Chip tone="sky">человек → {recipientOf(entry.prompt)}</Chip>
+            </p>
+            {entry.prompt.requirements.length === 0 ? (
+              <Title>{entry.prompt.goal}</Title>
+            ) : (
+              <details class="details">
+                <summary>
+                  <Title as="span">{entry.prompt.goal}</Title>
+                  <span class={`more ${buttonClass({ variant: "link" })}`}>подробнее</span>
+                </summary>
+                <BulletList items={entry.prompt.requirements} />
+              </details>
+            )}
+          </Card>
+        </li>
+      ) : (
+        <li id={messageAnchor(entry.index)}>
+          <Card>
+            <p class="route">
+              <Chip>{formatClock(entry.message.t)}</Chip>
+              <Chip tone="sky">{routeOf(entry.message)}</Chip>
+            </p>
+            <Title>{entry.message.line}</Title>
+            <div class="text">
+              {paragraphsOf(entry.message.text).map((paragraph) => (
+                <p>{paragraph}</p>
+              ))}
+            </div>
+          </Card>
+        </li>
+      ),
+    )}
   </ol>
 )}
 
@@ -51,11 +84,27 @@ const prompts = recording.events.filter((event): event is PromptEvent => event.t
     list-style: none;
   }
 
+  /* Реплику, к которой пришли по «подробнее», не прячет под край панели. */
+  .timeline > li {
+    scroll-margin: var(--space-l);
+  }
+
   .route {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-xs);
     margin: 0 0 var(--space-xs);
+  }
+
+  .text {
+    display: grid;
+    gap: var(--space-s);
+    margin-top: var(--space-xs);
+  }
+
+  .text p {
+    margin: 0;
+    white-space: pre-line;
   }
 
   .details summary {

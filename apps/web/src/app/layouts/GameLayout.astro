@@ -12,8 +12,8 @@ import { Drawer } from "@/shared/ui";
 interface Props {
   title?: string;
   description?: string;
-  /** Есть ли на странице журнал промптов (слот drawers) — тогда он в меню. */
-  promptLog?: boolean;
+  /** Есть ли на странице журнал сборки (слот drawers) — тогда он в меню. */
+  journal?: boolean;
   /**
    * Главный заголовок страницы, если его нет в содержимом: на главной HUD называет сборку
    * заголовком второго уровня, а первый — сайт. Виден только программам чтения и поисковикам.
@@ -21,12 +21,12 @@ interface Props {
   heading?: string | undefined;
 }
 
-const { title, description, promptLog = false, heading } = Astro.props;
+const { title, description, journal = false, heading } = Astro.props;
 ---
 
 <BaseLayout title={title} description={description}>
   <div class="game">
-    <Sidebar promptLog={promptLog} />
+    <Sidebar journal={journal} />
     <main class="field">
       {heading && <h1 class="visually-hidden">{heading}</h1>}
       <slot />
@@ -40,9 +40,9 @@ const { title, description, promptLog = false, heading } = Astro.props;
     <div class="about">
       <p>{site.description}</p>
       <p>
-        Хуки Claude Code пишут журнал сессии, из него собирается запись: этапы, промпты, время и
-        токены. Цех проигрывает её — каждый станок это этап, а рабочие передают деталь из рук в
-        руки.
+        Хуки Claude Code пишут журнал сессии, из него собирается запись: этапы, промпты, реплики,
+        время и токены. Цех проигрывает её — каждый станок это этап, рабочие передают деталь из рук
+        в руки, а мастер в своём кабинете раздаёт задания и принимает отчёты.
       </p>
       <p>
         <a href={site.repoUrl}>Код проекта на GitHub</a>

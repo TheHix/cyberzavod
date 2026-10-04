@@ -1,9 +1,9 @@
 ---
 import type { GetStaticPaths } from "astro";
-import type { Recording } from "@cyberzavod/core";
+import { briefOf, type Recording } from "@cyberzavod/core";
 import GameLayout from "@/app/layouts/GameLayout.astro";
 import { Factory } from "@/widgets/factory";
-import { PromptTimeline } from "@/widgets/prompt-timeline";
+import { BuildJournal } from "@/widgets/build-journal";
 import { publishedRecordings } from "@/entities/recording";
 import { PANELS } from "@/shared/config/panels.ts";
 import { Drawer } from "@/shared/ui";
@@ -19,12 +19,12 @@ interface Props {
 }
 
 const { recording } = Astro.props;
-const description = `Как ИИ-агенты собирали «${recording.title}»: промпты человека, время и токены.`;
+const description = `Как ИИ-агенты собирали «${recording.title}»: промпты человека, реплики мастера и станций, время и токены.`;
 ---
 
-<GameLayout title={recording.title} description={description} promptLog>
-  <Factory client:load recording={recording} />
-  <Drawer slot="drawers" id={PANELS.promptLog} title="Журнал промптов">
-    <PromptTimeline recording={recording} />
+<GameLayout title={recording.title} description={description} journal>
+  <Factory client:load recording={briefOf(recording)} />
+  <Drawer slot="drawers" id={PANELS.journal} title="Журнал сборки">
+    <BuildJournal recording={recording} />
   </Drawer>
 </GameLayout>

@@ -1,7 +1,7 @@
 // Поза рабочего вида сверху: насколько руки вынесены вперёд, как они качаются и как
 // пружинит шаг. Считается из кадра, поэтому при перемотке поза та же, что при просмотре.
 
-import type { WorkerFrame } from "@cyberzavod/core";
+import type { ConductorFrame, WorkerFrame } from "@cyberzavod/core";
 
 /** Поза рабочего в единицах плана: `reach` — вынос рук вперёд, `swing` — разнос рук, `bob` — пружина шага. */
 export interface Pose {
@@ -21,6 +21,8 @@ const REACH = { rest: 0.08, walk: 0.12, hold: 0.3, work: 0.3, handoff: 0.38 } as
 const SWING = { walk: 0.12, work: 0.07 } as const;
 // Пружина шага и дыхание стоящего.
 const BOB = { walk: 0.04, breath: 0.015 } as const;
+// Мастер, пока говорит, жестикулирует: руки вынесены вперёд и покачиваются в такт речи.
+const GESTURE = { periodMs: 600, reach: 0.22, swing: 0.1 } as const;
 
 function wave(elapsed: number, periodMs: number): number {
   return Math.sin((elapsed / periodMs) * FULL_TURN);
@@ -49,4 +51,20 @@ export function poseOf(worker: WorkerFrame): Pose {
     default:
       return worker.activity satisfies never;
   }
+}
+
+/**
+ * Поза мастера в кадре: стоит спокойно, а пока говорит, покачивает руками.
+ * @param {ConductorFrame} conductor Мастер в кадре.
+ * @returns {Pose} Вынос и разнос рук и дыхание.
+ */
+export function conductorPoseOf(conductor: ConductorFrame): Pose {
+  if (!conductor.talking) {
+    return { reach: REACH.rest, swing: 0, bob: BOB.breath * wave(conductor.elapsed, BREATH_MS) };
+  }
+  return {
+    reach: GESTURE.reach,
+    swing: GESTURE.swing * wave(conductor.elapsed, GESTURE.periodMs),
+    bob: 0,
+  };
 }

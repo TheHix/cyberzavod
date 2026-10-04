@@ -1,14 +1,17 @@
 // Цех в стиле тайкуна на PixiJS, вид сверху. Всё рисуется один раз при встраивании (пол,
-// станки, текстуры рабочих и детали); в кадре у готовых спрайтов меняются только координаты,
-// поворот, масштаб и прозрачность — без перерисовки и без новых объектов.
+// станки, кабинет мастера, текстуры рабочих, мастера и детали); в кадре у готовых спрайтов
+// меняются только координаты, поворот, масштаб и прозрачность — без перерисовки и без новых
+// объектов.
 
 import { STAGES, type FactoryLayout, type Point, type Scene, type Stage } from "@cyberzavod/core";
 import { Application, Container } from "pixi.js";
 import type { FactoryGraphics, Frame, ScreenPoint } from "../factory-graphics.ts";
 import {
   bakeActorTextures,
+  createConductor,
   createCrate,
   createWorker,
+  placeConductor,
   placeCrate,
   placeWorker,
   type CrateSprites,
@@ -17,6 +20,7 @@ import {
 import { fitPlan, planBounds, type PlanBounds } from "./bounds.ts";
 import { drawFloor } from "./floor.ts";
 import { drawMachine, loadPlaqueFont, type MachineSprites } from "./machines.ts";
+import { drawOffice } from "./office.ts";
 import { readPalette } from "./palette.ts";
 import { UNIT } from "./units.ts";
 
@@ -35,6 +39,7 @@ export class ShapesGraphics implements FactoryGraphics {
   readonly #world = new Container();
   readonly #workers = new Map<Stage, WorkerSprites>();
   readonly #machines = new Map<Stage, MachineSprites>();
+  #conductor: WorkerSprites | undefined;
   #crate: CrateSprites | undefined;
   #bounds: PlanBounds | undefined;
   #scale = 1;
@@ -42,7 +47,7 @@ export class ShapesGraphics implements FactoryGraphics {
   #mounted = false;
 
   /**
-   * Встраивает холст в контейнер и рисует неподвижный цех: пол, станки, таблички.
+   * Встраивает холст в контейнер и рисует неподвижный цех: пол, станки, кабинет мастера, таблички.
    * @param {HTMLElement} container Элемент, в который встаёт холст.
    * @param {FactoryLayout} layout План цеха.
    * @returns {Promise<void>} Готово, когда холст встроен.
@@ -84,12 +89,17 @@ export class ShapesGraphics implements FactoryGraphics {
       this.#world.addChild(machine.root);
       this.#machines.set(stage, machine.sprites);
     }
+    this.#world.addChild(
+      drawOffice(layout.conductor, renderer.resolution * TEXT_SHARPNESS, palette),
+    );
     const textures = bakeActorTextures(renderer, palette);
     for (const stage of STAGES) {
       const worker = createWorker(stage, textures, palette);
       this.#world.addChild(worker.root);
       this.#workers.set(stage, worker);
     }
+    this.#conductor = createConductor(textures, palette);
+    this.#world.addChild(this.#conductor.root);
     this.#crate = createCrate(textures, palette);
     this.#world.addChild(this.#crate.root);
     this.#app.stage.addChild(this.#world);
@@ -106,6 +116,7 @@ export class ShapesGraphics implements FactoryGraphics {
       const sprites = this.#workers.get(worker.station);
       if (sprites !== undefined) placeWorker(sprites, worker);
     }
+    if (this.#conductor !== undefined) placeConductor(this.#conductor, scene.conductor);
     const carrier = scene.workers.find((worker) => worker.station === scene.part.holder);
     if (this.#crate !== undefined) {
       placeCrate(this.#crate, scene.part, carrier?.heading ?? 0, scene.time);

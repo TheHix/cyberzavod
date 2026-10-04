@@ -1,5 +1,5 @@
 import type { JSX } from "solid-js";
-import type { Recording } from "@cyberzavod/core";
+import type { BriefRecording } from "@cyberzavod/core";
 import { formatDate, formatDuration, formatTokens } from "@/shared/lib/format.ts";
 import { Panel, StatList, Title } from "@/shared/ui";
 import { useFactoryModel } from "./model-context.ts";
@@ -7,7 +7,7 @@ import { PlaybackControls } from "./PlaybackControls.tsx";
 import styles from "./Hud.module.css";
 
 interface Props {
-  recording: Recording;
+  recording: BriefRecording;
   /** Уровень заголовка: на странице записи это главный заголовок, на главной — нет. */
   titleLevel: "h1" | "h2";
 }
@@ -15,7 +15,7 @@ interface Props {
 /**
  * HUD цеха справа: какая сборка идёт, её итоги и управление проигрыванием.
  * @param {Props} props Свойства компонента.
- * @param {Recording} props.recording Запись, которую проигрывает цех.
+ * @param {BriefRecording} props.recording Запись, которую проигрывает цех.
  * @param {"h1" | "h2"} props.titleLevel Уровень заголовка с названием сборки.
  * @returns {JSX.Element} Панель сборки.
  */

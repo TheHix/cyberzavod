@@ -1,10 +1,17 @@
 // Рабочие и деталь: фигуры рисуются один раз и запекаются в текстуры, в кадре у спрайтов
 // меняются только координаты, поворот, масштаб и прозрачность.
 
-import type { PartFrame, PartStatus, Stage, WorkerFrame } from "@cyberzavod/core";
+import type {
+  ConductorFrame,
+  PartFrame,
+  PartStatus,
+  Point,
+  Stage,
+  WorkerFrame,
+} from "@cyberzavod/core";
 import { Container, Graphics, Sprite, type Renderer, type Texture } from "pixi.js";
 import { shade, type Palette } from "./palette.ts";
-import { poseOf } from "./pose.ts";
+import { conductorPoseOf, poseOf, type Pose } from "./pose.ts";
 import { UNIT } from "./units.ts";
 
 /** Запечённые текстуры действующих лиц. */
@@ -12,12 +19,13 @@ export interface ActorTextures {
   readonly shadow: Texture;
   readonly torso: Texture;
   readonly helmet: Texture;
+  readonly conductorHelmet: Texture;
   readonly hand: Texture;
   readonly crate: Texture;
   readonly glow: Texture;
 }
 
-/** Рабочий в кадре: корпус поворачивается целиком, руки двигаются по позе. */
+/** Рабочий или мастер в кадре: корпус поворачивается целиком, руки двигаются по позе. */
 export interface WorkerSprites {
   readonly root: Container;
   readonly leftHand: Sprite;
@@ -48,11 +56,23 @@ const WHITE = 0xffffff;
 const HIGHLIGHT_ALPHA = 0.75;
 const VISOR_SHADE = -0.25;
 
+function drawHelmet(color: number, palette: Palette): Graphics {
+  return new Graphics()
+    .circle(0, 0, HELMET_SIZE.radius)
+    .fill(color)
+    .stroke({ width: OUTLINE, color: palette.ink })
+    .roundRect(HELMET_SIZE.radius - 12, -10, HELMET_SIZE.visor, 20, 6)
+    .fill(shade(color, VISOR_SHADE))
+    .stroke({ width: 4, color: palette.ink })
+    .circle(-6, -8, HELMET_SIZE.highlight)
+    .fill({ color: WHITE, alpha: HIGHLIGHT_ALPHA });
+}
+
 /**
  * Рисует фигуры действующих лиц и запекает их в текстуры.
  * @param {Renderer} renderer Рендерер цеха.
  * @param {Palette} palette Краски цеха.
- * @returns {ActorTextures} Текстуры рабочих и детали.
+ * @returns {ActorTextures} Текстуры рабочих, мастера и детали.
  */
 export function bakeActorTextures(renderer: Renderer, palette: Palette): ActorTextures {
   const bake = (graphics: Graphics) => {
@@ -79,17 +99,9 @@ export function bakeActorTextures(renderer: Renderer, palette: Palette): ActorTe
         .fill(WHITE)
         .stroke({ width: OUTLINE, color: ink }),
     ),
-    helmet: bake(
-      new Graphics()
-        .circle(0, 0, HELMET_SIZE.radius)
-        .fill(palette.helmet)
-        .stroke({ width: OUTLINE, color: ink })
-        .roundRect(HELMET_SIZE.radius - 12, -10, HELMET_SIZE.visor, 20, 6)
-        .fill(shade(palette.helmet, VISOR_SHADE))
-        .stroke({ width: 4, color: ink })
-        .circle(-6, -8, HELMET_SIZE.highlight)
-        .fill({ color: WHITE, alpha: HIGHLIGHT_ALPHA }),
-    ),
+    helmet: bake(drawHelmet(palette.helmet, palette)),
+    // Каска мастера белая: его видно среди рабочих в жёлтых касках.
+    conductorHelmet: bake(drawHelmet(WHITE, palette)),
     hand: bake(
       new Graphics().circle(0, 0, HAND_RADIUS).fill(palette.skin).stroke({ width: 5, color: ink }),
     ),
@@ -118,6 +130,27 @@ function centered(texture: Texture): Sprite {
   return new Sprite({ texture, anchor: 0.5 });
 }
 
+// Фигура вида сверху: корпус цвета формы под каской, руки под корпусом — видны, только
+// когда вынесены вперёд.
+function createFigure(torsoColor: number, helmet: Texture, textures: ActorTextures): WorkerSprites {
+  const leftHand = centered(textures.hand);
+  const rightHand = centered(textures.hand);
+  const torso = centered(textures.torso);
+  torso.tint = torsoColor;
+  const root = new Container({
+    children: [centered(textures.shadow), leftHand, rightHand, torso, centered(helmet)],
+  });
+  return { root, leftHand, rightHand };
+}
+
+function placeFigure(sprites: WorkerSprites, position: Point, heading: number, pose: Pose): void {
+  sprites.root.position.set(position.x * UNIT, position.y * UNIT);
+  sprites.root.rotation = heading;
+  sprites.root.scale.set(1 + pose.bob);
+  sprites.leftHand.position.set((pose.reach + pose.swing) * UNIT, -HAND_SPREAD);
+  sprites.rightHand.position.set((pose.reach - pose.swing) * UNIT, HAND_SPREAD);
+}
+
 /**
  * Собирает спрайты рабочего этапа.
  * @param {Stage} stage Этап — цвет формы.
@@ -130,15 +163,7 @@ export function createWorker(
   textures: ActorTextures,
   palette: Palette,
 ): WorkerSprites {
-  const leftHand = centered(textures.hand);
-  const rightHand = centered(textures.hand);
-  const torso = centered(textures.torso);
-  torso.tint = palette.stations[stage];
-  // Руки под корпусом: видны, только когда вынесены вперёд.
-  const root = new Container({
-    children: [centered(textures.shadow), leftHand, rightHand, torso, centered(textures.helmet)],
-  });
-  return { root, leftHand, rightHand };
+  return createFigure(palette.stations[stage], textures.helmet, textures);
 }
 
 /**
@@ -147,12 +172,26 @@ export function createWorker(
  * @param {WorkerFrame} worker Рабочий в кадре.
  */
 export function placeWorker(sprites: WorkerSprites, worker: WorkerFrame): void {
-  const pose = poseOf(worker);
-  sprites.root.position.set(worker.position.x * UNIT, worker.position.y * UNIT);
-  sprites.root.rotation = worker.heading;
-  sprites.root.scale.set(1 + pose.bob);
-  sprites.leftHand.position.set((pose.reach + pose.swing) * UNIT, -HAND_SPREAD);
-  sprites.rightHand.position.set((pose.reach - pose.swing) * UNIT, HAND_SPREAD);
+  placeFigure(sprites, worker.position, worker.heading, poseOf(worker));
+}
+
+/**
+ * Собирает спрайты мастера: фигура как у рабочих, но формы своего цвета и в белой каске.
+ * @param {ActorTextures} textures Запечённые текстуры.
+ * @param {Palette} palette Краски цеха.
+ * @returns {WorkerSprites} Мастер, ещё не поставленный на место.
+ */
+export function createConductor(textures: ActorTextures, palette: Palette): WorkerSprites {
+  return createFigure(palette.conductor, textures.conductorHelmet, textures);
+}
+
+/**
+ * Ставит мастера в кадр: место, поворот к собеседнику и жесты, пока он говорит.
+ * @param {WorkerSprites} sprites Спрайты мастера.
+ * @param {ConductorFrame} conductor Мастер в кадре.
+ */
+export function placeConductor(sprites: WorkerSprites, conductor: ConductorFrame): void {
+  placeFigure(sprites, conductor.position, conductor.heading, conductorPoseOf(conductor));
 }
 
 /**

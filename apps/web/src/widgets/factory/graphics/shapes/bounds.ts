@@ -1,4 +1,5 @@
-// Границы нарисованного цеха в единицах плана: станки, места рабочих, площадки и таблички.
+// Границы нарисованного цеха в единицах плана: станки, места рабочих, кабинет мастера,
+// площадки и таблички.
 // По ним план вписывается в поле — без пустых краёв, которые есть у плана целиком.
 
 import { STAGES, type FactoryLayout } from "@cyberzavod/core";
@@ -37,10 +38,11 @@ const MARGIN = {
  * @returns {PlanBounds} Прямоугольник, который надо вписать в поле.
  */
 export function planBounds(layout: FactoryLayout): PlanBounds {
-  const points = STAGES.flatMap((stage) => {
+  const stationPoints = STAGES.flatMap((stage) => {
     const { machine, post } = layout.stations[stage];
     return [machine, post];
   });
+  const points = [...stationPoints, layout.conductor.desk, layout.conductor.post];
   const xs = points.map((point) => point.x);
   const ys = points.map((point) => point.y);
   const left = Math.min(...xs) - MARGIN.x;

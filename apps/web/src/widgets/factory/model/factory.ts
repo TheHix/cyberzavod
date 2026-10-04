@@ -3,13 +3,15 @@
 
 import {
   buildScript,
+  CONDUCTOR,
   sceneAt,
   summarize,
+  type BriefRecording,
   type BuildStats,
   type FactoryScript,
+  type MessageCue,
   type Point,
   type PromptCue,
-  type Recording,
   type Scene,
 } from "@cyberzavod/core";
 import { atom, computed, type ReadableAtom } from "nanostores";
@@ -41,6 +43,10 @@ export interface FactoryModel {
   readonly $prompt: ReadableAtom<PromptCue | null>;
   /** Где рабочий, получивший висящий промпт, — точка плана, над которой висит пузырь. */
   readonly $promptPosition: ReadableAtom<Point | null>;
+  /** Реплика, которая сейчас висит над говорящим. */
+  readonly $message: ReadableAtom<MessageCue | null>;
+  /** Где говорящий — мастер у стола или рабочий, — точка плана, над которой висит реплика. */
+  readonly $messagePosition: ReadableAtom<Point | null>;
   /** Раскрыты ли уточнения висящего промпта; со сменой промпта закрываются. */
   readonly $promptDetailsOpen: ReadableAtom<boolean>;
   /** Графика готова; сцена сразу идёт, если `autoplay`. */
@@ -62,10 +68,10 @@ export interface FactoryModel {
 /**
  * Создаёт модель цеха для записи: сценарий, сторы и действия. На каждый цех на странице —
  * своя модель.
- * @param {Recording} recording Запись сборки, которую проигрывает цех.
+ * @param {BriefRecording} recording Запись сборки без полных текстов реплик — их цеху не нужно.
  * @returns {FactoryModel} Модель, ещё не запущенная: ждёт готовности графики.
  */
-export function createFactoryModel(recording: Recording): FactoryModel {
+export function createFactoryModel(recording: BriefRecording): FactoryModel {
   const script = buildScript(recording);
   const $status = atom<GraphicsStatus>("loading");
   const $playback = atom(startPlayback(script.duration, false));
@@ -79,6 +85,15 @@ export function createFactoryModel(recording: Recording): FactoryModel {
     const cue = scene.prompt?.cue;
     if (cue === undefined) return null;
     return scene.workers.find((worker) => worker.station === cue.station)?.position ?? null;
+  });
+
+  const $message = computed($scene, (scene) => scene.message?.cue ?? null);
+  // Мастер говорит из кабинета, рабочий — со своего места.
+  const $messagePosition = computed($scene, (scene) => {
+    const cue = scene.message?.cue;
+    if (cue === undefined) return null;
+    if (cue.speaker === CONDUCTOR) return scene.conductor.position;
+    return scene.workers.find((worker) => worker.station === cue.speaker)?.position ?? null;
   });
 
   const update = (change: (playback: Playback) => Playback) => {
@@ -100,6 +115,8 @@ export function createFactoryModel(recording: Recording): FactoryModel {
     $recordingTime,
     $prompt,
     $promptPosition,
+    $message,
+    $messagePosition,
     $promptDetailsOpen,
     start: (autoplay) => {
       $status.set("ready");

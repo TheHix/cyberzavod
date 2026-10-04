@@ -1,7 +1,8 @@
-// Пол цеха: плитка до краёв любого экрана, полоса прохода с разметкой и площадки под станками.
+// Пол цеха: плитка до краёв любого экрана, полоса прохода с разметкой, площадки под станками
+// и под кабинетом мастера.
 // Рисуется один раз и дальше не меняется; координаты — в точках рисования (`UNIT` на единицу).
 
-import { STAGES, type FactoryLayout } from "@cyberzavod/core";
+import { STAGES, type FactoryLayout, type Point } from "@cyberzavod/core";
 import { Container, Graphics, TilingSprite, type Renderer } from "pixi.js";
 import type { Palette } from "./palette.ts";
 import { UNIT } from "./units.ts";
@@ -52,20 +53,26 @@ function drawLane(aisle: number, floor: Palette["floor"]): Graphics {
   return lane.fill(floor.mark);
 }
 
+// Площадка охватывает мебель и место рабочего у неё с запасом.
+function addPad(pads: Graphics, furniture: Point, post: Point): void {
+  const top = Math.min(furniture.y, post.y) * UNIT - PAD.margin;
+  const bottom = Math.max(furniture.y, post.y) * UNIT + PAD.margin;
+  pads.roundRect(
+    furniture.x * UNIT - PAD_HALF_WIDTH,
+    top,
+    PAD_HALF_WIDTH * 2,
+    bottom - top,
+    PAD.radius,
+  );
+}
+
 function drawPads(layout: FactoryLayout, palette: Palette): Graphics {
   const pads = new Graphics();
   for (const stage of STAGES) {
     const { machine, post } = layout.stations[stage];
-    const top = Math.min(machine.y, post.y) * UNIT - PAD.margin;
-    const bottom = Math.max(machine.y, post.y) * UNIT + PAD.margin;
-    pads.roundRect(
-      machine.x * UNIT - PAD_HALF_WIDTH,
-      top,
-      PAD_HALF_WIDTH * 2,
-      bottom - top,
-      PAD.radius,
-    );
+    addPad(pads, machine, post);
   }
+  addPad(pads, layout.conductor.desk, layout.conductor.post);
   return pads
     .fill(palette.floor.pad)
     .stroke({ width: PAD_STROKE.width, color: palette.ink, alpha: PAD_STROKE.alpha });
@@ -76,7 +83,7 @@ function drawPads(layout: FactoryLayout, palette: Palette): Graphics {
  * @param {FactoryLayout} layout План цеха.
  * @param {Renderer} renderer Рендерер — запекает плитку в текстуру.
  * @param {Palette} palette Краски цеха.
- * @returns {Container} Пол: плитка, проход и площадки станков.
+ * @returns {Container} Пол: плитка, проход и площадки станков и кабинета.
  */
 export function drawFloor(layout: FactoryLayout, renderer: Renderer, palette: Palette): Container {
   const tiles = new TilingSprite({

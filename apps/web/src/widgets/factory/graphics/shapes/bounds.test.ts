@@ -22,6 +22,34 @@ describe("planBounds", () => {
   });
 });
 
+describe("planBounds: кабинет мастера", () => {
+  const marginX = PAD_HALF_WIDTH / UNIT + OUTLINE_SLACK;
+
+  it("включает стол и место мастера в плане по умолчанию", () => {
+    const { desk, post } = DEFAULT_LAYOUT.conductor;
+
+    const bounds = planBounds(DEFAULT_LAYOUT);
+
+    for (const point of [desk, post]) {
+      expect(point.x).toBeGreaterThanOrEqual(bounds.x + marginX);
+      expect(point.y).toBeGreaterThanOrEqual(bounds.y);
+      expect(point.x).toBeLessThanOrEqual(bounds.x + bounds.width - marginX);
+      expect(point.y).toBeLessThanOrEqual(bounds.y + bounds.height);
+    }
+  });
+
+  it("расширяет границы, если кабинет вынесен за ряд станков", () => {
+    const layout = {
+      ...DEFAULT_LAYOUT,
+      conductor: { desk: { x: -4, y: 6.3 }, post: { x: -4, y: 7.4 }, facing: 0 },
+    };
+
+    const bounds = planBounds(layout);
+
+    expect(bounds.x).toBeCloseTo(-4 - marginX);
+  });
+});
+
 describe("fitPlan", () => {
   it("вписывает план по меньшей стороне и ставит его по центру поля", () => {
     const bounds = { x: 1, y: 0, width: 10, height: 5 };
