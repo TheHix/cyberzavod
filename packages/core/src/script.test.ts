@@ -190,6 +190,31 @@ describe("buildScript", () => {
     }).toEqual({ usageAt: 15_500, finishAt: 16_500 });
   });
 
+  it("замораживает сценарий: правка на месте падает, а не портит сцену", () => {
+    const script = buildScript(reworkRecording(), LINE_LAYOUT, PLAIN_PACING);
+    const post = script.layout.stations.code.post as { y: number };
+
+    const act = () => {
+      post.y = 2;
+    };
+
+    expect(act).toThrow(TypeError);
+  });
+
+  it("не замораживает переданные запись, план и темп", () => {
+    const recording = reworkRecording();
+    const layout = structuredClone(LINE_LAYOUT);
+    const pacing = { ...PLAIN_PACING };
+
+    buildScript(recording, layout, pacing);
+
+    expect(
+      [recording.events[1], layout.stations.code.post, pacing].map((value) =>
+        Object.isFrozen(value),
+      ),
+    ).toEqual([false, false, false]);
+  });
+
   it("сжимает работу у станка, но не короче минимума и не дольше максимума", () => {
     const recording = recordingOf([
       { t: 0, type: "build_start" },

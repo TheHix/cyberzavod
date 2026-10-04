@@ -202,9 +202,10 @@ class Director {
   #clock = 0;
 
   constructor(layout: FactoryLayout, pacing: Pacing) {
-    this.#layout = layout;
+    // Своя копия плана: сценарий замораживается, а план вызывающего кода остаётся его.
+    this.#layout = structuredClone(layout);
     this.#pacing = pacing;
-    this.#headings = perStation((stage) => layout.stations[stage].facing);
+    this.#headings = perStation((stage) => this.#layout.stations[stage].facing);
   }
 
   #act(worker: Stage, action: Action): void {
@@ -245,7 +246,7 @@ class Director {
           start: at,
           end: at + this.#pacing.promptMs,
           station,
-          prompt: event,
+          prompt: { ...event, requirements: [...event.requirements] },
           index: this.#prompts.length,
         });
         return;
@@ -324,17 +325,26 @@ class Director {
     this.#partStatus = ok ? "done" : "scrap";
     this.#movePart(at, at, machineOf(station), machineOf(station));
     const lastReturn = Math.max(...Object.values(this.#homeAt));
-    return {
+    return deepFreeze({
       layout: this.#layout,
-      pacing: this.#pacing,
+      pacing: { ...this.#pacing },
       duration: Math.max(at + this.#pacing.finaleMs, lastReturn),
       finishAt: at,
       workers: this.#workers,
       part: this.#part,
       prompts: this.#prompts,
       marks: this.#marks,
-    };
+    });
   }
+}
+
+// Сценарий неизменяем: кадры отдают его объекты наружу как есть, и правка на месте —
+// например, в интерфейсе — испортила бы сцену. Замороженный объект правку не пропустит.
+function deepFreeze<T>(value: T): T {
+  if (typeof value !== "object" || value === null || Object.isFrozen(value)) return value;
+  Object.freeze(value);
+  for (const nested of Object.values(value)) deepFreeze(nested);
+  return value;
 }
 
 // Путь бегущего: со своего места в проход, по проходу и из прохода к получателю —
