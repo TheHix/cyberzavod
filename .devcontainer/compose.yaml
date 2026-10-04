@@ -39,6 +39,7 @@ services:
       - node-modules:/workspace/node_modules
       - web-node-modules:/workspace/apps/web/node_modules
       - core-node-modules:/workspace/packages/core/node_modules
+      - recorder-node-modules:/workspace/packages/recorder/node_modules
       - pnpm-store:/home/node/.local/share/pnpm
       - go-cache:/home/node/go
       # Вход в Claude и GitHub сохраняется между пересборками контейнера.
@@ -67,6 +68,7 @@ volumes:
   node-modules:
   web-node-modules:
   core-node-modules:
+  recorder-node-modules:
   pnpm-store:
   go-cache:
   claude-config:
