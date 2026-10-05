@@ -1,6 +1,8 @@
 // Формат записи сборки. Цех на сайте проигрывает запись по этим событиям,
 // поэтому всё, что видно на экране, должно выводиться отсюда.
 
+import { isLine, isObject } from "./guards.ts";
+
 /** Этапы сборки по порядку: постановка, код, проверки, ревью, выпуск. */
 export const STAGES = ["spec", "code", "test", "review", "ship"] as const;
 
@@ -94,17 +96,8 @@ export const NO_TALLY: Tally = { tokens: 0, prompts: 0, reworks: 0 };
 /** Ошибка формата записи: запись пришла извне и не прошла проверку. */
 export class RecordingError extends Error {}
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
 function isStage(value: unknown): value is Stage {
   return (STAGES as readonly unknown[]).includes(value);
-}
-
-// Тексты записи показываются в одну строку: в заголовке, в карточке промпта.
-function isLine(value: unknown): value is string {
-  return typeof value === "string" && value.trim() !== "" && !/[\r\n]/.test(value);
 }
 
 /**

@@ -27,6 +27,7 @@ export {
   type Recording,
   type BuildStats,
 } from "./recording.ts";
+export { ProjectError, parseProject, type Project } from "./project.ts";
 export {
   DEFAULT_LAYOUT,
   type FactoryLayout,
