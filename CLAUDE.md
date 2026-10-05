@@ -13,6 +13,7 @@
 - `make format` — привести код к стилю (Prettier, ESLint --fix, gofumpt, goimports).
 - `/feature <номер issue>` — провести задачу через цех агентов: постановка (ждёт одобрения человека), код, проверки, ревью, выкатка.
 - `/publish-recording` — опубликовать запись сборки: черновик из журнала, чистовая редактура промптов и реплик, проверка человеком, файл в `recordings/published/`.
+- `make project-init DIR=<путь> ID=<id> [VERSION=<версия>]` — подключить внешний git-репозиторий к заводу (см. «Playbooks завода»).
 - `make help` — остальные команды.
 
 Если работаешь в dev-контейнере (`DEVCONTAINER=true`, см. `.devcontainer/README.md`): Docker и доступа к серверу там нет намеренно. Перед коммитом — `make check-web check-api`, проверки с Docker выполнит CI. API — `make api-dev`, сайт — `pnpm dev --host`.
@@ -26,6 +27,7 @@
 - `recordings/` — `raw/` (сырые журналы) и `drafts/` (черновики с исходными текстами промптов) вне git; `published/` — опубликованные записи в git, сайт берёт их при сборке.
 - `.cyberzavod/project.json` — конфиг проекта: `id`, версия завода `factory` и `checks` (команда проверок и каталоги с кодом для хука остановки); сборка несёт в записи `id` и `factory`.
 - `projects/` — карточки проектов для сайта (название, описание, ссылки), в git; сайт берёт их при сборке.
+- `factory/` — подключение внешних проектов: `project-init.sh` (его запускает `make project-init`), шаблон их настроек Claude Code `project-settings.json` и тест `project-init.test.sh`.
 - `apps/web` — сайт: Astro + SolidJS + Nano Stores, слои FSD, свой ui-kit на Kobalte, цех на весь экран на canvas через PixiJS.
 - `apps/api` — API на Go с Postgres.
 - `compose.yaml` — локальное окружение: db → migrate → api.
@@ -44,11 +46,14 @@
 
 ## Playbooks завода
 
-Набор, который завод отдаёт проектам (в #13 его копируют во внешний проект без правок):
+Набор, который завод отдаёт проектам; `make project-init` копирует его во внешний проект без правок:
 
 - агенты `.claude/agents/analyst.md`, `coder.md`, `tester.md`, `reviewer.md`;
 - скилл `.claude/skills/feature/SKILL.md`;
-- хуки остановки `.claude/hooks/stop-gate.sh`, `turn-start.sh` и общий `lib.sh`.
+- хуки остановки `.claude/hooks/stop-gate.sh`, `turn-start.sh` и общий `lib.sh`;
+- шаблон настроек проекта `factory/project-settings.json`: хуки записи и остановки, запреты на `.env`. Он становится `.claude/settings.json` проекта, а не копируется как есть.
+
+Список набора записан в трёх местах и меняется во всех: здесь, в `PLAYBOOKS` скрипта `factory/project-init.sh` (шаблон — там же, в `SETTINGS_TEMPLATE`) и в `PLAYBOOK_FILES` теста `factory/project-init.test.sh` (тест намеренно сверяет скрипт с отдельным списком).
 
 Только у завода остаются `format-go.sh`, агент `recording-editor`, скилл `publish-recording` и тесты хуков.
 
@@ -58,6 +63,15 @@
 
 - команды форматирования, быстрых проверок и полных проверок (нет команды форматирования — шаг пропускается);
 - правила кода и тестов: по ним пишет исполнитель, проверяют тестировщик и ревьюер.
+
+Версия набора — тег `factory-v<версия>` в репозитории завода; проект получает файлы из тега, а не из рабочей копии. Выпуск версии: правка набора, затем `factory` в `.cyberzavod/project.json` завода, затем тег `factory-vX.Y.Z` на этом коммите и `git push origin factory-vX.Y.Z`.
+
+Подключение проекта: `make project-init DIR=<путь к корню git-репозитория> ID=<id> [VERSION=<версия>]`. Без `VERSION` берётся старший тег; `VERSION` читается только из командной строки make, не из окружения, и должен быть точным именем тега без `factory-v`. Команда кладёт набор, `.claude/settings.json` из шаблона и `.cyberzavod/project.json` (`id`, `factory`) в проект и заготовку карточки `projects/<id>.json` в завод. Если в проекте или в заводе уже есть что-то из этого, команда отказывает и ничего не меняет. Остальное делает человек, команда напоминает об этом в конце:
+
+- создать `.claude/settings.local.json` проекта с `{"env": {"CYBERZAVOD_HOME": "<путь к заводу>"}}` и не коммитить его: по этой переменной хуки записи находят завод, без неё не пишут ничего;
+- заполнить `checks` в `.cyberzavod/project.json`;
+- написать CLAUDE.md проекта;
+- заполнить `description`, `repo`, `website` в `projects/<id>.json` и закоммитить карточку в заводе.
 
 Набору нужны `jq` и `git`. Без `jq` хуки остановки ничего не проверяют: `stop-gate.sh` отпускает агента с сообщением, `turn-start.sh` молча выходит.
 
@@ -109,4 +123,4 @@
 
 - TypeScript strict, без `any`. Идентификаторы на английском, комментарии и тексты интерфейса на русском.
 - В записи сборок и в репозиторий не должны попадать ключи, токены, пароли, адреса серверов и личные данные. Сырые журналы лежат в `recordings/raw/` и в git не идут. Исключение — учётка локальной базы в `compose.yaml` и `.devcontainer/compose.yaml`: она только для разработки, порты привязаны к 127.0.0.1, в продакшене пароли берутся из `.env` на сервере.
-- Небольшие коммиты в формате [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/): `<тип>(<область>): <описание>`. Тип и область на английском (`feat`, `fix`, `docs`, `test`, `refactor`, `ci`, `chore`, `build`), описание того, что сделано, — на русском: `feat(core): добавлен проигрыватель записи`. Области: `core`, `recorder`, `recordings`, `web`, `api`, `deploy`, `ci`, `hooks`. Ломающие изменения — `!` после типа и футер `BREAKING CHANGE:`.
+- Небольшие коммиты в формате [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/): `<тип>(<область>): <описание>`. Тип и область на английском (`feat`, `fix`, `docs`, `test`, `refactor`, `ci`, `chore`, `build`), описание того, что сделано, — на русском: `feat(core): добавлен проигрыватель записи`. Области: `core`, `recorder`, `recordings`, `web`, `api`, `deploy`, `ci`, `hooks`, `factory`. Ломающие изменения — `!` после типа и футер `BREAKING CHANGE:`.
