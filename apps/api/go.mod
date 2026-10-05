@@ -1,4 +1,4 @@
-module github.com/TheHix/cyberzavod/apps/api
+module github.com/bysavelii/cyberzavod/apps/api
 
 go 1.27.1
 

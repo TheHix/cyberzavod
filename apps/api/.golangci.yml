@@ -21,4 +21,4 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/TheHix/cyberzavod
+        - github.com/bysavelii/cyberzavod

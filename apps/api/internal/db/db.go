@@ -11,7 +11,7 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/pressly/goose/v3/lock"
 
-	"github.com/TheHix/cyberzavod/apps/api/migrations"
+	"github.com/bysavelii/cyberzavod/apps/api/migrations"
 )
 
 // Connect открывает пул соединений с Postgres.

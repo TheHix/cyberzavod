@@ -3,7 +3,7 @@
 ```
 push в main
   └─ CI: web, api, infra (проверки)
-       └─ images: сборка → ghcr.io/thehix/cyberzavod-{api,web}:<sha>
+       └─ images: сборка → ghcr.io/bysavelii/cyberzavod-{api,web}:<sha>
             └─ deploy: ssh deploy@сервер <sha>      (только если sha всё ещё последний в main)
 
 Сервер (Ubuntu, /srv/cyberzavod, владелец root)

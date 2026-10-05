@@ -14,7 +14,7 @@ x-logging: &logging
       max-file: "3"
 
 x-api: &api
-  image: ghcr.io/thehix/cyberzavod-api:${TAG:?не задан TAG}
+  image: ghcr.io/bysavelii/cyberzavod-api:${TAG:?не задан TAG}
   environment:
     DATABASE_URL: postgres://cyberzavod:${POSTGRES_PASSWORD:?не задан POSTGRES_PASSWORD}@db:5432/cyberzavod?sslmode=disable
     API_ADDR: ":8080"
@@ -63,7 +63,7 @@ services:
     restart: unless-stopped
 
   web:
-    image: ghcr.io/thehix/cyberzavod-web:${TAG:?не задан TAG}
+    image: ghcr.io/bysavelii/cyberzavod-web:${TAG:?не задан TAG}
     ports:
       - "127.0.0.1:8082:8080"
     environment:

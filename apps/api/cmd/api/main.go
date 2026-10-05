@@ -16,9 +16,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/TheHix/cyberzavod/apps/api/internal/config"
-	"github.com/TheHix/cyberzavod/apps/api/internal/db"
-	"github.com/TheHix/cyberzavod/apps/api/internal/httpapi"
+	"github.com/bysavelii/cyberzavod/apps/api/internal/config"
+	"github.com/bysavelii/cyberzavod/apps/api/internal/db"
+	"github.com/bysavelii/cyberzavod/apps/api/internal/httpapi"
 )
 
 func main() {

@@ -22,13 +22,13 @@ describe("parseProject", () => {
   it("возвращает repo и website", () => {
     const raw = {
       ...validProject(),
-      repo: "https://github.com/TheHix/cyberzavod",
+      repo: "https://github.com/bysavelii/cyberzavod",
       website: "https://cyberzavod.com",
     };
 
     const project = parseProject(raw);
 
-    expect(project.repo).toBe("https://github.com/TheHix/cyberzavod");
+    expect(project.repo).toBe("https://github.com/bysavelii/cyberzavod");
     expect(project.website).toBe("https://cyberzavod.com");
   });
 
@@ -71,7 +71,7 @@ describe("parseProject", () => {
   });
 
   it("отклоняет ссылку http://", () => {
-    const raw = { ...validProject(), repo: "http://github.com/TheHix/cyberzavod" };
+    const raw = { ...validProject(), repo: "http://github.com/bysavelii/cyberzavod" };
 
     const act = () => parseProject(raw);
 

@@ -117,7 +117,7 @@
 
 ## Задачи
 
-План работ — [GitHub Issues](https://github.com/TheHix/cyberzavod/issues): одна задача — один issue с тем, зачем она, что сделать и когда готово. Коммит, который её закрывает, пишет в теле `closes #N`.
+План работ — [GitHub Issues](https://github.com/bysavelii/cyberzavod/issues): одна задача — один issue с тем, зачем она, что сделать и когда готово. Коммит, который её закрывает, пишет в теле `closes #N`.
 
 ## Общие правила
 
