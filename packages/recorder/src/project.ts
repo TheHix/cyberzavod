@@ -16,7 +16,9 @@ export class ProjectConfigError extends Error {}
 
 /**
  * Проверяет конфиг проекта, прочитанный из файла. Неизвестные поля допустимы — их добавят
- * следующие задачи, — но дальше идут только `id` и `factory`.
+ * следующие задачи, — но дальше идут только `id` и `factory`. Поле `checks` читают хуки
+ * остановки (`.claude/hooks/lib.sh`), рекордеру оно не нужно, поэтому схема `checks` здесь
+ * не проверяется.
  * @param {unknown} raw Разобранный JSON конфига.
  * @returns {ProjectConfig} Проверенный конфиг.
  * @throws {ProjectConfigError} Если конфиг не объект или `id` либо `factory` некорректны.
