@@ -4,7 +4,7 @@
 // объектов.
 
 import { STAGES, type FactoryLayout, type Point, type Scene, type Stage } from "@cyberzavod/core";
-import { Application, Container } from "pixi.js";
+import { Container, isWebGLSupported } from "pixi.js";
 import type { FactoryGraphics, Frame, ScreenPoint } from "../factory-graphics.ts";
 import {
   bakeActorTextures,
@@ -22,6 +22,7 @@ import { drawFloor } from "./floor.ts";
 import { drawMachine, loadPlaqueFont, type MachineSprites } from "./machines.ts";
 import { drawOffice } from "./office.ts";
 import { readPalette } from "./palette.ts";
+import { createRenderer, type FactoryRenderer } from "./renderer.ts";
 import { UNIT } from "./units.ts";
 
 // Плотность выше двух не видна глазу, а пикселей на холсте вчетверо больше.
@@ -35,7 +36,8 @@ const LAMP_BLINK = { periodMs: 900, base: 0.75, swing: 0.25 } as const;
 
 /** Графика цеха в стиле тайкуна из фигур, нарисованных кодом. */
 export class ShapesGraphics implements FactoryGraphics {
-  readonly #app = new Application();
+  readonly #renderer: FactoryRenderer = createRenderer(isWebGLSupported());
+  readonly #stage = new Container();
   readonly #world = new Container();
   readonly #workers = new Map<Stage, WorkerSprites>();
   readonly #machines = new Map<Stage, MachineSprites>();
@@ -56,26 +58,26 @@ export class ShapesGraphics implements FactoryGraphics {
   async mount(container: HTMLElement, layout: FactoryLayout): Promise<void> {
     this.#bounds = planBounds(layout);
     await Promise.all([
-      this.#app.init({
+      this.#renderer.init({
         width: container.clientWidth,
         height: container.clientHeight,
         backgroundAlpha: 0,
         antialias: true,
         autoDensity: true,
         resolution: Math.min(window.devicePixelRatio, MAX_RESOLUTION),
-        // Кадр рисуется по подписке на сцену модели, только когда она меняется: свой цикл
-        // Pixi не нужен.
-        autoStart: false,
-        preference: "webgl",
+        // Расширения Pixi для браузера (события, доступность, DOM, фильтры) цеху не нужны:
+        // холст скрыт от доступности, а текст и клики живут в HTML поверх. Понадобится какое-то —
+        // подключать явным импортом `pixi.js/<модуль>`.
+        manageImports: false,
       }),
       // Таблички пишутся шрифтом сайта — он должен быть загружен до первой надписи.
       loadPlaqueFont(),
     ]);
     this.#mounted = true;
-    this.#app.canvas.setAttribute("aria-hidden", "true");
-    container.append(this.#app.canvas);
+    this.#renderer.canvas.setAttribute("aria-hidden", "true");
+    container.append(this.#renderer.canvas);
 
-    const { renderer } = this.#app;
+    const renderer = this.#renderer;
     // Краски — из токенов оформления, как у интерфейса.
     const palette = readPalette(getComputedStyle(container));
     this.#world.addChild(drawFloor(layout, renderer, palette));
@@ -100,7 +102,7 @@ export class ShapesGraphics implements FactoryGraphics {
     this.#world.addChild(this.#foreman.root);
     this.#crate = createCrate(textures, palette);
     this.#world.addChild(this.#crate.root);
-    this.#app.stage.addChild(this.#world);
+    this.#stage.addChild(this.#world);
     const { clientWidth: width, clientHeight: height } = container;
     this.resize(width, height, { x: 0, y: 0, width, height });
   }
@@ -127,7 +129,7 @@ export class ShapesGraphics implements FactoryGraphics {
       machine.body.scale.set(1, working ? pump : 1);
       machine.lampOn.alpha = working ? lamp : 0;
     }
-    this.#app.render();
+    this.#renderer.render(this.#stage);
   }
 
   /**
@@ -139,7 +141,7 @@ export class ShapesGraphics implements FactoryGraphics {
   resize(width: number, height: number, frame: Frame): void {
     const bounds = this.#bounds;
     if (!this.#mounted || bounds === undefined) return;
-    this.#app.renderer.resize(width, height);
+    this.#renderer.resize(width, height);
     // Вписывается нарисованный цех, а не план с пустыми краями: так он крупнее.
     const fit = fitPlan(bounds, frame);
     this.#scale = fit.scale;
@@ -160,7 +162,8 @@ export class ShapesGraphics implements FactoryGraphics {
   /** Убирает холст и освобождает текстуры. */
   destroy(): void {
     if (!this.#mounted) return;
-    this.#app.destroy({ removeView: true }, { children: true, texture: true, textureSource: true });
+    this.#stage.destroy({ children: true, texture: true, textureSource: true });
+    this.#renderer.destroy({ removeView: true });
     this.#mounted = false;
   }
 }
