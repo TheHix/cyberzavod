@@ -25,6 +25,7 @@
 - `packages/recorder` — запись сборок: хуки Claude Code пишут сырой журнал, `make recording-draft` собирает из него черновик, `make recording-publish` превращает отредактированный черновик в запись формата ядра.
 - `recordings/` — `raw/` (сырые журналы) и `drafts/` (черновики с исходными текстами промптов) вне git; `published/` — опубликованные записи в git, сайт берёт их при сборке.
 - `.cyberzavod/project.json` — конфиг проекта: `id` и версия завода `factory`; сборка несёт их в записи.
+- `projects/` — карточки проектов для сайта (название, описание, ссылки), в git; сайт берёт их при сборке.
 - `apps/web` — сайт: Astro + SolidJS + Nano Stores, слои FSD, свой ui-kit на Kobalte, цех на весь экран на canvas через PixiJS.
 - `apps/api` — API на Go с Postgres.
 - `compose.yaml` — локальное окружение: db → migrate → api.

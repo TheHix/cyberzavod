@@ -2,5 +2,6 @@
 export const PANELS = {
   records: "records",
   journal: "journal",
+  project: "project",
   about: "about",
 } as const;

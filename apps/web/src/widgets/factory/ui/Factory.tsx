@@ -1,5 +1,6 @@
 import { createSignal, onCleanup, onMount, Show, untrack, type JSX } from "solid-js";
 import type { BriefRecording } from "@cyberzavod/core";
+import type { ProjectLink } from "@/entities/project";
 import { useStoreValue } from "@/shared/lib/use-store-value.ts";
 import {
   loadFactoryGraphics,
@@ -16,6 +17,8 @@ import styles from "./Factory.module.css";
 
 interface Props {
   recording: BriefRecording;
+  /** Проект, который собирали, — ссылка на его страницу в HUD. */
+  project: ProjectLink;
   /** Уровень заголовка с названием сборки; по умолчанию — главный заголовок страницы. */
   titleLevel?: "h1" | "h2" | undefined;
 }
@@ -64,10 +67,11 @@ function fieldWithin(host: HTMLElement, field: HTMLElement): Frame {
 
 /**
  * Живой цех на весь экран: проигрывает запись сборки — рабочие у станков, бег с деталью,
- * кабинет мастера, промпты и реплики над говорящими, HUD сборки справа. Графика грузится только
- * в браузере.
+ * кабинет мастера, промпты и реплики над говорящими, HUD сборки справа со ссылкой на проект.
+ * Графика грузится только в браузере.
  * @param {Props} props Свойства компонента.
  * @param {BriefRecording} props.recording Запись сборки, которую проигрывает цех.
+ * @param {ProjectLink} props.project Проект, который собирали.
  * @param {"h1" | "h2"} [props.titleLevel] Уровень заголовка с названием сборки.
  * @returns {JSX.Element} Цех с HUD.
  */
@@ -138,7 +142,11 @@ export function Factory(props: Props): JSX.Element {
             <p class={styles.notice}>Цех не запустился — попробуйте обновить страницу.</p>
           </Show>
         </div>
-        <Hud recording={props.recording} titleLevel={props.titleLevel ?? "h1"} />
+        <Hud
+          recording={props.recording}
+          project={props.project}
+          titleLevel={props.titleLevel ?? "h1"}
+        />
         <div class={styles.overlay}>
           <PromptBubble graphics={graphics()} field={field()} />
           <MessageBubble graphics={graphics()} field={field()} />

@@ -1,0 +1,66 @@
+---
+import type { GetStaticPaths } from "astro";
+import { briefOf, type Project, type Recording } from "@cyberzavod/core";
+import GameLayout from "@/app/layouts/GameLayout.astro";
+import { Factory } from "@/widgets/factory";
+import { BuildJournal } from "@/widgets/build-journal";
+import { ProjectCard } from "@/widgets/project-card";
+import { RecordingList } from "@/widgets/recording-list";
+import { projectLinkOf, publishedProjects } from "@/entities/project";
+import { publishedRecordings, recordingsOfProject } from "@/entities/recording";
+import { PANELS } from "@/shared/config/panels.ts";
+import { Drawer, Panel } from "@/shared/ui";
+
+export const getStaticPaths = (() =>
+  publishedProjects.map((project) => ({
+    params: { id: project.id },
+    props: { project, recordings: recordingsOfProject(publishedRecordings, project.id) },
+  }))) satisfies GetStaticPaths;
+
+interface Props {
+  project: Project;
+  recordings: readonly Recording[];
+}
+
+const { project, recordings } = Astro.props;
+const [latest] = recordings;
+---
+
+<GameLayout
+  title={`Проект «${project.name}»`}
+  description={project.description}
+  heading={project.name}
+  journal={latest !== undefined}
+  project
+>
+  {latest ? (
+    <Factory
+      client:load
+      recording={briefOf(latest)}
+      project={projectLinkOf(project)}
+      titleLevel="h2"
+    />
+  ) : (
+    <Panel label="Цех">
+      <p>Сборок пока нет.</p>
+    </Panel>
+  )}
+  {latest && (
+    <Drawer slot="drawers" id={PANELS.journal} title="Журнал сборки">
+      <BuildJournal recording={latest} />
+    </Drawer>
+  )}
+  <Drawer slot="drawers" id={PANELS.project} title={project.name}>
+    <div class="project">
+      <ProjectCard project={project} />
+      <RecordingList recordings={recordings} />
+    </div>
+  </Drawer>
+</GameLayout>
+
+<style>
+  .project {
+    display: grid;
+    gap: var(--space-xl);
+  }
+</style>

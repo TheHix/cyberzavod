@@ -1,9 +1,10 @@
 ---
-// Список опубликованных записей: заголовок, день и главные счётчики каждой сборки.
+// Список записей: заголовок, проект, день и главные счётчики каждой сборки.
 import { summarize, type Recording } from "@cyberzavod/core";
+import { projectOf, projectUrl, publishedProjects } from "@/entities/project";
 import { recordingUrl } from "@/entities/recording";
 import { formatCount, formatDate, formatDuration } from "@/shared/lib/format.ts";
-import { Card, Chip, Title } from "@/shared/ui";
+import { ButtonLink, Card, Chip, Title } from "@/shared/ui";
 
 interface Props {
   recordings: readonly Recording[];
@@ -20,6 +21,7 @@ const PROMPTS = { one: "промпт", few: "промпта", many: "промп�
   <ul class="list">
     {recordings.map((recording) => {
       const stats = summarize(recording);
+      const project = projectOf(publishedProjects, recording.project);
       return (
         <li>
           <Card>
@@ -28,6 +30,9 @@ const PROMPTS = { one: "промпт", few: "промпта", many: "промп�
               <a href={recordingUrl(recording.id)}>
                 <Title as="span">{recording.title}</Title>
               </a>
+              <ButtonLink variant="link" href={projectUrl(project.id)}>
+                {project.name}
+              </ButtonLink>
               <p class="note">
                 {formatDuration(stats.durationMs)} · {formatCount(stats.tokens, TOKENS)} ·{" "}
                 {formatCount(stats.prompts, PROMPTS)}

@@ -9,9 +9,10 @@ export default defineConfig({
   integrations: [solid()],
   vite: {
     resolve: {
-      // Опубликованные записи лежат в корне репозитория, рядом с журналами и черновиками.
+      // Опубликованные записи и карточки проектов лежат в корне репозитория.
       alias: {
         "@recordings": fileURLToPath(new URL("../../recordings/published", import.meta.url)),
+        "@projects": fileURLToPath(new URL("../../projects", import.meta.url)),
       },
     },
     server: {

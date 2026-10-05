@@ -1,5 +1,5 @@
 ---
-// Игровой экран: цех на всё окно, меню слева, панели записей и «о проекте» поверх.
+// Игровой экран: цех на всё окно, меню слева, панели записей и «о заводе» поверх.
 // Содержимое страницы — цех со своим HUD — встаёт в поле справа от меню.
 import BaseLayout from "./BaseLayout.astro";
 import { RecordingList } from "@/widgets/recording-list";
@@ -14,6 +14,8 @@ interface Props {
   description?: string;
   /** Есть ли на странице журнал сборки (слот drawers) — тогда он в меню. */
   journal?: boolean;
+  /** Есть ли на странице карточка проекта (слот drawers) — тогда она в меню. */
+  project?: boolean;
   /**
    * Главный заголовок страницы, если его нет в содержимом: на главной HUD называет сборку
    * заголовком второго уровня, а первый — сайт. Виден только программам чтения и поисковикам.
@@ -21,12 +23,12 @@ interface Props {
   heading?: string | undefined;
 }
 
-const { title, description, journal = false, heading } = Astro.props;
+const { title, description, journal = false, project = false, heading } = Astro.props;
 ---
 
 <BaseLayout title={title} description={description}>
   <div class="game">
-    <Sidebar journal={journal} />
+    <Sidebar journal={journal} project={project} />
     <main class="field">
       {heading && <h1 class="visually-hidden">{heading}</h1>}
       <slot />
@@ -36,7 +38,7 @@ const { title, description, journal = false, heading } = Astro.props;
   <Drawer id={PANELS.records} title="Записи сборок">
     <RecordingList recordings={publishedRecordings} />
   </Drawer>
-  <Drawer id={PANELS.about} title="О проекте">
+  <Drawer id={PANELS.about} title="О заводе">
     <div class="about">
       <p>{site.description}</p>
       <p>

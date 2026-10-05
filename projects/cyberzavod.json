@@ -1,0 +1,7 @@
+{
+  "id": "cyberzavod",
+  "name": "Киберзавод",
+  "description": "Цех, в котором ИИ-агенты собирают продукты, и сайт, который показывает эту работу. Первый продукт завода — он сам.",
+  "repo": "https://github.com/TheHix/cyberzavod",
+  "website": "https://cyberzavod.com"
+}

@@ -1,4 +1,5 @@
 import Factory from "lucide-solid/icons/factory";
+import FolderKanban from "lucide-solid/icons/folder-kanban";
 import Info from "lucide-solid/icons/info";
 import ListVideo from "lucide-solid/icons/list-video";
 import MessageSquareText from "lucide-solid/icons/message-square-text";
@@ -12,15 +13,18 @@ import styles from "./Sidebar.module.css";
 interface Props {
   /** Есть ли на странице журнал сборки — тогда в меню его кнопка. */
   journal: boolean;
+  /** Есть ли на странице карточка проекта — тогда в меню кнопка «Проект». */
+  project: boolean;
 }
 
 const ICON_STROKE = 2.5;
 
 /**
- * Меню сайта слева: логотип, цех, панели записей, журнала сборки и «о проекте», ссылка на код.
+ * Меню сайта слева: логотип, цех, панели записей, журнала сборки, проекта и «о заводе», ссылка на код.
  * Работает без JavaScript: панели открываются нативным popover.
  * @param {Props} props Свойства компонента.
  * @param {boolean} props.journal Показывать ли кнопку журнала сборки.
+ * @param {boolean} props.project Показывать ли кнопку проекта.
  * @returns {JSX.Element} Боковое меню.
  */
 export function Sidebar(props: Props): JSX.Element {
@@ -57,9 +61,17 @@ export function Sidebar(props: Props): JSX.Element {
             </Button>
           </li>
         </Show>
+        <Show when={props.project}>
+          <li>
+            <Button layout="tile" popovertarget={PANELS.project}>
+              <FolderKanban stroke-width={ICON_STROKE} />
+              Проект
+            </Button>
+          </li>
+        </Show>
         <li>
           <Button layout="tile" popovertarget={PANELS.about}>
-            <Info stroke-width={ICON_STROKE} />О проекте
+            <Info stroke-width={ICON_STROKE} />О заводе
           </Button>
         </li>
       </ul>

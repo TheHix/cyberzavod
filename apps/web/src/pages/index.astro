@@ -3,6 +3,7 @@ import { briefOf } from "@cyberzavod/core";
 import GameLayout from "@/app/layouts/GameLayout.astro";
 import { Factory } from "@/widgets/factory";
 import { BuildJournal } from "@/widgets/build-journal";
+import { projectLinkOf, projectOf, publishedProjects } from "@/entities/project";
 import { publishedRecordings } from "@/entities/recording";
 import { PANELS } from "@/shared/config/panels.ts";
 import { site } from "@/shared/config/site.ts";
@@ -13,7 +14,12 @@ const [latest] = publishedRecordings;
 
 <GameLayout journal={latest !== undefined} heading={`${site.name} — цех ИИ-агентов`}>
   {latest ? (
-    <Factory client:load recording={briefOf(latest)} titleLevel="h2" />
+    <Factory
+      client:load
+      recording={briefOf(latest)}
+      project={projectLinkOf(projectOf(publishedProjects, latest.project))}
+      titleLevel="h2"
+    />
   ) : (
     <Panel label="Цех">
       <p>Записей пока нет.</p>

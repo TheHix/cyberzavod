@@ -122,3 +122,13 @@
     white-space: nowrap;
   }
 }
+
+/* Подпись не переносится, а шесть плиток на 360px делят строку: без боковых отступов, с мелким
+   кеглем подписи остаются в рамке. */
+@media (max-width: 48rem) {
+  .tile {
+    padding-inline: 0;
+    font-size: var(--text-2xs);
+    letter-spacing: -0.03em;
+  }
+}

@@ -60,7 +60,7 @@
     --badge-size: 2.4rem;
 
     flex-direction: row;
-    gap: var(--space-xs);
+    gap: var(--space-2xs);
     align-items: center;
     padding: var(--space-xs) var(--space-s);
     overflow: visible;
@@ -77,11 +77,11 @@
   .menu {
     display: flex;
     flex: 1;
-    gap: var(--space-xs);
+    gap: var(--space-2xs);
     min-width: 0;
   }
 
-  /* Плитки делят ширину по длине подписи: «О проекте» длиннее «Цеха». */
+  /* Плитки делят ширину по длине подписи: «О заводе» длиннее «Цеха». */
   .menu li {
     flex: 1 1 auto;
     min-width: 0;

@@ -1,0 +1,53 @@
+---
+// Карточка проекта: описание и ссылки. Название — в заголовке панели, где карточку показывают.
+import type { Project } from "@cyberzavod/core";
+import { ButtonLink } from "@/shared/ui";
+
+interface Props {
+  project: Project;
+}
+
+const { project } = Astro.props;
+---
+
+<div class="card">
+  <p class="description">{project.description}</p>
+  {(project.repo !== undefined || project.website !== undefined) && (
+    <ul class="links">
+      {project.repo !== undefined && (
+        <li>
+          <ButtonLink variant="link" href={project.repo}>
+            Репозиторий
+          </ButtonLink>
+        </li>
+      )}
+      {project.website !== undefined && (
+        <li>
+          <ButtonLink variant="link" href={project.website}>
+            Сайт
+          </ButtonLink>
+        </li>
+      )}
+    </ul>
+  )}
+</div>
+
+<style>
+  .card {
+    display: grid;
+    gap: var(--space-m);
+  }
+
+  .description {
+    margin: 0;
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-l);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+</style>
