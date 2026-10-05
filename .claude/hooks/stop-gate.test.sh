@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Сценарии хуков turn-start.sh и stop-gate.sh на временном git-репозитории с подставным Makefile.
+# Сценарии хуков turn-start.sh и stop-gate.sh на временном git-репозитории с конфигом проекта
+# и подставным Makefile.
 # Запускается из `make check-deploy`.
 set -uo pipefail
 
@@ -8,19 +9,26 @@ readonly HOOKS_DIR
 readonly SESSION=test-session
 readonly BLOCKED=2
 readonly RELEASED=0
+readonly DEFAULT_CONFIG='{"id": "test", "checks": {"command": "make check", "paths": ["apps"]}}'
 passed=0
 failed=0
 
-# Временный репозиторий: check-web падает, если существует файл apps/broken.
+# Временный репозиторий с конфигом проекта. Конфиг — необязательный аргумент: пустая строка
+# значит «без конфига». По умолчанию проверки — `make check`, он падает, если существует файл
+# apps/broken. Файлы самих хуков (вывод, состояние) git не видит, чтобы не попадали в отпечаток.
 make_repo() {
-  local repo
+  local config="${1-$DEFAULT_CONFIG}" repo
   repo=$(mktemp -d)
   (
     cd "$repo" || exit 1
     git init -q
-    mkdir -p apps
-    printf 'check-web:\n\t@test ! -f apps/broken || (echo "ошибка типов в apps/broken"; exit 1)\ncheck-api:\n\t@true\n' > Makefile
+    mkdir -p apps .cyberzavod
+    printf 'check:\n\t@test ! -f apps/broken || (echo "ошибка типов в apps/broken"; exit 1)\n' > Makefile
     echo ok > apps/main.ts
+    if [[ -n "$config" ]]; then
+      echo "$config" > .cyberzavod/project.json
+    fi
+    printf 'out\nfactory-*\n' > .git/info/exclude
     git add -A
     git -c user.email=t@t -c user.name=t commit -qm init
   )
@@ -36,6 +44,18 @@ run_hook() {
   local repo="$1" hook="$2"
   jq -n --arg s "$SESSION" '{session_id: $s}' \
     | CLAUDE_PROJECT_DIR="$repo" TMPDIR="$repo" "$HOOKS_DIR/$hook" > "$repo/out" 2>&1
+}
+
+# Запускает хук с PATH, где есть только bash (нужен шебангу), — как на машине без jq.
+run_hook_without_jq() {
+  local repo="$1" hook="$2" tools
+  tools=$(mktemp -d)
+  ln -s "$(command -v bash)" "$tools/bash"
+  printf '{"session_id": "%s"}' "$SESSION" \
+    | CLAUDE_PROJECT_DIR="$repo" TMPDIR="$repo" PATH="$tools" "$HOOKS_DIR/$hook" > "$repo/out" 2>&1
+  local code=$?
+  rm -rf "$tools"
+  return "$code"
 }
 
 check() {
@@ -147,7 +167,7 @@ test_green_checks_release_and_end_turn() {
   code=$?
 
   check "зелёные проверки отпускают и завершают ход" \
-    "[[ $code -eq $RELEASED && ! -e '$repo/cyberzavod-turn-start-$SESSION' ]]"
+    "[[ $code -eq $RELEASED && ! -e '$repo/factory-turn-start-$SESSION' ]]"
   rm -rf "$repo"
 }
 
@@ -170,12 +190,153 @@ test_unwritable_counter_releases_instead_of_looping() {
   repo=$(make_repo)
   run_hook "$repo" turn-start.sh
   touch "$repo/apps/broken"
-  mkdir "$repo/cyberzavod-stop-blocks-$SESSION"
+  mkdir "$repo/factory-stop-blocks-$SESSION"
 
   run_hook "$repo" stop-gate.sh
   code=$?
 
   check "незаписываемый счётчик отпускает, а не зацикливает" "[[ $code -eq $RELEASED ]]"
+  rm -rf "$repo"
+}
+
+test_checks_command_from_config_runs_and_is_named() {
+  local repo code
+  repo=$(make_repo '{"checks": {"command": "touch checks-ran; exit 1", "paths": ["apps"]}}')
+  run_hook "$repo" turn-start.sh
+  echo changed > "$repo/apps/main.ts"
+
+  run_hook "$repo" stop-gate.sh
+  code=$?
+
+  check "запускается команда из конфига, и отказ называет её" \
+    "[[ $code -eq $BLOCKED && -e '$repo/checks-ran' ]] && grep -q 'touch checks-ran; exit 1 не проходит' '$repo/out'"
+  rm -rf "$repo"
+}
+
+test_edits_outside_paths_do_not_block() {
+  local repo code
+  repo=$(make_repo '{"checks": {"command": "false", "paths": ["apps"]}}')
+  run_hook "$repo" turn-start.sh
+  mkdir "$repo/docs"
+  echo changed > "$repo/docs/note.md"
+
+  run_hook "$repo" stop-gate.sh
+  code=$?
+
+  check "правки вне paths не держат агента" "[[ $code -eq $RELEASED ]]"
+  rm -rf "$repo"
+}
+
+test_missing_paths_watch_whole_repository() {
+  local repo code
+  repo=$(make_repo '{"checks": {"command": "test ! -f broken"}}')
+  run_hook "$repo" turn-start.sh
+  touch "$repo/broken"
+
+  run_hook "$repo" stop-gate.sh
+  code=$?
+
+  check "без paths проверяется весь репозиторий" "[[ $code -eq $BLOCKED ]]"
+  rm -rf "$repo"
+}
+
+test_without_config_agent_is_released() {
+  local repo code
+  repo=$(make_repo "")
+  run_hook "$repo" turn-start.sh
+  touch "$repo/apps/broken"
+
+  run_hook "$repo" stop-gate.sh
+  code=$?
+
+  check "без конфига агент отпускается молча" "[[ $code -eq $RELEASED && ! -s '$repo/out' ]]"
+  rm -rf "$repo"
+}
+
+test_without_checks_agent_is_released() {
+  local repo code
+  repo=$(make_repo '{"id": "test"}')
+  run_hook "$repo" turn-start.sh
+  touch "$repo/apps/broken"
+
+  run_hook "$repo" stop-gate.sh
+  code=$?
+
+  check "без checks агент отпускается молча" "[[ $code -eq $RELEASED && ! -s '$repo/out' ]]"
+  rm -rf "$repo"
+}
+
+test_broken_config_releases_with_message() {
+  local repo code
+  repo=$(make_repo '{"checks": ')
+  touch "$repo/apps/broken"
+
+  run_hook "$repo" stop-gate.sh
+  code=$?
+
+  check "битый конфиг отпускает агента с сообщением" \
+    "[[ $code -eq $RELEASED ]] && grep -q 'systemMessage' '$repo/out' && grep -q 'project.json' '$repo/out'"
+  rm -rf "$repo"
+}
+
+test_turn_start_with_broken_config_remembers_nothing() {
+  local repo code
+  repo=$(make_repo '{"checks": ')
+
+  run_hook "$repo" turn-start.sh
+  code=$?
+
+  check "turn-start с битым конфигом выходит без ошибки и без отпечатка" \
+    "[[ $code -eq $RELEASED && ! -e '$repo/factory-turn-start-$SESSION' ]]"
+  rm -rf "$repo"
+}
+
+test_turn_start_without_config_remembers_nothing() {
+  local repo code
+  repo=$(make_repo "")
+
+  run_hook "$repo" turn-start.sh
+  code=$?
+
+  check "turn-start без конфига выходит без ошибки и без отпечатка" \
+    "[[ $code -eq $RELEASED && ! -e '$repo/factory-turn-start-$SESSION' ]]"
+  rm -rf "$repo"
+}
+
+test_turn_start_without_checks_remembers_nothing() {
+  local repo code
+  repo=$(make_repo '{"id": "test"}')
+
+  run_hook "$repo" turn-start.sh
+  code=$?
+
+  check "turn-start без checks выходит без ошибки и без отпечатка" \
+    "[[ $code -eq $RELEASED && ! -e '$repo/factory-turn-start-$SESSION' ]]"
+  rm -rf "$repo"
+}
+
+test_stop_gate_without_jq_releases_with_message() {
+  local repo code
+  repo=$(make_repo)
+  touch "$repo/apps/broken"
+
+  run_hook_without_jq "$repo" stop-gate.sh
+  code=$?
+
+  check "без jq хук остановки отпускает агента с сообщением" \
+    "[[ $code -eq $RELEASED ]] && grep -q 'systemMessage' '$repo/out' && grep -q 'нет jq' '$repo/out'"
+  rm -rf "$repo"
+}
+
+test_turn_start_without_jq_remembers_nothing() {
+  local repo code
+  repo=$(make_repo)
+
+  run_hook_without_jq "$repo" turn-start.sh
+  code=$?
+
+  check "без jq turn-start выходит без ошибки и без отпечатка" \
+    "[[ $code -eq $RELEASED && ! -e '$repo/factory-turn-start-$SESSION' ]]"
   rm -rf "$repo"
 }
 
@@ -188,6 +349,17 @@ test_service_message_mid_turn_keeps_turn_start
 test_green_checks_release_and_end_turn
 test_without_turn_start_dirty_red_code_blocks
 test_unwritable_counter_releases_instead_of_looping
+test_checks_command_from_config_runs_and_is_named
+test_edits_outside_paths_do_not_block
+test_missing_paths_watch_whole_repository
+test_without_config_agent_is_released
+test_without_checks_agent_is_released
+test_broken_config_releases_with_message
+test_turn_start_with_broken_config_remembers_nothing
+test_turn_start_without_config_remembers_nothing
+test_turn_start_without_checks_remembers_nothing
+test_stop_gate_without_jq_releases_with_message
+test_turn_start_without_jq_remembers_nothing
 
 if [[ $failed -eq 0 ]]; then
   echo "хуки остановки: $passed сценариев прошли"

@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
-# Хук Stop: если агент в этом ходе менял код, он не может закончить, пока быстрые проверки
-# красные. Код выхода 2 возвращает агента к работе, а stderr он получает как задание.
+# Хук Stop: если агент в этом ходе менял код, он не может закончить, пока проверки проекта
+# красные. Команду проверок и пути, за которыми следит хук, задаёт `checks` в конфиге проекта.
+# Нет конфига или `checks` — агент отпускается без проверок; битый конфиг — отпускается
+# с сообщением. Код выхода 2 возвращает агента к работе, а stderr он получает как задание.
 # Защита от вечного цикла: после MAX_BLOCKS отказов за ход агент отпускается и зовёт
 # человека; если счётчик не удаётся записать, агент тоже отпускается. Счётчик обнуляет
 # turn-start.sh в начале хода, поэтому здесь он только растёт.
 #
-# Без set -e: коды make и записи файлов разбираются вручную.
+# Без set -e: коды проверок и записи файлов разбираются вручную.
 set -uo pipefail
+
+# Без jq хук не прочитает ни ввод, ни конфиг, поэтому сообщение собирается без него.
+if ! command -v jq > /dev/null; then
+  printf '{"systemMessage": "Хук остановки: нет jq — проверки не запускались, агент отпущен."}\n'
+  exit 0
+fi
 
 readonly MAX_BLOCKS=3
 readonly OUTPUT_TAIL_LINES=40
@@ -17,7 +25,6 @@ hooks_dir=$(dirname "$0")
 . "$hooks_dir/lib.sh"
 
 session=$(jq -r '.session_id // "unknown"')
-cd "${CLAUDE_PROJECT_DIR:-.}" || exit 1
 
 turn_start=$(state_file "$session" turn-start)
 counter=$(state_file "$session" stop-blocks)
@@ -33,16 +40,25 @@ release_with_message() {
   release
 }
 
+cd "${CLAUDE_PROJECT_DIR:-.}" || exit 1
+
+if ! read_checks; then
+  release_with_message "Конфиг $PROJECT_CONFIG не читается — проверки пропущены, агент отпущен."
+fi
+if [[ -z "$CHECKS_COMMAND" ]]; then
+  release
+fi
+
 # Код в этом ходе не менялся — проверять нечего. Если отпечатка начала хода нет
 # (хуки подключились посреди хода), проверяем при любых правках в коде.
 if [[ -f "$turn_start" && "$(cat "$turn_start")" == "$(code_fingerprint)" ]]; then
   release
 fi
-if [[ ! -f "$turn_start" && -z "$(git status --porcelain -- "${CODE_DIRS[@]}")" ]]; then
+if [[ ! -f "$turn_start" && -z "$(git status --porcelain -- "${CHECKS_PATHS[@]}")" ]]; then
   release
 fi
 
-if output=$(make check-web check-api 2>&1); then
+if output=$(bash -c "$CHECKS_COMMAND" 2>&1); then
   release
 fi
 
@@ -55,7 +71,7 @@ if ! echo "$blocks" > "$counter"; then
 fi
 
 {
-  echo "make check-web check-api не проходит — закончить работу нельзя (попытка $blocks из $MAX_BLOCKS). Исправь:"
+  echo "$CHECKS_COMMAND не проходит — закончить работу нельзя (попытка $blocks из $MAX_BLOCKS). Исправь:"
   tail -n "$OUTPUT_TAIL_LINES" <<< "$output"
 } >&2
 exit "$BLOCK_EXIT_CODE"
