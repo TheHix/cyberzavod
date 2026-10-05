@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { fromHookPayload, isSafeSessionId, parseRawLog, RawLogError } from "./raw-event.ts";
+import {
+  fromHookPayload,
+  isSafeSessionId,
+  parseRawLog,
+  RawLogError,
+  stampProject,
+} from "./raw-event.ts";
 
 const TS = 1_000;
 
@@ -212,6 +218,29 @@ describe("isSafeSessionId", () => {
   });
 });
 
+describe("stampProject", () => {
+  it("добавляет к началу сессии проект и версию завода", () => {
+    const event = { ts: TS, kind: "session_start" } as const;
+
+    const stamped = stampProject(event, { id: "cyberzavod", factory: "0.1.0" });
+
+    expect(stamped).toEqual({
+      ts: TS,
+      kind: "session_start",
+      project: "cyberzavod",
+      factory: "0.1.0",
+    });
+  });
+
+  it("не меняет исходное событие", () => {
+    const event = { ts: TS, kind: "session_start" } as const;
+
+    stampProject(event, { id: "cyberzavod", factory: "0.1.0" });
+
+    expect(event).toEqual({ ts: TS, kind: "session_start" });
+  });
+});
+
 describe("parseRawLog", () => {
   it("пропускает оборванную строку и читает остальные", () => {
     const log = '{"ts":1,"kind":"session_start"}\n{"ts":2,"kind":"pro\n{"ts":3,"kind":"stop"}\n';
@@ -235,6 +264,28 @@ describe("parseRawLog", () => {
   it("отклоняет событие без обязательного поля своего вида", () => {
     const log = '{"ts":1,"kind":"prompt"}\n';
 
+    const act = () => parseRawLog(log);
+
+    expect(act).toThrow(RawLogError);
+  });
+
+  it("принимает начало сессии с проектом и без него", () => {
+    const log =
+      '{"ts":1,"kind":"session_start","project":"cyberzavod","factory":"0.1.0"}\n{"ts":2,"kind":"session_start"}\n';
+
+    const events = parseRawLog(log);
+
+    expect(events).toEqual([
+      { ts: 1, kind: "session_start", project: "cyberzavod", factory: "0.1.0" },
+      { ts: 2, kind: "session_start" },
+    ]);
+  });
+
+  it.each([
+    '{"ts":1,"kind":"session_start","project":"cyberzavod"}\n',
+    '{"ts":1,"kind":"session_start","factory":"0.1.0"}\n',
+    '{"ts":1,"kind":"session_start","project":"cyberzavod","factory":1}\n',
+  ])("отклоняет начало сессии с одним полем проекта или не строкой: %s", (log) => {
     const act = () => parseRawLog(log);
 
     expect(act).toThrow(RawLogError);

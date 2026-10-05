@@ -3,8 +3,14 @@
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 
-const projectDir = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
-const recordingsDir = path.join(projectDir, "recordings");
+// Журналы внешнего проекта ложатся в клон завода (CYBERZAVOD_HOME), а не в сам проект:
+// записи, черновики и публикация живут в одном месте. Пустая строка в переменной — не задано.
+const factoryHome = process.env.CYBERZAVOD_HOME || process.env.CLAUDE_PROJECT_DIR || process.cwd();
+const recordingsDir = path.join(factoryHome, "recordings");
+const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+
+/** Конфиг проекта, в котором идёт сессия: идентификатор проекта и версия завода. */
+export const PROJECT_CONFIG_PATH = path.join(projectDir, ".cyberzavod", "project.json");
 
 /** Каталоги записей: сырые журналы и черновики вне git, опубликованные записи — в git. */
 export const RECORDINGS_DIRS = {
@@ -48,10 +54,10 @@ export async function newestFile(dir: string, extension: string): Promise<string
 }
 
 /**
- * Путь для вывода в консоль: от корня проекта.
+ * Путь для вывода в консоль: от корня записей.
  * @param {string} filePath Абсолютный путь.
- * @returns {string} Путь от корня проекта.
+ * @returns {string} Путь от корня записей.
  */
-export function fromProject(filePath: string): string {
-  return path.relative(projectDir, filePath);
+export function fromFactoryHome(filePath: string): string {
+  return path.relative(factoryHome, filePath);
 }

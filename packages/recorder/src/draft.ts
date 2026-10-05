@@ -65,6 +65,10 @@ export type EditableDraftEvent = DraftPrompt | DraftMessage;
 /** Черновик записи сборки: собирается из журнала, редактируется и публикуется. */
 export interface Draft {
   id: string;
+  /** Идентификатор проекта; пустая строка — ждёт редактуры, как `title`. */
+  project: string;
+  /** Версия завода на момент сборки; пустая строка — ждёт редактуры, как `title`. */
+  factory: string;
   startedAt: string;
   title: string;
   events: DraftEvent[];
@@ -72,6 +76,13 @@ export interface Draft {
 
 /** Ошибка черновика: файл повреждён или текст для публикации не прошёл проверку. */
 export class DraftError extends Error {}
+
+// Поля шапки, которые заполняет редактор, если журнал их не принёс, и их названия для людей.
+const HEADER_FIELD_NAMES = {
+  title: "заголовок",
+  project: "проект",
+  factory: "версия завода",
+} as const satisfies Partial<Record<keyof Draft, string>>;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -129,6 +140,14 @@ function parseDraftEvent(raw: unknown, index: number): DraftEvent {
   return parseFactoryEvent(raw, index);
 }
 
+// Старые черновики без project и factory читаются как ждущие редактуры.
+function parseHeaderText(raw: Record<string, unknown>, field: "project" | "factory"): string {
+  const value = raw[field];
+  if (value === undefined) return "";
+  if (typeof value !== "string") throw new DraftError(`${field} должно быть строкой`);
+  return value;
+}
+
 /**
  * Проверяет черновик, прочитанный из файла: его правил редактор, поэтому доверять ему нельзя.
  * Чистовые версии промптов могут быть ещё пустыми — их проверяет публикация.
@@ -143,8 +162,10 @@ export function parseDraft(raw: unknown): Draft {
   if (typeof id !== "string" || typeof startedAt !== "string" || typeof title !== "string") {
     throw new DraftError("у черновика должны быть id, startedAt и title");
   }
+  const project = parseHeaderText(raw, "project");
+  const factory = parseHeaderText(raw, "factory");
   if (!Array.isArray(events)) throw new DraftError("у черновика нет events");
-  return { id, startedAt, title, events: events.map(parseDraftEvent) };
+  return { id, project, factory, startedAt, title, events: events.map(parseDraftEvent) };
 }
 
 // Правка пересобранного черновика узнаётся по времени и исходному тексту: у той же сессии
@@ -174,6 +195,11 @@ function isEdited(event: EditableDraftEvent): boolean {
 
 function editedEventsOf(draft: Draft): EditableDraftEvent[] {
   return editableEventsOf(draft).filter(isEdited);
+}
+
+// Заполненное редактором значение прошлого черновика важнее значения из журнала.
+function filledOr(earlier: string, fresh: string): string {
+  return earlier === "" ? fresh : earlier;
 }
 
 function carryOverPrompt(earlier: DraftPrompt, fresh: DraftPrompt): DraftPrompt {
@@ -207,8 +233,9 @@ function carryOverEvent(event: DraftEvent, edited: readonly EditableDraftEvent[]
 }
 
 /**
- * Переносит редактуру из прошлого черновика той же сессии в пересобранный: чистовые промпты,
- * пометки «склеен» и реплики. Новые промпты и реплики остаются пустыми.
+ * Переносит редактуру из прошлого черновика той же сессии в пересобранный: заголовок, проект
+ * и версию завода, если они заполнены, чистовые промпты, пометки «склеен» и реплики. Новые
+ * промпты и реплики остаются пустыми.
  * @param {Draft} previous Прошлый черновик с уже сделанной редактурой.
  * @param {Draft} next Черновик, только что собранный из журнала.
  * @returns {Draft} Пересобранный черновик с перенесённой редактурой.
@@ -216,7 +243,24 @@ function carryOverEvent(event: DraftEvent, edited: readonly EditableDraftEvent[]
 export function carryOverEdits(previous: Draft, next: Draft): Draft {
   const edited = editedEventsOf(previous);
   const events = next.events.map((event) => carryOverEvent(event, edited));
-  return { ...next, title: previous.title, events };
+  return {
+    ...next,
+    project: filledOr(previous.project, next.project),
+    factory: filledOr(previous.factory, next.factory),
+    title: previous.title,
+    events,
+  };
+}
+
+/**
+ * Называет поля шапки черновика, которые ещё ждут редактуры: пустые заголовок, проект
+ * и версия завода.
+ * @param {Draft} draft Черновик записи.
+ * @returns {string[]} Названия незаполненных полей для вывода человеку, по порядку шапки.
+ */
+export function unfilledHeader(draft: Draft): string[] {
+  const fields = Object.keys(HEADER_FIELD_NAMES) as (keyof typeof HEADER_FIELD_NAMES)[];
+  return fields.filter((field) => draft[field] === "").map((field) => HEADER_FIELD_NAMES[field]);
 }
 
 /**
@@ -294,23 +338,26 @@ function textsOf(event: FactoryEvent): string[] {
 /**
  * Превращает отредактированный черновик в запись для сайта: без исходных текстов промптов
  * и реплик, без склеенных промптов.
- * @param {Draft} draft Черновик с заполненными заголовком, чистовыми промптами и репликами.
+ * @param {Draft} draft Черновик с заполненными заголовком, проектом, версией завода,
+ *   чистовыми промптами и репликами.
  * @returns {Recording} Запись, прошедшая проверку формата ядра.
- * @throws {RecordingError} Если заголовок, чистовой промпт или реплика пусты или запись
- *   не соответствует формату ядра.
+ * @throws {RecordingError} Если заголовок, проект, версия завода, чистовой промпт или реплика
+ *   пусты или запись не соответствует формату ядра.
  * @throws {DraftError} Если склеенный промпт стоит без предыдущего несклеенного или в тексте
  *   для публикации похоже на адрес, ключ или личный путь.
  */
 export function publishDraft(draft: Draft): Recording {
   const recording = parseRecording({
-    version: 1,
+    version: 2,
     id: draft.id,
+    project: draft.project,
+    factory: draft.factory,
     startedAt: draft.startedAt,
     title: draft.title,
     events: toPublishedEvents(draft.events),
   });
 
-  const texts = [recording.title, ...recording.events.flatMap(textsOf)];
+  const texts = [recording.title, recording.factory, ...recording.events.flatMap(textsOf)];
   const leaks = texts.flatMap((text) => findLeaks(text).map((kind) => `${kind} в «${text}»`));
   if (leaks.length > 0) {
     throw new DraftError(

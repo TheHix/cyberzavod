@@ -6,6 +6,7 @@ import {
   orphanedEdits,
   parseDraft,
   publishDraft,
+  unfilledHeader,
   type Draft,
   type DraftMessage,
   type DraftPrompt,
@@ -37,6 +38,8 @@ function draftWith(...events: Draft["events"]): Draft {
 function editedDraft(): Draft {
   return {
     id: "2026-10-04-744e7547",
+    project: "cyberzavod",
+    factory: "0.1.0",
     startedAt: "2026-10-04T09:52:13.000Z",
     title: "Счётчик токенов",
     events: [
@@ -73,6 +76,24 @@ describe("parseDraft", () => {
     const draft = parseDraft(raw);
 
     expect(draft).toEqual(uneditedDraft());
+  });
+
+  it("читает старый черновик без project и factory с пустыми строками", () => {
+    const old: Record<string, unknown> = { ...uneditedDraft() };
+    delete old.project;
+    delete old.factory;
+
+    const draft = parseDraft(old);
+
+    expect(draft).toMatchObject({ project: "", factory: "" });
+  });
+
+  it.each(["project", "factory"] as const)("отклоняет %s не строкой", (field) => {
+    const raw = { ...uneditedDraft(), [field]: 5 };
+
+    const act = () => parseDraft(raw);
+
+    expect(act).toThrow(new RegExp(field));
   });
 
   it("отклоняет промпт без исходного текста", () => {
@@ -164,6 +185,24 @@ describe("carryOverEdits", () => {
     const draft = carryOverEdits(previous, next);
 
     expect(draft).toEqual(editedDraft());
+  });
+
+  it("переносит заполненные редактором проект и версию завода", () => {
+    const previous = { ...editedDraft(), project: "demo", factory: "0.2.0" };
+    const next = { ...uneditedDraft(), project: "", factory: "" };
+
+    const draft = carryOverEdits(previous, next);
+
+    expect(draft).toMatchObject({ project: "demo", factory: "0.2.0" });
+  });
+
+  it("берёт проект и версию завода из журнала, если редактор их не заполнил", () => {
+    const previous = { ...editedDraft(), project: "", factory: "" };
+    const next = { ...uneditedDraft(), project: "cyberzavod", factory: "0.1.0" };
+
+    const draft = carryOverEdits(previous, next);
+
+    expect(draft).toMatchObject({ project: "cyberzavod", factory: "0.1.0" });
   });
 
   it("сохраняет найденную раньше модель, если транскрипта уже нет", () => {
@@ -361,6 +400,31 @@ describe("publishDraft", () => {
     expect(act).toThrow(/goal/);
   });
 
+  it("переносит проект и версию завода в запись", () => {
+    const draft = editedDraft();
+
+    const recording = publishDraft(draft);
+
+    expect(recording).toMatchObject({ version: 2, project: "cyberzavod", factory: "0.1.0" });
+  });
+
+  it.each(["project", "factory"] as const)("не публикует черновик с пустым полем %s", (field) => {
+    const draft = { ...editedDraft(), [field]: "" };
+
+    const act = () => publishDraft(draft);
+
+    expect(act).toThrow(RecordingError);
+    expect(act).toThrow(new RegExp(field));
+  });
+
+  it("проверяет на утечки версию завода", () => {
+    const draft = { ...editedDraft(), factory: "сервер 203.0.113.7" };
+
+    const act = () => publishDraft(draft);
+
+    expect(act).toThrow(DraftError);
+  });
+
   it("не публикует черновик без заголовка", () => {
     const draft = { ...editedDraft(), title: "" };
 
@@ -485,5 +549,31 @@ describe("publishDraft", () => {
     const act = () => publishDraft(draft);
 
     expect(act).toThrow(/IP-адрес/);
+  });
+});
+
+describe("unfilledHeader", () => {
+  it("не называет ничего, если шапка заполнена", () => {
+    const draft = editedDraft();
+
+    const names = unfilledHeader(draft);
+
+    expect(names).toEqual([]);
+  });
+
+  it("называет все пустые поля шапки по порядку", () => {
+    const draft = { ...editedDraft(), title: "", project: "", factory: "" };
+
+    const names = unfilledHeader(draft);
+
+    expect(names).toEqual(["заголовок", "проект", "версия завода"]);
+  });
+
+  it("называет только пустые поля", () => {
+    const draft = { ...editedDraft(), factory: "" };
+
+    const names = unfilledHeader(draft);
+
+    expect(names).toEqual(["версия завода"]);
   });
 });

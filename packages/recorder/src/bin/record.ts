@@ -1,10 +1,11 @@
 // Точка входа хука: читает JSON события Claude Code из stdin и дописывает строку
 // в recordings/raw/<session_id>.jsonl. Запускается асинхронно и работу агента не тормозит.
 
-import { appendFile, mkdir } from "node:fs/promises";
+import { appendFile, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
-import { fromHookPayload, isSafeSessionId } from "../raw-event.ts";
-import { RECORDINGS_DIRS } from "./paths.ts";
+import { parseProjectConfig, type ProjectConfig } from "../project.ts";
+import { fromHookPayload, isSafeSessionId, stampProject, type RawEvent } from "../raw-event.ts";
+import { isNotFound, PROJECT_CONFIG_PATH, RECORDINGS_DIRS } from "./paths.ts";
 
 async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
@@ -12,8 +13,28 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
+// Хук не должен падать из-за конфига: без него сессия пишется без проекта, а причина
+// остаётся предупреждением.
+async function readProjectConfig(): Promise<ProjectConfig | undefined> {
+  try {
+    return parseProjectConfig(JSON.parse(await readFile(PROJECT_CONFIG_PATH, "utf8")));
+  } catch (err) {
+    if (!isNotFound(err)) {
+      console.warn(`конфиг проекта ${PROJECT_CONFIG_PATH} не прочитан: ${String(err)}`);
+    }
+    return undefined;
+  }
+}
+
+async function withProject(event: RawEvent): Promise<RawEvent> {
+  if (event.kind !== "session_start") return event;
+  const project = await readProjectConfig();
+  return project === undefined ? event : stampProject(event, project);
+}
+
 const payload: unknown = JSON.parse(await readStdin());
-const event = fromHookPayload(payload, Date.now());
+const hookEvent = fromHookPayload(payload, Date.now());
+const event = hookEvent === null ? null : await withProject(hookEvent);
 
 if (event !== null) {
   const sessionId = (payload as { session_id?: unknown }).session_id;

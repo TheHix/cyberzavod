@@ -6,7 +6,9 @@ export {
   isSafeSessionId,
   parseRawLog,
   RawLogError,
+  stampProject,
   type RawEvent,
+  type SessionStartEvent,
 } from "./raw-event.ts";
 export {
   isHumanPrompt,
@@ -22,6 +24,7 @@ export {
   orphanedEdits,
   parseDraft,
   publishDraft,
+  unfilledHeader,
   type Draft,
   type DraftEvent,
   type DraftMessage,
@@ -29,6 +32,7 @@ export {
   type EditableDraftEvent,
   type MessageSource,
 } from "./draft.ts";
+export { parseProjectConfig, ProjectConfigError, type ProjectConfig } from "./project.ts";
 export { findLeaks } from "./leaks.ts";
 export {
   agentAssignments,

@@ -2,9 +2,18 @@
 // Из полезной нагрузки хука берётся только то, что нужно для записи, — без содержимого
 // файлов и ответов инструментов, чтобы в журнал не попадало лишнее.
 
+import type { ProjectConfig } from "./project.ts";
+
 /** Событие сырого журнала сборки; `ts` — время по часам машины в миллисекундах. */
 export type RawEvent =
-  | { ts: number; kind: "session_start" }
+  | {
+      ts: number;
+      kind: "session_start";
+      /** Идентификатор проекта из `.cyberzavod/project.json`; приходит вместе с `factory`. */
+      project?: string;
+      /** Версия завода из `.cyberzavod/project.json`; приходит вместе с `project`. */
+      factory?: string;
+    }
   | { ts: number; kind: "prompt"; text: string }
   | { ts: number; kind: "tool"; tool: string; ok: boolean; command?: string; file?: string }
   | { ts: number; kind: "subagent_start"; agent: string; agentId?: string }
@@ -19,6 +28,9 @@ export type RawEvent =
     }
   | { ts: number; kind: "subagent_report"; agentId: string; verdict?: string }
   | { ts: number; kind: "stop"; transcriptPath?: string };
+
+/** Начало сессии в журнале сборки. */
+export type SessionStartEvent = Extract<RawEvent, { kind: "session_start" }>;
 
 /** Ошибка формата журнала: разобранная строка не похожа на событие. */
 export class RawLogError extends Error {}
@@ -148,6 +160,16 @@ export function fromHookPayload(payload: unknown, ts: number): RawEvent | null {
 }
 
 /**
+ * Помечает начало сессии проектом и версией завода из конфига проекта.
+ * @param {SessionStartEvent} event Начало сессии.
+ * @param {ProjectConfig} project Конфиг проекта, в котором идёт сессия.
+ * @returns {SessionStartEvent} Новое событие с `project` и `factory`.
+ */
+export function stampProject(event: SessionStartEvent, project: ProjectConfig): SessionStartEvent {
+  return { ...event, project: project.id, factory: project.factory };
+}
+
+/**
  * Проверяет, что id сессии можно использовать в имени файла журнала.
  * @param {unknown} value Значение session_id из полезной нагрузки хука.
  * @returns {value is string} true, если id можно подставить в имя файла журнала.
@@ -159,7 +181,9 @@ export function isSafeSessionId(value: unknown): value is string {
 // Проверка обязательных полей каждого вида события. Тип требует запись для каждого вида:
 // новый вид в RawEvent не скомпилируется, пока здесь не опишут его проверку.
 const RAW_EVENT_SHAPES: Record<RawEvent["kind"], (value: HookPayload) => boolean> = {
-  session_start: () => true,
+  session_start: (value) =>
+    (value.project === undefined && value.factory === undefined) ||
+    (typeof value.project === "string" && typeof value.factory === "string"),
   prompt: (value) => typeof value.text === "string",
   tool: (value) => typeof value.tool === "string" && typeof value.ok === "boolean",
   subagent_start: (value) => typeof value.agent === "string",

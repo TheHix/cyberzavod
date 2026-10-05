@@ -6,7 +6,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { RecordingError } from "@cyberzavod/core";
 import { DraftError, parseDraft, publishDraft } from "../draft.ts";
-import { fromProject, newestFile, RECORDINGS_DIRS } from "./paths.ts";
+import { fromFactoryHome, newestFile, RECORDINGS_DIRS } from "./paths.ts";
 
 const draftPath = process.argv[2] ?? (await newestFile(RECORDINGS_DIRS.drafts, ".json"));
 if (draftPath === undefined) {
@@ -18,9 +18,11 @@ try {
   const publishedPath = path.join(RECORDINGS_DIRS.published, `${recording.id}.json`);
   await mkdir(RECORDINGS_DIRS.published, { recursive: true });
   await writeFile(publishedPath, `${JSON.stringify(recording, null, 2)}\n`);
-  console.log(`опубликовано: ${fromProject(publishedPath)} — сайт покажет запись после выкатки`);
+  console.log(
+    `опубликовано: ${fromFactoryHome(publishedPath)} — сайт покажет запись после выкатки`,
+  );
 } catch (err) {
   if (!(err instanceof DraftError || err instanceof RecordingError)) throw err;
-  console.error(`${fromProject(draftPath)} не готов к публикации: ${err.message}`);
+  console.error(`${fromFactoryHome(draftPath)} не готов к публикации: ${err.message}`);
   process.exitCode = 1;
 }

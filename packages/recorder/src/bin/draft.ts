@@ -9,6 +9,7 @@ import {
   carryOverEdits,
   orphanedEdits,
   parseDraft,
+  unfilledHeader,
   type Draft,
   type DraftEvent,
   type EditableDraftEvent,
@@ -31,7 +32,7 @@ import {
   type ModelReply,
   type TranscriptText,
 } from "../transcript.ts";
-import { fromProject, isNotFound, newestFile, RECORDINGS_DIRS } from "./paths.ts";
+import { fromFactoryHome, isNotFound, newestFile, RECORDINGS_DIRS } from "./paths.ts";
 
 // Токены сессии и её сабагентов. Непрочитанный транскрипт — предупреждение, а не ошибка:
 // черновик полезен и без счётчика токенов. Транскрипты служебных сабагентов Claude Code
@@ -116,7 +117,7 @@ async function withEarlierEdits(fresh: Draft, draftPath: string): Promise<Draft>
     previous = parseDraft(JSON.parse(earlier));
   } catch (err) {
     throw new Error(
-      `прошлый черновик ${fromProject(draftPath)} не разобран — исправьте или удалите его`,
+      `прошлый черновик ${fromFactoryHome(draftPath)} не разобран — исправьте или удалите его`,
       { cause: err },
     );
   }
@@ -169,9 +170,12 @@ await writeFile(draftPath, `${JSON.stringify(draft, null, 2)}\n`);
 const prompts = draft.events.filter((event) => event.type === "draft_prompt");
 const messages = draft.events.filter((event) => event.type === "draft_message");
 const waiting = draft.events.filter(awaitsEditing);
-console.log(`черновик: ${fromProject(draftPath)}`);
+console.log(`черновик: ${fromFactoryHome(draftPath)}`);
 console.log(
   `токенов: ${tokens ?? "неизвестно"}, промптов: ${prompts.length}, реплик: ${messages.length}`,
 );
-console.log(`ждут редактуры: ${waiting.length}${draft.title === "" ? ", и заголовок" : ""}`);
+const unfilled = unfilledHeader(draft);
+console.log(
+  `ждут редактуры: ${waiting.length}${unfilled.length > 0 ? `, и ${unfilled.join(", ")}` : ""}`,
+);
 for (const event of waiting) console.log(`  • ${describeWaiting(event)}`);

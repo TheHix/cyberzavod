@@ -300,10 +300,26 @@ function mergeMessages(events: readonly DraftEvent[], messages: readonly DraftMe
   return [...merged, ...pending];
 }
 
+// Проект и версия завода — из первого начала сессии, где есть оба: сессию могли подключить
+// к хукам посреди работы, и тогда первое начало без проекта.
+function projectOf(events: readonly RawEvent[]): Pick<Draft, "project" | "factory"> {
+  for (const event of events) {
+    if (
+      event.kind === "session_start" &&
+      event.project !== undefined &&
+      event.factory !== undefined
+    ) {
+      return { project: event.project, factory: event.factory };
+    }
+  }
+  return { project: "", factory: "" };
+}
+
 /**
  * Собирает черновик записи из сырого журнала: промпты человека, реплики (задания, отчёты и
  * итоговые ответы, если переданы их тексты), этапы и итог. Заголовок, чистовые версии промптов
- * и `line` с `text` у реплик остаются пустыми — их заполняет редактор.
+ * и `line` с `text` у реплик остаются пустыми — их заполняет редактор. Проект и версия завода
+ * берутся из первого начала сессии, где они есть; без них остаются пустыми.
  * @param {RawEvent[]} rawEvents События журнала в любом порядке.
  * @param {DraftMeta} meta Данные сборки, которых нет в журнале.
  * @returns {Draft} Черновик с id вида `2026-10-04-744e7547`: день начала по UTC и начало
@@ -427,6 +443,7 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
   const startedAt = new Date(startTs).toISOString();
   return {
     id: `${startedAt.slice(0, ISO_DATE_LENGTH)}-${meta.sessionId.slice(0, SHORT_SESSION_LENGTH)}`,
+    ...projectOf(events),
     startedAt,
     title: "",
     events: chatEvents,

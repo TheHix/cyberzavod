@@ -102,6 +102,35 @@ describe("toDraft", () => {
     });
   });
 
+  it("берёт проект и версию завода из начала сессии", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "session_start", project: "cyberzavod", factory: "0.1.0" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(draft).toMatchObject({ project: "cyberzavod", factory: "0.1.0" });
+  });
+
+  it("оставляет проект и версию завода пустыми, если в журнале их нет", () => {
+    const raw: RawEvent[] = [{ ts: START, kind: "session_start" }];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(draft).toMatchObject({ project: "", factory: "" });
+  });
+
+  it("берёт проект из первого начала сессии, где он есть", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "session_start" },
+      { ts: START + 1_000, kind: "session_start", project: "cyberzavod", factory: "0.1.0" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(draft).toMatchObject({ project: "cyberzavod", factory: "0.1.0" });
+  });
+
   it("считает сборку неуспешной, если последний запуск проверок упал", () => {
     const raw: RawEvent[] = [
       { ts: START, kind: "prompt", text: "почини" },
