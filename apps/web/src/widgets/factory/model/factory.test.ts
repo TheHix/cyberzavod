@@ -7,8 +7,10 @@ import { createFactoryModel, type FactoryModel } from "./factory.ts";
 // уже у станка кода.
 function recordingWithPrompt(): Recording {
   return {
-    version: 1,
+    version: 2,
     id: "test",
+    project: "test",
+    factory: "0.0.0",
     startedAt: "2026-10-04T00:00:00.000Z",
     title: "Тест",
     events: [

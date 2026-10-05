@@ -5,8 +5,10 @@ import { startFrameClock } from "./frame-clock.ts";
 
 function recording(): Recording {
   return {
-    version: 1,
+    version: 2,
     id: "test",
+    project: "test",
+    factory: "0.0.0",
     startedAt: "2026-10-04T00:00:00.000Z",
     title: "Тест",
     events: [

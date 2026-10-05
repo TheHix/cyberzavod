@@ -4,8 +4,10 @@ import { newestFirst } from "./order.ts";
 
 function recordingOf(id: string, startedAt: string): Recording {
   return {
-    version: 1,
+    version: 2,
     id,
+    project: "test",
+    factory: "0.0.0",
     startedAt,
     title: "Сборка",
     events: [

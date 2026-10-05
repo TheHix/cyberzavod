@@ -11,6 +11,8 @@ export {
   tally,
   briefOf,
   isSpeaker,
+  isRecordingId,
+  isFactoryVersion,
   FOREMAN,
   NO_TALLY,
   type Tally,

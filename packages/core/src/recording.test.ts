@@ -12,6 +12,8 @@ import {
 interface RawRecording {
   version: number;
   id: string;
+  project: string;
+  factory: string;
   startedAt: string;
   title: string;
   events: Record<string, unknown>[];
@@ -19,8 +21,10 @@ interface RawRecording {
 
 function validRecording(): RawRecording {
   return {
-    version: 1,
+    version: 2,
     id: "demo-1",
+    project: "demo",
+    factory: "0.1.0",
     startedAt: "2026-10-04T09:52:13.000Z",
     title: "Счётчики над цехом",
     events: [
@@ -50,6 +54,46 @@ describe("parseRecording", () => {
     const recording = parseRecording(raw);
 
     expect(recording.events).toHaveLength(raw.events.length);
+  });
+
+  it("возвращает проект и версию завода", () => {
+    const raw = validRecording();
+
+    const recording = parseRecording(raw);
+
+    expect(recording).toMatchObject({ version: 2, project: "demo", factory: "0.1.0" });
+  });
+
+  it("отклоняет версию 1", () => {
+    const raw = { ...validRecording(), version: 1 };
+
+    const act = () => parseRecording(raw);
+
+    expect(act).toThrow(/неподдерживаемая версия 1/);
+  });
+
+  it.each(["project", "factory"] as const)("отклоняет запись без поля %s", (field) => {
+    const raw = { ...validRecording(), [field]: undefined };
+
+    const act = () => parseRecording(raw);
+
+    expect(act).toThrow(new RegExp(field));
+  });
+
+  it.each(["../demo", "demo/1", ""])("отклоняет проект «%s»", (project) => {
+    const raw = { ...validRecording(), project };
+
+    const act = () => parseRecording(raw);
+
+    expect(act).toThrow(/project/);
+  });
+
+  it.each(["", "  ", "0.1.0\n0.2.0"])("отклоняет версию завода «%s»", (factory) => {
+    const raw = { ...validRecording(), factory };
+
+    const act = () => parseRecording(raw);
+
+    expect(act).toThrow(/factory/);
   });
 
   it("отклоняет неизвестный этап", () => {

@@ -79,7 +79,15 @@ export function reworkRecording(ok = true): Recording {
     { t: 7_000, type: "usage", tokens: 1_200 },
     { t: 8_000, type: "build_end", ok },
   ];
-  return { version: 1, id: "test", startedAt: "2026-10-04T00:00:00.000Z", title: "Тест", events };
+  return {
+    version: 2,
+    id: "test",
+    project: "test",
+    factory: "0.0.0",
+    startedAt: "2026-10-04T00:00:00.000Z",
+    title: "Тест",
+    events,
+  };
 }
 
 /**

@@ -51,9 +51,13 @@ export type FactoryEvent =
 
 /** Запись сборки: последовательность событий, которую проигрывает цех. */
 export interface Recording {
-  version: 1;
+  version: 2;
   /** Идентификатор записи: он же имя файла и часть адреса страницы. */
   id: string;
+  /** Идентификатор проекта, который собирали: те же правила, что у `id` записи. */
+  project: string;
+  /** Версия завода на момент сборки одной строкой, например `0.1.0`. */
+  factory: string;
   /** Время начала сборки в ISO 8601 по UTC, как у `Date.prototype.toISOString`. */
   startedAt: string;
   title: string;
@@ -118,6 +122,24 @@ function isLines(value: unknown): value is string[] {
 
 // id уходит в имя файла и в адрес страницы: только буквы, цифры, `_` и `-`.
 const ID_PATTERN = /^[\w-]+$/;
+
+/**
+ * Проверяет, что значение годится в идентификаторы записи и проекта.
+ * @param {unknown} value Проверяемое значение.
+ * @returns {value is string} true, если это строка из букв, цифр, «_» и «-».
+ */
+export function isRecordingId(value: unknown): value is string {
+  return typeof value === "string" && ID_PATTERN.test(value);
+}
+
+/**
+ * Проверяет, что значение — версия завода: непустая строка без переводов строки.
+ * @param {unknown} value Проверяемое значение.
+ * @returns {value is string} true, если значение можно показать версией в одну строку.
+ */
+export function isFactoryVersion(value: unknown): value is string {
+  return isLine(value);
+}
 
 // Строгое сравнение с toISOString отсекает и другие форматы, и несуществующие дни вроде
 // 31 февраля, которые Date.parse молча переносит на март.
@@ -200,9 +222,15 @@ export function parseFactoryEvent(raw: unknown, index: number): FactoryEvent {
  */
 export function parseRecording(raw: unknown): Recording {
   if (!isObject(raw)) throw new RecordingError("запись должна быть объектом");
-  if (raw.version !== 1) throw new RecordingError(`неподдерживаемая версия ${String(raw.version)}`);
-  if (typeof raw.id !== "string" || !ID_PATTERN.test(raw.id)) {
+  if (raw.version !== 2) throw new RecordingError(`неподдерживаемая версия ${String(raw.version)}`);
+  if (!isRecordingId(raw.id)) {
     throw new RecordingError("id должен состоять из букв, цифр, «_» и «-»");
+  }
+  if (!isRecordingId(raw.project)) {
+    throw new RecordingError("project должен состоять из букв, цифр, «_» и «-»");
+  }
+  if (!isFactoryVersion(raw.factory)) {
+    throw new RecordingError("factory должна быть непустой строкой без переводов строки");
   }
   if (!isInstant(raw.startedAt)) {
     throw new RecordingError("startedAt должно быть временем ISO 8601 по UTC, как у toISOString");
@@ -225,7 +253,15 @@ export function parseRecording(raw: unknown): Recording {
     prevT = event.t;
   });
 
-  return { version: 1, id: raw.id, startedAt: raw.startedAt, title: raw.title, events };
+  return {
+    version: 2,
+    id: raw.id,
+    project: raw.project,
+    factory: raw.factory,
+    startedAt: raw.startedAt,
+    title: raw.title,
+    events,
+  };
 }
 
 /**
