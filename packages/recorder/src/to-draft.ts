@@ -2,9 +2,23 @@
 // Этапы выводятся из действий агента по таблицам ниже; новый признак этапа — новая строка в таблице.
 
 import { FOREMAN, STAGES, type Speaker, type Stage } from "@cyberzavod/core";
-import type { Draft, DraftEvent, DraftMessage, MessageSource } from "./draft.ts";
+import { eventBuilds } from "./builds.ts";
+import type {
+  Draft,
+  DraftBuild,
+  DraftEvent,
+  DraftMessage,
+  DraftRun,
+  MessageSource,
+} from "./draft.ts";
 import type { RawEvent } from "./raw-event.ts";
-import type { AgentAssignment, AgentReport, ModelReply, TranscriptText } from "./transcript.ts";
+import type {
+  AgentAssignment,
+  AgentReport,
+  ModelReply,
+  TokenUsage,
+  TranscriptText,
+} from "./transcript.ts";
 
 // Инструменты, по которым видно этап.
 const TOOL_STAGES: Readonly<Record<string, Stage>> = {
@@ -74,11 +88,16 @@ const SHORT_SESSION_LENGTH = 8;
 // Длина дня `2026-10-04` в начале строки toISOString — по UTC, где бы ни собирали черновик.
 const ISO_DATE_LENGTH = 10;
 const TEST_FAILURE_REASON = "проверки не прошли";
+// Участок токенов до первой привязки сборки: ему нет события, после которого его вставить.
+const BEFORE_FIRST_ANCHOR = -1;
 
 /** Данные сборки, которых нет в журнале. */
 export interface DraftMeta {
   sessionId: string;
-  tokens?: number;
+  /** Токены запусков сабагентов по `agentId`: каждый запуск несёт свой транскрипт. */
+  runTokens?: ReadonlyMap<string, number>;
+  /** Токены сообщений основной сессии: по ним они раскладываются между сборками. */
+  sessionUsages?: readonly TokenUsage[];
   /** Ответы моделей из транскрипта сессии: по ним промпт узнаёт свою модель. */
   replies?: readonly ModelReply[];
   /** Ответы модели из транскрипта сессии: из них берутся итоговые ответы человеку. */
@@ -161,8 +180,19 @@ function draftMessage(
   to: Speaker,
   source: MessageSource,
   said: string,
+  run: string | undefined,
 ): DraftMessage {
-  return { t, type: "draft_message", from, to, source, said, line: "", text: "" };
+  return {
+    t,
+    type: "draft_message",
+    from,
+    to,
+    source,
+    said,
+    line: "",
+    text: "",
+    ...(run === undefined ? {} : { run }),
+  };
 }
 
 // Агенты запусков по id: из старта сабагента видно, чей отчёт или чьё сообщение это было.
@@ -178,11 +208,18 @@ function agentsByIdOf(events: readonly RawEvent[]): Map<string, string> {
 
 // Ремарка — всё, что прозвучало в сессии, ещё без адресата: его даёт ход, в котором она стоит.
 // `stage` — станция, чьё слово это: у задания и отчёта — станция агента, у ответа — этап
-// в момент ответа.
-type Remark =
-  | { kind: "assignment"; t: number; stage: Stage; said: string }
-  | { kind: "report"; t: number; stage: Stage; said: string }
-  | { kind: "answer"; t: number; stage: Stage; said: string };
+// в момент ответа. `run` — запуск станции, о котором речь.
+interface Remark {
+  kind: MessageSource;
+  t: number;
+  stage: Stage;
+  said: string;
+  run?: string;
+}
+
+function runMark(run: string | undefined): { run?: string } {
+  return run === undefined ? {} : { run };
+}
 
 // Задание станции: рабочий агента принимает его. Агенты не из AGENT_STAGES пропускаются.
 function assignmentRemarks(
@@ -190,13 +227,21 @@ function assignmentRemarks(
   agentsById: ReadonlyMap<string, string>,
   at: (ts: number) => number,
 ): Remark[] {
-  return assignments.flatMap((assignment) => {
+  return assignments.flatMap((assignment): Remark[] => {
     const agent =
       assignment.via === "spawn" ? assignment.agentType : agentsById.get(assignment.agentId);
     const stage = stageOfAgent(agent);
     return stage === undefined
       ? []
-      : [{ kind: "assignment", t: at(assignment.ts), stage, said: assignment.text }];
+      : [
+          {
+            kind: "assignment",
+            t: at(assignment.ts),
+            stage,
+            said: assignment.text,
+            ...runMark(assignment.agentId),
+          },
+        ];
   });
 }
 
@@ -206,11 +251,11 @@ function reportRemarks(
   agentsById: ReadonlyMap<string, string>,
   at: (ts: number) => number,
 ): Remark[] {
-  return reports.flatMap((report) => {
+  return reports.flatMap((report): Remark[] => {
     const stage = stageOfAgent(agentsById.get(report.agentId));
     return stage === undefined
       ? []
-      : [{ kind: "report", t: at(report.ts), stage, said: report.text }];
+      : [{ kind: "report", t: at(report.ts), stage, said: report.text, run: report.agentId }];
   });
 }
 
@@ -234,7 +279,7 @@ function answerRemarks(
   stageOnTime: (t: number) => Stage,
   at: (ts: number) => number,
 ): Remark[] {
-  return turnsOf(events).flatMap((turn) => {
+  return turnsOf(events).flatMap((turn): Remark[] => {
     const answer = answers.findLast(({ ts }) => ts >= turn.from && ts < turn.to);
     if (answer === undefined) return [];
     const t = at(answer.ts);
@@ -261,17 +306,21 @@ function giverOfAssignment(remarks: readonly Remark[], index: number, stage: Sta
   return report?.stage ?? FOREMAN;
 }
 
-// Ремарка превращается в реплику: говорит рабочий станции. Задание принимает принимающий
-// («Принял, изучу»), отчёт говорит сдающий («Держи»), ответ — мастеру.
-function messageOf(remark: Remark, remarks: readonly Remark[], index: number): DraftMessage {
-  const { kind, t, stage, said } = remark;
+// Маршрут ремарки: говорит рабочий станции. Задание принимает принимающий («Принял, изучу»),
+// отчёт говорит сдающий («Держи»), ответ — мастеру.
+function routeOf(
+  remark: Remark,
+  remarks: readonly Remark[],
+  index: number,
+): Pick<DraftMessage, "from" | "to"> {
+  const { kind, stage } = remark;
   switch (kind) {
     case "assignment":
-      return draftMessage(t, stage, giverOfAssignment(remarks, index, stage), kind, said);
+      return { from: stage, to: giverOfAssignment(remarks, index, stage) };
     case "report":
-      return draftMessage(t, stage, recipientOfReport(remarks, index, stage), kind, said);
+      return { from: stage, to: recipientOfReport(remarks, index, stage) };
     case "answer":
-      return draftMessage(t, stage, FOREMAN, kind, said);
+      return { from: stage, to: FOREMAN };
     default:
       return kind satisfies never;
   }
@@ -279,13 +328,16 @@ function messageOf(remark: Remark, remarks: readonly Remark[], index: number): D
 
 // Ремарки делятся на ходы по промптам человека: ход длится от промпта до следующего, а то,
 // что прозвучало до первого промпта, образует свой ход.
-function messagesOf(remarks: readonly Remark[], promptTimes: readonly number[]): DraftMessage[] {
-  const turns: Remark[][] = [[], ...promptTimes.map((): Remark[] => [])];
-  for (const remark of [...remarks].sort((a, b) => a.t - b.t)) {
-    const turn = promptTimes.filter((promptTime) => promptTime <= remark.t).length;
-    turns[turn]?.push(remark);
+function splitIntoTurns<T extends { remark: Remark }>(
+  items: readonly T[],
+  promptTimes: readonly number[],
+): T[][] {
+  const turns: T[][] = [[], ...promptTimes.map((): T[] => [])];
+  for (const item of items) {
+    const turn = promptTimes.filter((promptTime) => promptTime <= item.remark.t).length;
+    turns[turn]?.push(item);
   }
-  return turns.flatMap((turn) => turn.map((remark, index) => messageOf(remark, turn, index)));
+  return turns;
 }
 
 // Реплики встают после событий с тем же t: сначала происходит событие, потом о нём говорят.
@@ -300,9 +352,63 @@ function mergeMessages(events: readonly DraftEvent[], messages: readonly DraftMe
   return [...merged, ...pending];
 }
 
+// Ремарка реплики черновика: у ответа этап — этап сборки в момент ответа, у остальных — тот,
+// кто говорит.
+function remarkOfMessage(message: DraftMessage, buildEvents: readonly DraftEvent[]): Remark {
+  const { source, t, from, said } = message;
+  return {
+    kind: source,
+    t,
+    said,
+    stage: source === "answer" ? stageAt(buildEvents, t) : stageOfSpeaker(from),
+  };
+}
+
+// Говорящий в реплике станции — всегда рабочий этапа: мастер сам ремарок не даёт.
+function stageOfSpeaker(speaker: Speaker): Stage {
+  return speaker === FOREMAN ? STAGES[0] : speaker;
+}
+
+/**
+ * Пересчитывает маршруты реплик: кому говорит каждая и от чьего этапа звучит ответ. Каждая
+ * сборка считается отдельно: ходы делят только её промпты, этап берётся из её событий, поэтому
+ * отчёт станции одной задачи не адресуется станции другой.
+ * Задание станции X говорит X тому, кто сдал работу последним (отчёт другой станции раньше
+ * в ходе), а если такого нет — мастеру. Отчёт станции X говорит X тому, чьё задание идёт
+ * следом (другая станция), а если раньше ответ человеку или ход кончился — мастеру. Ответ
+ * говорит рабочий этапа в момент ответа мастеру.
+ * @param {Draft} draft Черновик с репликами и расставленными сборками.
+ * @returns {Draft} Тот же черновик, у реплик которого пересчитаны `from` и `to`.
+ */
+export function routeMessages(draft: Draft): Draft {
+  const owners = eventBuilds(draft);
+  const events = [...draft.events];
+  for (const build of draft.builds) {
+    const own = draft.events.flatMap((event, index) =>
+      owners[index] === build.id ? [{ event, index }] : [],
+    );
+    const buildEvents = own.map(({ event }) => event);
+    const promptTimes = buildEvents.flatMap((event) =>
+      event.type === "draft_prompt" ? [event.t] : [],
+    );
+    const spoken = own.flatMap(({ event, index }) =>
+      event.type === "draft_message"
+        ? [{ message: event, index, remark: remarkOfMessage(event, buildEvents) }]
+        : [],
+    );
+    for (const turn of splitIntoTurns(spoken, promptTimes)) {
+      const remarks = turn.map(({ remark }) => remark);
+      turn.forEach(({ message, index, remark }, position) => {
+        events[index] = { ...message, ...routeOf(remark, remarks, position) };
+      });
+    }
+  }
+  return { ...draft, events };
+}
+
 // Проект и версия завода — из первого начала сессии, где есть оба: сессию могли подключить
 // к хукам посреди работы, и тогда первое начало без проекта.
-function projectOf(events: readonly RawEvent[]): Pick<Draft, "project" | "factory"> {
+function projectOf(events: readonly RawEvent[]): Pick<DraftBuild, "project" | "factory"> {
   for (const event of events) {
     if (
       event.kind === "session_start" &&
@@ -315,11 +421,44 @@ function projectOf(events: readonly RawEvent[]): Pick<Draft, "project" | "factor
   return { project: "", factory: "" };
 }
 
+// Событие привязывает сборку к своему месту в черновике: промпт человека или событие запуска.
+function isBuildAnchor(event: DraftEvent): boolean {
+  return event.type === "draft_prompt" || event.run !== undefined;
+}
+
+// Токены основной сессии ложатся в черновик по участкам между соседними привязками сборки:
+// сообщения участка суммируются в одно `usage` на время первой привязки, а значит, достаются
+// той же сборке. Сообщения до первой привязки идут в начало черновика, к первой сборке.
+function withSessionUsages(
+  events: readonly DraftEvent[],
+  usages: readonly TokenUsage[],
+): DraftEvent[] {
+  const anchors = events.flatMap((event, index) =>
+    isBuildAnchor(event) ? [{ t: event.t, index }] : [],
+  );
+  const sums = new Map<number, { t: number; tokens: number }>();
+  for (const { ts, tokens } of usages) {
+    const anchorTime = anchors.findLast((anchor) => anchor.t <= ts)?.t;
+    const anchor = anchors.find(({ t }) => t === anchorTime);
+    const key = anchor?.index ?? BEFORE_FIRST_ANCHOR;
+    const sum = sums.get(key);
+    sums.set(key, { t: anchorTime ?? 0, tokens: (sum?.tokens ?? 0) + tokens });
+  }
+  const toEvent = (sum: { t: number; tokens: number } | undefined): DraftEvent[] =>
+    sum === undefined ? [] : [{ t: sum.t, type: "usage", tokens: sum.tokens }];
+  return [
+    ...toEvent(sums.get(BEFORE_FIRST_ANCHOR)),
+    ...events.flatMap((event, index) => [event, ...toEvent(sums.get(index))]),
+  ];
+}
+
 /**
  * Собирает черновик записи из сырого журнала: промпты человека, реплики (задания, отчёты и
- * итоговые ответы, если переданы их тексты), этапы и итог. Заголовок, чистовые версии промптов
- * и `line` с `text` у реплик остаются пустыми — их заполняет редактор. Проект и версия завода
- * берутся из первого начала сессии, где они есть; без них остаются пустыми.
+ * итоговые ответы, если переданы их тексты), этапы, окна запусков станций, исходы проверок
+ * и токены. Заголовок, чистовые версии промптов и `line` с `text` у реплик остаются пустыми —
+ * их заполняет редактор. В черновике одна сборка с `id` черновика; проект и версия завода
+ * берутся из первого начала сессии, где они есть, без них остаются пустыми. Другие сборки
+ * добавляет редактор.
  * @param {RawEvent[]} rawEvents События журнала в любом порядке.
  * @param {DraftMeta} meta Данные сборки, которых нет в журнале.
  * @returns {Draft} Черновик с id вида `2026-10-04-744e7547`: день начала по UTC и начало
@@ -333,26 +472,36 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
   // Время из транскрипта может выйти за журнал: реплика не должна оказаться после конца сборки.
   const atWithinBuild = (ts: number) => Math.min(Math.max(at(ts), 0), at(endTs));
 
-  const draftEvents: DraftEvent[] = [{ t: 0, type: "build_start" }];
+  const draftEvents: DraftEvent[] = [];
   let currentStage: Stage | null = null;
-  // Сборка считается успешной, если последняя проверка прошла (или их не было): запуск
-  // проверок или вердикт тестировщика и ревьюера.
-  let lastChecksOk = true;
   // Инструменты сабагента приходят в той же сессии и ничем не помечены. Пока работает сабагент
   // со своим этапом, этап задаёт он: make check внутри ревьюера — часть ревью, а не возврат
   // к тестам. Окна ведутся по agent_id; остановка без парного старта (служебные сабагенты
   // Claude Code) ничего не закрывает.
   const stagedAgentWindows = new Set<string>();
+  // Окно запуска станции тянется до конца журнала, пока не пришла остановка.
+  const openRuns = new Map<string, DraftRun>();
   // Вердикт станции приходит с её остановкой (терминальный Claude Code) или отдельным
   // отчётом по agent_id (десктопное приложение). Каждый запуск судится один раз; повторный
   // запуск того же агента после SendMessage — новый запуск со своим вердиктом.
   const agentsStarted = new Map<string, string>();
   const judgedRuns = new Set<string>();
+  // Токены запуска ставятся на его последнюю остановку: транскрипт один на все его старты.
+  const lastStops = new Map<string, RawEvent>();
+  for (const event of events) {
+    if (event.kind === "subagent_stop" && event.agentId !== undefined) {
+      lastStops.set(event.agentId, event);
+    }
+  }
 
-  const enterStage = (stage: Stage, ts: number) => {
-    if (stage === currentStage) return;
-    draftEvents.push({ t: at(ts), type: "stage_enter", stage });
+  const enterStage = (stage: Stage, ts: number, run?: string) => {
+    draftEvents.push({ t: at(ts), type: "stage_enter", stage, ...runMark(run) });
     currentStage = stage;
+  };
+
+  // Инструмент не должен повторять этап, на котором сборка уже стоит: правок много, а этап один.
+  const enterStageByTool = (stage: Stage, ts: number) => {
+    if (stage !== currentStage) enterStage(stage, ts);
   };
 
   const judge = (agent: string, run: string, line: string | undefined, ts: number) => {
@@ -360,10 +509,18 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
     const verdict = verdictFor(agent, line);
     if (stage === undefined || verdict === undefined || judgedRuns.has(run)) return;
     judgedRuns.add(run);
-    lastChecksOk = verdict.passed;
+    draftEvents.push({ t: at(ts), type: "draft_check", ok: verdict.passed, run });
     if (!verdict.passed) {
-      draftEvents.push({ t: at(ts), type: "stage_fail", stage, reason: verdict.reason });
+      draftEvents.push({ t: at(ts), type: "stage_fail", stage, reason: verdict.reason, run });
     }
+  };
+
+  const countRunTokens = (event: Extract<RawEvent, { kind: "subagent_stop" }>) => {
+    const { agentId } = event;
+    const tokens = agentId === undefined ? undefined : meta.runTokens?.get(agentId);
+    if (agentId === undefined || tokens === undefined || lastStops.get(agentId) !== event) return;
+    const run = stageOfAgent(event.agent) === undefined ? undefined : agentId;
+    draftEvents.push({ t: at(event.ts), type: "usage", tokens, ...runMark(run) });
   };
 
   for (const event of events) {
@@ -383,17 +540,33 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
         break;
       case "subagent_start": {
         if (event.agentId !== undefined) agentsStarted.set(event.agentId, event.agent);
-        judgedRuns.delete(agentWindowKey(event));
+        const run = agentWindowKey(event);
+        judgedRuns.delete(run);
         const stage = stageOfAgent(event.agent);
         if (stage === undefined) break;
-        stagedAgentWindows.add(agentWindowKey(event));
-        enterStage(stage, event.ts);
+        stagedAgentWindows.add(run);
+        enterStage(stage, event.ts, run);
+        const window: DraftRun = {
+          t: at(event.ts),
+          type: "draft_run",
+          run,
+          agent: event.agent,
+          until: at(endTs),
+        };
+        draftEvents.push(window);
+        openRuns.set(run, window);
         break;
       }
-      case "subagent_stop":
-        stagedAgentWindows.delete(agentWindowKey(event));
-        judge(event.agent, agentWindowKey(event), event.verdict, event.ts);
+      case "subagent_stop": {
+        const run = agentWindowKey(event);
+        stagedAgentWindows.delete(run);
+        const window = openRuns.get(run);
+        if (window !== undefined) window.until = at(event.ts);
+        openRuns.delete(run);
+        judge(event.agent, run, event.verdict, event.ts);
+        countRunTokens(event);
         break;
+      }
       case "subagent_report": {
         const agent = agentsStarted.get(event.agentId);
         if (agent !== undefined) judge(agent, event.agentId, event.verdict, event.ts);
@@ -402,9 +575,9 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
       case "tool": {
         if (stagedAgentWindows.size > 0) break;
         for (const stage of stagesReachedByTool(event)) {
-          enterStage(stage, event.ts);
+          enterStageByTool(stage, event.ts);
           if (stage !== "test") continue;
-          lastChecksOk = event.ok;
+          draftEvents.push({ t: at(event.ts), type: "draft_check", ok: event.ok });
           if (!event.ok) {
             draftEvents.push({
               t: at(event.ts),
@@ -430,42 +603,58 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
     ...reportRemarks(meta.reports ?? [], agentsById, atWithinBuild),
     ...answerRemarks(events, meta.answers ?? [], (t) => stageAt(draftEvents, t), atWithinBuild),
   ];
-  const promptTimes = draftEvents.flatMap((event) =>
-    event.type === "draft_prompt" ? [event.t] : [],
-  );
-  const messages = messagesOf(remarks, promptTimes);
-  const chatEvents = mergeMessages(draftEvents, messages);
-  if (meta.tokens !== undefined) {
-    chatEvents.push({ t: at(endTs), type: "usage", tokens: meta.tokens });
-  }
-  chatEvents.push({ t: at(endTs), type: "build_end", ok: lastChecksOk });
+  // Адресатов расставит routeMessages: ему нужны события уже собранного черновика.
+  const messages = remarks
+    .sort((a, b) => a.t - b.t)
+    .map(({ kind, t, stage, said, run }) => draftMessage(t, stage, FOREMAN, kind, said, run));
+  const sessionUsages = (meta.sessionUsages ?? [])
+    .map(({ ts, tokens }) => ({ ts: at(ts), tokens }))
+    .filter(({ ts }) => ts >= 0 && ts <= at(endTs));
 
   const startedAt = new Date(startTs).toISOString();
-  return {
-    id: `${startedAt.slice(0, ISO_DATE_LENGTH)}-${meta.sessionId.slice(0, SHORT_SESSION_LENGTH)}`,
-    ...projectOf(events),
+  const id = `${startedAt.slice(0, ISO_DATE_LENGTH)}-${meta.sessionId.slice(0, SHORT_SESSION_LENGTH)}`;
+  return routeMessages({
+    id,
     startedAt,
-    title: "",
-    events: chatEvents,
-  };
+    builds: [{ id, ...projectOf(events), title: "", runs: [] }],
+    events: withSessionUsages(mergeMessages(draftEvents, messages), sessionUsages),
+  });
 }
 
 /**
- * Собирает пути к транскриптам сессии и её сабагентов без повторов.
+ * Собирает пути к транскриптам самой сессии без повторов: по ним считаются токены основной
+ * сессии.
  * @param {RawEvent[]} events События журнала.
- * @returns {string[]} Пути к транскриптам, по которым считаются токены.
+ * @returns {string[]} Пути к транскриптам остановок сессии, без сабагентов.
  */
-export function transcriptPaths(events: RawEvent[]): string[] {
+export function sessionTranscriptPaths(events: RawEvent[]): string[] {
   const paths = new Set<string>();
   for (const event of events) {
-    if (
-      (event.kind === "stop" || event.kind === "subagent_stop") &&
-      event.transcriptPath !== undefined
-    ) {
+    if (event.kind === "stop" && event.transcriptPath !== undefined) {
       paths.add(event.transcriptPath);
     }
   }
   return [...paths];
+}
+
+/**
+ * Находит транскрипты запусков сабагентов: по ним считаются токены каждого запуска.
+ * @param {RawEvent[]} events События журнала.
+ * @returns {Map<string, string>} Путь к транскрипту по `agentId` запуска; у запуска, который
+ *   останавливался не раз, последний.
+ */
+export function runTranscriptPaths(events: RawEvent[]): Map<string, string> {
+  const paths = new Map<string, string>();
+  for (const event of events) {
+    if (
+      event.kind === "subagent_stop" &&
+      event.agentId !== undefined &&
+      event.transcriptPath !== undefined
+    ) {
+      paths.set(event.agentId, event.transcriptPath);
+    }
+  }
+  return paths;
 }
 
 /**

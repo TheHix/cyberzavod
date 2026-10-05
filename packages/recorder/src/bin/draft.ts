@@ -1,25 +1,31 @@
 // Черновик записи из сырого журнала: `make recording-draft [RAW=recordings/raw/<сессия>.jsonl]`.
 // Без аргумента берётся самый свежий журнал. Черновик кладётся в recordings/drafts/ (вне git);
-// редактура из прошлого черновика той же сессии переносится, пустыми остаются новые промпты
-// и реплики.
+// редактура из прошлого черновика той же сессии переносится, включая сборки и их запуски,
+// пустыми остаются новые промпты и реплики. Маршруты реплик пересчитываются по сборкам.
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { eventBuilds, unassignedRuns } from "../builds.ts";
 import {
   carryOverEdits,
   orphanedEdits,
+  orphanedRuns,
   parseDraft,
+  reroutedMessages,
   unfilledHeader,
   type Draft,
   type DraftEvent,
+  type DraftRun,
   type EditableDraftEvent,
 } from "../draft.ts";
 import { parseRawLog } from "../raw-event.ts";
 import {
+  routeMessages,
+  runTranscriptPaths,
   sessionTranscriptPath,
+  sessionTranscriptPaths,
   stationTranscriptPaths,
   toDraft,
-  transcriptPaths,
 } from "../to-draft.ts";
 import {
   agentAssignments,
@@ -27,30 +33,48 @@ import {
   assistantTexts,
   countTokens,
   modelReplies,
+  tokenUsages,
   type AgentAssignment,
   type AgentReport,
   type ModelReply,
+  type TokenUsage,
   type TranscriptText,
 } from "../transcript.ts";
 import { fromFactoryHome, isNotFound, newestFile, RECORDINGS_DIRS } from "./paths.ts";
 
-// Токены сессии и её сабагентов. Непрочитанный транскрипт — предупреждение, а не ошибка:
-// черновик полезен и без счётчика токенов. Транскрипты служебных сабагентов Claude Code
-// не сохраняет — о них одна строка, а не по строке на каждый.
-async function tokensFromTranscripts(paths: string[]): Promise<number | undefined> {
-  if (paths.length === 0) return undefined;
-  let total = 0;
+// Транскрипты читаются по одному: непрочитанный — предупреждение, а не ошибка, черновик полезен
+// и без счётчика токенов. Транскрипты служебных сабагентов Claude Code не сохраняет — о них
+// одна строка, а не по строке на каждый.
+async function readTranscripts(paths: Iterable<string>): Promise<Map<string, string>> {
+  const transcripts = new Map<string, string>();
   let missing = 0;
   for (const transcriptPath of paths) {
     try {
-      total += countTokens(await readFile(transcriptPath, "utf8"));
+      transcripts.set(transcriptPath, await readFile(transcriptPath, "utf8"));
     } catch (err) {
       if (isNotFound(err)) missing++;
       else console.warn(`транскрипт ${transcriptPath} не прочитан: ${String(err)}`);
     }
   }
   if (missing > 0) console.warn(`транскриптов не найдено: ${missing}, их токены не посчитаны`);
-  return total;
+  return transcripts;
+}
+
+// Токены каждого запуска сабагента по его транскрипту.
+async function tokensOfRuns(paths: ReadonlyMap<string, string>): Promise<Map<string, number>> {
+  const transcripts = await readTranscripts(paths.values());
+  const tokens = new Map<string, number>();
+  for (const [agentId, transcriptPath] of paths) {
+    const transcript = transcripts.get(transcriptPath);
+    if (transcript !== undefined) tokens.set(agentId, countTokens(transcript));
+  }
+  return tokens;
+}
+
+// Токены основной сессии по сообщениям: так их можно разложить по сборкам.
+async function usagesOfSession(paths: string[]): Promise<TokenUsage[]> {
+  const transcripts = await readTranscripts(paths);
+  return [...transcripts.values()].flatMap(tokenUsages);
 }
 
 // Что берётся из транскрипта сессии: модели промптов, ответы человеку и задания станциям.
@@ -104,23 +128,26 @@ function titleOf(edit: EditableDraftEvent): string {
 }
 
 // Битый прошлый черновик не перезаписывается молча: в нём может быть несохранённая редактура.
-async function withEarlierEdits(fresh: Draft, draftPath: string): Promise<Draft> {
+async function readEarlierDraft(draftPath: string): Promise<Draft | undefined> {
   let earlier: string;
   try {
     earlier = await readFile(draftPath, "utf8");
   } catch (err) {
-    if (isNotFound(err)) return fresh;
+    if (isNotFound(err)) return undefined;
     throw err;
   }
-  let previous: Draft;
   try {
-    previous = parseDraft(JSON.parse(earlier));
+    return parseDraft(JSON.parse(earlier));
   } catch (err) {
     throw new Error(
       `прошлый черновик ${fromFactoryHome(draftPath)} не разобран — исправьте или удалите его`,
       { cause: err },
     );
   }
+}
+
+function withEarlierEdits(fresh: Draft, previous: Draft | undefined): Draft {
+  if (previous === undefined) return fresh;
   for (const edit of orphanedEdits(previous, fresh)) {
     console.warn(`редактура «${titleOf(edit)}» не перенесена: такого события в журнале нет`);
   }
@@ -147,22 +174,45 @@ function describeWaiting(event: EditableDraftEvent): string {
     : `${event.from} → ${event.to} (${event.source}): ${said}`;
 }
 
+const MS_PER_SECOND = 1000;
+const SECONDS_PER_MINUTE = 60;
+const MAX_ASSIGNMENT_LINE = 100;
+
+// Время от начала журнала, как его видит человек: минуты и секунды.
+function clockOf(t: number): string {
+  const seconds = Math.floor(t / MS_PER_SECOND);
+  const minutes = Math.floor(seconds / SECONDS_PER_MINUTE);
+  return `${minutes}:${String(seconds % SECONDS_PER_MINUTE).padStart(2, "0")}`;
+}
+
+// По первой строке задания редактор узнаёт, к какой задаче относится запуск.
+function assignmentLineOf(draft: Draft, run: DraftRun): string {
+  const assignment = draft.events.find(
+    (event) =>
+      event.type === "draft_message" && event.run === run.run && event.source === "assignment",
+  );
+  if (assignment?.type !== "draft_message") return "задание не найдено";
+  const line = assignment.said.split("\n").find((text) => text.trim() !== "") ?? "";
+  return line.trim().slice(0, MAX_ASSIGNMENT_LINE);
+}
+
 const rawPath = process.argv[2] ?? (await newestFile(RECORDINGS_DIRS.raw, ".jsonl"));
 if (rawPath === undefined) {
   throw new Error(`журналов сборок ещё нет: хуки пишут их в ${RECORDINGS_DIRS.raw}`);
 }
 const rawEvents = parseRawLog(await readFile(rawPath, "utf8"));
-const tokens = await tokensFromTranscripts(transcriptPaths(rawEvents));
 const session = await textsFromSessionTranscript(sessionTranscriptPath(rawEvents));
 const reports = await reportsFromStationTranscripts(stationTranscriptPaths(rawEvents));
 const fresh = toDraft(rawEvents, {
   sessionId: path.basename(rawPath, ".jsonl"),
-  tokens,
+  runTokens: await tokensOfRuns(runTranscriptPaths(rawEvents)),
+  sessionUsages: await usagesOfSession(sessionTranscriptPaths(rawEvents)),
   ...session,
   reports,
 });
 const draftPath = path.join(RECORDINGS_DIRS.drafts, `${fresh.id}.json`);
-const draft = await withEarlierEdits(fresh, draftPath);
+const previous = await readEarlierDraft(draftPath);
+const draft = routeMessages(withEarlierEdits(fresh, previous));
 
 await mkdir(RECORDINGS_DIRS.drafts, { recursive: true });
 await writeFile(draftPath, `${JSON.stringify(draft, null, 2)}\n`);
@@ -170,12 +220,32 @@ await writeFile(draftPath, `${JSON.stringify(draft, null, 2)}\n`);
 const prompts = draft.events.filter((event) => event.type === "draft_prompt");
 const messages = draft.events.filter((event) => event.type === "draft_message");
 const waiting = draft.events.filter(awaitsEditing);
+const owners = eventBuilds(draft);
 console.log(`черновик: ${fromFactoryHome(draftPath)}`);
-console.log(
-  `токенов: ${tokens ?? "неизвестно"}, промптов: ${prompts.length}, реплик: ${messages.length}`,
-);
-const unfilled = unfilledHeader(draft);
-console.log(
-  `ждут редактуры: ${waiting.length}${unfilled.length > 0 ? `, и ${unfilled.join(", ")}` : ""}`,
-);
+console.log(`промптов: ${prompts.length}, реплик: ${messages.length}`);
+for (const build of draft.builds) {
+  const eventCount = owners.filter((owner) => owner === build.id).length;
+  console.log(
+    `сборка ${build.id}: проект ${build.project || "—"}, завод ${build.factory || "—"}, ` +
+      `запусков: ${build.runs.length}, событий: ${eventCount}`,
+  );
+}
+for (const line of unfilledHeader(draft)) console.log(`  не заполнено: ${line}`);
+console.log(`ждут редактуры: ${waiting.length}`);
 for (const event of waiting) console.log(`  • ${describeWaiting(event)}`);
+
+const unassigned = unassignedRuns(draft);
+if (unassigned.length > 0) {
+  console.log(`запуски станций без сборки (достанутся первой): ${unassigned.length}`);
+  for (const run of unassigned) {
+    console.log(`  • ${run.agent} ${run.run} ${clockOf(run.t)}: ${assignmentLineOf(draft, run)}`);
+  }
+}
+for (const run of orphanedRuns(draft)) {
+  console.warn(`запуск ${run} указан в сборке, но в журнале его нет`);
+}
+for (const message of previous === undefined ? [] : reroutedMessages(previous, draft)) {
+  console.warn(
+    `у реплики «${message.line}» поменялся маршрут: ${message.from} → ${message.to}, перечитайте строку`,
+  );
+}

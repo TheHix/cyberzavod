@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { DraftEvent } from "./draft.ts";
+import type { Draft, DraftEvent, DraftMessage } from "./draft.ts";
 import type { RawEvent } from "./raw-event.ts";
 import {
   isHumanPrompt,
+  routeMessages,
+  runTranscriptPaths,
   sessionTranscriptPath,
+  sessionTranscriptPaths,
   stationTranscriptPaths,
   toDraft,
-  transcriptPaths,
 } from "./to-draft.ts";
 import type { AgentAssignment, AgentReport, TranscriptText } from "./transcript.ts";
 
@@ -40,6 +42,15 @@ function typicalSession(): RawEvent[] {
   ];
 }
 
+// Исходы проверок по порядку: у вердикта станции — с запуском, у запуска проверок — без.
+function checksOf(events: DraftEvent[]) {
+  return events.flatMap((event) =>
+    event.type === "draft_check"
+      ? [{ ok: event.ok, ...(event.run === undefined ? {} : { run: event.run }) }]
+      : [],
+  );
+}
+
 function stagesOf(events: DraftEvent[]): string[] {
   return events.flatMap((event) => {
     if (event.type === "stage_enter") return [event.stage];
@@ -70,7 +81,17 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect([draft.events[0]?.t, draft.events.at(-1)?.t]).toEqual([0, 45_000]);
+    expect([draft.events[0]?.t, draft.events.at(-1)?.t]).toEqual([1_000, 42_000]);
+  });
+
+  it("не пишет начало и конец сборки: их ставит публикация", () => {
+    const raw = typicalSession();
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(draft.events.filter((e) => e.type === "build_start" || e.type === "build_end")).toEqual(
+      [],
+    );
   });
 
   it("кладёт промпт как есть, а заголовок и чистовую версию оставляет редактору", () => {
@@ -78,7 +99,7 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect({ title: draft.title, prompt: draft.events[1] }).toEqual({
+    expect({ title: draft.builds[0]?.title, prompt: draft.events[0] }).toEqual({
       title: "",
       prompt: {
         t: 1_000,
@@ -109,7 +130,15 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(draft).toMatchObject({ project: "cyberzavod", factory: "0.1.0" });
+    expect(draft.builds[0]).toMatchObject({ project: "cyberzavod", factory: "0.1.0" });
+  });
+
+  it("собирает одну сборку с id черновика и без запусков", () => {
+    const raw: RawEvent[] = [{ ts: START, kind: "session_start" }];
+
+    const draft = toDraft(raw, { sessionId: "744e7547-d312" });
+
+    expect(draft.builds).toEqual([{ id: draft.id, project: "", factory: "", title: "", runs: [] }]);
   });
 
   it("оставляет проект и версию завода пустыми, если в журнале их нет", () => {
@@ -117,7 +146,7 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(draft).toMatchObject({ project: "", factory: "" });
+    expect(draft.builds[0]).toMatchObject({ project: "", factory: "" });
   });
 
   it("берёт проект из первого начала сессии, где он есть", () => {
@@ -128,26 +157,19 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(draft).toMatchObject({ project: "cyberzavod", factory: "0.1.0" });
+    expect(draft.builds[0]).toMatchObject({ project: "cyberzavod", factory: "0.1.0" });
   });
 
-  it("считает сборку неуспешной, если последний запуск проверок упал", () => {
+  it("пишет исход каждого запуска проверок в основной сессии без запуска станции", () => {
     const raw: RawEvent[] = [
       { ts: START, kind: "prompt", text: "почини" },
       { ts: START + 1_000, kind: "tool", tool: "Bash", ok: false, command: "go test ./..." },
+      { ts: START + 2_000, kind: "tool", tool: "Bash", ok: true, command: "make check-web" },
     ];
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(draft.events.at(-1)).toEqual({ t: 1_000, type: "build_end", ok: false });
-  });
-
-  it("добавляет токены перед концом сборки", () => {
-    const raw = typicalSession();
-
-    const draft = toDraft(raw, { sessionId: "s1", tokens: 12_345 });
-
-    expect(draft.events.at(-2)).toEqual({ t: 45_000, type: "usage", tokens: 12_345 });
+    expect(checksOf(draft.events)).toEqual([{ ok: false }, { ok: true }]);
   });
 
   it("сортирует события не по порядку", () => {
@@ -155,7 +177,7 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(draft.events[1]?.type).toBe("draft_prompt");
+    expect(draft.events[0]?.type).toBe("draft_prompt");
   });
 
   it("не возвращает сборку на этап тестов из-за проверок внутри ревью", () => {
@@ -225,7 +247,7 @@ describe("toDraft", () => {
   it.each([
     ["ПРИНЯТО", true],
     ["НА ДОРАБОТКУ", false],
-  ])("по последнему вердикту ревью «%s» считает сборку успешной: %s", (verdict, ok) => {
+  ])("пишет вердикт ревью «%s» как исход проверок с запуском: %s", (verdict, ok) => {
     const raw: RawEvent[] = [
       { ts: START, kind: "tool", tool: "Bash", ok: false, command: "make check-web" },
       { ts: START + 1_000, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
@@ -234,7 +256,7 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(draft.events.at(-1)).toEqual({ t: 2_000, type: "build_end", ok });
+    expect(checksOf(draft.events)).toEqual([{ ok: false }, { ok, run: "r1" }]);
   });
 
   it("считает «ГОТОВО» тестировщика пройденными проверками", () => {
@@ -252,9 +274,9 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect([stagesOf(draft.events), draft.events.at(-1)]).toEqual([
-      ["test", "fail:test"],
-      { t: 2_000, type: "build_end", ok: true },
+    expect([stagesOf(draft.events), checksOf(draft.events).at(-1)]).toEqual([
+      ["test", "fail:test", "test"],
+      { ok: true, run: "t1" },
     ]);
   });
 
@@ -275,8 +297,8 @@ describe("toDraft", () => {
 
     expect([
       stagesOf(draft.events).filter((stage) => stage.startsWith("fail:")),
-      draft.events.at(-1),
-    ]).toEqual([[], { t: 1_000, type: "build_end", ok: true }]);
+      checksOf(draft.events),
+    ]).toEqual([[], []]);
   });
 
   it("берёт вердикт станции из её отчёта по id агента", () => {
@@ -330,7 +352,7 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(draft.events)).toEqual(["review", "fail:review", "fail:review"]);
+    expect(stagesOf(draft.events)).toEqual(["review", "fail:review", "review", "fail:review"]);
   });
 
   it.each(["constructor", "Готово"])(
@@ -344,9 +366,9 @@ describe("toDraft", () => {
 
       const draft = toDraft(raw, { sessionId: "s1" });
 
-      expect([stagesOf(draft.events), draft.events.at(-1)]).toEqual([
+      expect([stagesOf(draft.events), checksOf(draft.events)]).toEqual([
         ["test", "fail:test", "review"],
-        { t: 2_000, type: "build_end", ok: false },
+        [{ ok: false }],
       ]);
     },
   );
@@ -517,17 +539,33 @@ describe("isHumanPrompt", () => {
   });
 });
 
-describe("transcriptPaths", () => {
-  it("собирает транскрипты остановок сессии и сабагентов без повторов", () => {
+describe("sessionTranscriptPaths", () => {
+  it("собирает транскрипты остановок сессии без повторов и без сабагентов", () => {
     const raw: RawEvent[] = [
       { ts: 1, kind: "subagent_stop", agent: "reviewer", transcriptPath: "/t/agent.jsonl" },
       { ts: 2, kind: "stop", transcriptPath: "/t/main.jsonl" },
       { ts: 3, kind: "stop", transcriptPath: "/t/main.jsonl" },
     ];
 
-    const paths = transcriptPaths(raw);
+    const paths = sessionTranscriptPaths(raw);
 
-    expect(paths).toEqual(["/t/agent.jsonl", "/t/main.jsonl"]);
+    expect(paths).toEqual(["/t/main.jsonl"]);
+  });
+});
+
+describe("runTranscriptPaths", () => {
+  it("собирает транскрипты запусков по agentId, у повторной остановки — последний", () => {
+    const raw: RawEvent[] = [
+      { ts: 1, kind: "subagent_stop", agent: "coder", agentId: "c1", transcriptPath: "/t/old" },
+      { ts: 2, kind: "subagent_stop", agent: "coder", agentId: "c1", transcriptPath: "/t/new" },
+      { ts: 3, kind: "subagent_stop", agent: "tester", agentId: "t1" },
+      { ts: 4, kind: "subagent_stop", agent: "tester", transcriptPath: "/t/no-id" },
+      { ts: 5, kind: "stop", transcriptPath: "/t/main.jsonl" },
+    ];
+
+    const paths = runTranscriptPaths(raw);
+
+    expect([...paths]).toEqual([["c1", "/t/new"]]);
   });
 });
 
@@ -632,25 +670,15 @@ describe("toDraft: реплики", () => {
     expect(routesOf(draft).map(([t]) => t)).toEqual([0, 40_000]);
   });
 
-  it("ставит реплику после событий с тем же временем и до токенов и конца сборки", () => {
+  it("ставит реплику после событий с тем же временем", () => {
     const raw: RawEvent[] = [
       { ts: START, kind: "tool", tool: "Edit", ok: true },
       { ts: START + 5_000, kind: "stop" },
     ];
 
-    const draft = toDraft(raw, {
-      sessionId: "s1",
-      tokens: 100,
-      assignments: [spawn(0, "analyst")],
-    });
+    const draft = toDraft(raw, { sessionId: "s1", assignments: [spawn(0, "analyst")] });
 
-    expect(draft.events.map((event) => event.type)).toEqual([
-      "build_start",
-      "stage_enter",
-      "draft_message",
-      "usage",
-      "build_end",
-    ]);
+    expect(draft.events.map((event) => event.type)).toEqual(["stage_enter", "draft_message"]);
   });
 
   it("не теряет порядок реплик одного момента: задание, отчёт, ответ", () => {
@@ -662,7 +690,6 @@ describe("toDraft: реплики", () => {
 
     const draft = toDraft(raw, {
       sessionId: "s1",
-      tokens: 100,
       answers: [answer(5_000)],
       reports: [report(5_000, "c1")],
       assignments: [spawn(5_000, "coder")],
@@ -672,8 +699,6 @@ describe("toDraft: реплики", () => {
       "draft_message",
       "draft_message",
       "draft_message",
-      "usage",
-      "build_end",
     ]);
     expect(routesOf(draft)).toEqual([
       [5_000, "code", "foreman", "assignment"],
@@ -926,5 +951,387 @@ describe("stationTranscriptPaths", () => {
     const paths = stationTranscriptPaths(raw);
 
     expect(paths).toEqual(["/t/a.jsonl", "/t/p.jsonl"]);
+  });
+});
+
+function runsOf(draft: Draft) {
+  return draft.events.flatMap((event) =>
+    event.type === "draft_run" ? [[event.run, event.agent, event.t, event.until]] : [],
+  );
+}
+
+describe("toDraft: запуски станций", () => {
+  it("пишет окно запуска от старта до остановки станции", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "analyst", agentId: "a1" },
+      { ts: START + 4_000, kind: "subagent_stop", agent: "analyst", agentId: "a1" },
+      { ts: START + 9_000, kind: "stop" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(runsOf(draft)).toEqual([["a1", "analyst", 0, 4_000]]);
+  });
+
+  it("тянет окно запуска без остановки до конца журнала", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "coder", agentId: "c1" },
+      { ts: START + 9_000, kind: "stop" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(runsOf(draft)).toEqual([["c1", "coder", 0, 9_000]]);
+  });
+
+  it("пишет отдельное окно на каждый старт одного и того же запуска", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "coder", agentId: "c1" },
+      { ts: START + 1_000, kind: "subagent_stop", agent: "coder", agentId: "c1" },
+      { ts: START + 5_000, kind: "subagent_start", agent: "coder", agentId: "c1" },
+      { ts: START + 6_000, kind: "subagent_stop", agent: "coder", agentId: "c1" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(runsOf(draft)).toEqual([
+      ["c1", "coder", 0, 1_000],
+      ["c1", "coder", 5_000, 6_000],
+    ]);
+  });
+
+  it("не пишет окна служебным сабагентам без своего этапа", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "Explore", agentId: "e1" },
+      { ts: START + 1_000, kind: "subagent_stop", agent: "Explore", agentId: "e1" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(runsOf(draft)).toEqual([]);
+  });
+
+  it("входит на этап при каждом старте станции, даже если этап тот же", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "coder", agentId: "c1" },
+      { ts: START + 1_000, kind: "subagent_stop", agent: "coder", agentId: "c1" },
+      { ts: START + 2_000, kind: "subagent_start", agent: "coder", agentId: "c2" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(
+      draft.events.flatMap((event) => (event.type === "stage_enter" ? [event.run] : [])),
+    ).toEqual(["c1", "c2"]);
+  });
+
+  it("не повторяет этап правками, пока сборка стоит на нём", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "tool", tool: "Edit", ok: true },
+      { ts: START + 1_000, kind: "tool", tool: "Edit", ok: true },
+      { ts: START + 2_000, kind: "tool", tool: "Write", ok: true },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(stagesOf(draft.events)).toEqual(["code"]);
+  });
+
+  it("ставит запуск на возврат по вердикту и на исход проверок", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "tester", agentId: "t1" },
+      {
+        ts: START + 1_000,
+        kind: "subagent_stop",
+        agent: "tester",
+        agentId: "t1",
+        verdict: "ДЕФЕКТ",
+      },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(draft.events.filter((event) => event.type === "stage_fail")).toEqual([
+      { t: 1_000, type: "stage_fail", stage: "test", reason: expect.any(String), run: "t1" },
+    ]);
+    expect(checksOf(draft.events)).toEqual([{ ok: false, run: "t1" }]);
+  });
+
+  it("ставит запуск станции на реплики: у задания новому запуску и у отчёта — его id", () => {
+    const assignments: AgentAssignment[] = [
+      { ts: START + 1_500, text: "Задание", via: "spawn", agentType: "analyst", agentId: "a1" },
+    ];
+    const reports = [report(9_000, "a1")];
+
+    const draft = toDraft(chatSession(), { sessionId: "s1", assignments, reports });
+
+    expect(
+      draft.events.flatMap((event) =>
+        event.type === "draft_message" ? [[event.source, event.run]] : [],
+      ),
+    ).toEqual([
+      ["assignment", "a1"],
+      ["report", "a1"],
+    ]);
+  });
+
+  it("ставит на сообщение работающему его id, а у задания без agentId и ответа запуска нет", () => {
+    const assignments = [message(15_000, "c1"), spawn(1_500, "analyst")];
+
+    const draft = toDraft(chatSession(), {
+      sessionId: "s1",
+      assignments,
+      answers: [answer(35_000)],
+    });
+
+    expect(
+      draft.events.flatMap((event) =>
+        event.type === "draft_message" ? [[event.source, event.run]] : [],
+      ),
+    ).toEqual([
+      ["assignment", undefined],
+      ["assignment", "c1"],
+      ["answer", undefined],
+    ]);
+  });
+});
+
+function usagesOf(draft: Draft) {
+  return draft.events.flatMap((event) =>
+    event.type === "usage" ? [{ t: event.t, tokens: event.tokens, run: event.run }] : [],
+  );
+}
+
+describe("toDraft: токены", () => {
+  it("ставит токены станции на её последнюю остановку с запуском", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "coder", agentId: "c1" },
+      { ts: START + 1_000, kind: "subagent_stop", agent: "coder", agentId: "c1" },
+      { ts: START + 5_000, kind: "subagent_start", agent: "coder", agentId: "c1" },
+      { ts: START + 6_000, kind: "subagent_stop", agent: "coder", agentId: "c1" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1", runTokens: new Map([["c1", 500]]) });
+
+    expect(usagesOf(draft)).toEqual([{ t: 6_000, tokens: 500, run: "c1" }]);
+  });
+
+  it("ставит токены служебного сабагента на его остановку без запуска", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "Explore", agentId: "e1" },
+      { ts: START + 2_000, kind: "subagent_stop", agent: "Explore", agentId: "e1" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1", runTokens: new Map([["e1", 40]]) });
+
+    expect(usagesOf(draft)).toEqual([{ t: 2_000, tokens: 40, run: undefined }]);
+  });
+
+  it("не пишет токенов запуску, чьи токены неизвестны", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "coder", agentId: "c1" },
+      { ts: START + 1_000, kind: "subagent_stop", agent: "coder", agentId: "c1" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1", runTokens: new Map() });
+
+    expect(usagesOf(draft)).toEqual([]);
+  });
+
+  describe("участки основной сессии", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "session_start" },
+      { ts: START + 1_000, kind: "prompt", text: "Сделай" },
+      { ts: START + 2_000, kind: "subagent_start", agent: "coder", agentId: "c1" },
+      { ts: START + 6_000, kind: "subagent_stop", agent: "coder", agentId: "c1" },
+      { ts: START + 20_000, kind: "stop" },
+    ];
+
+    it("суммирует сообщения между соседними привязками в одно usage на время первой", () => {
+      const sessionUsages = [
+        { ts: START + 1_500, tokens: 1 },
+        { ts: START + 1_900, tokens: 2 },
+        { ts: START + 3_000, tokens: 10 },
+        { ts: START + 7_000, tokens: 100 },
+        { ts: START + 8_000, tokens: 200 },
+      ];
+
+      const draft = toDraft(raw, {
+        sessionId: "s1",
+        sessionUsages,
+        runTokens: new Map([["c1", 50]]),
+      });
+
+      expect(usagesOf(draft)).toEqual([
+        { t: 1_000, tokens: 3, run: undefined },
+        { t: 2_000, tokens: 10, run: undefined },
+        { t: 6_000, tokens: 50, run: "c1" },
+        { t: 6_000, tokens: 300, run: undefined },
+      ]);
+    });
+
+    it("ставит сообщения до первой привязки в начало черновика", () => {
+      const sessionUsages = [{ ts: START + 200, tokens: 4 }];
+
+      const draft = toDraft(raw, { sessionId: "s1", sessionUsages });
+
+      expect(draft.events[0]).toEqual({ t: 0, type: "usage", tokens: 4 });
+    });
+
+    it("не считает сообщения вне времени журнала", () => {
+      const sessionUsages = [
+        { ts: START - 1, tokens: 7 },
+        { ts: START + 20_001, tokens: 9 },
+      ];
+
+      const draft = toDraft(raw, { sessionId: "s1", sessionUsages });
+
+      expect(usagesOf(draft)).toEqual([]);
+    });
+
+    it("считает в сумме токены станций и сообщений журнала без потерь", () => {
+      const sessionUsages = [
+        { ts: START + 100, tokens: 1 },
+        { ts: START + 3_000, tokens: 20 },
+        { ts: START + 10_000, tokens: 300 },
+      ];
+
+      const draft = toDraft(raw, {
+        sessionId: "s1",
+        sessionUsages,
+        runTokens: new Map([["c1", 4_000]]),
+      });
+
+      expect(usagesOf(draft).reduce((sum, { tokens }) => sum + tokens, 0)).toBe(4_321);
+    });
+  });
+});
+
+function routedDraft(events: DraftEvent[], secondRuns: string[]): Draft {
+  return {
+    id: "first",
+    startedAt: "2026-10-04T09:52:13.000Z",
+    builds: [
+      { id: "first", project: "p", factory: "0.1.0", title: "", runs: ["a1", "a2"] },
+      { id: "second", project: "p", factory: "0.1.0", title: "", runs: secondRuns },
+    ],
+    events,
+  };
+}
+
+function say(
+  t: number,
+  from: "spec" | "code" | "test" | "review",
+  source: "assignment" | "report" | "answer",
+  run?: string,
+): DraftMessage {
+  return {
+    t,
+    type: "draft_message",
+    from,
+    to: "foreman",
+    source,
+    said: `${source} ${t}`,
+    line: "",
+    text: "",
+    ...(run === undefined ? {} : { run }),
+  };
+}
+
+function routes(draft: Draft) {
+  return draft.events.flatMap((event) =>
+    event.type === "draft_message" ? [[event.t, event.from, event.to]] : [],
+  );
+}
+
+describe("routeMessages", () => {
+  it("не адресует отчёт станции одной задачи станции другой", () => {
+    const draft = routedDraft(
+      [
+        { t: 0, type: "stage_enter", stage: "spec", run: "a1" },
+        say(1_000, "spec", "report", "a1"),
+        { t: 2_000, type: "stage_enter", stage: "code", run: "b1" },
+        say(3_000, "code", "assignment", "b1"),
+      ],
+      ["b1"],
+    );
+
+    const routed = routeMessages(draft);
+
+    expect(routes(routed)).toEqual([
+      [1_000, "spec", "foreman"],
+      [3_000, "code", "foreman"],
+    ]);
+  });
+
+  it("не берёт отчёт другой задачи в отправители задания", () => {
+    const draft = routedDraft(
+      [
+        say(1_000, "spec", "report", "a1"),
+        say(2_000, "code", "assignment", "b1"),
+        say(3_000, "test", "assignment", "a2"),
+      ],
+      ["b1"],
+    );
+
+    const routed = routeMessages(draft);
+
+    expect(routes(routed)).toEqual([
+      [1_000, "spec", "test"],
+      [2_000, "code", "foreman"],
+      [3_000, "test", "spec"],
+    ]);
+  });
+
+  it("считает ходы по промптам сборки: промпт другой задачи ход не обрывает", () => {
+    const prompt: DraftEvent = {
+      t: 1_500,
+      type: "draft_prompt",
+      said: "вторая задача",
+      goal: "",
+      requirements: [],
+      build: "second",
+    };
+    const draft = routedDraft(
+      [
+        say(1_000, "spec", "report", "a1"),
+        prompt,
+        say(2_000, "code", "assignment", "b1"),
+        say(3_000, "test", "assignment", "a2"),
+      ],
+      ["b1"],
+    );
+
+    const routed = routeMessages(draft);
+
+    expect(routes(routed)).toEqual([
+      [1_000, "spec", "test"],
+      [2_000, "code", "foreman"],
+      [3_000, "test", "spec"],
+    ]);
+  });
+
+  it("берёт этап ответа из событий его сборки", () => {
+    const draft = routedDraft(
+      [
+        { t: 0, type: "stage_enter", stage: "review", run: "a1" },
+        { t: 1_000, type: "stage_enter", stage: "code", run: "b1" },
+        say(2_000, "spec", "answer"),
+      ],
+      ["b1"],
+    );
+
+    const routed = routeMessages(draft);
+
+    expect(routes(routed)).toEqual([[2_000, "code", "foreman"]]);
+  });
+
+  it("сохраняет строку, текст, запуск и сборку реплики", () => {
+    const draft = routedDraft([], ["b1"]);
+    draft.events.push({ ...say(1_000, "spec", "report", "a1"), line: "Держи", text: "Текст" });
+
+    const routed = routeMessages(draft);
+
+    expect(routed.events).toEqual(draft.events.map((event) => ({ ...event, to: "foreman" })));
   });
 });

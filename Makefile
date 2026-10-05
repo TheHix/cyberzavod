@@ -23,8 +23,8 @@ api-dev: ## API из исходников: миграции и запуск (н�
 recording-draft: ## Черновик записи из журнала сборки (RAW=файл, по умолчанию самый свежий)
 	node packages/recorder/src/bin/draft.ts $(RAW)
 
-recording-publish: ## Опубликовать отредактированный черновик (DRAFT=файл, по умолчанию самый свежий)
-	node packages/recorder/src/bin/publish.ts $(DRAFT)
+recording-publish: ## Опубликовать черновик (DRAFT=файл, по умолчанию самый свежий; BUILD=id — одну сборку)
+	node packages/recorder/src/bin/publish.ts "$(DRAFT)" "$(BUILD)"
 
 # VERSION берётся только из командной строки: одноимённая переменная окружения (у версий
 # инструментов они бывают) молча выбрала бы чужую версию завода.

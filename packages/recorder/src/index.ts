@@ -12,26 +12,35 @@ export {
 } from "./raw-event.ts";
 export {
   isHumanPrompt,
+  routeMessages,
+  runTranscriptPaths,
   sessionTranscriptPath,
+  sessionTranscriptPaths,
   stationTranscriptPaths,
   toDraft,
-  transcriptPaths,
   type DraftMeta,
 } from "./to-draft.ts";
 export {
   carryOverEdits,
   DraftError,
   orphanedEdits,
+  orphanedRuns,
   parseDraft,
+  publishBuild,
   publishDraft,
+  reroutedMessages,
   unfilledHeader,
   type Draft,
+  type DraftBuild,
+  type DraftCheck,
   type DraftEvent,
   type DraftMessage,
   type DraftPrompt,
+  type DraftRun,
   type EditableDraftEvent,
   type MessageSource,
 } from "./draft.ts";
+export { buildTimeline, eventBuilds, IDLE_GAP_MS, unassignedRuns } from "./builds.ts";
 export { parseProjectConfig, ProjectConfigError, type ProjectConfig } from "./project.ts";
 export { findLeaks } from "./leaks.ts";
 export {
@@ -40,8 +49,10 @@ export {
   assistantTexts,
   countTokens,
   modelReplies,
+  tokenUsages,
   type AgentAssignment,
   type AgentReport,
   type ModelReply,
+  type TokenUsage,
   type TranscriptText,
 } from "./transcript.ts";

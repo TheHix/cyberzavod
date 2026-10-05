@@ -5,6 +5,7 @@ import {
   assistantTexts,
   countTokens,
   modelReplies,
+  tokenUsages,
 } from "./transcript.ts";
 
 function assistantLine(id: string, usage: Record<string, number>): string {
@@ -51,6 +52,54 @@ describe("countTokens", () => {
     const tokens = countTokens(transcript);
 
     expect(tokens).toBe(7);
+  });
+});
+
+function timedAssistantLine(id: string, second: number, usage: Record<string, number>): string {
+  return JSON.stringify({
+    type: "assistant",
+    timestamp: `2026-10-04T10:00:${String(second).padStart(2, "0")}.000Z`,
+    message: { id, usage },
+  });
+}
+
+describe("tokenUsages", () => {
+  it("даёт токены каждого сообщения: последний вариант и время последней части", () => {
+    const transcript = [
+      timedAssistantLine("m1", 1, { input_tokens: 10, output_tokens: 5 }),
+      timedAssistantLine("m2", 4, { output_tokens: 7, cache_read_input_tokens: 9_000 }),
+      timedAssistantLine("m1", 3, { input_tokens: 10, output_tokens: 50 }),
+    ].join("\n");
+
+    const usages = tokenUsages(transcript);
+
+    expect(usages).toEqual([
+      { ts: Date.parse("2026-10-04T10:00:03.000Z"), tokens: 60 },
+      { ts: Date.parse("2026-10-04T10:00:04.000Z"), tokens: 7 },
+    ]);
+  });
+
+  it("даёт в сумме столько же, сколько countTokens", () => {
+    const transcript = [
+      timedAssistantLine("m1", 1, { input_tokens: 10, cache_creation_input_tokens: 100 }),
+      timedAssistantLine("m2", 2, { output_tokens: 20 }),
+      timedAssistantLine("m2", 3, { output_tokens: 25 }),
+    ].join("\n");
+
+    const usages = tokenUsages(transcript);
+
+    expect(usages.reduce((sum, { tokens }) => sum + tokens, 0)).toBe(countTokens(transcript));
+  });
+
+  it("пропускает сообщения без времени", () => {
+    const transcript = [
+      assistantLine("m1", { output_tokens: 7 }),
+      timedAssistantLine("m2", 2, { output_tokens: 3 }),
+    ].join("\n");
+
+    const usages = tokenUsages(transcript);
+
+    expect(usages.map(({ tokens }) => tokens)).toEqual([3]);
   });
 });
 
@@ -110,11 +159,23 @@ function userEntry(patch: Pick<EntryPatch, "uuid" | "second" | "agentId">, conte
 }
 
 const text = (value: string) => ({ type: "text", text: value });
-const toolUse = (name: string, input: Record<string, unknown>) => ({
+const toolUse = (name: string, input: Record<string, unknown>, id?: string) => ({
   type: "tool_use",
   name,
   input,
+  ...(id === undefined ? {} : { id }),
 });
+
+// Ответ среды на вызов инструмента: запись user с блоком tool_result и результатом инструмента.
+function toolResultEntry(uuid: string, second: number, callId: string, result: unknown): string {
+  return JSON.stringify({
+    type: "user",
+    uuid,
+    timestamp: timestampAt(second),
+    toolUseResult: result,
+    message: { role: "user", content: [{ type: "tool_result", tool_use_id: callId }] },
+  });
+}
 
 describe("assistantTexts", () => {
   it("склеивает текстовые блоки одного ответа через пустую строку и берёт время последнего", () => {
@@ -188,6 +249,41 @@ describe("agentAssignments", () => {
         agentId: "a8dea51d",
       },
     ]);
+  });
+
+  it("берёт agentId задания новому сабагенту из результата вызова", () => {
+    const transcript = [
+      assistantEntry({ uuid: "a1", second: 1 }, [
+        toolUse("Agent", { subagent_type: "coder", prompt: "Сделай задачу" }, "call-1"),
+        toolUse("Agent", { subagent_type: "tester", prompt: "Проверь" }, "call-2"),
+      ]),
+      toolResultEntry("u1", 2, "call-2", { agentId: "t-7" }),
+      toolResultEntry("u2", 3, "call-1", { agentId: "c-3", status: "async_launched" }),
+    ].join("\n");
+
+    const assignments = agentAssignments(transcript);
+
+    expect(
+      assignments.map((assignment) => assignment.via === "spawn" && assignment.agentId),
+    ).toEqual(["c-3", "t-7"]);
+  });
+
+  it.each([
+    ["нет результата вызова", []],
+    ["в результате нет agentId", [toolResultEntry("u1", 2, "call-1", { status: "error" })]],
+    ["agentId не строка", [toolResultEntry("u1", 2, "call-1", { agentId: 5 })]],
+    ["результат другого вызова", [toolResultEntry("u1", 2, "call-9", { agentId: "x" })]],
+  ])("не добавляет agentId заданию, если %s", (_name, results) => {
+    const transcript = [
+      assistantEntry({ uuid: "a1", second: 1 }, [
+        toolUse("Agent", { subagent_type: "coder", prompt: "Сделай задачу" }, "call-1"),
+      ]),
+      ...results,
+    ].join("\n");
+
+    const [assignment] = agentAssignments(transcript);
+
+    expect(assignment).not.toHaveProperty("agentId");
   });
 
   it("пропускает другие инструменты и сообщения не строкой", () => {

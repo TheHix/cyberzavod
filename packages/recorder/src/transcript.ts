@@ -32,12 +32,19 @@ function entryOf(line: string): Record<string, unknown> | null {
   }
 }
 
-function usageOf(line: string): { messageId: string; usage: Usage } | null {
-  const message = entryOf(line)?.message;
-  if (!isObject(message)) return null;
+function timestampOf(entry: Record<string, unknown>): number | undefined {
+  const ts = typeof entry.timestamp === "string" ? Date.parse(entry.timestamp) : Number.NaN;
+  return Number.isNaN(ts) ? undefined : ts;
+}
+
+function usageOf(line: string): { messageId: string; usage: Usage; ts?: number } | null {
+  const entry = entryOf(line);
+  const message = entry?.message;
+  if (entry === null || !isObject(message)) return null;
   const { id, usage } = message;
   if (typeof id !== "string" || !isObject(usage)) return null;
-  return { messageId: id, usage: usage as Usage };
+  const ts = timestampOf(entry);
+  return { messageId: id, usage: usage as Usage, ...(ts === undefined ? {} : { ts }) };
 }
 
 function replyOf(line: string): ModelReply | null {
@@ -45,8 +52,8 @@ function replyOf(line: string): ModelReply | null {
   if (entry === null || !isObject(entry.message)) return null;
   const { model } = entry.message;
   if (typeof model !== "string" || model.startsWith(SERVICE_MODEL_PREFIX)) return null;
-  const ts = typeof entry.timestamp === "string" ? Date.parse(entry.timestamp) : Number.NaN;
-  return Number.isNaN(ts) ? null : { ts, model };
+  const ts = timestampOf(entry);
+  return ts === undefined ? null : { ts, model };
 }
 
 function tokensOf(usage: Usage): number {
@@ -57,22 +64,48 @@ function tokensOf(usage: Usage): number {
   );
 }
 
+/** Токены одного сообщения модели и время, когда оно закончилось. */
+export interface TokenUsage {
+  ts: number;
+  tokens: number;
+}
+
+// Одно сообщение модели встречается в транскрипте несколько раз (по частям ответа) —
+// учитывается последний вариант для каждого id, а время берётся у последней части с временем.
+function messageUsages(transcript: string): { ts?: number; tokens: number }[] {
+  const byMessage = new Map<string, { ts?: number; usage: Usage }>();
+  for (const line of transcript.split("\n")) {
+    const parsed = usageOf(line);
+    if (parsed === null) continue;
+    const ts = parsed.ts ?? byMessage.get(parsed.messageId)?.ts;
+    byMessage.set(parsed.messageId, { usage: parsed.usage, ...(ts === undefined ? {} : { ts }) });
+  }
+  return [...byMessage.values()].map(({ ts, usage }) => ({
+    tokens: tokensOf(usage),
+    ...(ts === undefined ? {} : { ts }),
+  }));
+}
+
 /**
  * Считает токены по транскрипту сессии Claude Code.
  * @param {string} transcript Содержимое транскрипта в формате JSONL.
  * @returns {number} Сумма входных, выходных и записанных в кеш токенов.
  */
 export function countTokens(transcript: string): number {
-  // Одно сообщение модели встречается в транскрипте несколько раз (по частям ответа) —
-  // учитывается последний вариант для каждого id.
-  const byMessage = new Map<string, Usage>();
-  for (const line of transcript.split("\n")) {
-    const parsed = usageOf(line);
-    if (parsed !== null) byMessage.set(parsed.messageId, parsed.usage);
-  }
-  let total = 0;
-  for (const usage of byMessage.values()) total += tokensOf(usage);
-  return total;
+  return messageUsages(transcript).reduce((total, { tokens }) => total + tokens, 0);
+}
+
+/**
+ * Раскладывает токены транскрипта по сообщениям модели: по ним токены основной сессии
+ * делятся между сборками.
+ * @param {string} transcript Содержимое транскрипта в формате JSONL.
+ * @returns {TokenUsage[]} Токены каждого сообщения по тем же правилам, что у `countTokens`,
+ *   от ранних к поздним; сообщения без времени пропускаются.
+ */
+export function tokenUsages(transcript: string): TokenUsage[] {
+  return messageUsages(transcript)
+    .flatMap(({ ts, tokens }) => (ts === undefined ? [] : [{ ts, tokens }]))
+    .sort((a, b) => a.ts - b.ts);
 }
 
 /**
@@ -96,7 +129,7 @@ export interface TranscriptText {
 
 /** Задание сабагенту, выданное сессией: новому запуском (`spawn`) или сообщением (`message`). */
 export type AgentAssignment = { ts: number; text: string } & (
-  { via: "spawn"; agentType: string } | { via: "message"; agentId: string }
+  { via: "spawn"; agentType: string; agentId?: string } | { via: "message"; agentId: string }
 );
 
 /** Отчёт запуска сабагента: что он сдал сессии, когда и кто это был. */
@@ -113,6 +146,8 @@ interface Entry {
   ts: number;
   message: Record<string, unknown>;
   agentId?: string;
+  /** Результат инструмента: у `Agent` в нём лежит `agentId` запущенного сабагента. */
+  toolUseResult?: Record<string, unknown>;
 }
 
 const PARAGRAPH_SEPARATOR = "\n\n";
@@ -129,14 +164,15 @@ function entryOfLine(line: string): Entry | null {
   if (entry === null || !isObject(entry.message)) return null;
   const role = entry.type;
   if (role !== ASSISTANT_ROLE && role !== USER_ROLE) return null;
-  const ts = typeof entry.timestamp === "string" ? Date.parse(entry.timestamp) : Number.NaN;
-  if (Number.isNaN(ts)) return null;
+  const ts = timestampOf(entry);
+  if (ts === undefined) return null;
   return {
     role,
     ts,
     message: entry.message,
     ...(typeof entry.uuid === "string" ? { uuid: entry.uuid } : {}),
     ...(typeof entry.agentId === "string" ? { agentId: entry.agentId } : {}),
+    ...(isObject(entry.toolUseResult) ? { toolUseResult: entry.toolUseResult } : {}),
   };
 }
 
@@ -201,13 +237,39 @@ export function assistantTexts(transcript: string): TranscriptText[] {
   return textsOfEntries(entriesOf(transcript)).sort((a, b) => a.ts - b.ts);
 }
 
-function assignmentOf(block: Record<string, unknown>, ts: number): AgentAssignment | null {
-  const { name, input } = block;
+// Запущенный сабагент узнаётся по результату вызова `Agent`: запись user с блоком
+// `tool_result` того же `tool_use_id` и `agentId` в `toolUseResult`.
+function agentIdsByCall(entries: readonly Entry[]): Map<string, string> {
+  const agentIds = new Map<string, string>();
+  for (const entry of entries) {
+    const agentId = entry.toolUseResult?.agentId;
+    if (entry.role !== USER_ROLE || typeof agentId !== "string") continue;
+    for (const block of blocksOf(entry)) {
+      const { tool_use_id: callId } = block;
+      if (block.type === "tool_result" && typeof callId === "string") agentIds.set(callId, agentId);
+    }
+  }
+  return agentIds;
+}
+
+function assignmentOf(
+  block: Record<string, unknown>,
+  ts: number,
+  agentIds: ReadonlyMap<string, string>,
+): AgentAssignment | null {
+  const { name, input, id } = block;
   if (block.type !== "tool_use" || !isObject(input)) return null;
   if (name === AGENT_TOOL) {
     const { subagent_type: agentType, prompt } = input;
     if (typeof agentType !== "string" || typeof prompt !== "string") return null;
-    return { ts, text: prompt, via: "spawn", agentType };
+    const agentId = typeof id === "string" ? agentIds.get(id) : undefined;
+    return {
+      ts,
+      text: prompt,
+      via: "spawn",
+      agentType,
+      ...(agentId === undefined ? {} : { agentId }),
+    };
   }
   if (name === SEND_MESSAGE_TOOL) {
     const { to: agentId, message } = input;
@@ -220,12 +282,15 @@ function assignmentOf(block: Record<string, unknown>, ts: number): AgentAssignme
 /**
  * Находит задания, которые сессия выдала сабагентам: вызовы `Agent` и `SendMessage`.
  * @param {string} transcript Содержимое транскрипта сессии в формате JSONL.
- * @returns {AgentAssignment[]} Задания от ранних к поздним.
+ * @returns {AgentAssignment[]} Задания от ранних к поздним; у задания новому запуску есть
+ *   `agentId`, если в транскрипте нашёлся результат вызова.
  */
 export function agentAssignments(transcript: string): AgentAssignment[] {
-  return entriesOf(transcript)
+  const entries = entriesOf(transcript);
+  const agentIds = agentIdsByCall(entries);
+  return entries
     .filter(isModelEntry)
-    .flatMap((entry) => blocksOf(entry).map((block) => assignmentOf(block, entry.ts)))
+    .flatMap((entry) => blocksOf(entry).map((block) => assignmentOf(block, entry.ts, agentIds)))
     .filter((assignment) => assignment !== null)
     .sort((a, b) => a.ts - b.ts);
 }
