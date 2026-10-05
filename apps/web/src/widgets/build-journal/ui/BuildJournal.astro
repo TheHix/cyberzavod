@@ -2,11 +2,16 @@
 // Журнал сборки: промпты человека и реплики цеха одним списком по времени. Промпт — как
 // сообщение модели, которая его получила: главное указание видно сразу, уточнения раскрываются
 // без JS через <details>. Реплика раскрыта целиком: строка из цеха и полный текст абзацами.
+// Каждая запись — остров client:visible со статичным телом в слоте: пока журнал закрыт, его
+// не видно и JS не грузится. Подсветка записи, до которой дошёл цех, и кнопка «показать в цехе»
+// появляются только с JS, когда запись на экране; без него остаётся эта же разметка.
 import type { MessageEvent, PromptEvent, Recording } from "@cyberzavod/core";
 import { recipientOf } from "@/entities/prompt";
 import { messageAnchor, paragraphsOf, routeOf } from "@/entities/message";
+import type { Speech } from "@/features/journal-sync";
 import { formatClock } from "@/shared/lib/format.ts";
-import { BulletList, buttonClass, Card, Chip, Title } from "@/shared/ui";
+import { BulletList, buttonClass, Title } from "@/shared/ui";
+import { JournalEntry } from "./JournalEntry.tsx";
 
 interface Props {
   /** Полная запись: в журнале, в отличие от цеха, есть полные тексты реплик. */
@@ -14,18 +19,30 @@ interface Props {
 }
 
 type Entry =
-  | { kind: "prompt"; prompt: PromptEvent }
-  | { kind: "message"; message: MessageEvent; index: number };
+  | { kind: "prompt"; prompt: PromptEvent; speech: Speech }
+  | { kind: "message"; message: MessageEvent; speech: Speech };
 
 const { recording } = Astro.props;
 
-// Номер реплики в журнале — тот же, что у реплики в цехе: по нему «подробнее» находит запись.
+// Номера промптов и реплик — те же, что у пузырей в цехе: по ним цех и журнал находят друг
+// друга, а по номеру реплики «подробнее» находит запись.
 const entries: Entry[] = [];
+let promptIndex = 0;
 let messageIndex = 0;
 for (const event of recording.events) {
-  if (event.type === "prompt") entries.push({ kind: "prompt", prompt: event });
+  if (event.type === "prompt") {
+    entries.push({
+      kind: "prompt",
+      prompt: event,
+      speech: { kind: "prompt", index: promptIndex++ },
+    });
+  }
   if (event.type === "message") {
-    entries.push({ kind: "message", message: event, index: messageIndex++ });
+    entries.push({
+      kind: "message",
+      message: event,
+      speech: { kind: "message", index: messageIndex++ },
+    });
   }
 }
 ---
@@ -37,11 +54,12 @@ for (const event of recording.events) {
     {entries.map((entry) =>
       entry.kind === "prompt" ? (
         <li>
-          <Card>
-            <p class="route">
-              <Chip>{formatClock(entry.prompt.t)}</Chip>
-              <Chip tone="sky">человек → {recipientOf(entry.prompt)}</Chip>
-            </p>
+          <JournalEntry
+            client:visible
+            speech={entry.speech}
+            clock={formatClock(entry.prompt.t)}
+            route={`человек → ${recipientOf(entry.prompt)}`}
+          >
             {entry.prompt.requirements.length === 0 ? (
               <Title>{entry.prompt.goal}</Title>
             ) : (
@@ -53,22 +71,23 @@ for (const event of recording.events) {
                 <BulletList items={entry.prompt.requirements} />
               </details>
             )}
-          </Card>
+          </JournalEntry>
         </li>
       ) : (
-        <li id={messageAnchor(entry.index)}>
-          <Card>
-            <p class="route">
-              <Chip>{formatClock(entry.message.t)}</Chip>
-              <Chip tone="sky">{routeOf(entry.message)}</Chip>
-            </p>
+        <li id={messageAnchor(entry.speech.index)}>
+          <JournalEntry
+            client:visible
+            speech={entry.speech}
+            clock={formatClock(entry.message.t)}
+            route={routeOf(entry.message)}
+          >
             <Title>{entry.message.line}</Title>
             <div class="text">
               {paragraphsOf(entry.message.text).map((paragraph) => (
                 <p>{paragraph}</p>
               ))}
             </div>
-          </Card>
+          </JournalEntry>
         </li>
       ),
     )}
@@ -87,13 +106,6 @@ for (const event of recording.events) {
   /* Реплику, к которой пришли по «подробнее», не прячет под край панели. */
   .timeline > li {
     scroll-margin: var(--space-l);
-  }
-
-  .route {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-    margin: 0 0 var(--space-xs);
   }
 
   .text {

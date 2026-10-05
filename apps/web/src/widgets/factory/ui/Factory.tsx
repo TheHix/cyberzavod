@@ -1,6 +1,7 @@
 import { createSignal, onCleanup, onMount, Show, untrack, type JSX } from "solid-js";
 import type { BriefRecording } from "@cyberzavod/core";
 import type { ProjectLink } from "@/entities/project";
+import { connectScene } from "@/features/journal-sync";
 import { useStoreValue } from "@/shared/lib/use-store-value.ts";
 import {
   loadFactoryGraphics,
@@ -95,6 +96,7 @@ export function Factory(props: Props): JSX.Element {
   };
 
   onMount(() => {
+    onCleanup(connectScene(model));
     let stop: (() => void) | undefined;
     let disposed = false;
     const resizeObserver = new ResizeObserver(fitToScreen);

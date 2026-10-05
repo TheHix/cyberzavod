@@ -1,0 +1,12 @@
+.route {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  align-items: center;
+  margin: 0 0 var(--space-xs);
+}
+
+/* Кнопка уходит в конец строки: время и маршрут остаются слева. */
+.seek {
+  margin-left: auto;
+}

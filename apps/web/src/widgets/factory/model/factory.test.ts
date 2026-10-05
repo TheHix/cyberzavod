@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Recording } from "@cyberzavod/core";
 import { createFactoryModel, type FactoryModel } from "./factory.ts";
 
@@ -232,5 +232,74 @@ describe("createFactoryModel: реплики", () => {
     model.seek(0);
 
     expect(model.$messagePosition.get()).toBeNull();
+  });
+});
+
+describe("createFactoryModel: журнал", () => {
+  it("не указывает на речь в начале сцены", () => {
+    const model = createFactoryModel(recordingWithMessages());
+
+    expect(model.$speech.get()).toBeNull();
+  });
+
+  it("ставит сцену на начало пузыря реплики, и $speech указывает на неё", () => {
+    const model = createFactoryModel(recordingWithMessages());
+
+    model.seekToSpeech({ kind: "message", index: 1 });
+
+    expect(model.$scene.get().time).toBe(model.script.messages[1]?.start);
+    expect(model.$speech.get()).toEqual({ kind: "message", index: 1 });
+    expect(model.$message.get()?.index).toBe(1);
+  });
+
+  it("ставит сцену на начало пузыря промпта", () => {
+    const model = createFactoryModel(recordingWithPrompt());
+
+    model.seekToSpeech({ kind: "prompt", index: 1 });
+
+    expect(model.$scene.get().time).toBe(model.script.prompts[1]?.start);
+    expect(model.$prompt.get()?.index).toBe(1);
+  });
+
+  it.each([true, false])("не меняет «идёт или пауза» (идёт: %s)", (playing) => {
+    const model = createFactoryModel(recordingWithMessages());
+    model.start(playing);
+
+    model.seekToSpeech({ kind: "message", index: 2 });
+
+    expect(model.$playing.get()).toBe(playing);
+  });
+
+  it("пропускает неизвестную речь", () => {
+    const model = createFactoryModel(recordingWithMessages());
+    model.seek(500);
+
+    model.seekToSpeech({ kind: "message", index: 9 });
+
+    expect(model.$scene.get().time).toBe(500);
+  });
+
+  it("не уведомляет слушателя, пока сцена внутри одной речи", () => {
+    const model = createFactoryModel(recordingWithMessages());
+    model.seekToSpeech({ kind: "message", index: 0 });
+    const listener = vi.fn();
+    model.$speech.listen(listener);
+
+    model.seek(duringMessage(model, 0) + 10);
+    model.seek(duringMessage(model, 0) + 20);
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("уведомляет слушателя, когда начинается следующая речь", () => {
+    const model = createFactoryModel(recordingWithMessages());
+    model.seekToSpeech({ kind: "message", index: 0 });
+    const listener = vi.fn();
+    model.$speech.listen(listener);
+
+    model.seekToSpeech({ kind: "message", index: 1 });
+
+    expect(listener).toHaveBeenCalledOnce();
+    expect(model.$speech.get()).toEqual({ kind: "message", index: 1 });
   });
 });

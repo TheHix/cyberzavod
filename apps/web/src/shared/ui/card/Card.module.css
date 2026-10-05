@@ -5,3 +5,9 @@
   border: var(--outline);
   border-radius: var(--radius-m);
 }
+
+/* Текущая карточка списка: жёлтая плашка и тень вниз, как у приподнятых элементов kit. */
+.card[aria-current="true"] {
+  background: var(--sun);
+  box-shadow: var(--lift-text);
+}

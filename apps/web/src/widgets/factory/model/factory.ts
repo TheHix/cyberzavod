@@ -15,6 +15,8 @@ import {
   type Scene,
 } from "@cyberzavod/core";
 import { atom, computed, type ReadableAtom } from "nanostores";
+import type { JournalScene, Speech } from "@/features/journal-sync";
+import { speechAt, speechStart, speechTimeline } from "../lib/speech-timeline.ts";
 import {
   advance,
   seek,
@@ -27,8 +29,11 @@ import {
 /** Готова ли графика цеха: пока она грузится, проигрывать нечем. */
 export type GraphicsStatus = "loading" | "ready" | "failed";
 
-/** Модель цеха: сторы состояния (имена с `$`) и действия над ним. */
-export interface FactoryModel {
+/**
+ * Модель цеха: сторы состояния (имена с `$`) и действия над ним. Журналу сборки она подходит
+ * как `JournalScene`: `$speech` и `seekToSpeech`.
+ */
+export interface FactoryModel extends JournalScene {
   readonly script: FactoryScript;
   /** Итоги всей сборки: время, токены, промпты, возвраты. */
   readonly summary: BuildStats;
@@ -47,6 +52,8 @@ export interface FactoryModel {
   readonly $message: ReadableAtom<MessageCue | null>;
   /** Где говорящий — мастер или рабочий, — точка плана, над которой висит реплика. */
   readonly $messagePosition: ReadableAtom<Point | null>;
+  /** Последний промпт или реплика, начавшиеся к этому моменту: их подсвечивает журнал. */
+  readonly $speech: ReadableAtom<Speech | null>;
   /** Раскрыты ли уточнения висящего промпта; со сменой промпта закрываются. */
   readonly $promptDetailsOpen: ReadableAtom<boolean>;
   /** Графика готова; сцена сразу идёт, если `autoplay`. */
@@ -63,6 +70,8 @@ export interface FactoryModel {
   setSpeed(speed: Speed): void;
   /** Раскрывает или сворачивает уточнения висящего промпта; раскрытие ставит паузу. */
   togglePromptDetails(): void;
+  /** Перематывает к началу пузыря промпта или реплики; «идёт или пауза» не меняется. */
+  seekToSpeech(speech: Speech): void;
 }
 
 /**
@@ -94,6 +103,9 @@ export function createFactoryModel(recording: BriefRecording): FactoryModel {
     return scene.workers.find((worker) => worker.station === cue.speaker)?.position ?? null;
   });
 
+  const timeline = speechTimeline(script);
+  const $speech = computed($scene, (scene) => speechAt(timeline, scene.time));
+
   const update = (change: (playback: Playback) => Playback) => {
     const promptBefore = $prompt.get();
     $playback.set(change($playback.get()));
@@ -115,6 +127,7 @@ export function createFactoryModel(recording: BriefRecording): FactoryModel {
     $promptPosition,
     $message,
     $messagePosition,
+    $speech,
     $promptDetailsOpen,
     start: (autoplay) => {
       $status.set("ready");
@@ -132,6 +145,10 @@ export function createFactoryModel(recording: BriefRecording): FactoryModel {
       $promptDetailsOpen.set(open);
       // Чтобы прочитать уточнения, сцену останавливаем.
       if (open) pause();
+    },
+    seekToSpeech: (speech) => {
+      const start = speechStart(timeline, speech);
+      if (start !== undefined) update((playback) => seek(playback, start));
     },
   };
 }
