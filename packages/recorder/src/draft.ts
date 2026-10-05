@@ -88,14 +88,21 @@ export interface DraftCheck {
   ok: boolean;
   /** Запуск станции, вынесший вердикт; у проверок основной сессии его нет. */
   run?: string;
+  /** Проект, в чьём каталоге шли проверки основной сессии; `make recording-draft` ставит его. */
+  project?: string;
 }
 
 /**
- * Событие черновика: событие записи (у событий станций с пометкой запуска `run`), промпт,
- * реплика, окно запуска или исход проверок, ещё не прошедшие публикацию.
+ * Событие черновика: событие записи (у событий станций с пометкой запуска `run`, у событий
+ * основной сессии, чей проект известен, — с пометкой `project`), промпт, реплика, окно запуска
+ * или исход проверок, ещё не прошедшие публикацию.
  */
 export type DraftEvent =
-  (FactoryEvent & { run?: string }) | DraftPrompt | DraftMessage | DraftRun | DraftCheck;
+  | (FactoryEvent & { run?: string; project?: string })
+  | DraftPrompt
+  | DraftMessage
+  | DraftRun
+  | DraftCheck;
 
 /** Событие черновика, которое правит редактор: промпт или реплика. */
 export type EditableDraftEvent = DraftPrompt | DraftMessage;
@@ -218,23 +225,27 @@ function parseDraftRun(raw: Record<string, unknown>, index: number): DraftRun {
 }
 
 function parseDraftCheck(raw: Record<string, unknown>, index: number): DraftCheck {
-  const { t, ok, run } = raw;
+  const { t, ok } = raw;
   if (typeof t !== "number" || typeof ok !== "boolean") {
     throw new DraftError(`событие #${index}: у проверки должны быть t и ok`);
   }
-  if (run !== undefined && typeof run !== "string") {
-    throw new DraftError(`событие #${index}: run должен быть строкой`);
-  }
-  return { t, type: "draft_check", ok, ...(run === undefined ? {} : { run }) };
+  return { t, type: "draft_check", ok, ...parseEventMarks(raw, index) };
 }
 
 // Событие цеха проходит проверку ядра, которая оставляет только поля формата, поэтому
-// пометку запуска `run` читаем отдельно.
-function parseRunMark(raw: unknown, index: number): { run?: string } {
-  const run = isObject(raw) ? raw.run : undefined;
-  if (run === undefined) return {};
-  if (typeof run !== "string") throw new DraftError(`событие #${index}: run должен быть строкой`);
-  return { run };
+// пометки черновика — запуск `run` и проект `project` — читаем отдельно.
+function parseEventMarks(raw: unknown, index: number): { run?: string; project?: string } {
+  const { run, project } = isObject(raw) ? raw : { run: undefined, project: undefined };
+  if (run !== undefined && typeof run !== "string") {
+    throw new DraftError(`событие #${index}: run должен быть строкой`);
+  }
+  if (project !== undefined && typeof project !== "string") {
+    throw new DraftError(`событие #${index}: project должен быть строкой`);
+  }
+  return {
+    ...(run === undefined ? {} : { run }),
+    ...(project === undefined ? {} : { project }),
+  };
 }
 
 function parseDraftEvent(raw: unknown, index: number): DraftEvent {
@@ -242,7 +253,7 @@ function parseDraftEvent(raw: unknown, index: number): DraftEvent {
   if (isObject(raw) && raw.type === "draft_message") return parseDraftMessage(raw, index);
   if (isObject(raw) && raw.type === "draft_run") return parseDraftRun(raw, index);
   if (isObject(raw) && raw.type === "draft_check") return parseDraftCheck(raw, index);
-  return { ...parseFactoryEvent(raw, index), ...parseRunMark(raw, index) };
+  return { ...parseFactoryEvent(raw, index), ...parseEventMarks(raw, index) };
 }
 
 function parseBuild(raw: unknown, index: number): DraftBuild {
@@ -263,7 +274,7 @@ function parseBuild(raw: unknown, index: number): DraftBuild {
 function parseLegacyBuild(raw: Record<string, unknown>, id: string): DraftBuild {
   const { title } = raw;
   if (typeof title !== "string") {
-    throw new DraftError("у черновика должны быть id, startedAt и title");
+    throw new DraftError("у черновика без builds должен быть title");
   }
   const header = (field: "project" | "factory") => {
     const value = raw[field];
@@ -328,7 +339,7 @@ export function parseDraft(raw: unknown): Draft {
   if (!isObject(raw)) throw new DraftError("черновик должен быть объектом");
   const { id, startedAt, events } = raw;
   if (typeof id !== "string" || typeof startedAt !== "string") {
-    throw new DraftError("у черновика должны быть id, startedAt и title");
+    throw new DraftError("у черновика должны быть id и startedAt");
   }
   const builds = parseBuilds(raw, id);
   checkBuildIds(builds);
@@ -598,9 +609,13 @@ function textsOf(event: FactoryEvent): string[] {
 }
 
 // Исход сборки — последний вердикт или запуск проверок; без проверок сборка считается удачной.
+// Черновики до #6 несли исход не в `draft_check`, а в `build_end`, поэтому без проверок
+// смотрим на него.
 function checksPassed(events: readonly DraftEvent[]): boolean {
-  const last = events.findLast((event) => event.type === "draft_check");
-  return last?.ok ?? true;
+  const lastCheck = events.findLast((event) => event.type === "draft_check");
+  if (lastCheck !== undefined) return lastCheck.ok;
+  const legacyEnd = events.findLast((event) => event.type === "build_end");
+  return legacyEnd?.ok ?? true;
 }
 
 function totalTokens(events: readonly DraftEvent[]): number | undefined {
@@ -617,7 +632,7 @@ function buildOf(draft: Draft, buildId: string): DraftBuild {
 /**
  * Превращает одну сборку отредактированного черновика в запись для сайта: только события
  * этой сборки, время от её первого события и без долгих пауз, без исходных текстов промптов
- * и реплик, без склеенных промптов и служебных событий черновика.
+ * и реплик, без пометок `project`, без склеенных промптов и служебных событий черновика.
  * @param {Draft} draft Черновик с заполненными заголовком, проектом, версией завода,
  *   чистовыми промптами и репликами публикуемой сборки.
  * @param {string} buildId Идентификатор публикуемой сборки.

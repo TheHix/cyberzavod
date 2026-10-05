@@ -15,7 +15,18 @@ export type RawEvent =
       factory?: string;
     }
   | { ts: number; kind: "prompt"; text: string }
-  | { ts: number; kind: "tool"; tool: string; ok: boolean; command?: string; file?: string }
+  | {
+      ts: number;
+      kind: "tool";
+      tool: string;
+      ok: boolean;
+      command?: string;
+      file?: string;
+      /** Каталог, в котором шла сессия или сабагент в момент вызова инструмента. */
+      cwd?: string;
+      /** Сабагент, вызвавший инструмент; у вызова основной сессии поля нет. */
+      agentId?: string;
+    }
   | { ts: number; kind: "subagent_start"; agent: string; agentId?: string }
   | {
       ts: number;
@@ -64,19 +75,25 @@ function stringField(payload: HookPayload, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+// Инструменты сабагентов приходят в той же сессии: по `agentId` вызов сабагента отличается
+// от вызова основной сессии, а по `cwd` находится проект, в котором шла команда.
 function toolEvent(payload: HookPayload, ts: number, ok: boolean): RawEvent {
   const input = isPayload(payload.tool_input) ? payload.tool_input : {};
-  const event: RawEvent = {
-    ts,
-    kind: "tool",
-    tool: stringField(payload, "tool_name") ?? UNKNOWN,
-    ok,
-  };
   const command = stringField(input, "command");
-  if (command !== undefined) event.command = command.slice(0, MAX_COMMAND_LENGTH);
-  const file = stringField(input, "file_path") ?? stringField(input, "notebook_path");
-  if (file !== undefined) event.file = file;
-  return event;
+  return withOptional<Extract<RawEvent, { kind: "tool" }>>(
+    {
+      ts,
+      kind: "tool",
+      tool: stringField(payload, "tool_name") ?? UNKNOWN,
+      ok,
+    },
+    {
+      command: command?.slice(0, MAX_COMMAND_LENGTH),
+      file: stringField(input, "file_path") ?? stringField(input, "notebook_path"),
+      cwd: stringField(payload, "cwd"),
+      agentId: stringField(payload, "agent_id"),
+    },
+  );
 }
 
 // Из ответа сабагента в журнал идёт только первая строка: станции пайплайна начинают

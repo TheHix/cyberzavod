@@ -45,6 +45,53 @@ describe("fromHookPayload", () => {
     });
   });
 
+  it("сохраняет каталог, в котором выполнялся инструмент", () => {
+    const payload = {
+      hook_event_name: "PostToolUse",
+      tool_name: "Bash",
+      tool_input: { command: "make check-web" },
+      cwd: "/work/cyberzavod",
+    };
+
+    const event = fromHookPayload(payload, TS);
+
+    expect(event).toEqual({
+      ts: TS,
+      kind: "tool",
+      tool: "Bash",
+      ok: true,
+      command: "make check-web",
+      cwd: "/work/cyberzavod",
+    });
+  });
+
+  it("сохраняет agent_id вызова сабагента как agentId", () => {
+    const payload = {
+      hook_event_name: "PostToolUse",
+      tool_name: "Edit",
+      tool_input: { file_path: "/a.ts" },
+      cwd: "/work/cyberzavod",
+      agent_id: "a52e",
+    };
+
+    const event = fromHookPayload(payload, TS);
+
+    expect(event).toMatchObject({ kind: "tool", agentId: "a52e" });
+  });
+
+  it("не пишет agentId у вызова основной сессии", () => {
+    const payload = {
+      hook_event_name: "PostToolUse",
+      tool_name: "Edit",
+      tool_input: { file_path: "/a.ts" },
+      cwd: "/work/cyberzavod",
+    };
+
+    const event = fromHookPayload(payload, TS);
+
+    expect(event).not.toHaveProperty("agentId");
+  });
+
   it("помечает упавший инструмент как ok: false", () => {
     const payload = {
       hook_event_name: "PostToolUseFailure",

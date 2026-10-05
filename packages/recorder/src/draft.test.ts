@@ -163,6 +163,44 @@ describe("parseDraft", () => {
     expect(act).toThrow(new RegExp(field));
   });
 
+  it.each([
+    ["событие цеха", { t: 2_000, type: "stage_enter", stage: "test", project: "b" }],
+    ["исход проверок", { t: 2_000, type: "draft_check", ok: true, project: "b" }],
+  ])("принимает пометку project у события: %s", (_name, event) => {
+    const raw = { ...uneditedDraft(), events: [event] };
+
+    const draft = parseDraft(raw);
+
+    expect(draft.events).toEqual([event]);
+  });
+
+  it.each([
+    ["событие цеха", { t: 2_000, type: "stage_enter", stage: "test", project: 5 }],
+    ["исход проверок", { t: 2_000, type: "draft_check", ok: true, project: 5 }],
+  ])("отклоняет нестроковую пометку project у события: %s", (_name, event) => {
+    const raw = { ...uneditedDraft(), events: [event] };
+
+    const act = () => parseDraft(raw);
+
+    expect(act).toThrow(/project должен быть строкой/);
+  });
+
+  it("называет id и startedAt, когда их нет у черновика", () => {
+    const raw = { ...uneditedDraft(), startedAt: undefined };
+
+    const act = () => parseDraft(raw);
+
+    expect(act).toThrow("у черновика должны быть id и startedAt");
+  });
+
+  it("называет title, когда его нет у старого черновика", () => {
+    const raw = { ...legacyDraft(), title: undefined };
+
+    const act = () => parseDraft(raw);
+
+    expect(act).toThrow("у черновика без builds должен быть title");
+  });
+
   it("отклоняет черновик без сборок", () => {
     const raw = { ...uneditedDraft(), builds: [] };
 
@@ -886,6 +924,46 @@ describe("publishBuild", () => {
       [1_000, "stage_enter"],
       [1_000, "build_end"],
     ]);
+  });
+
+  it("не оставляет в записи пометок project у событий", () => {
+    const draft = editedDraft();
+    draft.events.push(
+      { t: 3_000, type: "stage_enter", stage: "test", project: "cyberzavod" },
+      { t: 3_000, type: "draft_check", ok: false, project: "cyberzavod" },
+      {
+        t: 3_000,
+        type: "stage_fail",
+        stage: "test",
+        reason: "проверки не прошли",
+        project: "cyberzavod",
+      },
+    );
+
+    const recording = publishOnly(draft);
+
+    expect(JSON.stringify(recording.events)).not.toContain("project");
+  });
+
+  it("берёт исход сборки из build_end старого черновика, если проверок нет", () => {
+    const draft = editedDraft();
+    draft.events.push({ t: 3_000, type: "build_end", ok: false });
+
+    const recording = publishOnly(draft);
+
+    expect(recording.events.at(-1)).toMatchObject({ type: "build_end", ok: false });
+  });
+
+  it("предпочитает проверки старому build_end", () => {
+    const draft = editedDraft();
+    draft.events.push(
+      { t: 3_000, type: "draft_check", ok: true },
+      { t: 3_500, type: "build_end", ok: false },
+    );
+
+    const recording = publishOnly(draft);
+
+    expect(recording.events.at(-1)).toMatchObject({ type: "build_end", ok: true });
   });
 
   it("считает сборку без проверок удачной", () => {

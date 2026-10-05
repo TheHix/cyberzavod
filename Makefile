@@ -23,11 +23,12 @@ api-dev: ## API из исходников: миграции и запуск (н�
 recording-draft: ## Черновик записи из журнала сборки (RAW=файл, по умолчанию самый свежий)
 	node packages/recorder/src/bin/draft.ts $(RAW)
 
+# VERSION и BUILD берутся только из командной строки: одноимённая переменная окружения (у версий
+# инструментов они бывают, а BUILD ставят многие сборочные системы) молча выбрала бы чужую версию
+# завода или опубликовала бы одну сборку вместо всех.
 recording-publish: ## Опубликовать черновик (DRAFT=файл, по умолчанию самый свежий; BUILD=id — одну сборку)
-	node packages/recorder/src/bin/publish.ts "$(DRAFT)" "$(BUILD)"
+	node packages/recorder/src/bin/publish.ts "$(DRAFT)" $(if $(filter command line,$(origin BUILD)),"$(BUILD)")
 
-# VERSION берётся только из командной строки: одноимённая переменная окружения (у версий
-# инструментов они бывают) молча выбрала бы чужую версию завода.
 project-init: ## Подключить внешний репозиторий к заводу (DIR=путь ID=id [VERSION=версия])
 	factory/project-init.sh "$(CURDIR)" "$(DIR)" "$(ID)" $(if $(filter command line,$(origin VERSION)),"$(VERSION)")
 

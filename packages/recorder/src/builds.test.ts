@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildTimeline, eventBuilds, IDLE_GAP_MS, unassignedRuns } from "./builds.ts";
+import {
+  buildTimeline,
+  eventBuilds,
+  IDLE_GAP_MS,
+  projectsWithoutBuild,
+  unassignedRuns,
+} from "./builds.ts";
 import type { Draft, DraftEvent } from "./draft.ts";
 import { FIRST_BUILD_ID, interleavedDraft, message, SECOND_BUILD_ID } from "./draft.fixtures.ts";
 
@@ -28,6 +34,24 @@ function prompt(t: number, build?: string): DraftEvent {
 
 function stageEnter(t: number, run?: string): DraftEvent {
   return { t, type: "stage_enter", stage: "code", ...(run === undefined ? {} : { run }) };
+}
+
+function projectCheck(t: number, project: string): DraftEvent {
+  return { t, type: "draft_check", ok: true, project };
+}
+
+// Две сборки проекта `a` вокруг сборки проекта `b`: первая по порядку — `first`.
+function projectDraftOf(events: DraftEvent[]): Draft {
+  return {
+    id: "first",
+    startedAt: "2026-10-04T09:52:13.000Z",
+    builds: [
+      { id: "first", project: "a", factory: "0.1.0", title: "", runs: ["a1"] },
+      { id: "other", project: "b", factory: "0.1.0", title: "", runs: ["b1"] },
+      { id: "third", project: "a", factory: "0.1.0", title: "", runs: ["a3"] },
+    ],
+    events,
+  };
 }
 
 function runWindow(t: number, run: string, until: number): DraftEvent {
@@ -124,6 +148,62 @@ describe("eventBuilds", () => {
   });
 });
 
+describe("eventBuilds: проект события", () => {
+  it("относит событие к сборке его проекта вопреки предыдущему событию", () => {
+    const draft = projectDraftOf([stageEnter(1, "a1"), projectCheck(2, "b")]);
+
+    const builds = eventBuilds(draft);
+
+    expect(builds).toEqual(["first", "other"]);
+  });
+
+  it("выбирает из сборок проекта ту, к которой относилось ближайшее предыдущее событие", () => {
+    const draft = projectDraftOf([stageEnter(1, "a3"), stageEnter(2, "b1"), projectCheck(3, "a")]);
+
+    const builds = eventBuilds(draft);
+
+    expect(builds).toEqual(["third", "other", "third"]);
+  });
+
+  it("выбирает первую по порядку сборку проекта, пока его событий не было", () => {
+    const draft = projectDraftOf([stageEnter(1, "b1"), projectCheck(2, "a")]);
+
+    const builds = eventBuilds(draft);
+
+    expect(builds).toEqual(["other", "first"]);
+  });
+
+  it("оставляет событие проекта без сборки в текущей сборке", () => {
+    const draft = projectDraftOf([stageEnter(1, "b1"), projectCheck(2, "unknown")]);
+
+    const builds = eventBuilds(draft);
+
+    expect(builds).toEqual(["other", "other"]);
+  });
+
+  it("не меняет сборку, которую наследуют следующие события", () => {
+    const draft = projectDraftOf([
+      prompt(1, "third"),
+      projectCheck(2, "b"),
+      { t: 3, type: "usage", tokens: 5 },
+    ]);
+
+    const builds = eventBuilds(draft);
+
+    expect(builds).toEqual(["third", "other", "third"]);
+  });
+
+  it("ставит запуск выше проекта", () => {
+    const draft = projectDraftOf([
+      { t: 1, type: "stage_enter", stage: "code", run: "a1", project: "b" },
+    ]);
+
+    const builds = eventBuilds(draft);
+
+    expect(builds).toEqual(["first"]);
+  });
+});
+
 describe("unassignedRuns", () => {
   it("находит окна запусков, не указанных ни в одной сборке", () => {
     const draft = draftOf([runWindow(1, "a1", 2), runWindow(3, "x1", 4), runWindow(5, "x2", 6)]);
@@ -131,6 +211,40 @@ describe("unassignedRuns", () => {
     const runs = unassignedRuns(draft).map(({ run }) => run);
 
     expect(runs).toEqual(["x1", "x2"]);
+  });
+
+  it("называет запуск один раз, когда у него два окна", () => {
+    const draft = draftOf([runWindow(1, "x1", 2), runWindow(3, "x1", 4)]);
+
+    const runs = unassignedRuns(draft);
+
+    expect(runs).toEqual([runWindow(1, "x1", 2)]);
+  });
+});
+
+describe("projectsWithoutBuild", () => {
+  it("находит проект без сборки и пропускает проект со сборкой", () => {
+    const draft = projectDraftOf([
+      projectCheck(1, "a"),
+      projectCheck(2, "lab"),
+      projectCheck(3, "b"),
+    ]);
+
+    const projects = projectsWithoutBuild(draft);
+
+    expect(projects).toEqual(["lab"]);
+  });
+
+  it("называет проект один раз, в порядке появления", () => {
+    const draft = projectDraftOf([
+      projectCheck(1, "lab"),
+      projectCheck(2, "docs"),
+      { t: 3, type: "stage_enter", stage: "code", project: "lab" },
+    ]);
+
+    const projects = projectsWithoutBuild(draft);
+
+    expect(projects).toEqual(["lab", "docs"]);
   });
 });
 

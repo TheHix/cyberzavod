@@ -5,7 +5,7 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { eventBuilds, unassignedRuns } from "../builds.ts";
+import { eventBuilds, projectsWithoutBuild, unassignedRuns } from "../builds.ts";
 import {
   carryOverEdits,
   orphanedEdits,
@@ -26,6 +26,7 @@ import {
   sessionTranscriptPaths,
   stationTranscriptPaths,
   toDraft,
+  toolDirectories,
 } from "../to-draft.ts";
 import {
   agentAssignments,
@@ -40,7 +41,13 @@ import {
   type TokenUsage,
   type TranscriptText,
 } from "../transcript.ts";
-import { fromFactoryHome, isNotFound, newestFile, RECORDINGS_DIRS } from "./paths.ts";
+import {
+  findProjectId,
+  fromFactoryHome,
+  isNotFound,
+  newestFile,
+  RECORDINGS_DIRS,
+} from "./paths.ts";
 
 // Транскрипты читаются по одному: непрочитанный — предупреждение, а не ошибка, черновик полезен
 // и без счётчика токенов. Транскрипты служебных сабагентов Claude Code не сохраняет — о них
@@ -120,6 +127,17 @@ async function reportsFromStationTranscripts(paths: string[]): Promise<AgentRepo
   }
   if (missing > 0) console.warn(`транскриптов станций не найдено: ${missing}, их отчётов не будет`);
   return reports;
+}
+
+// Проект каждого каталога, где шли команды. Проект ищется здесь, а не в хуке: так он находится
+// и для старых журналов, где пути уже лежат в командах, а хук остаётся лёгким.
+async function projectsOfDirectories(directories: string[]): Promise<Map<string, string>> {
+  const projects = new Map<string, string>();
+  for (const directory of directories) {
+    const id = await findProjectId(directory);
+    if (id !== undefined) projects.set(directory, id);
+  }
+  return projects;
 }
 
 // Как назвать правку в предупреждении: у промпта — цель, у реплики — строка.
@@ -209,6 +227,7 @@ const fresh = toDraft(rawEvents, {
   sessionUsages: await usagesOfSession(sessionTranscriptPaths(rawEvents)),
   ...session,
   reports,
+  projectsByDirectory: await projectsOfDirectories(toolDirectories(rawEvents)),
 });
 const draftPath = path.join(RECORDINGS_DIRS.drafts, `${fresh.id}.json`);
 const previous = await readEarlierDraft(draftPath);
@@ -231,6 +250,9 @@ for (const build of draft.builds) {
   );
 }
 for (const line of unfilledHeader(draft)) console.log(`  не заполнено: ${line}`);
+for (const project of projectsWithoutBuild(draft)) {
+  console.warn(`команды проекта ${project} без сборки: достанутся сборке по времени`);
+}
 console.log(`ждут редактуры: ${waiting.length}`);
 for (const event of waiting) console.log(`  • ${describeWaiting(event)}`);
 

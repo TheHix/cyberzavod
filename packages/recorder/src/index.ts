@@ -18,6 +18,7 @@ export {
   sessionTranscriptPaths,
   stationTranscriptPaths,
   toDraft,
+  toolDirectories,
   type DraftMeta,
 } from "./to-draft.ts";
 export {
@@ -40,7 +41,13 @@ export {
   type EditableDraftEvent,
   type MessageSource,
 } from "./draft.ts";
-export { buildTimeline, eventBuilds, IDLE_GAP_MS, unassignedRuns } from "./builds.ts";
+export {
+  buildTimeline,
+  eventBuilds,
+  IDLE_GAP_MS,
+  projectsWithoutBuild,
+  unassignedRuns,
+} from "./builds.ts";
 export { parseProjectConfig, ProjectConfigError, type ProjectConfig } from "./project.ts";
 export { findLeaks } from "./leaks.ts";
 export {

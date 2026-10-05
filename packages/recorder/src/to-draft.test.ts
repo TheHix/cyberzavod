@@ -9,6 +9,7 @@ import {
   sessionTranscriptPaths,
   stationTranscriptPaths,
   toDraft,
+  toolDirectories,
 } from "./to-draft.ts";
 import type { AgentAssignment, AgentReport, TranscriptText } from "./transcript.ts";
 
@@ -1189,6 +1190,24 @@ describe("toDraft: токены", () => {
       expect(usagesOf(draft)).toEqual([]);
     });
 
+    it("отдаёт участок последней из привязок с одним временем", () => {
+      const raw: RawEvent[] = [
+        { ts: START + 1_000, kind: "prompt", text: "Сделай" },
+        { ts: START + 1_000, kind: "subagent_start", agent: "coder", agentId: "c1" },
+        { ts: START + 9_000, kind: "stop" },
+      ];
+      const sessionUsages = [{ ts: START + 2_000, tokens: 5 }];
+
+      const draft = toDraft(raw, { sessionId: "s1", sessionUsages });
+
+      expect(draft.events.map((event) => event.type)).toEqual([
+        "draft_prompt",
+        "stage_enter",
+        "draft_run",
+        "usage",
+      ]);
+    });
+
     it("считает в сумме токены станций и сообщений журнала без потерь", () => {
       const sessionUsages = [
         { ts: START + 100, tokens: 1 },
@@ -1204,6 +1223,304 @@ describe("toDraft: токены", () => {
 
       expect(usagesOf(draft).reduce((sum, { tokens }) => sum + tokens, 0)).toBe(4_321);
     });
+  });
+});
+
+const PROJECT_A = "/work/a";
+const PROJECT_B = "/work/b";
+const PROJECTS_BY_DIRECTORY = new Map([
+  [PROJECT_A, "a"],
+  [PROJECT_B, "b"],
+  [`${PROJECT_B}/src`, "b"],
+  [`${PROJECT_B}/src/state`, "b"],
+]);
+
+type ToolEvent = Extract<RawEvent, { kind: "tool" }>;
+
+function bash(ts: number, command: string, cwd?: string, agentId?: string): ToolEvent {
+  return {
+    ts,
+    kind: "tool",
+    tool: "Bash",
+    ok: true,
+    command,
+    ...(cwd === undefined ? {} : { cwd }),
+    ...(agentId === undefined ? {} : { agentId }),
+  };
+}
+
+function edit(ts: number, file: string, cwd?: string): RawEvent {
+  return { ts, kind: "tool", tool: "Edit", ok: true, file, ...(cwd === undefined ? {} : { cwd }) };
+}
+
+// Этап или проверка и проект события по порядку: так видно, куда команда отнесена.
+function projectMarksOf(draft: Draft): string[] {
+  return draft.events.flatMap((event) => {
+    const project = "project" in event && event.project !== undefined ? event.project : "—";
+    if (event.type === "stage_enter") return [`${event.stage} ${project}`];
+    if (event.type === "stage_fail") return [`fail:${event.stage} ${project}`];
+    if (event.type === "draft_check") return [`check ${project}`];
+    return [];
+  });
+}
+
+describe("toDraft: проект команды", () => {
+  const meta = { sessionId: "s1", projectsByDirectory: PROJECTS_BY_DIRECTORY };
+
+  it("берёт проект из абсолютного cd", () => {
+    const raw = [bash(START, `cd ${PROJECT_B} && pnpm check`, PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["test b", "check b"]);
+  });
+
+  it("берёт проект подкаталога, в который перешёл cd", () => {
+    const raw = [bash(START, `cd ${PROJECT_B}/src/state && pnpm test`, PROJECT_A)];
+
+    const draft = toDraft(raw, {
+      sessionId: "s1",
+      projectsByDirectory: new Map([[`${PROJECT_B}/src/state`, "b-state"]]),
+    });
+
+    expect(projectMarksOf(draft)).toEqual(["test b-state", "check b-state"]);
+  });
+
+  it("разрешает относительный cd от каталога вызова", () => {
+    const raw = [bash(START, "cd src && pnpm test", PROJECT_B)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["test b", "check b"]);
+  });
+
+  it("разрешает cd с двумя точками от каталога вызова", () => {
+    const raw = [bash(START, "cd ../a && pnpm test", PROJECT_B)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["test a", "check a"]);
+  });
+
+  it("снимает простые кавычки вокруг каталога", () => {
+    const raw = [bash(START, `cd '${PROJECT_B}' && pnpm test`, PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["test b", "check b"]);
+  });
+
+  it("даёт сегментам цепочки с двумя cd разные проекты", () => {
+    const raw = [
+      bash(START, `cd ${PROJECT_A} && make check && cd ${PROJECT_B} && git commit -m x`),
+    ];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["test a", "check a", "ship b"]);
+  });
+
+  it("распознаёт git -C как выпуск проекта каталога", () => {
+    const raw = [bash(START, `git -C ${PROJECT_B} commit -m x`, PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["ship b"]);
+  });
+
+  it("не распространяет git -C на следующие команды цепочки", () => {
+    const raw = [bash(START, `git -C ${PROJECT_B} commit -m x && git push`, PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["ship b", "ship a"]);
+  });
+
+  it("берёт проект каталога правимого файла", () => {
+    const raw = [edit(START, `${PROJECT_B}/src/lib.ts`, PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["code b"]);
+  });
+
+  it("берёт проект каталога вызова, если cd в команде нет", () => {
+    const raw = [bash(START, "make check-web", PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["test a", "check a"]);
+  });
+
+  it("берёт проект из начала сессии для старого журнала без cwd", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "session_start", project: "old", factory: "0.1.0" },
+      bash(START + 1_000, "make check-web"),
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(projectMarksOf(draft)).toEqual(["test old", "check old"]);
+  });
+
+  it("не берёт проект сессии, когда относительный cd выходит из её каталога", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "session_start", project: "old", factory: "0.1.0" },
+      bash(START + 1_000, "cd ../other && make check-web"),
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(projectMarksOf(draft)).toEqual(["test —", "check —"]);
+  });
+
+  it.each([
+    "cd ~/x && make check",
+    "cd $WORK && make check",
+    "cd `pwd` && make check",
+    "cd - && make check",
+    "cd && make check",
+  ])("оставляет без проекта команду «%s»", (command) => {
+    const raw = [bash(START, command, PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["test —", "check —"]);
+  });
+
+  it("оставляет без проекта каталог, которого нет в карте", () => {
+    const raw = [bash(START, "cd /tmp && make check", PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["test —", "check —"]);
+  });
+
+  it("ставит проект и на провал проверок", () => {
+    const raw: RawEvent[] = [{ ...bash(START, "make check", PROJECT_B), ok: false }];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["test b", "check b", "fail:test b"]);
+  });
+
+  it("записывает команду основной сессии, пока работает станция", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
+      bash(START + 1_000, "make check", PROJECT_A),
+    ];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["review —", "test a", "check a"]);
+  });
+
+  it("пропускает команду сабагента, чья станция работает", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
+      bash(START + 1_000, "make check", PROJECT_A, "r1"),
+    ];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["review —"]);
+  });
+
+  it("записывает команду сабагента без станции", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
+      bash(START + 1_000, "make check", PROJECT_A, "e1"),
+    ];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["review —", "test a", "check a"]);
+  });
+
+  it("входит на этап проекта b после станции code проекта a", () => {
+    const raw: RawEvent[] = [
+      edit(START, `${PROJECT_A}/x.ts`, PROJECT_A),
+      { ts: START + 1_000, kind: "subagent_start", agent: "coder", agentId: "c1" },
+      { ts: START + 2_000, kind: "subagent_stop", agent: "coder", agentId: "c1" },
+      edit(START + 3_000, `${PROJECT_B}/x.ts`, PROJECT_B),
+    ];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["code a", "code —", "code b"]);
+  });
+
+  it("входит на этап снова после работы станции того же проекта", () => {
+    const raw: RawEvent[] = [
+      edit(START, `${PROJECT_A}/x.ts`, PROJECT_A),
+      { ts: START + 1_000, kind: "subagent_start", agent: "coder", agentId: "c1" },
+      { ts: START + 2_000, kind: "subagent_stop", agent: "coder", agentId: "c1" },
+      edit(START + 3_000, `${PROJECT_A}/x.ts`, PROJECT_A),
+    ];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["code a", "code —", "code a"]);
+  });
+
+  it("не повторяет этап при повторных правках одного проекта", () => {
+    const raw = [
+      edit(START, `${PROJECT_B}/x.ts`, PROJECT_B),
+      edit(START + 1_000, `${PROJECT_B}/y.ts`, PROJECT_B),
+      edit(START + 2_000, `${PROJECT_B}/src/z.ts`, PROJECT_B),
+    ];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["code b"]);
+  });
+
+  it("ведёт этап каждого проекта отдельно", () => {
+    const raw = [
+      edit(START, `${PROJECT_A}/x.ts`, PROJECT_A),
+      edit(START + 1_000, `${PROJECT_B}/x.ts`, PROJECT_A),
+      edit(START + 2_000, `${PROJECT_A}/y.ts`, PROJECT_A),
+    ];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["code a", "code b"]);
+  });
+});
+
+describe("toolDirectories", () => {
+  it("собирает каталоги из cwd, cd, git -C и файлов без повторов", () => {
+    const raw = [
+      bash(START, "make check", PROJECT_A),
+      bash(START + 1_000, `cd ${PROJECT_B}/src && pnpm test`, PROJECT_A),
+      bash(START + 2_000, `git -C ${PROJECT_B} commit -m x`, PROJECT_A),
+      edit(START + 3_000, `${PROJECT_B}/src/lib.ts`, PROJECT_A),
+      bash(START + 4_000, "make check", PROJECT_A),
+    ];
+
+    const directories = toolDirectories(raw);
+
+    expect(directories).toEqual([PROJECT_A, `${PROJECT_B}/src`, PROJECT_B]);
+  });
+
+  it("не называет каталоги нераспознанных мест и вызовов без этапа", () => {
+    const raw: RawEvent[] = [
+      bash(START, "cd ~/x && make check", PROJECT_A),
+      bash(START + 1_000, "ls", PROJECT_B),
+      {
+        ts: START + 2_000,
+        kind: "tool",
+        tool: "Read",
+        ok: true,
+        file: `${PROJECT_B}/a.ts`,
+        cwd: PROJECT_B,
+      },
+      bash(START + 3_000, "make check"),
+    ];
+
+    const directories = toolDirectories(raw);
+
+    expect(directories).toEqual([]);
   });
 });
 
@@ -1328,7 +1645,12 @@ describe("routeMessages", () => {
 
   it("сохраняет строку, текст, запуск и сборку реплики", () => {
     const draft = routedDraft([], ["b1"]);
-    draft.events.push({ ...say(1_000, "spec", "report", "a1"), line: "Держи", text: "Текст" });
+    draft.events.push({
+      ...say(1_000, "spec", "report", "a1"),
+      line: "Держи",
+      text: "Текст",
+      build: "second",
+    });
 
     const routed = routeMessages(draft);
 

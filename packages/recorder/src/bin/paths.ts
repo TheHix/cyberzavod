@@ -1,7 +1,8 @@
 // Каталоги записей сборок и поиск в них файлов — общее для точек входа.
 
-import { readdir, stat } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { parseProjectConfig } from "../project.ts";
 
 // Журналы внешнего проекта ложатся в клон завода (CYBERZAVOD_HOME), а не в сам проект:
 // записи, черновики и публикация живут в одном месте. Пустая строка в переменной — не задано.
@@ -9,8 +10,11 @@ const factoryHome = process.env.CYBERZAVOD_HOME || process.env.CLAUDE_PROJECT_DI
 const recordingsDir = path.join(factoryHome, "recordings");
 const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 
-/** Конфиг проекта, в котором идёт сессия: идентификатор проекта и версия завода. */
-export const PROJECT_CONFIG_PATH = path.join(projectDir, ".cyberzavod", "project.json");
+/** Путь конфига проекта от корня его репозитория: идентификатор проекта и версия завода. */
+export const PROJECT_CONFIG_FILE = path.join(".cyberzavod", "project.json");
+
+/** Конфиг проекта, в котором идёт сессия. */
+export const PROJECT_CONFIG_PATH = path.join(projectDir, PROJECT_CONFIG_FILE);
 
 /** Каталоги записей: сырые журналы и черновики вне git, опубликованные записи — в git. */
 export const RECORDINGS_DIRS = {
@@ -35,6 +39,27 @@ async function filesIn(dir: string): Promise<string[]> {
   } catch (err) {
     if (isNotFound(err)) return [];
     throw err;
+  }
+}
+
+/**
+ * Находит проект каталога: поднимается от него вверх до первого `.cyberzavod/project.json`.
+ * Нет конфига на всём пути — каталог не принадлежит проекту завода, битый конфиг — предупреждение.
+ * @param {string} directory Абсолютный путь каталога.
+ * @returns {Promise<string | undefined>} `id` проекта или undefined, если проекта нет.
+ */
+export async function findProjectId(directory: string): Promise<string | undefined> {
+  for (let current = directory; ; current = path.dirname(current)) {
+    const configPath = path.join(current, PROJECT_CONFIG_FILE);
+    try {
+      return parseProjectConfig(JSON.parse(await readFile(configPath, "utf8"))).id;
+    } catch (err) {
+      if (!isNotFound(err)) {
+        console.warn(`конфиг проекта ${configPath} не прочитан: ${String(err)}`);
+        return undefined;
+      }
+    }
+    if (path.dirname(current) === current) return undefined;
   }
 }
 
