@@ -1,9 +1,11 @@
 ---
-// Игровой экран: цех на всё окно, меню слева, панели записей и «о заводе» поверх.
+// Игровой экран: цех на всё окно, меню слева, панели записей, гайдов и «о заводе» поверх.
 // Содержимое страницы — цех со своим HUD — встаёт в поле справа от меню.
 import BaseLayout from "./BaseLayout.astro";
+import { GuideList } from "@/widgets/guide-list";
 import { RecordingList } from "@/widgets/recording-list";
 import { Sidebar } from "@/widgets/sidebar";
+import { publishedGuides } from "@/entities/guide";
 import { publishedRecordings } from "@/entities/recording";
 import { PANELS } from "@/shared/config/panels.ts";
 import { site } from "@/shared/config/site.ts";
@@ -37,6 +39,9 @@ const { title, description, journal = false, project = false, heading } = Astro.
 
   <Drawer id={PANELS.records} title="Записи сборок">
     <RecordingList recordings={publishedRecordings} />
+  </Drawer>
+  <Drawer id={PANELS.guides} title="Гайды">
+    <GuideList guides={publishedGuides} />
   </Drawer>
   <Drawer id={PANELS.about} title="О заводе">
     <div class="about">

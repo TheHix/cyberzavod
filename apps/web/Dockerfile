@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Собирается из корня репозитория: сайту нужны пакет packages/core, опубликованные записи и карточки проектов.
+# Собирается из корня репозитория: сайту нужны пакет packages/core, опубликованные записи, карточки проектов и гайды.
 #   docker build -f apps/web/Dockerfile .
 
 FROM node:24-alpine AS build
@@ -14,6 +14,7 @@ COPY tsconfig.base.json ./
 COPY packages/core packages/core
 COPY recordings/published recordings/published
 COPY projects projects
+COPY guides guides
 COPY apps/web apps/web
 RUN pnpm --filter @cyberzavod/web build
 

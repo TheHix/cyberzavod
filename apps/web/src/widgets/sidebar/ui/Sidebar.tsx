@@ -1,3 +1,4 @@
+import BookOpen from "lucide-solid/icons/book-open";
 import Factory from "lucide-solid/icons/factory";
 import FolderKanban from "lucide-solid/icons/folder-kanban";
 import Info from "lucide-solid/icons/info";
@@ -20,7 +21,8 @@ interface Props {
 const ICON_STROKE = 2.5;
 
 /**
- * Меню сайта слева: логотип, цех, панели записей, журнала сборки, проекта и «о заводе», ссылка на код.
+ * Меню сайта слева: логотип, цех, панели записей, журнала сборки, проекта, гайдов и «о заводе»,
+ * ссылка на код.
  * Работает без JavaScript: панели открываются нативным popover.
  * @param {Props} props Свойства компонента.
  * @param {boolean} props.journal Показывать ли кнопку журнала сборки.
@@ -69,6 +71,12 @@ export function Sidebar(props: Props): JSX.Element {
             </Button>
           </li>
         </Show>
+        <li>
+          <Button layout="tile" popovertarget={PANELS.guides}>
+            <BookOpen stroke-width={ICON_STROKE} />
+            Гайды
+          </Button>
+        </li>
         <li>
           <Button layout="tile" popovertarget={PANELS.about}>
             <Info stroke-width={ICON_STROKE} />О заводе

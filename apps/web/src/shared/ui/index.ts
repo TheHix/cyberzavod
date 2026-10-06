@@ -9,8 +9,10 @@ export {
 } from "./button/Button.tsx";
 export { Card } from "./card/Card.tsx";
 export { Chip, type ChipTone } from "./chip/Chip.tsx";
+export { CopyButton } from "./copy-button/CopyButton.tsx";
 export { Drawer } from "./drawer/Drawer.tsx";
 export { Panel } from "./panel/Panel.tsx";
+export { codeBlockClass, Prose } from "./prose/Prose.tsx";
 export { SegmentedControl, type SegmentOption } from "./segmented-control/SegmentedControl.tsx";
 export { Slider } from "./slider/Slider.tsx";
 export { StatList, type StatItem } from "./stat/Stat.tsx";

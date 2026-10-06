@@ -1,0 +1,126 @@
+/* Текст статьи: разметка приходит готовой (из Markdown), поэтому элементы оформляются
+   селекторами по тегам внутри контейнера. */
+.prose {
+  --prose-width: 46rem;
+  --prose-gap: var(--space-l);
+  --quote-bar-width: 0.5rem;
+  --inline-code-size: 0.9em;
+
+  max-width: var(--prose-width);
+  overflow-wrap: break-word;
+}
+
+.prose h2,
+.prose h3 {
+  margin: var(--space-xl) 0 var(--space-s);
+}
+
+.prose h2 {
+  font-size: var(--text-l);
+  font-weight: 800;
+}
+
+.prose h3 {
+  font-size: var(--text-m);
+  font-weight: 800;
+}
+
+.prose > :first-child {
+  margin-top: 0;
+}
+
+.prose p,
+.prose ul,
+.prose ol,
+.prose blockquote,
+.prose pre,
+.codeBlock {
+  margin: 0 0 var(--prose-gap);
+}
+
+.prose ul,
+.prose ol {
+  padding-left: var(--space-xl);
+}
+
+.prose li + li {
+  margin-top: var(--space-2xs);
+}
+
+.prose li > ul,
+.prose li > ol {
+  margin: var(--space-2xs) 0 0;
+}
+
+.prose a {
+  font-weight: 700;
+  text-decoration-thickness: var(--outline-width);
+  text-underline-offset: var(--outline-width);
+  overflow-wrap: anywhere;
+}
+
+.prose strong {
+  font-weight: 800;
+}
+
+.prose code {
+  padding: 0 var(--space-2xs);
+  font-family: var(--font-mono);
+  font-size: var(--inline-code-size);
+  overflow-wrap: anywhere;
+  background: var(--paper-deep);
+  border-radius: var(--radius-s);
+}
+
+/* Блок кода прокручивается по горизонтали сам, а не растягивает страницу. */
+.prose pre {
+  padding: var(--space-m);
+  overflow-x: auto;
+  background: var(--paper-deep);
+  border: var(--outline);
+  border-radius: var(--radius-m);
+}
+
+.prose pre code {
+  padding: 0;
+  font-size: var(--text-s);
+  overflow-wrap: normal;
+  white-space: pre;
+  background: none;
+  border-radius: 0;
+}
+
+.prose blockquote {
+  padding: var(--space-s) var(--space-l);
+  background: var(--paper-deep);
+  border: var(--outline);
+  border-left: var(--quote-bar-width) solid var(--sun-deep);
+  border-radius: var(--radius-s);
+}
+
+.prose blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.prose hr {
+  margin: var(--space-xl) 0;
+  border: 0;
+  border-top: var(--outline);
+}
+
+/* Блок кода с кнопкой: код и кнопка в одной строке, кнопка не уезжает при прокрутке кода. */
+.codeBlock {
+  display: flex;
+  gap: var(--space-s);
+  align-items: flex-start;
+}
+
+.codeBlock pre {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.codeBlock > :not(pre) {
+  flex: none;
+}

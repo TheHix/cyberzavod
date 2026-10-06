@@ -7,6 +7,12 @@
   box-shadow: var(--lift-large);
 }
 
+/* Длинный текст прокручивается внутри панели; без min-height панель выросла бы по содержимому. */
+.scrollable {
+  min-height: 0;
+  overflow-y: auto;
+}
+
 /* Ярлык над содержимым: «СБОРКА», «ЖУРНАЛ». */
 .label {
   display: inline-block;

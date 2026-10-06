@@ -71,14 +71,21 @@
   }
 }
 
-/* На узком экране меню — строкой сверху; плитки сжимает сам kit. */
+/* На узком экране меню — строкой сверху; плитки сжимает сам kit. Семь плиток и логотип на 360px
+   не помещаются при обычных отступах: логотип и поля меню сжаты, чтобы подписи остались целыми. */
 @media (width <= 48rem) and (height > 40rem) {
   .sidebar {
+    --badge-size: 1.8rem;
+
     flex-direction: row;
     gap: var(--space-2xs);
     align-items: center;
-    padding: var(--space-xs) var(--space-s);
+    padding: var(--space-xs) var(--space-2xs);
     overflow: visible;
+  }
+
+  .badge {
+    font-size: var(--text-s);
   }
 
   .menu {
@@ -104,11 +111,11 @@
 /* На низком экране меню остаётся слева, но должно поместиться без прокрутки: отступы меньше. */
 @media (height <= 40rem) {
   .sidebar {
-    gap: var(--space-xs);
-    padding: var(--space-xs);
+    gap: var(--space-2xs);
+    padding: var(--space-2xs) var(--space-xs);
   }
 
   .menu {
-    gap: var(--space-xs);
+    gap: var(--space-2xs);
   }
 }

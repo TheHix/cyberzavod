@@ -1,0 +1,41 @@
+---
+// Статья гайда: заголовок, описание и текст в одной панели, которая прокручивается внутри поля.
+import type { PublishedGuide } from "@/entities/guide";
+import { CopyCode } from "@/features/copy-code";
+import { Panel, Prose, Title } from "@/shared/ui";
+
+interface Props {
+  guide: PublishedGuide;
+}
+
+const { meta, Content } = Astro.props.guide;
+const proseId = `guide-${meta.id}`;
+---
+
+<Panel scrollable>
+  <article class="article">
+    <Title as="h1" size="xl">
+      {meta.title}
+    </Title>
+    <p class="description">{meta.description}</p>
+    <Prose id={proseId}>
+      <Content />
+    </Prose>
+  </article>
+</Panel>
+<CopyCode client:idle scope={proseId} />
+
+<style>
+  /* minmax(0, …): иначе колонка не уже самого длинного кода, и панель прокручивается вбок. */
+  .article {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-m);
+  }
+
+  .description {
+    margin: 0;
+    color: var(--ink-soft);
+    font-weight: 700;
+  }
+</style>
