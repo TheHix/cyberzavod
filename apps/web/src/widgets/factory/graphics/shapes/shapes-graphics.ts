@@ -1,7 +1,7 @@
-// Цех в стиле тайкуна на PixiJS, вид сверху. Всё рисуется один раз при встраивании (пол,
-// станки, кабинет мастера, текстуры рабочих, мастера и детали); в кадре у готовых спрайтов
-// меняются только координаты, поворот, масштаб и прозрачность — без перерисовки и без новых
-// объектов.
+// Цех в стиле тайкуна на PixiJS, вид сверху. Всё рисуется при встраивании (пол, станки,
+// кабинет мастера, текстуры рабочих, мастера и детали) и заново только при смене плана; в кадре
+// у готовых спрайтов меняются только координаты, поворот, масштаб и прозрачность — без
+// перерисовки и без новых объектов.
 
 import { STAGES, type FactoryLayout, type Point, type Scene, type Stage } from "@cyberzavod/core";
 import { Container, isWebGLSupported } from "pixi.js";
@@ -21,7 +21,7 @@ import { fitPlan, planBounds, type PlanBounds } from "./bounds.ts";
 import { drawFloor } from "./floor.ts";
 import { drawMachine, loadPlaqueFont, type MachineSprites } from "./machines.ts";
 import { drawOffice } from "./office.ts";
-import { readPalette } from "./palette.ts";
+import { readPalette, type Palette } from "./palette.ts";
 import { createRenderer, type FactoryRenderer } from "./renderer.ts";
 import { UNIT } from "./units.ts";
 
@@ -39,6 +39,9 @@ export class ShapesGraphics implements FactoryGraphics {
   readonly #renderer: FactoryRenderer = createRenderer(isWebGLSupported());
   readonly #stage = new Container();
   readonly #world = new Container();
+  // Неподвижный план — пол, станки, кабинет: при смене плана он заменяется целиком.
+  #plan: Container | undefined;
+  #palette: Palette | undefined;
   readonly #workers = new Map<Stage, WorkerSprites>();
   readonly #machines = new Map<Stage, MachineSprites>();
   #foreman: WorkerSprites | undefined;
@@ -56,7 +59,6 @@ export class ShapesGraphics implements FactoryGraphics {
    * @throws {Error} Если не удалось создать рендерер или нарисовать план.
    */
   async mount(container: HTMLElement, layout: FactoryLayout): Promise<void> {
-    this.#bounds = planBounds(layout);
     await Promise.all([
       this.#renderer.init({
         width: container.clientWidth,
@@ -80,18 +82,8 @@ export class ShapesGraphics implements FactoryGraphics {
     const renderer = this.#renderer;
     // Краски — из токенов оформления, как у интерфейса.
     const palette = readPalette(getComputedStyle(container));
-    this.#world.addChild(drawFloor(layout, renderer, palette));
-    for (const stage of STAGES) {
-      const machine = drawMachine(
-        stage,
-        layout.stations[stage],
-        renderer.resolution * TEXT_SHARPNESS,
-        palette,
-      );
-      this.#world.addChild(machine.root);
-      this.#machines.set(stage, machine.sprites);
-    }
-    this.#world.addChild(drawOffice(layout.foreman, renderer.resolution * TEXT_SHARPNESS, palette));
+    this.#palette = palette;
+    this.#drawPlan(layout);
     const textures = bakeActorTextures(renderer, palette);
     for (const stage of STAGES) {
       const worker = createWorker(stage, textures, palette);
@@ -105,6 +97,18 @@ export class ShapesGraphics implements FactoryGraphics {
     this.#stage.addChild(this.#world);
     const { clientWidth: width, clientHeight: height } = container;
     this.resize(width, height, { x: 0, y: 0, width, height });
+  }
+
+  /**
+   * Заменяет неподвижный план — пол, станки и кабинет. Рабочие, мастер и деталь остаются.
+   * Вписывает новый план следующий `resize`: вызывающий всё равно меряет поле заново.
+   * @param {FactoryLayout} layout Новый план цеха.
+   */
+  setLayout(layout: FactoryLayout): void {
+    if (!this.#mounted) return;
+    this.#plan?.destroy({ children: true, texture: true, textureSource: true });
+    this.#machines.clear();
+    this.#drawPlan(layout);
   }
 
   /**
@@ -157,6 +161,24 @@ export class ShapesGraphics implements FactoryGraphics {
    */
   toScreen(point: Point): ScreenPoint {
     return { x: this.#offset.x + point.x * this.#scale, y: this.#offset.y + point.y * this.#scale };
+  }
+
+  // План рисуется под рабочими, мастером и деталью: он первый в мире.
+  #drawPlan(layout: FactoryLayout): void {
+    const palette = this.#palette;
+    if (palette === undefined) return;
+    this.#bounds = planBounds(layout);
+    const textSharpness = this.#renderer.resolution * TEXT_SHARPNESS;
+    const plan = new Container();
+    plan.addChild(drawFloor(layout, this.#renderer, palette));
+    for (const stage of STAGES) {
+      const machine = drawMachine(stage, layout.stations[stage], textSharpness, palette);
+      plan.addChild(machine.root);
+      this.#machines.set(stage, machine.sprites);
+    }
+    plan.addChild(drawOffice(layout.foreman, textSharpness, palette));
+    this.#world.addChildAt(plan, 0);
+    this.#plan = plan;
   }
 
   /** Убирает холст и освобождает текстуры. */

@@ -8,6 +8,7 @@ import { isSameSpeech, type Speech } from "@/features/journal-sync";
 export interface SpeechMark {
   /** Момент сцены, мс, когда над говорящим появляется пузырь. */
   readonly start: number;
+  /** Промпт или реплика, чей пузырь появляется в этот момент. */
   readonly speech: Speech;
 }
 

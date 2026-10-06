@@ -79,6 +79,8 @@
   --drawer-width: 30rem;
   --control-size: 3.25rem;
   --control-size-large: 4.5rem;
+  --chip-line-height: 1.5;
+  --chip-height: calc(var(--chip-line-height) * var(--text-s) + 2 * var(--outline-width));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -95,6 +97,7 @@
   :root {
     --text-xl: 1.375rem;
     --gutter: 0.75rem;
+    --hud-width: 18rem;
     --control-size: 2.75rem;
     --control-size-large: 3.5rem;
   }

@@ -1,0 +1,17 @@
+/* Полка речи: строка метки и текст постоянной высоты, чтобы поле цеха не прыгало, когда
+   реплики меняются. */
+.dock {
+  display: grid;
+  grid-auto-rows: min-content;
+  gap: var(--space-xs);
+  align-content: start;
+}
+
+/* Строка метки занимает место и без метки: полка не меняет высоту между репликами. */
+.route {
+  display: flex;
+  gap: var(--space-m);
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--chip-height);
+}

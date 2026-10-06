@@ -48,6 +48,17 @@ export function seek(playback: Playback, position: number): Playback {
 }
 
 /**
+ * Переносит проигрывание в сцену другой длины: идёт ли и скорость остаются прежними.
+ * @param {Playback} playback Текущее состояние.
+ * @param {number} duration Длительность новой сцены, мс.
+ * @param {number} position Момент в новой сцене, мс; вне сцены прижимается к её границам.
+ * @returns {Playback} То же проигрывание в новой сцене.
+ */
+export function withDuration(playback: Playback, duration: number, position: number): Playback {
+  return seek({ ...playback, duration }, position);
+}
+
+/**
  * Ставит на паузу или продолжает; досмотренную сцену запускает с начала.
  * @param {Playback} playback Текущее состояние.
  * @returns {Playback} Состояние после переключения.

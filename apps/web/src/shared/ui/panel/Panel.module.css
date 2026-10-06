@@ -22,3 +22,10 @@
   border: var(--outline);
   border-radius: var(--radius-round);
 }
+
+/* На узком или низком экране каждая строка на счету: панели хватает содержимого. */
+@media (max-width: 48rem), (max-height: 40rem) {
+  .label {
+    display: none;
+  }
+}

@@ -62,7 +62,7 @@
   overflow-y: auto;
 }
 
-@media (max-width: 48rem) {
+@media (width <= 48rem) and (height > 40rem) {
   .drawer {
     inset: auto var(--gutter) var(--gutter);
     width: auto;

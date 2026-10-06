@@ -75,9 +75,19 @@ export interface Scene {
 // Деталь в руках — чуть впереди рабочего, по направлению взгляда.
 const CARRY_DISTANCE = 0.45;
 
-// Номер последнего элемента, начавшегося не позже момента; -1, если такого нет.
-// Элементы отсортированы по началу — так их кладёт сценарий.
-function lastStartedIndex<T>(items: readonly T[], time: number, startOf: (item: T) => number) {
+/**
+ * Номер последнего элемента, начавшегося не позже момента. Элементы отсортированы по началу —
+ * так их кладёт сценарий. Наружу пакета не выходит.
+ * @param {readonly T[]} items Элементы сценария по возрастанию начала.
+ * @param {number} time Момент сцены, мс.
+ * @param {(item: T) => number} startOf Начало элемента, мс сцены.
+ * @returns {number} Номер элемента; -1, если ни один ещё не начался.
+ */
+export function lastStartedIndex<T>(
+  items: readonly T[],
+  time: number,
+  startOf: (item: T) => number,
+): number {
   let low = 0;
   let high = items.length - 1;
   let found = -1;

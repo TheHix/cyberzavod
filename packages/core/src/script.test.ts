@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { Recording } from "./recording.ts";
-import { headingTo } from "./layout.ts";
+import { aisleStop } from "./aisle.ts";
+import { FACTORY_LAYOUTS, distance, headingTo, type Point } from "./layout.ts";
+import { STAGES, type Recording } from "./recording.ts";
+import { sceneAt } from "./scene.ts";
 import type { ForemanMove } from "./script.ts";
 import {
   chatRecording,
@@ -10,7 +12,7 @@ import {
   reworkRecording,
   stationAt,
 } from "./script.fixtures.ts";
-import { buildScript } from "./script.ts";
+import { buildScript, DEFAULT_PACING } from "./script.ts";
 
 function recordingOf(events: Recording["events"]): Recording {
   return { ...reworkRecording(), events };
@@ -575,5 +577,120 @@ describe("buildScript: обмен при передаче", () => {
       lastExchangeEnd: lastExchange?.end,
       status: "defect",
     });
+  });
+});
+
+interface Walk {
+  readonly since: number;
+  readonly start: number;
+  readonly end: number;
+  readonly from: Point;
+  readonly to: Point;
+}
+
+const SAME_POINT_TOLERANCE = 1e-9;
+// Шаг выборки кадров при поиске скачков детали, мс.
+const FRAME_STEP_MS = 20;
+// Самый большой честный сдвиг детали за шаг: бег 3,5 единицы в секунду даёт 0,07.
+const MAX_PART_STEP = 0.25;
+
+function isSamePoint(a: Point, b: Point): boolean {
+  return distance(a, b) <= SAME_POINT_TOLERANCE;
+}
+
+// Идущие отрезки, подряд и с одним началом пути, — это одна ходьба.
+function walksOf(moves: readonly (Walk & { readonly activity: string })[]): Walk[][] {
+  const walks: Walk[][] = [];
+  for (const move of moves.filter(({ activity }) => activity === "walk")) {
+    const walk = walks.at(-1);
+    if (walk?.[0]?.since === move.since) walk.push(move);
+    else walks.push([move]);
+  }
+  return walks;
+}
+
+function plannedRecordings(): { name: string; recording: Recording }[] {
+  return [
+    { name: "с браком", recording: reworkRecording() },
+    { name: "с репликами", recording: chatRecording() },
+  ];
+}
+
+describe.each(
+  FACTORY_LAYOUTS.map((layout) => ({ name: `${layout.width}×${layout.height}`, layout })),
+)("buildScript: план $name", ({ layout }) => {
+  const { post, door } = layout.foreman;
+  const isOnAisle = (point: Point) => isSamePoint(aisleStop(layout.aisle, point).point, point);
+
+  it.each(plannedRecordings())("ходит от прохода или к проходу: запись $name", ({ recording }) => {
+    const script = buildScript(recording, layout, DEFAULT_PACING);
+
+    const workerWalks = STAGES.flatMap((stage) => script.workers[stage]);
+    const foremanWalks = script.foreman.filter(
+      (move) =>
+        !(isSamePoint(move.from, post) && isSamePoint(move.to, door)) &&
+        !(isSamePoint(move.from, door) && isSamePoint(move.to, post)),
+    );
+    const offAisle = [...workerWalks, ...foremanWalks].filter(
+      (move) => move.activity === "walk" && !isOnAisle(move.from) && !isOnAisle(move.to),
+    );
+    expect(offAisle).toEqual([]);
+  });
+
+  it("не рвёт ходьбу: каждый отрезок начинается там и тогда, где кончился прошлый", () => {
+    const script = buildScript(chatRecording(), layout, DEFAULT_PACING);
+
+    const walks = [...STAGES.flatMap((stage) => script.workers[stage]), ...script.foreman];
+    const breaks = walksOf(walks)
+      .flatMap((walk) => walk.slice(1).map((leg, index) => [walk[index], leg] as const))
+      .filter(
+        ([previous, next]) =>
+          previous === undefined ||
+          !isSamePoint(previous.to, next.from) ||
+          Math.abs(previous.end - next.start) > SAME_POINT_TOLERANCE,
+      );
+    expect(breaks).toEqual([]);
+  });
+
+  it.each(plannedRecordings())("не двигает деталь скачком: запись $name", ({ recording }) => {
+    const script = buildScript(recording, layout, DEFAULT_PACING);
+
+    let jump = 0;
+    let previous = sceneAt(script, 0).part.position;
+    for (let time = FRAME_STEP_MS; time <= script.duration; time += FRAME_STEP_MS) {
+      const { position } = sceneAt(script, time).part;
+      jump = Math.max(jump, distance(previous, position));
+      previous = position;
+    }
+
+    expect(jump).toBeLessThanOrEqual(MAX_PART_STEP);
+  });
+});
+
+describe("buildScript: планы", () => {
+  it("даёт одно время записи на отметках любого плана", () => {
+    const recording = chatRecording();
+
+    const recordingTimes = FACTORY_LAYOUTS.map((layout) =>
+      buildScript(recording, layout, DEFAULT_PACING).marks.map((mark) => mark.recordingTime),
+    );
+
+    expect(recordingTimes).toEqual(FACTORY_LAYOUTS.map(() => recordingTimes[0]));
+  });
+
+  it("проводит передачу через угол Г-образного прохода", () => {
+    const corner = { x: 20, y: 2 };
+    const layout = {
+      ...LINE_LAYOUT,
+      aisle: [{ x: 0, y: 2 }, corner, { x: 20, y: 22 }] as const,
+      stations: { ...LINE_LAYOUT.stations, code: stationAt(22, 12) },
+    };
+
+    const script = buildScript(reworkRecording(), layout, PLAIN_PACING);
+
+    const route = script.workers.spec
+      .filter((move) => move.activity === "walk" && move.carrying)
+      .map((move) => move.to);
+    expect(route).toEqual([{ x: 0, y: 2 }, corner, { x: 20, y: 12 }, { x: 21, y: 12 }]);
   });
 });

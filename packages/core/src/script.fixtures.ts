@@ -32,7 +32,11 @@ export function stationAt(x: number, y = 0): StationPlan {
 export const LINE_LAYOUT: FactoryLayout = {
   width: 50,
   height: 10,
-  aisle: AISLE,
+  minFieldAspect: 0,
+  aisle: [
+    { x: -10, y: AISLE },
+    { x: 60, y: AISLE },
+  ],
   stations: {
     spec: stationAt(0),
     code: stationAt(10),

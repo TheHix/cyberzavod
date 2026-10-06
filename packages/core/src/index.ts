@@ -28,8 +28,13 @@ export {
   type BuildStats,
 } from "./recording.ts";
 export { ProjectError, parseProject, type Project } from "./project.ts";
+export type { Aisle } from "./aisle.ts";
+export { carryTime, ScriptMismatchError } from "./carry-time.ts";
 export {
-  DEFAULT_LAYOUT,
+  FACTORY_LAYOUTS,
+  PORTRAIT_LAYOUT,
+  WIDE_LAYOUT,
+  layoutFor,
   type FactoryLayout,
   type ForemanPlan,
   type Point,

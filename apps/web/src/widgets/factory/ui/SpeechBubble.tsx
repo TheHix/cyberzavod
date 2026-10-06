@@ -37,7 +37,11 @@ export function SpeechBubble(props: Props): JSX.Element {
       {(place) => (
         <div
           class={styles.anchor}
-          style={{ transform: `translate(${place().x}px, ${place().y}px)` }}
+          style={{
+            transform: `translate(${place().x}px, ${place().y}px)`,
+            // Пузырь не шире поля: на узком поле 80vw шире самого поля.
+            "--field-width": `${props.field.width}px`,
+          }}
           data-vertical={place().vertical}
           data-horizontal={place().horizontal}
         >

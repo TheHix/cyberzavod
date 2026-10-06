@@ -2,9 +2,10 @@
 // мастера с дверью, площадки и таблички.
 // По ним план вписывается в поле — без пустых краёв, которые есть у плана целиком.
 
-import { STAGES, type FactoryLayout } from "@cyberzavod/core";
+import { STAGES, type FactoryLayout, type Point } from "@cyberzavod/core";
 import type { Frame, ScreenPoint } from "../factory-graphics.ts";
-import { PAD_HALF_WIDTH } from "./floor.ts";
+import { ACTOR_REACH } from "./actors.ts";
+import { PAD_HALF_WIDTH, PAD_MARGIN } from "./floor.ts";
 import { PLAQUE_REACH } from "./machines.ts";
 import { UNIT } from "./units.ts";
 
@@ -25,12 +26,36 @@ export interface PlanFit {
 /** Запас на контур поверх размеров рисунка, единиц плана. */
 export const OUTLINE_SLACK = 0.05;
 
-// Запас вокруг станков и мест рабочих берётся из размеров рисунка: по горизонтали —
-// площадка станка, по вертикали — табличка по другую сторону станка.
-const MARGIN = {
+// Насколько от точки уходит нарисованное: у каждого вида точки — своё.
+interface Reach {
+  readonly x: number;
+  readonly y: number;
+}
+
+// Станок и стол: по горизонтали — площадка, по вертикали — табличка по другую сторону.
+const FURNITURE_REACH: Reach = {
   x: PAD_HALF_WIDTH / UNIT + OUTLINE_SLACK,
   y: PLAQUE_REACH / UNIT + OUTLINE_SLACK,
-} as const;
+};
+// Место рабочего: по горизонтали — площадка, по вертикали — её поле за рабочим.
+const WORKER_POST_REACH: Reach = {
+  x: PAD_HALF_WIDTH / UNIT + OUTLINE_SLACK,
+  y: PAD_MARGIN / UNIT + OUTLINE_SLACK,
+};
+// Мастер вне площадки и дверь: рисуется только фигура со своей тенью.
+const ACTOR_SPOT_REACH: Reach = {
+  x: ACTOR_REACH / UNIT + OUTLINE_SLACK,
+  y: ACTOR_REACH / UNIT + OUTLINE_SLACK,
+};
+
+interface ReachedPoint {
+  readonly point: Point;
+  readonly reach: Reach;
+}
+
+function reachedBy(reach: Reach, points: readonly Point[]): ReachedPoint[] {
+  return points.map((point) => ({ point, reach }));
+}
 
 /**
  * Считает, какую часть плана занимает нарисованный цех.
@@ -38,22 +63,29 @@ const MARGIN = {
  * @returns {PlanBounds} Прямоугольник, который надо вписать в поле.
  */
 export function planBounds(layout: FactoryLayout): PlanBounds {
-  const stationPoints = STAGES.flatMap((stage) => {
-    const { machine, post, foremanPost } = layout.stations[stage];
-    return [machine, post, foremanPost];
-  });
+  const stations = STAGES.map((stage) => layout.stations[stage]);
   const { desk, post, door } = layout.foreman;
-  const points = [...stationPoints, desk, post, door];
-  const xs = points.map((point) => point.x);
-  const ys = points.map((point) => point.y);
-  const left = Math.min(...xs) - MARGIN.x;
-  const top = Math.min(...ys) - MARGIN.y;
-  return {
-    x: left,
-    y: top,
-    width: Math.max(...xs) + MARGIN.x - left,
-    height: Math.max(...ys) + MARGIN.y - top,
-  };
+  const reached = [
+    ...reachedBy(
+      FURNITURE_REACH,
+      stations.map(({ machine }) => machine),
+    ),
+    ...reachedBy(FURNITURE_REACH, [desk, post]),
+    ...reachedBy(
+      WORKER_POST_REACH,
+      stations.map((station) => station.post),
+    ),
+    ...reachedBy(
+      ACTOR_SPOT_REACH,
+      stations.map((station) => station.foremanPost),
+    ),
+    ...reachedBy(ACTOR_SPOT_REACH, [door]),
+  ];
+  const left = Math.min(...reached.map(({ point, reach }) => point.x - reach.x));
+  const top = Math.min(...reached.map(({ point, reach }) => point.y - reach.y));
+  const right = Math.max(...reached.map(({ point, reach }) => point.x + reach.x));
+  const bottom = Math.max(...reached.map(({ point, reach }) => point.y + reach.y));
+  return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
 /**

@@ -47,9 +47,14 @@
   pointer-events: auto;
 }
 
-@media (max-width: 48rem) {
+@media (width <= 48rem) and (height > 40rem) {
   .factory {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  /* На узком экране пузыри закрыли бы станки: речь показывает полка в HUD. */
+  .overlay {
+    display: none;
   }
 }

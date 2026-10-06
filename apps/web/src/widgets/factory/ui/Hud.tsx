@@ -5,6 +5,7 @@ import { formatDate, formatDuration, formatTokens } from "@/shared/lib/format.ts
 import { ButtonLink, Panel, StatList, Title } from "@/shared/ui";
 import { useFactoryModel } from "./model-context.ts";
 import { PlaybackControls } from "./PlaybackControls.tsx";
+import { SpeechDock } from "./SpeechDock.tsx";
 import styles from "./Hud.module.css";
 
 interface Props {
@@ -17,6 +18,7 @@ interface Props {
 
 /**
  * HUD цеха справа: какая сборка идёт, к какому она проекту, её итоги и управление проигрыванием.
+ * На узком экране вместо пузырей над станками в нём полка речи.
  * @param {Props} props Свойства компонента.
  * @param {BriefRecording} props.recording Запись, которую проигрывает цех.
  * @param {ProjectLink} props.project Проект, который собирали.
@@ -34,7 +36,7 @@ export function Hud(props: Props): JSX.Element {
 
   return (
     <Panel label="Сборка" class={styles.hud}>
-      <header>
+      <header class={styles.header}>
         <Title as={props.titleLevel} size="xl">
           {props.recording.title}
         </Title>
@@ -47,6 +49,9 @@ export function Hud(props: Props): JSX.Element {
       </header>
       <div class={styles.stats}>
         <StatList items={stats()} />
+      </div>
+      <div class={styles.speech}>
+        <SpeechDock title={props.recording.title} />
       </div>
       <PlaybackControls />
     </Panel>

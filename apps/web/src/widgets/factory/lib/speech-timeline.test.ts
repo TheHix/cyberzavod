@@ -97,9 +97,10 @@ describe("speechAt", () => {
     const timeline = speechTimeline(validScript());
     const start = timeline[0]?.start ?? 0;
 
-    const speech = speechAt(timeline, start);
+    const atStart = speechAt(timeline, start);
+    const later = speechAt(timeline, start + 1);
 
-    expect(speechAt(timeline, start + 1)).toBe(speech);
+    expect(later).toBe(atStart);
   });
 });
 

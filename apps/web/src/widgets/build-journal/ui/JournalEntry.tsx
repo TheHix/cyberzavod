@@ -1,5 +1,6 @@
 import { createSignal, onMount, Show, type JSX } from "solid-js";
 import { $sceneSpeech, isSameSpeech, seekScene, type Speech } from "@/features/journal-sync";
+import { PANELS } from "@/shared/config/panels.ts";
 import { useStoreValue } from "@/shared/lib/use-store-value.ts";
 import { Button, Card, Chip } from "@/shared/ui";
 import styles from "./JournalEntry.module.css";
@@ -13,7 +14,8 @@ interface Props {
 
 /**
  * Запись журнала сборки: время, маршрут и тело записи. В браузере подсвечивается, когда цех
- * дошёл до этой речи, и получает кнопку «показать в цехе». Без JS — та же разметка без них.
+ * дошёл до этой речи, и получает кнопку «показать в цехе»: она перематывает цех и закрывает
+ * журнал, чтобы сцена была видна. Без JS — та же разметка без них.
  * @param {Props} props Свойства компонента.
  * @param {Speech} props.speech Какой промпт или реплика записи.
  * @param {string} props.clock Время записи в сборке, например `01:30`.
@@ -35,7 +37,14 @@ export function JournalEntry(props: Props): JSX.Element {
         <Chip>{props.clock}</Chip>
         <Chip tone="sky">{props.route}</Chip>
         <Show when={hydrated()}>
-          <Button variant="link" class={styles.seek} onClick={() => seekScene(props.speech)}>
+          <Button
+            variant="link"
+            class={styles.seek}
+            popovertarget={PANELS.journal}
+            popovertargetaction="hide"
+            aria-label={`Показать в цехе: ${props.clock}, ${props.route}`}
+            onClick={() => seekScene(props.speech)}
+          >
             показать в цехе
           </Button>
         </Show>

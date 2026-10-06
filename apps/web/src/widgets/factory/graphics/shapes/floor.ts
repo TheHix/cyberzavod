@@ -2,13 +2,16 @@
 // и под кабинетом мастера.
 // Рисуется один раз и дальше не меняется; координаты — в точках рисования (`UNIT` на единицу).
 
-import { STAGES, type FactoryLayout, type Point } from "@cyberzavod/core";
+import { STAGES, type Aisle, type FactoryLayout, type Point } from "@cyberzavod/core";
 import { Container, Graphics, TilingSprite, type Renderer } from "pixi.js";
+import { extendedAisle, laneDashes, laneEdge } from "./lane.ts";
 import type { Palette } from "./palette.ts";
 import { UNIT } from "./units.ts";
 
 // Пол и полоса прохода тянутся далеко за план — на любом экране край не виден.
 const FLOOR_REACH = 200 * UNIT;
+// Штрихов разметки на проходе хватает в пределах далёкой видимости.
+const DASH_REACH = FLOOR_REACH / 4;
 const TILE = UNIT;
 const GROUT = 4;
 const LANE_HALF_WIDTH = 0.55 * UNIT;
@@ -18,6 +21,8 @@ const EDGE_LINE = { width: 0.04 * UNIT, alpha: 0.7 } as const;
 export const PAD_HALF_WIDTH = 1.55 * UNIT;
 // Площадка станка охватывает станок и место рабочего с запасом.
 const PAD = { margin: 0.85 * UNIT, radius: 0.35 * UNIT } as const;
+/** Насколько площадка выступает за мебель и место рабочего по вертикали, точки рисования. */
+export const PAD_MARGIN = PAD.margin;
 const PAD_STROKE = { width: 6, alpha: 0.2 } as const;
 
 function bakeTile(renderer: Renderer, floor: Palette["floor"]) {
@@ -37,18 +42,29 @@ function bakeTile(renderer: Renderer, floor: Palette["floor"]) {
   return texture;
 }
 
-function drawLane(aisle: number, floor: Palette["floor"]): Graphics {
-  const y = aisle * UNIT;
-  const lane = new Graphics()
-    .rect(-FLOOR_REACH, y - LANE_HALF_WIDTH, FLOOR_REACH * 2, LANE_HALF_WIDTH * 2)
-    .fill(floor.lane);
-  for (const edge of [y - LANE_HALF_WIDTH, y + LANE_HALF_WIDTH]) {
-    lane.moveTo(-FLOOR_REACH, edge).lineTo(FLOOR_REACH, edge);
+function flat(points: readonly Point[]): number[] {
+  return points.flatMap((point) => [point.x, point.y]);
+}
+
+function inDrawingPoints(aisle: Aisle): Aisle {
+  const [first, second, ...rest] = aisle;
+  const scaled = (point: Point): Point => ({ x: point.x * UNIT, y: point.y * UNIT });
+  return [scaled(first), scaled(second), ...rest.map(scaled)];
+}
+
+// Полоса идёт вдоль каждого отрезка ломаной; крайние отрезки уходят за экран.
+function drawLane(aisle: Aisle, floor: Palette["floor"]): Graphics {
+  const axis = extendedAisle(inDrawingPoints(aisle), FLOOR_REACH);
+  const left = laneEdge(axis, -LANE_HALF_WIDTH);
+  const right = laneEdge(axis, LANE_HALF_WIDTH);
+  const lane = new Graphics().poly(flat([...left, ...right.toReversed()])).fill(floor.lane);
+  for (const edge of [left, right]) {
+    lane.poly(flat(edge), false);
   }
   lane.stroke({ width: EDGE_LINE.width, color: floor.mark, alpha: EDGE_LINE.alpha });
-  // Пунктир посередине — только в пределах далёкой видимости, без лишних тысяч штрихов.
-  for (let x = -FLOOR_REACH / 4; x < FLOOR_REACH / 4; x += MARK.length + MARK.gap) {
-    lane.rect(x, y - MARK.width / 2, MARK.length, MARK.width);
+  const dashAxis = extendedAisle(inDrawingPoints(aisle), DASH_REACH);
+  for (const dash of laneDashes(dashAxis, MARK.length, MARK.gap, MARK.width)) {
+    lane.poly(flat(dash));
   }
   return lane.fill(floor.mark);
 }

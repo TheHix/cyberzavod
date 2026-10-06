@@ -72,7 +72,7 @@ const { title, description, journal = false, project = false, heading } = Astro.
     margin: 0 0 var(--space-l);
   }
 
-  @media (max-width: 48rem) {
+  @media (width <= 48rem) and (height > 40rem) {
     .game {
       grid-template-columns: minmax(0, 1fr);
       grid-template-rows: auto minmax(0, 1fr);

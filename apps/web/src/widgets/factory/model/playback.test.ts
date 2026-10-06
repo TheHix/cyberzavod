@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { advance, seek, speedFrom, startPlayback, togglePlaying } from "./playback.ts";
+import {
+  advance,
+  seek,
+  speedFrom,
+  startPlayback,
+  togglePlaying,
+  withDuration,
+} from "./playback.ts";
 
 describe("advance", () => {
   it("сдвигает момент на прошедшее время с учётом скорости", () => {
@@ -77,5 +84,37 @@ describe("speedFrom", () => {
     const speed = speedFrom(value);
 
     expect(speed).toBe(expected);
+  });
+});
+
+describe("withDuration", () => {
+  it("меняет длительность и ставит позицию", () => {
+    const playback = startPlayback(10_000, false);
+
+    const next = withDuration(playback, 20_000, 12_000);
+
+    expect({ duration: next.duration, position: next.position }).toEqual({
+      duration: 20_000,
+      position: 12_000,
+    });
+  });
+
+  it.each([
+    [-5, 0],
+    [30_000, 8_000],
+  ])("прижимает позицию %i к границам новой сцены: %i", (position, expected) => {
+    const playback = startPlayback(10_000, false);
+
+    const next = withDuration(playback, 8_000, position);
+
+    expect(next.position).toBe(expected);
+  });
+
+  it("сохраняет, идёт ли проигрывание, и скорость", () => {
+    const playback = { ...startPlayback(10_000, true), speed: 4 as const };
+
+    const next = withDuration(playback, 8_000, 1_000);
+
+    expect({ playing: next.playing, speed: next.speed }).toEqual({ playing: true, speed: 4 });
   });
 });

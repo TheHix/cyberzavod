@@ -3,11 +3,14 @@
 
 import {
   buildScript,
+  carryTime,
   FOREMAN,
   sceneAt,
   summarize,
+  WIDE_LAYOUT,
   type BriefRecording,
   type BuildStats,
+  type FactoryLayout,
   type FactoryScript,
   type MessageCue,
   type Point,
@@ -22,6 +25,7 @@ import {
   seek,
   startPlayback,
   togglePlaying,
+  withDuration,
   type Playback,
   type Speed,
 } from "./playback.ts";
@@ -29,12 +33,22 @@ import {
 /** Готова ли графика цеха: пока она грузится, проигрывать нечем. */
 export type GraphicsStatus = "loading" | "ready" | "failed";
 
+// Всё, что меняется при смене плана, одним значением: его записывают целиком.
+interface ProductionState {
+  readonly layout: FactoryLayout;
+  readonly script: FactoryScript;
+  readonly playback: Playback;
+}
+
 /**
  * Модель цеха: сторы состояния (имена с `$`) и действия над ним. Журналу сборки она подходит
  * как `JournalScene`: `$speech` и `seekToSpeech`.
  */
 export interface FactoryModel extends JournalScene {
-  readonly script: FactoryScript;
+  /** Сценарий цеха на текущем плане; со сменой плана заменяется. */
+  readonly $script: ReadableAtom<FactoryScript>;
+  /** План цеха, по которому построен сценарий. Сравнивается по ссылке: у сценария своя копия. */
+  readonly $layout: ReadableAtom<FactoryLayout>;
   /** Итоги всей сборки: время, токены, промпты, возвраты. */
   readonly summary: BuildStats;
   readonly $status: ReadableAtom<GraphicsStatus>;
@@ -72,21 +86,39 @@ export interface FactoryModel extends JournalScene {
   togglePromptDetails(): void;
   /** Перематывает к началу пузыря промпта или реплики; «идёт или пауза» не меняется. */
   seekToSpeech(speech: Speech): void;
+  /**
+   * Переносит цех на другой план: сценарий строится заново, а момент записи, «идёт или пауза»
+   * и скорость остаются. Тот же план — ничего не меняет.
+   */
+  setLayout(layout: FactoryLayout): void;
 }
 
 /**
  * Создаёт модель цеха для записи: сценарий, сторы и действия. На каждый цех на странице —
  * своя модель.
  * @param {BriefRecording} recording Запись сборки без полных текстов реплик — их цеху не нужно.
+ * @param {FactoryLayout} layout План цеха в начале; потом его меняет `setLayout`.
  * @returns {FactoryModel} Модель, ещё не запущенная: ждёт готовности графики.
  */
-export function createFactoryModel(recording: BriefRecording): FactoryModel {
-  const script = buildScript(recording);
+export function createFactoryModel(
+  recording: BriefRecording,
+  layout: FactoryLayout = WIDE_LAYOUT,
+): FactoryModel {
+  const firstScript = buildScript(recording, layout);
+  // План, сценарий и проигрывание меняются вместе: отдельными атомами подписчики увидели бы
+  // новый сценарий со старым моментом.
+  const $state = atom<ProductionState>({
+    layout,
+    script: firstScript,
+    playback: startPlayback(firstScript.duration, false),
+  });
+  const $layout = computed($state, (state) => state.layout);
+  const $script = computed($state, (state) => state.script);
+  const $playback = computed($state, (state) => state.playback);
   const $status = atom<GraphicsStatus>("loading");
-  const $playback = atom(startPlayback(script.duration, false));
   const $promptDetailsOpen = atom(false);
   const $playing = computed($playback, (playback) => playback.playing);
-  const $scene = computed($playback, (playback) => sceneAt(script, playback.position));
+  const $scene = computed($state, ({ script, playback }) => sceneAt(script, playback.position));
   const $recordingTime = computed($scene, (scene) => scene.recordingTime);
   const $prompt = computed($scene, (scene) => scene.prompt?.cue ?? null);
   // Промпт говорит мастер, и пузырь висит над ним, там, где он стоит у станка.
@@ -103,20 +135,29 @@ export function createFactoryModel(recording: BriefRecording): FactoryModel {
     return scene.workers.find((worker) => worker.station === cue.speaker)?.position ?? null;
   });
 
-  const timeline = speechTimeline(script);
-  const $speech = computed($scene, (scene) => speechAt(timeline, scene.time));
+  const $timeline = computed($script, speechTimeline);
+  const $speech = computed([$timeline, $scene], (timeline, scene) =>
+    speechAt(timeline, scene.time),
+  );
 
-  const update = (change: (playback: Playback) => Playback) => {
-    const promptBefore = $prompt.get();
-    $playback.set(change($playback.get()));
-    if ($prompt.get() !== promptBefore) $promptDetailsOpen.set(false);
+  // Промпты разных сценариев — разные объекты, поэтому «тот же промпт» — по номеру.
+  const closingDetailsOnNewPrompt = (change: () => void) => {
+    const promptBefore = $prompt.get()?.index;
+    change();
+    if ($prompt.get()?.index !== promptBefore) $promptDetailsOpen.set(false);
   };
+  const update = (change: (playback: Playback) => Playback) =>
+    closingDetailsOnNewPrompt(() => {
+      const state = $state.get();
+      $state.set({ ...state, playback: change(state.playback) });
+    });
   const pause = () => {
     if ($playback.get().playing) update(togglePlaying);
   };
 
   return {
-    script,
+    $script,
+    $layout,
     summary: summarize(recording),
     $status,
     $playback,
@@ -147,8 +188,20 @@ export function createFactoryModel(recording: BriefRecording): FactoryModel {
       if (open) pause();
     },
     seekToSpeech: (speech) => {
-      const start = speechStart(timeline, speech);
+      const start = speechStart($timeline.get(), speech);
       if (start !== undefined) update((playback) => seek(playback, start));
+    },
+    setLayout: (next) => {
+      if (next === $layout.get()) return;
+      const previous = $script.get();
+      const script = buildScript(recording, next);
+      const playback = $playback.get();
+      const carried = withDuration(
+        playback,
+        script.duration,
+        carryTime(previous, script, playback.position),
+      );
+      closingDetailsOnNewPrompt(() => $state.set({ layout: next, script, playback: carried }));
     },
   };
 }

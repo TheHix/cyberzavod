@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Recording } from "@cyberzavod/core";
+import { FACTORY_LAYOUTS, PORTRAIT_LAYOUT, WIDE_LAYOUT, type Recording } from "@cyberzavod/core";
 import { createFactoryModel, type FactoryModel } from "./factory.ts";
 
 // Темп по умолчанию сжимает минуту записи в секунду сцены: постановка работает 0–2 000 мс.
@@ -25,7 +25,7 @@ function recordingWithPrompt(): Recording {
 
 // Момент сцены, когда висит промпт с номером `index`: чуть позже его начала.
 function duringPrompt(model: FactoryModel, index: number): number {
-  return (model.script.prompts[index]?.start ?? 0) + 100;
+  return (model.$script.get().prompts[index]?.start ?? 0) + 100;
 }
 
 describe("createFactoryModel", () => {
@@ -76,7 +76,9 @@ describe("createFactoryModel", () => {
 
     model.seek(duringPrompt(model, 1));
 
-    expect(model.$promptPosition.get()).toEqual(model.script.layout.stations.code.foremanPost);
+    expect(model.$promptPosition.get()).toEqual(
+      model.$script.get().layout.stations.code.foremanPost,
+    );
   });
 
   it("не ищет место промпта, когда его никто не говорит", () => {
@@ -180,7 +182,7 @@ function recordingWithMessages(): Recording {
 
 // Момент сцены, когда висит реплика с номером `index`: чуть позже её начала.
 function duringMessage(model: FactoryModel, index: number): number {
-  return (model.script.messages[index]?.start ?? 0) + 100;
+  return (model.$script.get().messages[index]?.start ?? 0) + 100;
 }
 
 describe("createFactoryModel: реплики", () => {
@@ -205,7 +207,9 @@ describe("createFactoryModel: реплики", () => {
 
     model.seek(duringMessage(model, 0));
 
-    expect(model.$messagePosition.get()).toEqual(model.script.layout.stations.spec.foremanPost);
+    expect(model.$messagePosition.get()).toEqual(
+      model.$script.get().layout.stations.spec.foremanPost,
+    );
   });
 
   it("ставит пузырь над рабочим на его месте, когда он говорит не при передаче", () => {
@@ -213,7 +217,7 @@ describe("createFactoryModel: реплики", () => {
 
     model.seek(duringMessage(model, 1));
 
-    expect(model.$messagePosition.get()).toEqual(model.script.layout.stations.spec.post);
+    expect(model.$messagePosition.get()).toEqual(model.$script.get().layout.stations.spec.post);
   });
 
   it("ставит пузырь над рабочим у места встречи, когда он говорит при передаче", () => {
@@ -223,7 +227,7 @@ describe("createFactoryModel: реплики", () => {
 
     const giver = model.$scene.get().workers.find((worker) => worker.station === "code");
     expect(model.$messagePosition.get()).toEqual(giver?.position);
-    expect(model.$messagePosition.get()).not.toEqual(model.script.layout.stations.code.post);
+    expect(model.$messagePosition.get()).not.toEqual(model.$script.get().layout.stations.code.post);
   });
 
   it("не ищет место, когда никто не говорит", () => {
@@ -247,7 +251,7 @@ describe("createFactoryModel: журнал", () => {
 
     model.seekToSpeech({ kind: "message", index: 1 });
 
-    expect(model.$scene.get().time).toBe(model.script.messages[1]?.start);
+    expect(model.$scene.get().time).toBe(model.$script.get().messages[1]?.start);
     expect(model.$speech.get()).toEqual({ kind: "message", index: 1 });
     expect(model.$message.get()?.index).toBe(1);
   });
@@ -257,7 +261,7 @@ describe("createFactoryModel: журнал", () => {
 
     model.seekToSpeech({ kind: "prompt", index: 1 });
 
-    expect(model.$scene.get().time).toBe(model.script.prompts[1]?.start);
+    expect(model.$scene.get().time).toBe(model.$script.get().prompts[1]?.start);
     expect(model.$prompt.get()?.index).toBe(1);
   });
 
@@ -301,5 +305,98 @@ describe("createFactoryModel: журнал", () => {
 
     expect(listener).toHaveBeenCalledOnce();
     expect(model.$speech.get()).toEqual({ kind: "message", index: 1 });
+  });
+});
+
+describe("createFactoryModel: план", () => {
+  it("начинает на переданном плане и по умолчанию на широком", () => {
+    const portrait = createFactoryModel(recordingWithMessages(), PORTRAIT_LAYOUT);
+    const byDefault = createFactoryModel(recordingWithMessages());
+
+    expect([portrait.$layout.get(), byDefault.$layout.get()]).toEqual([
+      PORTRAIT_LAYOUT,
+      WIDE_LAYOUT,
+    ]);
+  });
+
+  it("отдаёт выбранный план из FACTORY_LAYOUTS", () => {
+    const model = createFactoryModel(recordingWithMessages());
+
+    model.setLayout(PORTRAIT_LAYOUT);
+
+    expect(model.$layout.get()).toBe(FACTORY_LAYOUTS[1]);
+  });
+
+  it("строит сценарий заново по новому плану", () => {
+    const model = createFactoryModel(recordingWithMessages());
+
+    model.setLayout(PORTRAIT_LAYOUT);
+
+    expect(model.$script.get().layout.width).toBe(PORTRAIT_LAYOUT.width);
+  });
+
+  it("сохраняет время записи, «идёт или пауза» и скорость", () => {
+    const model = createFactoryModel(recordingWithMessages());
+    model.start(true);
+    model.setSpeed(2);
+    model.seek(duringMessage(model, 2) + 700);
+    const recordingTime = model.$recordingTime.get();
+
+    model.setLayout(PORTRAIT_LAYOUT);
+
+    const { playing, speed } = model.$playback.get();
+    expect(model.$recordingTime.get()).toBeCloseTo(recordingTime, 6);
+    expect({ playing, speed }).toEqual({ playing: true, speed: 2 });
+  });
+
+  it("сохраняет паузу", () => {
+    const model = createFactoryModel(recordingWithMessages());
+    model.start(false);
+    model.seek(duringMessage(model, 1));
+
+    model.setLayout(PORTRAIT_LAYOUT);
+
+    expect(model.$playing.get()).toBe(false);
+  });
+
+  it("не меняет сцену, когда план тот же", () => {
+    const model = createFactoryModel(recordingWithMessages(), PORTRAIT_LAYOUT);
+    model.seek(duringMessage(model, 1));
+    const scene = model.$scene.get();
+
+    model.setLayout(PORTRAIT_LAYOUT);
+
+    expect(model.$scene.get()).toBe(scene);
+  });
+
+  it("ставит seekToSpeech на начало речи в новом сценарии", () => {
+    const model = createFactoryModel(recordingWithMessages());
+    model.setLayout(PORTRAIT_LAYOUT);
+
+    model.seekToSpeech({ kind: "message", index: 2 });
+
+    expect(model.$scene.get().time).toBe(model.$script.get().messages[2]?.start);
+  });
+
+  it("отдаёт подписчикам сцены один кадр при смене плана", () => {
+    const model = createFactoryModel(recordingWithMessages());
+    model.seek(duringMessage(model, 2) + 700);
+    const expectedRecordingTime = model.$recordingTime.get();
+    const recordingTimes: number[] = [];
+    model.$scene.listen((scene) => recordingTimes.push(scene.recordingTime));
+
+    model.setLayout(PORTRAIT_LAYOUT);
+
+    expect(recordingTimes).toEqual([expect.closeTo(expectedRecordingTime, 6)]);
+  });
+
+  it("не закрывает уточнения того же промпта, когда сценарий построен заново", () => {
+    const model = createFactoryModel(recordingWithPrompt());
+    model.seek(duringPrompt(model, 0));
+    model.togglePromptDetails();
+
+    model.setLayout(structuredClone(WIDE_LAYOUT));
+
+    expect(model.$promptDetailsOpen.get()).toBe(true);
   });
 });

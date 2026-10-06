@@ -19,8 +19,8 @@ interface Props {
 }
 
 type Entry =
-  | { kind: "prompt"; prompt: PromptEvent; speech: Speech }
-  | { kind: "message"; message: MessageEvent; speech: Speech };
+  | { kind: "prompt"; prompt: PromptEvent; speech: Extract<Speech, { kind: "prompt" }> }
+  | { kind: "message"; message: MessageEvent; speech: Extract<Speech, { kind: "message" }> };
 
 const { recording } = Astro.props;
 

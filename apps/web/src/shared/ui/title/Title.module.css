@@ -5,6 +5,15 @@
   line-height: 1.2;
 }
 
+/* Блок занимает ровно `--lines` строк: короткий текст не сжимает его, длинный обрезается. */
+.clamped {
+  display: -webkit-box;
+  min-height: calc(var(--lines) * 1lh);
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--lines);
+}
+
 .m {
   font-size: var(--text-m);
 }

@@ -1,10 +1,10 @@
 import { Show, type JSX } from "solid-js";
-import { messageAnchor, routeOf } from "@/entities/message";
+import { routeOf } from "@/entities/message";
 import { useStoreValue } from "@/shared/lib/use-store-value.ts";
 import { Button, Chip, Title } from "@/shared/ui";
 import type { FactoryGraphics, Frame } from "../graphics/factory-graphics.ts";
 import { useFactoryModel } from "./model-context.ts";
-import { openJournalAt } from "./open-journal.ts";
+import { showMessageDetails } from "./open-journal.ts";
 import { SpeechBubble } from "./SpeechBubble.tsx";
 
 interface Props {
@@ -27,19 +27,13 @@ export function MessageBubble(props: Props): JSX.Element {
   const cue = useStoreValue(model.$message);
   const position = useStoreValue(model.$messagePosition);
 
-  const showDetails = (index: number) => {
-    // Чтобы прочитать полный текст, сцену останавливаем.
-    model.pause();
-    openJournalAt(messageAnchor(index));
-  };
-
   return (
     <Show when={cue()}>
       {(current) => (
         <SpeechBubble graphics={props.graphics} field={props.field} position={position()}>
           <Chip tone="sky">{routeOf(current().message)}</Chip>
           <Title>{current().message.line}</Title>
-          <Button variant="link" onClick={() => showDetails(current().index)}>
+          <Button variant="link" onClick={() => showMessageDetails(model, current().index)}>
             подробнее
           </Button>
         </SpeechBubble>

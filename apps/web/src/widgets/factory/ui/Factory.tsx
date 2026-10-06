@@ -1,5 +1,5 @@
 import { createSignal, onCleanup, onMount, Show, untrack, type JSX } from "solid-js";
-import type { BriefRecording } from "@cyberzavod/core";
+import { layoutFor, type BriefRecording } from "@cyberzavod/core";
 import type { ProjectLink } from "@/entities/project";
 import { connectScene } from "@/features/journal-sync";
 import { useStoreValue } from "@/shared/lib/use-store-value.ts";
@@ -36,7 +36,11 @@ const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 async function launchFactory(model: FactoryModel, host: HTMLElement): Promise<LaunchedFactory> {
   const graphics = await loadFactoryGraphics();
   try {
-    await graphics.mount(host, model.script.layout);
+    const mounted = model.$layout.get();
+    await graphics.mount(host, mounted);
+    // Пока холст встраивался, форма поля могла сменить план: графика его ещё не знала.
+    // Вписывает его `fitToScreen` сразу после запуска.
+    if (model.$layout.get() !== mounted) graphics.setLayout(model.$layout.get());
   } catch (err) {
     // Холст и контекст видеокарты не должны остаться под надписью об ошибке.
     graphics.destroy();
@@ -86,16 +90,31 @@ export function Factory(props: Props): JSX.Element {
   let canvasHost!: HTMLDivElement;
   let fieldElement!: HTMLDivElement;
 
+  // У скрытого поля нет формы: план остаётся прежним.
+  const layoutForField = (frame: Frame) =>
+    frame.width > 0 && frame.height > 0
+      ? layoutFor(frame.width, frame.height)
+      : model.$layout.get();
+
   // Сначала графика подстраивается под размер, потом размер видят компоненты: иначе
-  // пузырь на паузе встал бы по старому масштабу.
+  // пузырь на паузе встал бы по старому масштабу. Форма поля может потребовать другой план:
+  // графика меняет его раньше модели, чтобы кадр не рисовался по чужому плану, а `resize`
+  // сразу вписывает его в поле.
   const fitToScreen = () => {
     const frame = fieldWithin(canvasHost, fieldElement);
+    const layout = layoutForField(frame);
+    if (layout !== model.$layout.get()) {
+      graphics()?.setLayout(layout);
+      model.setLayout(layout);
+    }
     graphics()?.resize(canvasHost.clientWidth, canvasHost.clientHeight, frame);
     graphics()?.render(model.$scene.get());
     setField(frame);
   };
 
   onMount(() => {
+    // План выбирается по полю до запуска графики: она сразу рисует нужный.
+    model.setLayout(layoutForField(fieldWithin(canvasHost, fieldElement)));
     onCleanup(connectScene(model));
     let stop: (() => void) | undefined;
     let disposed = false;

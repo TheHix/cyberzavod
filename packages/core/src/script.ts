@@ -6,11 +6,12 @@
 // сменились за миллисекунды. Поэтому сценарий строится по порядку: следующая передача
 // начинается, когда работа закончена и получатель вернулся на своё место.
 
+import { aisleStop, aisleWalk, type Aisle } from "./aisle.ts";
 import {
   distance,
   headingTo,
   stopShortOf,
-  DEFAULT_LAYOUT,
+  WIDE_LAYOUT,
   type FactoryLayout,
   type Point,
 } from "./layout.ts";
@@ -504,7 +505,7 @@ class Director {
     const { handoffGap, handoffMs, liftMs, turnMs } = this.#pacing;
     const giverPlan = this.#layout.stations[giver];
     const takerPlan = this.#layout.stations[taker];
-    const meet = stopShortOf({ x: takerPlan.post.x, y: aisle }, takerPlan.post, handoffGap);
+    const meet = stopShortOf(aisleStop(aisle, takerPlan.post).point, takerPlan.post, handoffGap);
     const route = routeBetween(giverPlan.post, meet, aisle);
     const start = Math.max(readyAt, this.#homeAt[taker]);
 
@@ -584,10 +585,12 @@ function withoutStandstills(points: readonly Point[]): Point[] {
   });
 }
 
-// Путь идущего: со своего места в проход, по проходу и из прохода к цели — так он не проходит
-// сквозь чужие станки.
-function routeBetween(from: Point, to: Point, aisle: number): Point[] {
-  return withoutStandstills([from, { x: from.x, y: aisle }, { x: to.x, y: aisle }, to]);
+// Путь идущего: со своего места в проход, по проходу (через его повороты) и из прохода к цели —
+// так он не проходит сквозь чужие станки.
+function routeBetween(from: Point, to: Point, aisle: Aisle): Point[] {
+  const entry = aisleStop(aisle, from);
+  const exit = aisleStop(aisle, to);
+  return withoutStandstills([from, entry.point, ...aisleWalk(aisle, entry, exit), exit.point, to]);
 }
 
 // Путь из отрезков с моментами прохождения при заданной скорости.
@@ -625,7 +628,7 @@ function stand(
  */
 export function buildScript(
   recording: BriefRecording,
-  layout: FactoryLayout = DEFAULT_LAYOUT,
+  layout: FactoryLayout = WIDE_LAYOUT,
   pacing: Pacing = DEFAULT_PACING,
 ): FactoryScript {
   const director = new Director(layout, pacing, recording.events);

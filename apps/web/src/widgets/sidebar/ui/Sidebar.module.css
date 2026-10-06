@@ -2,7 +2,9 @@
   --badge-size: 3.4rem;
 
   position: relative;
-  z-index: 1;
+  /* Выше пузырей речи (.overlay в Factory.module.css, z-index 2): пузырь не должен закрывать
+     меню и перехватывать его нажатия. */
+  z-index: 3;
   display: flex;
   flex-direction: column;
   gap: var(--space-m);
@@ -55,7 +57,7 @@
 }
 
 /* На узком экране меню — строкой сверху; плитки сжимает сам kit. */
-@media (max-width: 48rem) {
+@media (width <= 48rem) and (height > 40rem) {
   .sidebar {
     --badge-size: 2.4rem;
 

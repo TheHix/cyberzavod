@@ -31,3 +31,10 @@
   color: var(--ink-soft);
   font-weight: 700;
 }
+
+/* На узком экране скорость не нужна: HUD отдаёт место полке речи. */
+@media (width <= 48rem) and (height > 40rem) {
+  .speed {
+    display: none;
+  }
+}

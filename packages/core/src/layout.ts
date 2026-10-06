@@ -1,6 +1,7 @@
 // План цеха в условных единицах. Представление на сайте само решает, сколько пикселей
 // в единице, поэтому план один для любой графики.
 
+import type { Aisle } from "./aisle.ts";
 import type { Stage } from "./recording.ts";
 
 /** Точка на плане цеха; ось y направлена вниз, как на экране. */
@@ -33,8 +34,13 @@ export interface ForemanPlan {
 export interface FactoryLayout {
   readonly width: number;
   readonly height: number;
-  /** Линия прохода между рядами станков, y: по ней бегают, не задевая чужие места. */
-  readonly aisle: number;
+  /**
+   * Наименьшее соотношение ширины поля к высоте, при котором берётся этот план (см.
+   * `layoutFor`); у последнего плана в `FACTORY_LAYOUTS` — 0.
+   */
+  readonly minFieldAspect: number;
+  /** Проход — ломаная из точек плана: с места к проходу идут по кратчайшей, дальше вдоль него. */
+  readonly aisle: Aisle;
   readonly stations: Readonly<Record<Stage, StationPlan>>;
   readonly foreman: ForemanPlan;
 }
@@ -48,15 +54,23 @@ function stationOf(machine: Point, post: Point, facing: number): StationPlan {
   return { machine, post, facing, foremanPost: { x: post.x + FOREMAN_SIDE_OFFSET, y: post.y } };
 }
 
+// Поле 351×487 на телефоне — соотношение 0,72, и ему нужен портретный план; поле десктопа
+// 852×860 — 0,99, там остаётся широкий вид цеха. Граница лежит между ними.
+const WIDE_MIN_FIELD_ASPECT = 0.8;
+
 /**
- * План по умолчанию: петля на полу 16×9. Сверху слева направо — постановка, код, проверки;
+ * Широкий план: петля на полу 16×9. Сверху слева направо — постановка, код, проверки;
  * снизу справа налево — ревью и выпуск, так деталь идёт по кругу. Кабинет мастера — внизу слева,
  * в стороне от маршрутов рабочих; мастер ходит к станкам и встаёт справа от рабочего.
  */
-export const DEFAULT_LAYOUT: FactoryLayout = {
+export const WIDE_LAYOUT: FactoryLayout = {
   width: 16,
   height: 9,
-  aisle: 4.5,
+  minFieldAspect: WIDE_MIN_FIELD_ASPECT,
+  aisle: [
+    { x: 0, y: 4.5 },
+    { x: 16, y: 4.5 },
+  ],
   stations: {
     spec: stationOf({ x: 3, y: 1.6 }, { x: 3, y: 2.9 }, FACING_UP),
     code: stationOf({ x: 8, y: 1.6 }, { x: 8, y: 2.9 }, FACING_UP),
@@ -71,6 +85,89 @@ export const DEFAULT_LAYOUT: FactoryLayout = {
     door: { x: 4.5, y: 7.4 },
   },
 };
+
+/**
+ * Портретный план для узкого поля: пол 7×10, станки в два столбца по обе стороны вертикального
+ * прохода. Деталь идёт по кругу: левый столбец сверху вниз, затем правый снизу вверх. Кабинет
+ * мастера — внизу справа. Все рабочие и мастер у стола смотрят вверх. Путь детали от места
+ * рабочего к проходу горизонтальный, поэтому место мастера на клетку ниже места рабочего,
+ * со стороны прохода: мастер стоит вне этого пути.
+ */
+export const PORTRAIT_LAYOUT: FactoryLayout = {
+  width: 7,
+  height: 10,
+  minFieldAspect: 0,
+  aisle: [
+    { x: 3.5, y: 0 },
+    { x: 3.5, y: 10 },
+  ],
+  stations: {
+    spec: {
+      machine: { x: 1.5, y: 1.6 },
+      post: { x: 1.5, y: 2.9 },
+      facing: FACING_UP,
+      foremanPost: { x: 2.6, y: 3.9 },
+    },
+    code: {
+      machine: { x: 1.5, y: 4.6 },
+      post: { x: 1.5, y: 5.9 },
+      facing: FACING_UP,
+      foremanPost: { x: 2.6, y: 6.9 },
+    },
+    test: {
+      machine: { x: 1.5, y: 7.6 },
+      post: { x: 1.5, y: 8.9 },
+      facing: FACING_UP,
+      foremanPost: { x: 2.6, y: 9.9 },
+    },
+    review: {
+      machine: { x: 5.5, y: 4.6 },
+      post: { x: 5.5, y: 5.9 },
+      facing: FACING_UP,
+      foremanPost: { x: 4.4, y: 6.9 },
+    },
+    ship: {
+      machine: { x: 5.5, y: 1.6 },
+      post: { x: 5.5, y: 2.9 },
+      facing: FACING_UP,
+      foremanPost: { x: 4.4, y: 3.9 },
+    },
+  },
+  foreman: {
+    desk: { x: 5.5, y: 7.8 },
+    post: { x: 5.5, y: 8.9 },
+    facing: FACING_UP,
+    door: { x: 4.4, y: 8.9 },
+  },
+};
+
+/**
+ * Планы цеха от широкого к узкому: `layoutFor` берёт первый подходящий по форме поля.
+ * Новый план — новая строка здесь.
+ */
+export const FACTORY_LAYOUTS: readonly [FactoryLayout, ...FactoryLayout[]] = [
+  WIDE_LAYOUT,
+  PORTRAIT_LAYOUT,
+];
+
+/**
+ * Выбирает план по форме поля: первый, у которого `minFieldAspect` не больше отношения
+ * ширины поля к высоте. Если не подходит ни один, остаётся самый узкий — последний.
+ * @param {number} width Ширина поля, пикселей.
+ * @param {number} height Высота поля, пикселей.
+ * @param {readonly [FactoryLayout, ...FactoryLayout[]]} layouts Планы от широкого к узкому; у последнего `minFieldAspect` 0.
+ * @returns {FactoryLayout} Подходящий план; у поля без площади — последний.
+ */
+export function layoutFor(
+  width: number,
+  height: number,
+  layouts: readonly [FactoryLayout, ...FactoryLayout[]] = FACTORY_LAYOUTS,
+): FactoryLayout {
+  const narrowest = layouts[layouts.length - 1] ?? layouts[0];
+  if (width <= 0 || height <= 0) return narrowest;
+  const aspect = width / height;
+  return layouts.find((layout) => layout.minFieldAspect <= aspect) ?? narrowest;
+}
 
 /**
  * Расстояние между точками плана.

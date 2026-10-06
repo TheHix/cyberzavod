@@ -6,7 +6,7 @@
   font-family: var(--font-display);
   font-size: var(--text-s);
   font-weight: 800;
-  line-height: 1.5;
+  line-height: var(--chip-line-height);
   white-space: nowrap;
   border: var(--outline);
   border-radius: var(--radius-round);

@@ -19,7 +19,7 @@
   gap: var(--space-xs);
   justify-items: start;
   width: max-content;
-  max-width: min(var(--bubble-max-width), 80vw);
+  max-width: min(var(--bubble-max-width), 80vw, var(--field-width));
   padding: var(--space-m) var(--space-l);
   background: var(--paper);
   border: var(--outline);

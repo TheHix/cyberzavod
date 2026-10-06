@@ -1,6 +1,8 @@
 .hud {
   position: relative;
-  z-index: 1;
+  /* Выше пузырей речи (.overlay в Factory.module.css, z-index 2): пузырь не должен закрывать
+     HUD и перехватывать его нажатия. */
+  z-index: 3;
   align-self: start;
   display: grid;
   gap: var(--space-l);
@@ -15,6 +17,11 @@
   font-weight: 700;
 }
 
+/* Полка речи нужна только там, где пузыри скрыты: на узком экране. */
+.speech {
+  display: none;
+}
+
 /* На узком или низком экране HUD — только заголовок и управление: место отдаётся цеху. */
 @media (max-width: 48rem), (max-height: 40rem) {
   .hud {
@@ -25,5 +32,22 @@
   .stats,
   .date {
     display: none;
+  }
+}
+
+/* На узком экране название сборки уступает место полке речи; оно остаётся в разметке для
+   программ чтения: на странице записи это главный заголовок. */
+@media (width <= 48rem) and (height > 40rem) {
+  .header {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .speech {
+    display: block;
   }
 }

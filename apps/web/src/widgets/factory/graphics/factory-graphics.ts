@@ -20,6 +20,11 @@ export interface Frame extends ScreenPoint {
 export interface FactoryGraphics {
   /** Встраивает холст в контейнер и рисует неподвижный план цеха. */
   mount(container: HTMLElement, layout: FactoryLayout): Promise<void>;
+  /**
+   * Заменяет неподвижный план — пол, станки, кабинет. Рабочие, мастер и деталь остаются.
+   * Вписывает новый план в поле следующий `resize`: до него масштаб остаётся от прежнего плана.
+   */
+  setLayout(layout: FactoryLayout): void;
   /** Рисует кадр сцены. */
   render(scene: Scene): void;
   /**

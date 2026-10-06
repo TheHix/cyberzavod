@@ -45,6 +45,10 @@ const OUTLINE = 6;
 const SHADOW = { radiusX: 46, radiusY: 40, alpha: 0.25 } as const;
 const TORSO = { depth: 24, width: 40 } as const;
 const HELMET_SIZE = { radius: 24, visor: 16, highlight: 7 } as const;
+/** Насколько фигура уходит от своей точки, точки рисования: по тени считаются границы цеха. */
+export const ACTOR_REACH = SHADOW.radiusX;
+/** Видимый размер рабочего сверху, точек: каска с контуром. */
+export const WORKER_SIZE = 2 * (HELMET_SIZE.radius + OUTLINE);
 const HAND_RADIUS = 10;
 const HAND_SPREAD = 0.3 * UNIT;
 const CRATE_SIZE = { half: 22, radius: 6, plank: 4 } as const;
