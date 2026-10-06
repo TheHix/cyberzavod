@@ -1,8 +1,0 @@
-[Unit]
-Description=Дамп базы Киберзавода
-Requires=docker.service
-After=docker.service
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/cyberzavod-backup

@@ -1,7 +1,0 @@
-# 5 неудачных входов за 10 минут — бан на час. Журнал читается из journald.
-[sshd]
-enabled  = true
-backend  = systemd
-maxretry = 5
-findtime = 10m
-bantime  = 1h

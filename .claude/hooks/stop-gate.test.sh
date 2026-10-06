@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Сценарии хуков turn-start.sh и stop-gate.sh на временном git-репозитории с конфигом проекта
 # и подставным Makefile.
-# Запускается из `make check-deploy`.
+# Запускается из `make check-scripts`.
 set -uo pipefail
 
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)

@@ -46,9 +46,8 @@ pnpm dev --host         # сайт на :4321
 
 ## Чего в контейнере нет — намеренно
 
-- **Docker.** Docker-in-Docker требует привилегированного режима, а это свело бы изоляцию на нет. Проверки с Docker (`make check-docker`, `make check-deploy`) выполняет CI. Перед коммитом в контейнере достаточно `make check-web check-api`.
+- **Docker.** Docker-in-Docker требует привилегированного режима, а это свело бы изоляцию на нет. Проверки с Docker (`make check-docker`, `make check-scripts`) выполняет CI. Перед коммитом в контейнере достаточно `make check-web check-api`.
 - **Записи в настройки git.** `git config` и `git push -u` для новой ветки делаются с хоста. Коммиты, ветки и обычный `git push` работают внутри (после `gh auth login` в контейнере).
-- **Доступа к серверу.** `make server-bootstrap` и выпуск сертификата выполняются с хоста.
 
 ## Файрвол
 

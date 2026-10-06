@@ -2,7 +2,7 @@
 # Сценарии хука session-start.sh на временном проекте с подставными pnpm, go и golangci-lint:
 # заглушки пишут свои вызовы в журнал и, как настоящие команды, печатают в stdout. Сеть и
 # настоящие установки не нужны.
-# Запускается из `make check-deploy`.
+# Запускается из `make check-scripts`.
 set -uo pipefail
 
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)

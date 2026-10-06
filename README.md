@@ -24,7 +24,7 @@ make dev
 
 `make check` прогоняет все проверки, `make help` показывает остальные команды.
 
-Для работы ИИ-агентов есть изолированный dev-контейнер с файрволом — см. [.devcontainer/README.md](.devcontainer/README.md). Как устроен деплой — [deploy/README.md](deploy/README.md).
+Для работы ИИ-агентов есть изолированный dev-контейнер с файрволом — см. [.devcontainer/README.md](.devcontainer/README.md).
 
 ## Подключить внешний проект
 

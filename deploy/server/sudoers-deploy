@@ -1,3 +1,0 @@
-# Пользователь deploy может от root запустить только скрипт выкатки — и ничего больше.
-# Аргумент (sha) скрипт проверяет сам.
-deploy ALL=(root) NOPASSWD: /usr/local/bin/cyberzavod-deploy

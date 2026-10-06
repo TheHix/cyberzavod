@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Сценарии project-init.sh на временном заводе с тегами и временном внешнем git-репозитории.
 # Запускается из `make check-web`: сценарию хука записи нужны Node и зависимости workspace,
-# которых нет в job infra.
+# которых нет в job scripts.
 set -uo pipefail
 
 FACTORY_SOURCE=$(cd "$(dirname "$0")/.." && pwd)
