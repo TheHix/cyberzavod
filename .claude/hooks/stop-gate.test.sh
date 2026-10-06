@@ -46,13 +46,14 @@ run_hook() {
     | CLAUDE_PROJECT_DIR="$repo" TMPDIR="$repo" "$HOOKS_DIR/$hook" > "$repo/out" 2>&1
 }
 
-# Запускает хук с PATH, где есть только bash (нужен шебангу), — как на машине без jq.
+# Запускает хук с PATH, где есть только bash (нужен шебангу), — как на машине без jq. Ввод подаётся
+# here-string, а не конвейером: без jq хук выходит, не прочитав stdin, и тогда писатель в
+# конвейере получает SIGPIPE, а pipefail отдаёт 141 вместо кода хука.
 run_hook_without_jq() {
   local repo="$1" hook="$2" tools
   tools=$(mktemp -d)
   ln -s "$(command -v bash)" "$tools/bash"
-  printf '{"session_id": "%s"}' "$SESSION" \
-    | CLAUDE_PROJECT_DIR="$repo" TMPDIR="$repo" PATH="$tools" "$HOOKS_DIR/$hook" > "$repo/out" 2>&1
+  CLAUDE_PROJECT_DIR="$repo" TMPDIR="$repo" PATH="$tools" "$HOOKS_DIR/$hook" > "$repo/out" 2>&1 <<< "{\"session_id\": \"$SESSION\"}"
   local code=$?
   rm -rf "$tools"
   return "$code"

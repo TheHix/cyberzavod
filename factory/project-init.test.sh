@@ -94,12 +94,13 @@ says() {
   grep -qF -- "$1" "${2:-$OUTPUT}"
 }
 
-# Запускает команду хука как Claude Code: через sh, JSON события на stdin.
+# Запускает команду хука как Claude Code: через sh, JSON события на stdin. Ввод подаётся
+# here-string, а не конвейером: хук может выйти, не прочитав stdin, и тогда писатель в конвейере
+# получает SIGPIPE, а pipefail отдаёт 141 вместо кода хука.
 run_session_start_hook() {
   local project="$1" factory_home="$2" command
   command=$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$project/.claude/settings.json")
-  printf '%s' "$SESSION_START_PAYLOAD" \
-    | CLAUDE_PROJECT_DIR="$project" CYBERZAVOD_HOME="$factory_home" sh -c "$command"
+  CLAUDE_PROJECT_DIR="$project" CYBERZAVOD_HOME="$factory_home" sh -c "$command" <<< "$SESSION_START_PAYLOAD"
 }
 
 check() {
@@ -358,7 +359,7 @@ test_session_start_hook_without_factory_home_writes_nothing() {
   run_init "$factory" "$project" "$PROJECT_ID" "$VERSION"
   command=$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$project/.claude/settings.json")
 
-  printf '%s' "$SESSION_START_PAYLOAD" | env -u CYBERZAVOD_HOME CLAUDE_PROJECT_DIR="$project" sh -c "$command"
+  env -u CYBERZAVOD_HOME CLAUDE_PROJECT_DIR="$project" sh -c "$command" <<< "$SESSION_START_PAYLOAD"
   code=$?
 
   check "без CYBERZAVOD_HOME хук выходит с кодом 0" "[[ $code -eq 0 ]]"
