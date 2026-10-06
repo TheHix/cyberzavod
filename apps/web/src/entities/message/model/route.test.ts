@@ -8,14 +8,18 @@ function messageBetween(from: Speaker, to: Speaker): BriefMessageEvent {
 
 describe("routeOf", () => {
   it.each([
-    ["code", "test", "Код → Проверки"],
-    ["spec", "foreman", "Постановка → мастер"],
-    ["foreman", "code", "Мастер → Код"],
-    ["review", "code", "Ревью → Код"],
-  ] as const)("называет маршрут %s → %s: «%s»", (from, to, expected) => {
+    ["code", "test", "ru", "Код → Проверки"],
+    ["spec", "foreman", "ru", "Постановка → мастер"],
+    ["foreman", "code", "ru", "Мастер → Код"],
+    ["review", "code", "ru", "Ревью → Код"],
+    ["code", "test", "en", "Code → Tests"],
+    ["spec", "foreman", "en", "Spec → foreman"],
+    ["foreman", "code", "en", "Foreman → Code"],
+    ["review", "code", "en", "Review → Code"],
+  ] as const)("называет маршрут %s → %s на языке %s: «%s»", (from, to, locale, expected) => {
     const message = messageBetween(from, to);
 
-    const route = routeOf(message);
+    const route = routeOf(message, locale);
 
     expect(route).toBe(expected);
   });

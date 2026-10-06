@@ -6,9 +6,10 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "check": "astro check && vitest run && astro build"
+    "check": "astro check && vitest run && astro build && vitest run --config vitest.build.config.ts"
   },
   "dependencies": {
+    "@astrojs/sitemap": "^3.7.4",
     "@astrojs/solid-js": "^7.0.2",
     "@cyberzavod/core": "workspace:*",
     "@fontsource-variable/nunito": "^5.3.0",

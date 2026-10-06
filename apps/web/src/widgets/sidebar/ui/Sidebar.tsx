@@ -2,11 +2,16 @@ import BookOpen from "lucide-solid/icons/book-open";
 import Factory from "lucide-solid/icons/factory";
 import FolderKanban from "lucide-solid/icons/folder-kanban";
 import Info from "lucide-solid/icons/info";
+import Languages from "lucide-solid/icons/languages";
 import ListVideo from "lucide-solid/icons/list-video";
 import MessageSquareText from "lucide-solid/icons/message-square-text";
-import { Show, type JSX } from "solid-js";
+import { For, Show, type JSX } from "solid-js";
 import { PANELS } from "@/shared/config/panels.ts";
 import { site } from "@/shared/config/site.ts";
+import { LOCALE_NAMES, otherLocales, type Locale } from "@/shared/i18n/locale.ts";
+import { localizedPath } from "@/shared/i18n/path.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
+import { cx } from "@/shared/lib/cx.ts";
 import { Button, ButtonLink, PixelPlaque } from "@/shared/ui";
 import { GithubMark } from "./GithubMark.tsx";
 import styles from "./Sidebar.module.css";
@@ -16,6 +21,10 @@ interface Props {
   journal: boolean;
   /** Есть ли на странице карточка проекта — тогда в меню кнопка «Проект». */
   project: boolean;
+  /** Язык страницы: на нём подписи меню. */
+  locale: Locale;
+  /** Путь страницы без языка: по нему переключатель ведёт на ту же страницу на другом языке. */
+  path: string;
 }
 
 const ICON_STROKE = 2.5;
@@ -25,38 +34,44 @@ const LOGO_SHORT_LINES = ["КЗ"];
 
 /**
  * Меню сайта слева: логотип, цех, панели записей, журнала сборки, проекта, гайдов и «о заводе»,
- * ссылка на код.
+ * ссылка на код и переключатель языка.
  * Работает без JavaScript: панели открываются нативным popover.
  * @param {Props} props Свойства компонента.
  * @param {boolean} props.journal Показывать ли кнопку журнала сборки.
  * @param {boolean} props.project Показывать ли кнопку проекта.
+ * @param {Locale} props.locale Язык страницы.
+ * @param {string} props.path Путь страницы без языка.
  * @returns {JSX.Element} Боковое меню.
  */
 export function Sidebar(props: Props): JSX.Element {
   return (
-    <nav class={styles.sidebar} aria-label="Меню">
-      <a class={styles.logo} href="/" aria-label={`${site.name} — цех`}>
+    <nav class={styles.sidebar} aria-label={UI_TEXT.menu.label[props.locale]}>
+      <a
+        class={styles.logo}
+        href={localizedPath(props.locale, "/")}
+        aria-label={UI_TEXT.menu.home[props.locale](site.name[props.locale])}
+      >
         <PixelPlaque class={styles.logoFull} lines={LOGO_LINES} />
         <PixelPlaque class={styles.logoShort} lines={LOGO_SHORT_LINES} />
       </a>
       <ul class={styles.menu}>
         <li>
-          <ButtonLink href="/" layout="tile">
+          <ButtonLink href={localizedPath(props.locale, "/")} layout="tile">
             <Factory stroke-width={ICON_STROKE} />
-            Цех
+            {UI_TEXT.menu.floor[props.locale]}
           </ButtonLink>
         </li>
         <li>
           <Button layout="tile" popovertarget={PANELS.records}>
             <ListVideo stroke-width={ICON_STROKE} />
-            Записи
+            {UI_TEXT.menu.records[props.locale]}
           </Button>
         </li>
         <Show when={props.journal}>
           <li>
             <Button layout="tile" popovertarget={PANELS.journal}>
               <MessageSquareText stroke-width={ICON_STROKE} />
-              Журнал
+              {UI_TEXT.menu.journal[props.locale]}
             </Button>
           </li>
         </Show>
@@ -64,26 +79,49 @@ export function Sidebar(props: Props): JSX.Element {
           <li>
             <Button layout="tile" popovertarget={PANELS.project}>
               <FolderKanban stroke-width={ICON_STROKE} />
-              Проект
+              {UI_TEXT.menu.project[props.locale]}
             </Button>
           </li>
         </Show>
         <li>
           <Button layout="tile" popovertarget={PANELS.guides}>
             <BookOpen stroke-width={ICON_STROKE} />
-            Гайды
+            {UI_TEXT.menu.guides[props.locale]}
           </Button>
         </li>
         <li>
           <Button layout="tile" popovertarget={PANELS.about}>
-            <Info stroke-width={ICON_STROKE} />О заводе
+            <Info stroke-width={ICON_STROKE} />
+            {UI_TEXT.menu.about[props.locale]}
           </Button>
         </li>
       </ul>
-      <ButtonLink class={styles.bottom} href={site.repoUrl} layout="tile" variant="ghost">
-        <GithubMark />
-        Код
-      </ButtonLink>
+      <div class={styles.bottom}>
+        <ButtonLink class={styles.bottomTile} href={site.repoUrl} layout="halfTile" variant="ghost">
+          <GithubMark />
+          {UI_TEXT.menu.code[props.locale]}
+        </ButtonLink>
+        <For each={otherLocales(props.locale)}>
+          {(other) => (
+            <ButtonLink
+              class={cx(styles.bottomTile, styles.language)}
+              href={localizedPath(other, props.path)}
+              hreflang={other}
+              lang={other}
+              aria-label={UI_TEXT.menu.language[props.locale](
+                other.toUpperCase(),
+                LOCALE_NAMES[other],
+              )}
+              title={LOCALE_NAMES[other]}
+              layout="halfTile"
+              variant="ghost"
+            >
+              <Languages stroke-width={ICON_STROKE} />
+              {other.toUpperCase()}
+            </ButtonLink>
+          )}
+        </For>
+      </div>
     </nav>
   );
 }

@@ -1,0 +1,17 @@
+---
+// Тело гайда: Markdown пишется один раз, без языка, поэтому ссылки на страницы сайта получают
+// язык страницы уже в готовой разметке.
+import { localizeLinks } from "@/shared/i18n/links.ts";
+import type { Locale } from "@/shared/i18n/locale.ts";
+
+interface Props {
+  /** Язык страницы, на которой стоит гайд. */
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+if (Astro.site === undefined) throw new Error("в astro.config.ts не задан site");
+const html = await Astro.slots.render("default");
+---
+
+<Fragment set:html={localizeLinks(html, locale, Astro.site.origin)} />

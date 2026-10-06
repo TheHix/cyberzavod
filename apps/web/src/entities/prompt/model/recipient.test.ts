@@ -8,19 +8,22 @@ function promptTo(model?: string): PromptEvent {
 }
 
 describe("recipientOf", () => {
-  it("называет модель, получившую промпт", () => {
+  it.each(["ru", "en"] as const)("называет модель, получившую промпт, на языке %s", (locale) => {
     const prompt = promptTo("claude-opus-5-5");
 
-    const recipient = recipientOf(prompt);
+    const recipient = recipientOf(prompt, locale);
 
     expect(recipient).toBe("Claude Opus 5.5");
   });
 
-  it("пишет «агент», если модель неизвестна", () => {
+  it.each([
+    ["ru", "агент"],
+    ["en", "agent"],
+  ] as const)("пишет слово «агент», если модель неизвестна, на языке %s", (locale, expected) => {
     const prompt = promptTo();
 
-    const recipient = recipientOf(prompt);
+    const recipient = recipientOf(prompt, locale);
 
-    expect(recipient).toBe("агент");
+    expect(recipient).toBe(expected);
   });
 });

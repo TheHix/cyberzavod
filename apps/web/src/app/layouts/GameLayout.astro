@@ -9,9 +9,14 @@ import { publishedGuides } from "@/entities/guide";
 import { publishedRecordings } from "@/entities/recording";
 import { PANELS } from "@/shared/config/panels.ts";
 import { site } from "@/shared/config/site.ts";
+import { LOCALE_NAMES, otherLocales, type Locale } from "@/shared/i18n/locale.ts";
+import { localizedPath, pathWithoutLocale } from "@/shared/i18n/path.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { Drawer } from "@/shared/ui";
 
 interface Props {
+  /** Язык страницы: на нём интерфейс, панели и мета-теги. */
+  locale: Locale;
   title?: string;
   description?: string;
   /** Есть ли на странице журнал сборки (слот drawers) — тогда он в меню. */
@@ -25,34 +30,39 @@ interface Props {
   heading?: string | undefined;
 }
 
-const { title, description, journal = false, project = false, heading } = Astro.props;
+const { locale, title, description, journal = false, project = false, heading } = Astro.props;
+const path = pathWithoutLocale(Astro.url.pathname);
+const closeLabel = UI_TEXT.panels.close[locale];
 ---
 
-<BaseLayout title={title} description={description}>
+<BaseLayout locale={locale} path={path} title={title} description={description}>
   <div class="game">
-    <Sidebar journal={journal} project={project} />
+    <Sidebar journal={journal} project={project} locale={locale} path={path} />
     <main class="field">
       {heading && <h1 class="visually-hidden">{heading}</h1>}
       <slot />
     </main>
   </div>
 
-  <Drawer id={PANELS.records} title="Записи сборок">
-    <RecordingList recordings={publishedRecordings} />
+  <Drawer id={PANELS.records} title={UI_TEXT.panels.records[locale]} closeLabel={closeLabel}>
+    <RecordingList recordings={publishedRecordings} locale={locale} />
   </Drawer>
-  <Drawer id={PANELS.guides} title="Гайды">
-    <GuideList guides={publishedGuides} />
+  <Drawer id={PANELS.guides} title={UI_TEXT.panels.guides[locale]} closeLabel={closeLabel}>
+    <GuideList guides={publishedGuides} locale={locale} />
   </Drawer>
-  <Drawer id={PANELS.about} title="О заводе">
+  <Drawer id={PANELS.about} title={UI_TEXT.panels.about[locale]} closeLabel={closeLabel}>
     <div class="about">
-      <p>{site.description}</p>
+      {otherLocales(locale).map((other) => (
+        <p>
+          <a href={localizedPath(other, path)} hreflang={other} lang={other}>
+            {LOCALE_NAMES[other]}
+          </a>
+        </p>
+      ))}
+      <p>{site.description[locale]}</p>
+      <p>{UI_TEXT.about.how[locale]}</p>
       <p>
-        Хуки Claude Code пишут журнал сессии, из него собирается запись: этапы, промпты, реплики,
-        время и токены. Цех проигрывает её — каждый станок это этап, рабочие передают деталь из рук
-        в руки, а мастер в своём кабинете раздаёт задания и принимает отчёты.
-      </p>
-      <p>
-        <a href={site.repoUrl}>Код проекта на GitHub</a>
+        <a href={site.repoUrl}>{UI_TEXT.about.code[locale]}</a>
       </p>
     </div>
   </Drawer>

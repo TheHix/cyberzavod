@@ -7,6 +7,7 @@ import {
 } from "@cyberzavod/core";
 import { describe, expect, it } from "vitest";
 import { FOREMAN_LABEL, STAGE_LABELS } from "@/shared/config/stages.ts";
+import { PLAQUE_LOCALE } from "@/shared/lib/pixel-plaque.ts";
 import { fitPixelPlan, planBounds, type PlanBounds } from "./bounds.ts";
 import { plaqueSize } from "./glyphs.ts";
 import { MACHINE_SIZE } from "./machines.ts";
@@ -66,9 +67,10 @@ function neededRects(layout: FactoryLayout): PlanBounds[] {
 }
 
 function widestPlaqueText(): string {
-  return [...Object.values(STAGE_LABELS), FOREMAN_LABEL].reduce((widest, text) =>
-    plaqueSize(widest).width >= plaqueSize(text).width ? widest : text,
-  );
+  return [
+    ...Object.values(STAGE_LABELS).map((label) => label[PLAQUE_LOCALE]),
+    FOREMAN_LABEL[PLAQUE_LOCALE],
+  ].reduce((widest, text) => (plaqueSize(widest).width >= plaqueSize(text).width ? widest : text));
 }
 
 describe("planBounds", () => {

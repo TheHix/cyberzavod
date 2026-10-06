@@ -2,28 +2,35 @@
 // Статья гайда: заголовок, описание и текст в одной панели, которая прокручивается внутри поля.
 import type { PublishedGuide } from "@/entities/guide";
 import { CopyCode } from "@/features/copy-code";
+import { CONTENT_LOCALE, type Locale } from "@/shared/i18n/locale.ts";
 import { Panel, Prose, Title } from "@/shared/ui";
+import GuideBody from "./GuideBody.astro";
 
 interface Props {
   guide: PublishedGuide;
+  /** Язык страницы: на нём подписи кнопок; сама статья — в оригинале. */
+  locale: Locale;
 }
 
-const { meta, Content } = Astro.props.guide;
+const { guide, locale } = Astro.props;
+const { meta, Content } = guide;
 const proseId = `guide-${meta.id}`;
 ---
 
 <Panel scrollable>
-  <article class="article">
+  <article class="article" lang={CONTENT_LOCALE}>
     <Title as="h1" size="xl">
       {meta.title}
     </Title>
     <p class="description">{meta.description}</p>
     <Prose id={proseId}>
-      <Content />
+      <GuideBody locale={locale}>
+        <Content />
+      </GuideBody>
     </Prose>
   </article>
 </Panel>
-<CopyCode client:idle scope={proseId} />
+<CopyCode client:idle scope={proseId} locale={locale} />
 
 <style>
   /* minmax(0, …): иначе колонка не уже самого длинного кода, и панель прокручивается вбок. */

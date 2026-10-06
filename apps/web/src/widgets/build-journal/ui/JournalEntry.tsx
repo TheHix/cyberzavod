@@ -1,12 +1,16 @@
 import { createSignal, onMount, Show, type JSX } from "solid-js";
 import { $sceneSpeech, isSameSpeech, seekScene, type Speech } from "@/features/journal-sync";
 import { PANELS } from "@/shared/config/panels.ts";
+import type { Locale } from "@/shared/i18n/locale.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { useStoreValue } from "@/shared/lib/use-store-value.ts";
 import { Button, Card, Chip } from "@/shared/ui";
 import styles from "./JournalEntry.module.css";
 
 interface Props {
   speech: Speech;
+  /** Язык страницы: на нём кнопка «показать в цехе». */
+  locale: Locale;
   clock: string;
   route: string;
   children: JSX.Element;
@@ -18,6 +22,7 @@ interface Props {
  * журнал, чтобы сцена была видна. Без JS — та же разметка без них.
  * @param {Props} props Свойства компонента.
  * @param {Speech} props.speech Какой промпт, вмешательство или реплика записи.
+ * @param {Locale} props.locale Язык страницы.
  * @param {string} props.clock Время записи в сборке, например `01:30`.
  * @param {string} props.route Маршрут: от кого и кому или метка вмешательства.
  * @param {JSX.Element} props.children Статичное тело записи из `.astro`.
@@ -42,10 +47,10 @@ export function JournalEntry(props: Props): JSX.Element {
             class={styles.seek}
             popovertarget={PANELS.journal}
             popovertargetaction="hide"
-            aria-label={`Показать в цехе: ${props.clock}, ${props.route}`}
+            aria-label={UI_TEXT.journal.showOnFloorLabel[props.locale](props.clock, props.route)}
             onClick={() => seekScene(props.speech)}
           >
-            показать в цехе
+            {UI_TEXT.journal.showOnFloor[props.locale]}
           </Button>
         </Show>
       </p>

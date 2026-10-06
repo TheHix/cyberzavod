@@ -1,4 +1,8 @@
-// Форматирование чисел, времени и дат для страниц записей и счётчиков над цехом.
+// Форматирование чисел, времени и дат для страниц записей и счётчиков над цехом. Язык приходит
+// параметром: страницы собираются заранее, и язык зрителя им неизвестен.
+
+import { byLocale, LOCALE_TAGS, type Locale } from "@/shared/i18n/locale.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 
 const SECOND_MS = 1000;
 const MINUTE_SECONDS = 60;
@@ -11,15 +15,21 @@ function twoDigits(value: number): string {
 /**
  * Форматирует длительность для счётчика: секунды, минуты с секундами или часы с минутами.
  * @param {number} ms Длительность в миллисекундах.
- * @returns {string} Строка вида «42 с», «2 мин 05 с» или «1 ч 05 мин».
+ * @param {Locale} locale Язык подписей единиц.
+ * @returns {string} Строка вида «42 с», «2 мин 05 с» или «1 ч 05 мин»; по-английски «42 s», «2 min 05 s», «1 h 05 min».
  */
-export function formatDuration(ms: number): string {
+export function formatDuration(ms: number, locale: Locale): string {
+  const { hour, minute, second } = UI_TEXT.duration;
   const totalSeconds = Math.round(ms / SECOND_MS);
   const totalMinutes = Math.floor(totalSeconds / MINUTE_SECONDS);
   const hours = Math.floor(totalMinutes / HOUR_MINUTES);
-  if (hours > 0) return `${hours} ч ${twoDigits(totalMinutes % HOUR_MINUTES)} мин`;
-  if (totalMinutes > 0) return `${totalMinutes} мин ${twoDigits(totalSeconds % MINUTE_SECONDS)} с`;
-  return `${totalSeconds} с`;
+  if (hours > 0) {
+    return `${hours} ${hour[locale]} ${twoDigits(totalMinutes % HOUR_MINUTES)} ${minute[locale]}`;
+  }
+  if (totalMinutes > 0) {
+    return `${totalMinutes} ${minute[locale]} ${twoDigits(totalSeconds % MINUTE_SECONDS)} ${second[locale]}`;
+  }
+  return `${totalSeconds} ${second[locale]}`;
 }
 
 /**
@@ -36,32 +46,37 @@ export function formatClock(ms: number): string {
   return `${hours}:${twoDigits(totalMinutes % HOUR_MINUTES)}:${seconds}`;
 }
 
-const tokenFormatter = new Intl.NumberFormat("ru-RU");
+const TOKEN_FORMATTERS = byLocale((locale) => new Intl.NumberFormat(LOCALE_TAGS[locale]));
 
 /**
  * Форматирует число токенов с разбиением по разрядам.
  * @param {number} tokens Число токенов.
- * @returns {string} Строка вида «1 234 567».
+ * @param {Locale} locale Язык, по правилам которого разбиваются разряды.
+ * @returns {string} Строка вида «1 234 567»; по-английски «1,234,567».
  */
-export function formatTokens(tokens: number): string {
-  return tokenFormatter.format(tokens);
+export function formatTokens(tokens: number, locale: Locale): string {
+  return TOKEN_FORMATTERS[locale].format(tokens);
 }
 
 // Страницы собираются заранее, без часового пояса зрителя, поэтому день — по UTC, как и в id записи.
-const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: "UTC",
-});
+const DATE_FORMATTERS = byLocale(
+  (locale) =>
+    new Intl.DateTimeFormat(LOCALE_TAGS[locale], {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }),
+);
 
 /**
  * Форматирует день начала записи для подписи.
  * @param {string} startedAt Время в ISO 8601: `2026-10-04T09:52:13.000Z`.
- * @returns {string} Строка вида «4 октября 2026 г.».
+ * @param {Locale} locale Язык названия месяца и порядка частей даты.
+ * @returns {string} Строка вида «4 октября 2026 г.»; по-английски «October 4, 2026».
  */
-export function formatDate(startedAt: string): string {
-  return dateFormatter.format(new Date(startedAt));
+export function formatDate(startedAt: string, locale: Locale): string {
+  return DATE_FORMATTERS[locale].format(new Date(startedAt));
 }
 
 // id модели Claude: `claude-opus-5-5`; у старых — с датой выпуска, иногда без младшей версии:
@@ -80,24 +95,38 @@ export function formatModel(id: string): string {
   return `Claude ${family.charAt(0).toUpperCase()}${family.slice(1)} ${version}`;
 }
 
-/** Формы слова для числа: «1 промпт», «2 промпта», «5 промптов». */
-export interface WordForms {
-  readonly one: string;
-  readonly few: string;
-  readonly many: string;
+/** Формы слова для числа на каждом языке: русский различает три формы, английский две. */
+export interface PluralWords {
+  /** «1 промпт», «2 промпта», «5 промптов». */
+  readonly ru: { readonly one: string; readonly few: string; readonly many: string };
+  /** «1 prompt», «2 prompts». */
+  readonly en: { readonly one: string; readonly other: string };
 }
 
-const pluralRules = new Intl.PluralRules("ru-RU");
-const countFormatter = new Intl.NumberFormat("ru-RU");
+const PLURAL_RULES = byLocale((locale) => new Intl.PluralRules(LOCALE_TAGS[locale]));
+const COUNT_FORMATTERS = byLocale((locale) => new Intl.NumberFormat(LOCALE_TAGS[locale]));
+
+function wordFor(count: number, words: PluralWords, locale: Locale): string {
+  switch (locale) {
+    case "ru": {
+      const category = PLURAL_RULES.ru.select(count);
+      return category === "one" ? words.ru.one : category === "few" ? words.ru.few : words.ru.many;
+    }
+    case "en":
+      return PLURAL_RULES.en.select(count) === "one" ? words.en.one : words.en.other;
+    default:
+      // Новый язык не скомпилируется, пока для него не опишут формы слова.
+      return locale satisfies never;
+  }
+}
 
 /**
  * Пишет число со словом в нужной форме.
  * @param {number} count Целое число.
- * @param {WordForms} forms Формы слова для 1, 2 и 5.
- * @returns {string} Строка вида «5 промптов» или «2 875 954 токена».
+ * @param {PluralWords} words Формы слова на каждом языке.
+ * @param {Locale} locale Язык, по правилам которого выбирается форма и пишется число.
+ * @returns {string} Строка вида «5 промптов» или «2 875 954 токена»; по-английски «1 prompt», «2 prompts».
  */
-export function formatCount(count: number, forms: WordForms): string {
-  const category = pluralRules.select(count);
-  const word = category === "one" ? forms.one : category === "few" ? forms.few : forms.many;
-  return `${countFormatter.format(count)} ${word}`;
+export function formatCount(count: number, words: PluralWords, locale: Locale): string {
+  return `${COUNT_FORMATTERS[locale].format(count)} ${wordFor(count, words, locale)}`;
 }

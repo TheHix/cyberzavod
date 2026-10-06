@@ -2,6 +2,8 @@ import { Match, Show, Switch, type JSX } from "solid-js";
 import { labelOf } from "@/entities/intervention";
 import { routeOf } from "@/entities/message";
 import { recipientOf } from "@/entities/prompt";
+import { useLocale } from "@/shared/i18n/locale-context.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { useStoreValue } from "@/shared/lib/use-store-value.ts";
 import { BulletList, Button, Chip, Title } from "@/shared/ui";
 import { useFactoryModel } from "./model-context.ts";
@@ -26,6 +28,7 @@ interface Props {
  */
 export function SpeechDock(props: Props): JSX.Element {
   const model = useFactoryModel();
+  const locale = useLocale();
   const prompt = useStoreValue(model.$prompt);
   const intervention = useStoreValue(model.$intervention);
   const message = useStoreValue(model.$message);
@@ -38,9 +41,9 @@ export function SpeechDock(props: Props): JSX.Element {
           {(current) => (
             <>
               <div class={styles.route}>
-                <Chip tone="sky">{routeOf(current().message)}</Chip>
+                <Chip tone="sky">{routeOf(current().message, locale)}</Chip>
                 <Button variant="link" onClick={() => showMessageDetails(model, current().index)}>
-                  подробнее
+                  {UI_TEXT.speech.more[locale]}
                 </Button>
               </div>
               <Title size="m" lines={LINE_COUNT}>
@@ -53,12 +56,12 @@ export function SpeechDock(props: Props): JSX.Element {
           {(current) => (
             <>
               <div class={styles.route}>
-                <Chip tone="sun">{labelOf(current().intervention)}</Chip>
+                <Chip tone="sun">{labelOf(current().intervention, locale)}</Chip>
                 <Button
                   variant="link"
                   onClick={() => showInterventionDetails(model, current().index)}
                 >
-                  подробнее
+                  {UI_TEXT.speech.more[locale]}
                 </Button>
               </div>
               <Title size="m" lines={LINE_COUNT}>
@@ -71,14 +74,16 @@ export function SpeechDock(props: Props): JSX.Element {
           {(current) => (
             <>
               <div class={styles.route}>
-                <Chip tone="sky">человек → {recipientOf(current().prompt)}</Chip>
+                <Chip tone="sky">
+                  {UI_TEXT.speech.humanTo[locale](recipientOf(current().prompt, locale))}
+                </Chip>
                 <Show when={current().prompt.requirements.length > 0}>
                   <Button
                     variant="link"
                     aria-expanded={detailsOpen()}
                     onClick={() => model.togglePromptDetails()}
                   >
-                    {detailsOpen() ? "свернуть" : "подробнее"}
+                    {detailsOpen() ? UI_TEXT.speech.less[locale] : UI_TEXT.speech.more[locale]}
                   </Button>
                 </Show>
               </div>

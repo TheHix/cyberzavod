@@ -7,6 +7,8 @@ interface Props {
   /** id панели: его указывают кнопки, которые её открывают (`popovertarget`). */
   id: string;
   title: string;
+  /** Подпись кнопки закрытия на языке страницы: kit словаря не знает. */
+  closeLabel: string;
   children: JSX.Element;
 }
 
@@ -16,6 +18,7 @@ interface Props {
  * @param {Props} props Свойства компонента.
  * @param {string} props.id Идентификатор панели.
  * @param {string} props.title Заголовок панели.
+ * @param {string} props.closeLabel Подпись кнопки закрытия.
  * @param {JSX.Element} props.children Содержимое.
  * @returns {JSX.Element} Панель, скрытая до открытия.
  */
@@ -31,7 +34,7 @@ export function Drawer(props: Props): JSX.Element {
           layout="icon"
           popovertarget={props.id}
           popovertargetaction="hide"
-          aria-label="Закрыть"
+          aria-label={props.closeLabel}
         >
           <X stroke-width={3} />
         </Button>

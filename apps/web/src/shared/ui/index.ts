@@ -9,7 +9,7 @@ export {
 } from "./button/Button.tsx";
 export { Card } from "./card/Card.tsx";
 export { Chip, type ChipTone } from "./chip/Chip.tsx";
-export { CopyButton } from "./copy-button/CopyButton.tsx";
+export { CopyButton, type CopyLabels } from "./copy-button/CopyButton.tsx";
 export { Drawer } from "./drawer/Drawer.tsx";
 export { Panel } from "./panel/Panel.tsx";
 export { PixelPlaque } from "./pixel-plaque/PixelPlaque.tsx";

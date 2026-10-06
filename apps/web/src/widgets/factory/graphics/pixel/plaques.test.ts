@@ -7,6 +7,7 @@ import {
 } from "@cyberzavod/core";
 import { describe, expect, it } from "vitest";
 import { FOREMAN_LABEL, STAGE_LABELS } from "@/shared/config/stages.ts";
+import { PLAQUE_LOCALE } from "@/shared/lib/pixel-plaque.ts";
 import { ACTOR_FIGURE } from "./actors.ts";
 import { artSize } from "./art.ts";
 import { MACHINE_SIZE } from "./machines.ts";
@@ -110,8 +111,8 @@ describe("plaquePlacements", () => {
       const placements = plaquePlacements(layout);
 
       expect(placements.map(({ text }) => text)).toEqual([
-        ...STAGES.map((stage) => STAGE_LABELS[stage]),
-        FOREMAN_LABEL,
+        ...STAGES.map((stage) => STAGE_LABELS[stage][PLAQUE_LOCALE]),
+        FOREMAN_LABEL[PLAQUE_LOCALE],
       ]);
     },
   );
@@ -203,7 +204,9 @@ describe("plaquePlacements", () => {
 
     const act = () => plaquePlacements(layout);
 
-    expect(act).toThrow(`табличка «${STAGE_LABELS.spec}» не помещается между фигурами`);
+    expect(act).toThrow(
+      `табличка «${STAGE_LABELS.spec[PLAQUE_LOCALE]}» не помещается между фигурами`,
+    );
   });
 });
 

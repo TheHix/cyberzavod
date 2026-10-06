@@ -1,0 +1,52 @@
+---
+import type { GetStaticPaths } from "astro";
+import { briefOf, type Recording } from "@cyberzavod/core";
+import GameLayout from "@/app/layouts/GameLayout.astro";
+import { Factory } from "@/widgets/factory";
+import { BuildJournal } from "@/widgets/build-journal";
+import {
+  projectLinkOf,
+  projectOf,
+  publishedProjects,
+  type ProjectLink,
+} from "@/entities/project";
+import { publishedRecordings } from "@/entities/recording";
+import { PANELS } from "@/shared/config/panels.ts";
+import { LOCALES, type Locale } from "@/shared/i18n/locale.ts";
+import { localeParam } from "@/shared/i18n/path.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
+import { Drawer } from "@/shared/ui";
+
+export const getStaticPaths = (() =>
+  LOCALES.flatMap((locale) =>
+    publishedRecordings.map((recording) => ({
+      params: { lang: localeParam(locale), id: recording.id },
+      props: {
+        locale,
+        recording,
+        project: projectLinkOf(projectOf(publishedProjects, recording.project), locale),
+      },
+    })),
+  )) satisfies GetStaticPaths;
+
+interface Props {
+  locale: Locale;
+  recording: Recording;
+  project: ProjectLink;
+}
+
+const { locale, recording, project } = Astro.props;
+const description = UI_TEXT.pages.recordingDescription[locale](recording.title);
+---
+
+<GameLayout locale={locale} title={recording.title} description={description} journal>
+  <Factory client:load locale={locale} recording={briefOf(recording)} project={project} />
+  <Drawer
+    slot="drawers"
+    id={PANELS.journal}
+    title={UI_TEXT.panels.journal[locale]}
+    closeLabel={UI_TEXT.panels.close[locale]}
+  >
+    <BuildJournal recording={recording} locale={locale} />
+  </Drawer>
+</GameLayout>

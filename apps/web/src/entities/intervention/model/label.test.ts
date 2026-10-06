@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { INTERVENTION_REASONS, type BriefInterventionEvent } from "@cyberzavod/core";
+import { LOCALES } from "@/shared/i18n/locale.ts";
 import { labelOf } from "./label.ts";
 
 function interventionFor(reason: BriefInterventionEvent["reason"]): BriefInterventionEvent {
@@ -8,20 +9,24 @@ function interventionFor(reason: BriefInterventionEvent["reason"]): BriefInterve
 
 describe("labelOf", () => {
   it.each([
-    ["question", "человек · ответ на вопрос"],
-    ["spec_review", "человек · решение по постановке"],
-    ["rework_limit", "человек · вызов после возвратов"],
-    ["stop_gate", "человек · вызов хуком остановки"],
-  ] as const)("называет причину %s: «%s»", (reason, expected) => {
+    ["question", "ru", "человек · ответ на вопрос"],
+    ["spec_review", "ru", "человек · решение по постановке"],
+    ["rework_limit", "ru", "человек · вызов после возвратов"],
+    ["stop_gate", "ru", "человек · вызов хуком остановки"],
+    ["question", "en", "human · answered a question"],
+    ["spec_review", "en", "human · spec decision"],
+    ["rework_limit", "en", "human · called after reworks"],
+    ["stop_gate", "en", "human · called by stop hook"],
+  ] as const)("называет причину %s на языке %s: «%s»", (reason, locale, expected) => {
     const intervention = interventionFor(reason);
 
-    const label = labelOf(intervention);
+    const label = labelOf(intervention, locale);
 
     expect(label).toBe(expected);
   });
 
-  it("знает каждую причину из ядра", () => {
-    const labels = INTERVENTION_REASONS.map((reason) => labelOf(interventionFor(reason)));
+  it.each(LOCALES)("знает каждую причину из ядра на языке %s", (locale) => {
+    const labels = INTERVENTION_REASONS.map((reason) => labelOf(interventionFor(reason), locale));
 
     expect(new Set(labels).size).toBe(INTERVENTION_REASONS.length);
   });

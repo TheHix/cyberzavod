@@ -1,6 +1,8 @@
 import Pause from "lucide-solid/icons/pause";
 import Play from "lucide-solid/icons/play";
 import { Show, type JSX } from "solid-js";
+import { useLocale } from "@/shared/i18n/locale-context.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { formatClock } from "@/shared/lib/format.ts";
 import { useStoreValue } from "@/shared/lib/use-store-value.ts";
 import { Button, SegmentedControl, Slider, type SegmentOption } from "@/shared/ui";
@@ -22,6 +24,7 @@ const SPEED_OPTIONS: readonly SegmentOption<`${Speed}`>[] = SPEEDS.map((speed) =
  */
 export function PlaybackControls(): JSX.Element {
   const model = useFactoryModel();
+  const locale = useLocale();
   const status = useStoreValue(model.$status);
   const playback = useStoreValue(model.$playback);
   const recordingTime = useStoreValue(model.$recordingTime);
@@ -34,7 +37,9 @@ export function PlaybackControls(): JSX.Element {
         size="large"
         layout="round"
         disabled={disabled()}
-        aria-label={playback().playing ? "Пауза" : "Смотреть"}
+        aria-label={
+          playback().playing ? UI_TEXT.playback.pause[locale] : UI_TEXT.playback.play[locale]
+        }
         onClick={() => model.toggle()}
       >
         <Show when={playback().playing} fallback={<Play size={ICON_SIZE} fill="currentColor" />}>
@@ -43,7 +48,7 @@ export function PlaybackControls(): JSX.Element {
       </Button>
       <div class={styles.timeline}>
         <Slider
-          label="Момент сборки"
+          label={UI_TEXT.playback.scrubber[locale]}
           value={playback().position}
           max={playback().duration}
           step={SCRUB_STEP_MS}
@@ -52,14 +57,16 @@ export function PlaybackControls(): JSX.Element {
           onChange={(position) => model.seek(position)}
         />
         <div class={styles.times}>
-          <span title="Время от начала сборки">{formatClock(recordingTime())}</span>
-          <span title="Длина сборки">{formatClock(model.summary.durationMs)}</span>
+          <span title={UI_TEXT.playback.elapsed[locale]}>{formatClock(recordingTime())}</span>
+          <span title={UI_TEXT.playback.length[locale]}>
+            {formatClock(model.summary.durationMs)}
+          </span>
         </div>
       </div>
       <div class={styles.speed}>
-        <span>Скорость</span>
+        <span>{UI_TEXT.playback.speed[locale]}</span>
         <SegmentedControl
-          label="Скорость проигрывания"
+          label={UI_TEXT.playback.speedLabel[locale]}
           options={SPEED_OPTIONS}
           value={`${playback().speed}`}
           disabled={disabled()}

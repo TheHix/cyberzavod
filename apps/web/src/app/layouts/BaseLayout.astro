@@ -4,27 +4,43 @@ import "@fontsource-variable/rubik";
 import "@fontsource-variable/nunito";
 import "@/app/styles/global.css";
 import { site } from "@/shared/config/site.ts";
+import { DEFAULT_LOCALE, LOCALES, type Locale } from "@/shared/i18n/locale.ts";
+import { localizedPath } from "@/shared/i18n/path.ts";
 
 interface Props {
+  /** Язык страницы: ставится в `<html lang>` и выбирает название и описание сайта. */
+  locale: Locale;
+  /** Путь страницы без языка: по нему строятся адрес страницы и её версии на других языках. */
+  path: string;
   title?: string | undefined;
   description?: string | undefined;
 }
 
-const { title, description = site.description } = Astro.props;
-const fullTitle = title ? `${title} — ${site.name}` : site.name;
-const canonical = new URL(Astro.url.pathname, Astro.site);
+const { locale, path, title, description = site.description[locale] } = Astro.props;
+const siteName = site.name[locale];
+const fullTitle = title ? `${title} — ${siteName}` : siteName;
+const canonical = new URL(localizedPath(locale, path), Astro.site);
+const alternates = LOCALES.map((alternate) => ({
+  hreflang: alternate,
+  href: new URL(localizedPath(alternate, path), Astro.site),
+}));
+const defaultAlternate = new URL(localizedPath(DEFAULT_LOCALE, path), Astro.site);
 ---
 
 <!doctype html>
-<html lang="ru">
+<html lang={locale}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
+    {alternates.map(({ hreflang, href }) => (
+      <link rel="alternate" hreflang={hreflang} href={href} />
+    ))}
+    <link rel="alternate" hreflang="x-default" href={defaultAlternate} />
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content={site.name} />
+    <meta property="og:site_name" content={siteName} />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />

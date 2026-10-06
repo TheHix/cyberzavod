@@ -1,6 +1,8 @@
 import type { JSX } from "solid-js";
 import type { BriefRecording } from "@cyberzavod/core";
 import type { ProjectLink } from "@/entities/project";
+import { useLocale } from "@/shared/i18n/locale-context.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { formatDate, formatDuration, formatTokens } from "@/shared/lib/format.ts";
 import { ButtonLink, Panel, StatList, Title } from "@/shared/ui";
 import { useFactoryModel } from "./model-context.ts";
@@ -28,16 +30,17 @@ interface Props {
  */
 export function Hud(props: Props): JSX.Element {
   const model = useFactoryModel();
+  const locale = useLocale();
   const stats = () => [
-    { label: "Время", value: formatDuration(model.summary.durationMs) },
-    { label: "Токены", value: formatTokens(model.summary.tokens) },
-    { label: "Промпты", value: String(model.summary.prompts) },
-    { label: "Возвраты", value: String(model.summary.reworks) },
-    { label: "Вмешательства", value: String(model.summary.interventions) },
+    { label: UI_TEXT.hud.time[locale], value: formatDuration(model.summary.durationMs, locale) },
+    { label: UI_TEXT.hud.tokens[locale], value: formatTokens(model.summary.tokens, locale) },
+    { label: UI_TEXT.hud.prompts[locale], value: String(model.summary.prompts) },
+    { label: UI_TEXT.hud.reworks[locale], value: String(model.summary.reworks) },
+    { label: UI_TEXT.hud.interventions[locale], value: String(model.summary.interventions) },
   ];
 
   return (
-    <Panel label="Сборка" class={styles.hud}>
+    <Panel label={UI_TEXT.hud.label[locale]} class={styles.hud}>
       <header class={styles.header}>
         <Title as={props.titleLevel} size="xl">
           {props.recording.title}
@@ -46,7 +49,7 @@ export function Hud(props: Props): JSX.Element {
           <ButtonLink variant="link" href={props.project.url}>
             {props.project.name}
           </ButtonLink>{" "}
-          · {formatDate(props.recording.startedAt)}
+          · {formatDate(props.recording.startedAt, locale)}
         </p>
       </header>
       <div class={styles.stats}>

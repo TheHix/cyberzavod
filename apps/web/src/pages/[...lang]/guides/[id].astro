@@ -1,0 +1,27 @@
+---
+import type { GetStaticPaths } from "astro";
+import GameLayout from "@/app/layouts/GameLayout.astro";
+import { publishedGuides, type PublishedGuide } from "@/entities/guide";
+import { LOCALES, type Locale } from "@/shared/i18n/locale.ts";
+import { localeParam } from "@/shared/i18n/path.ts";
+import { GuideArticle } from "@/widgets/guide-article";
+
+export const getStaticPaths = (() =>
+  LOCALES.flatMap((locale) =>
+    publishedGuides.map((guide) => ({
+      params: { lang: localeParam(locale), id: guide.meta.id },
+      props: { locale, guide },
+    })),
+  )) satisfies GetStaticPaths;
+
+interface Props {
+  locale: Locale;
+  guide: PublishedGuide;
+}
+
+const { locale, guide } = Astro.props;
+---
+
+<GameLayout locale={locale} title={guide.meta.title} description={guide.meta.description}>
+  <GuideArticle guide={guide} locale={locale} />
+</GameLayout>

@@ -6,31 +6,41 @@ import {
   formatDuration,
   formatModel,
   formatTokens,
+  type PluralWords,
 } from "./format.ts";
 
 describe("formatDuration", () => {
-  it("показывает только секунды, если меньше минуты", () => {
-    const result = formatDuration(42_400);
+  it.each([
+    ["en", "42 s"],
+    ["ru", "42 с"],
+  ] as const)("показывает только секунды, если меньше минуты (%s)", (locale, expected) => {
+    const result = formatDuration(42_400, locale);
 
-    expect(result).toBe("42 с");
+    expect(result).toBe(expected);
   });
 
-  it("дополняет секунды нулём, если есть минуты", () => {
-    const result = formatDuration(125_000);
+  it.each([
+    ["en", "2 min 05 s"],
+    ["ru", "2 мин 05 с"],
+  ] as const)("дополняет секунды нулём, если есть минуты (%s)", (locale, expected) => {
+    const result = formatDuration(125_000, locale);
 
-    expect(result).toBe("2 мин 05 с");
+    expect(result).toBe(expected);
   });
 
   it("округляет 59,6 с до целой минуты, а не до «60 с»", () => {
-    const result = formatDuration(59_600);
+    const result = formatDuration(59_600, "ru");
 
     expect(result).toBe("1 мин 00 с");
   });
 
-  it("переходит на часы с минутами, если сборка дольше часа", () => {
-    const result = formatDuration(3_900_000);
+  it.each([
+    ["en", "1 h 05 min"],
+    ["ru", "1 ч 05 мин"],
+  ] as const)("переходит на часы с минутами, если сборка дольше часа (%s)", (locale, expected) => {
+    const result = formatDuration(3_900_000, locale);
 
-    expect(result).toBe("1 ч 05 мин");
+    expect(result).toBe(expected);
   });
 });
 
@@ -49,19 +59,25 @@ describe("formatClock", () => {
 });
 
 describe("formatTokens", () => {
-  it("разбивает число по разрядам", () => {
-    const result = formatTokens(1_234_567);
+  it.each([
+    ["en", "1,234,567"],
+    ["ru", "1 234 567"],
+  ] as const)("разбивает число по разрядам по правилам языка (%s)", (locale, expected) => {
+    const result = formatTokens(1_234_567, locale);
 
     // Intl ставит неразрывные пробелы — сравниваем с обычными.
-    expect(result.replace(/\s/g, " ")).toBe("1 234 567");
+    expect(result.replace(/\s/g, " ")).toBe(expected);
   });
 });
 
 describe("formatDate", () => {
-  it("пишет день начала словами по UTC", () => {
-    const result = formatDate("2026-10-04T23:30:00.000Z");
+  it.each([
+    ["en", "October 4, 2026"],
+    ["ru", "4 октября 2026 г."],
+  ] as const)("пишет день начала словами по UTC (%s)", (locale, expected) => {
+    const result = formatDate("2026-10-04T23:30:00.000Z", locale);
 
-    expect(result).toBe("4 октября 2026 г.");
+    expect(result).toBe(expected);
   });
 });
 
@@ -79,7 +95,10 @@ describe("formatModel", () => {
 });
 
 describe("formatCount", () => {
-  const prompts = { one: "промпт", few: "промпта", many: "промптов" };
+  const prompts: PluralWords = {
+    ru: { one: "промпт", few: "промпта", many: "промптов" },
+    en: { one: "prompt", other: "prompts" },
+  };
 
   it.each([
     [1, "1 промпт"],
@@ -88,10 +107,22 @@ describe("formatCount", () => {
     [11, "11 промптов"],
     [21, "21 промпт"],
     [0, "0 промптов"],
-  ])("пишет %i со словом в нужной форме: %s", (count, expected) => {
-    const result = formatCount(count, prompts);
+  ])("пишет %i со словом в нужной форме по-русски: %s", (count, expected) => {
+    const result = formatCount(count, prompts, "ru");
 
     // Intl ставит неразрывные пробелы — сравниваем с обычными.
     expect(result.replace(/\s/g, " ")).toBe(expected);
+  });
+
+  it.each([
+    [1, "1 prompt"],
+    [0, "0 prompts"],
+    [2, "2 prompts"],
+    [21, "21 prompts"],
+    [1_000, "1,000 prompts"],
+  ])("пишет %i со словом в нужной форме по-английски: %s", (count, expected) => {
+    const result = formatCount(count, prompts, "en");
+
+    expect(result).toBe(expected);
   });
 });

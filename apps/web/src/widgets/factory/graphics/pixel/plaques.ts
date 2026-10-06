@@ -11,6 +11,7 @@ import {
 } from "@cyberzavod/core";
 import { Container, Sprite } from "pixi.js";
 import { FOREMAN_LABEL, STAGE_LABELS } from "@/shared/config/stages.ts";
+import { PLAQUE_LOCALE } from "@/shared/lib/pixel-plaque.ts";
 import { ACTOR_FIGURE } from "./actors.ts";
 import { plaqueImage, plaqueSize } from "./glyphs.ts";
 import type { PlanBounds } from "./bounds.ts";
@@ -47,7 +48,7 @@ function offsetOf(text: string): number {
 
 // Табличка станка — со стороны, противоположной рабочему; если они на одной высоте — над станком.
 function stationPlacement(stage: Stage, plan: StationPlan): PlaquePlacement {
-  const text = STAGE_LABELS[stage];
+  const text = STAGE_LABELS[stage][PLAQUE_LOCALE];
   const awayFromWorker = Math.sign(plan.machine.y - plan.post.y) || -1;
   return placementOf(text, {
     x: plan.machine.x,
@@ -59,9 +60,9 @@ function stationPlacement(stage: Stage, plan: StationPlan): PlaquePlacement {
 // с табличками станков.
 function foremanPlacement(plan: ForemanPlan): PlaquePlacement {
   const awayFromDesk = Math.sign(plan.post.y - plan.desk.y) || 1;
-  return placementOf(FOREMAN_LABEL, {
+  return placementOf(FOREMAN_LABEL[PLAQUE_LOCALE], {
     x: plan.desk.x,
-    y: plan.post.y + awayFromDesk * offsetOf(FOREMAN_LABEL),
+    y: plan.post.y + awayFromDesk * offsetOf(FOREMAN_LABEL[PLAQUE_LOCALE]),
   });
 }
 

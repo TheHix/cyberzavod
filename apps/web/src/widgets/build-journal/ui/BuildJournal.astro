@@ -10,6 +10,8 @@ import { interventionAnchor, labelOf } from "@/entities/intervention";
 import { recipientOf } from "@/entities/prompt";
 import { messageAnchor, paragraphsOf, routeOf } from "@/entities/message";
 import type { Speech } from "@/features/journal-sync";
+import type { Locale } from "@/shared/i18n/locale.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { formatClock } from "@/shared/lib/format.ts";
 import { BulletList, buttonClass, Title } from "@/shared/ui";
 import { JournalEntry } from "./JournalEntry.tsx";
@@ -17,6 +19,8 @@ import { JournalEntry } from "./JournalEntry.tsx";
 interface Props {
   /** Полная запись: в журнале, в отличие от цеха, есть полные тексты реплик. */
   recording: Recording;
+  /** Язык страницы: на нём метки и подписи журнала. */
+  locale: Locale;
 }
 
 type Entry =
@@ -28,7 +32,7 @@ type Entry =
     }
   | { kind: "message"; message: MessageEvent; speech: Extract<Speech, { kind: "message" }> };
 
-const { recording } = Astro.props;
+const { recording, locale } = Astro.props;
 
 // Номера промптов, вмешательств и реплик — те же, что у пузырей в цехе: по ним цех и журнал находят друг
 // друга, а по номеру вмешательства или реплики «подробнее» находит запись.
@@ -71,7 +75,7 @@ const entries = entriesOf(recording.events);
 ---
 
 {entries.length === 0 ? (
-  <p class="empty">В этой сборке нет промптов, вмешательств и реплик.</p>
+  <p class="empty">{UI_TEXT.journal.empty[locale]}</p>
 ) : (
   <ol class="timeline">
     {entries.map((entry) => {
@@ -82,8 +86,9 @@ const entries = entriesOf(recording.events);
               <JournalEntry
                 client:visible
                 speech={entry.speech}
+                locale={locale}
                 clock={formatClock(entry.prompt.t)}
-                route={`человек → ${recipientOf(entry.prompt)}`}
+                route={UI_TEXT.speech.humanTo[locale](recipientOf(entry.prompt, locale))}
               >
                 {entry.prompt.requirements.length === 0 ? (
                   <Title>{entry.prompt.goal}</Title>
@@ -91,7 +96,9 @@ const entries = entriesOf(recording.events);
                   <details class="details">
                     <summary>
                       <Title as="span">{entry.prompt.goal}</Title>
-                      <span class={`more ${buttonClass({ variant: "link" })}`}>подробнее</span>
+                      <span class={`more ${buttonClass({ variant: "link" })}`}>
+                        {UI_TEXT.speech.more[locale]}
+                      </span>
                     </summary>
                     <BulletList items={entry.prompt.requirements} />
                   </details>
@@ -105,8 +112,9 @@ const entries = entriesOf(recording.events);
               <JournalEntry
                 client:visible
                 speech={entry.speech}
+                locale={locale}
                 clock={formatClock(entry.intervention.t)}
-                route={labelOf(entry.intervention)}
+                route={labelOf(entry.intervention, locale)}
               >
                 <Title>{entry.intervention.line}</Title>
                 <div class="text">
@@ -123,8 +131,9 @@ const entries = entriesOf(recording.events);
               <JournalEntry
                 client:visible
                 speech={entry.speech}
+                locale={locale}
                 clock={formatClock(entry.message.t)}
-                route={routeOf(entry.message)}
+                route={routeOf(entry.message, locale)}
               >
                 <Title>{entry.message.line}</Title>
                 <div class="text">

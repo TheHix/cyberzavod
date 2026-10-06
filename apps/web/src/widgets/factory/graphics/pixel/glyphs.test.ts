@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { FOREMAN_LABEL, STAGE_LABELS } from "@/shared/config/stages.ts";
+import { PLAQUE_LOCALE } from "@/shared/lib/pixel-plaque.ts";
 import { plaqueImage, plaqueSize } from "./glyphs.ts";
 import { testPalette } from "./test-palette.ts";
 
 describe("plaqueImage", () => {
-  it.each([...Object.values(STAGE_LABELS), FOREMAN_LABEL])("рисует надпись «%s»", (text) => {
+  it.each([
+    ...Object.values(STAGE_LABELS).map((label) => label[PLAQUE_LOCALE]),
+    FOREMAN_LABEL[PLAQUE_LOCALE],
+  ])("рисует надпись «%s»", (text) => {
     const image = plaqueImage(text, testPalette());
 
     expect(image).toMatchObject(plaqueSize(text));

@@ -1,0 +1,84 @@
+---
+import type { GetStaticPaths } from "astro";
+import { briefOf, type Project, type Recording } from "@cyberzavod/core";
+import GameLayout from "@/app/layouts/GameLayout.astro";
+import { Factory } from "@/widgets/factory";
+import { BuildJournal } from "@/widgets/build-journal";
+import { ProjectCard } from "@/widgets/project-card";
+import { RecordingList } from "@/widgets/recording-list";
+import { projectLinkOf, publishedProjects } from "@/entities/project";
+import { publishedRecordings, recordingsOfProject } from "@/entities/recording";
+import { PANELS } from "@/shared/config/panels.ts";
+import { LOCALES, type Locale } from "@/shared/i18n/locale.ts";
+import { localeParam } from "@/shared/i18n/path.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
+import { Drawer, Panel } from "@/shared/ui";
+
+export const getStaticPaths = (() =>
+  LOCALES.flatMap((locale) =>
+    publishedProjects.map((project) => ({
+      params: { lang: localeParam(locale), id: project.id },
+      props: {
+        locale,
+        project,
+        recordings: recordingsOfProject(publishedRecordings, project.id),
+      },
+    })),
+  )) satisfies GetStaticPaths;
+
+interface Props {
+  locale: Locale;
+  project: Project;
+  recordings: readonly Recording[];
+}
+
+const { locale, project, recordings } = Astro.props;
+const closeLabel = UI_TEXT.panels.close[locale];
+const [latest] = recordings;
+---
+
+<GameLayout
+  locale={locale}
+  title={UI_TEXT.pages.projectTitle[locale](project.name)}
+  description={project.description}
+  heading={project.name}
+  journal={latest !== undefined}
+  project
+>
+  {latest ? (
+    <Factory
+      client:load
+      locale={locale}
+      recording={briefOf(latest)}
+      project={projectLinkOf(project, locale)}
+      titleLevel="h2"
+    />
+  ) : (
+    <Panel label={UI_TEXT.pages.floor[locale]}>
+      <p>{UI_TEXT.pages.noBuilds[locale]}</p>
+    </Panel>
+  )}
+  {latest && (
+    <Drawer
+      slot="drawers"
+      id={PANELS.journal}
+      title={UI_TEXT.panels.journal[locale]}
+      closeLabel={closeLabel}
+    >
+      <BuildJournal recording={latest} locale={locale} />
+    </Drawer>
+  )}
+  <Drawer slot="drawers" id={PANELS.project} title={project.name} closeLabel={closeLabel}>
+    <div class="project">
+      <ProjectCard project={project} locale={locale} />
+      <RecordingList recordings={recordings} locale={locale} />
+    </div>
+  </Drawer>
+</GameLayout>
+
+<style>
+  .project {
+    display: grid;
+    gap: var(--space-xl);
+  }
+</style>

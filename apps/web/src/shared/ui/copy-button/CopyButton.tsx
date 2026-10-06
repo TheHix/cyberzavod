@@ -7,9 +7,14 @@ import { Button } from "../button/Button.tsx";
 
 type CopyState = "idle" | "copied" | "failed";
 
+/** Подписи кнопки «копировать» по состояниям: обычная, скопировано, не удалось. */
+export type CopyLabels = Readonly<Record<CopyState, string>>;
+
 interface Props {
   /** Текст для копирования; читается в момент нажатия, а не при показе кнопки. */
   text: () => string;
+  /** Подписи по состояниям на языке страницы: kit словаря не знает. */
+  labels: CopyLabels;
 }
 
 /** Сколько кнопка показывает итог копирования, прежде чем вернуться в обычный вид. */
@@ -22,17 +27,12 @@ const ICONS: Record<CopyState, Component<{ "stroke-width": number }>> = {
   failed: X,
 };
 
-const LABELS: Record<CopyState, string> = {
-  idle: "Копировать код",
-  copied: "Скопировано",
-  failed: "Не удалось скопировать",
-};
-
 /**
  * Кнопка «копировать» ui-kit: кладёт текст в буфер обмена и на пару секунд показывает итог —
- * «Скопировано» или «Не удалось скопировать».
+ * удачу или неудачу копирования.
  * @param {Props} props Свойства компонента.
  * @param {() => string} props.text Текст для копирования, читается в момент нажатия.
+ * @param {CopyLabels} props.labels Подписи кнопки по состояниям.
  * @returns {JSX.Element} Кнопка-иконка и скрытый статус с итогом для экранных дикторов.
  */
 export function CopyButton(props: Props): JSX.Element {
@@ -65,14 +65,14 @@ export function CopyButton(props: Props): JSX.Element {
       <Button
         layout="icon"
         variant={state() === "copied" ? "primary" : "secondary"}
-        aria-label={LABELS[state()]}
-        title={LABELS[state()]}
+        aria-label={props.labels[state()]}
+        title={props.labels[state()]}
         onClick={() => void copy()}
       >
         <Dynamic component={ICONS[state()]} stroke-width={ICON_STROKE} />
       </Button>
       <span class="visually-hidden" role="status">
-        {state() === "idle" ? "" : LABELS[state()]}
+        {state() === "idle" ? "" : props.labels[state()]}
       </span>
     </>
   );

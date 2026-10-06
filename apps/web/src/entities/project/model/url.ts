@@ -1,8 +1,12 @@
+import type { Locale } from "@/shared/i18n/locale.ts";
+import { localizedPath } from "@/shared/i18n/path.ts";
+
 /**
  * Адрес страницы проекта на сайте.
  * @param {string} id Идентификатор проекта.
- * @returns {string} Путь вида `/projects/cyberzavod/`.
+ * @param {Locale} locale Язык страницы.
+ * @returns {string} Путь вида `/projects/cyberzavod/`, для русского — с префиксом `/ru`.
  */
-export function projectUrl(id: string): string {
-  return `/projects/${id}/`;
+export function projectUrl(id: string, locale: Locale): string {
+  return localizedPath(locale, `/projects/${id}/`);
 }

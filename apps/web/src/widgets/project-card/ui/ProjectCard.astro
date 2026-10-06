@@ -1,30 +1,39 @@
 ---
 // Карточка проекта: описание и ссылки. Название — в заголовке панели, где карточку показывают.
 import type { Project } from "@cyberzavod/core";
+import { localizeHref } from "@/shared/i18n/links.ts";
+import { CONTENT_LOCALE, type Locale } from "@/shared/i18n/locale.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { ButtonLink } from "@/shared/ui";
 
 interface Props {
   project: Project;
+  /** Язык страницы: на нём интерфейс вокруг карточки; описание — в оригинале. */
+  locale: Locale;
 }
 
-const { project } = Astro.props;
+const { project, locale } = Astro.props;
+if (Astro.site === undefined) throw new Error("в astro.config.ts не задан site");
+const { origin } = Astro.site;
 ---
 
 <div class="card">
-  <p class="description">{project.description}</p>
+  <p class="description" lang={CONTENT_LOCALE}>
+    {project.description}
+  </p>
   {(project.repo !== undefined || project.website !== undefined) && (
     <ul class="links">
       {project.repo !== undefined && (
         <li>
-          <ButtonLink variant="link" href={project.repo}>
-            Репозиторий
+          <ButtonLink variant="link" href={localizeHref(project.repo, locale, origin)}>
+            {UI_TEXT.project.repo[locale]}
           </ButtonLink>
         </li>
       )}
       {project.website !== undefined && (
         <li>
-          <ButtonLink variant="link" href={project.website}>
-            Сайт
+          <ButtonLink variant="link" href={localizeHref(project.website, locale, origin)}>
+            {UI_TEXT.project.website[locale]}
           </ButtonLink>
         </li>
       )}
