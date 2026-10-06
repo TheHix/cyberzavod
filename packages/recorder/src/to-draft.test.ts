@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Draft, DraftEvent, DraftMessage } from "./draft.ts";
 import type { RawEvent } from "./raw-event.ts";
 import {
+  directoriesOutsideProjects,
   isHumanPrompt,
   routeMessages,
   runTranscriptPaths,
@@ -1380,6 +1381,13 @@ describe("toDraft: проект команды", () => {
     "cd `pwd` && make check",
     "cd - && make check",
     "cd && make check",
+    "(cd /work/b && make check)",
+    "pushd /work/b && make check",
+    "{ cd /work/b; } && make check",
+    "if true; then cd /work/b; fi && make check",
+    "for d in x; do cd /work/b; done && make check",
+    "if false; then true; else cd /work/b; fi && make check",
+    "command cd /work/b && make check",
   ])("оставляет без проекта команду «%s»", (command) => {
     const raw = [bash(START, command, PROJECT_A)];
 
@@ -1388,12 +1396,137 @@ describe("toDraft: проект команды", () => {
     expect(projectMarksOf(draft)).toEqual(["test —", "check —"]);
   });
 
-  it("оставляет без проекта каталог, которого нет в карте", () => {
+  it("сохраняет проект после command без cd", () => {
+    const raw = [bash(START, `cd ${PROJECT_A} && command -v jq && make check`, PROJECT_B)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["test a", "check a"]);
+  });
+
+  it("не даёт этапа вызову из каталога, которого нет в карте проектов", () => {
     const raw = [bash(START, "cd /tmp && make check", PROJECT_A)];
 
     const draft = toDraft(raw, meta);
 
+    expect(projectMarksOf(draft)).toEqual([]);
+  });
+
+  it("не даёт этапа правке файла вне проектов", () => {
+    const raw = [edit(START, "/tmp/scratchpad/notes.ts", PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual([]);
+  });
+
+  it("оставляет этап каталога без карты проектов", () => {
+    const raw = [bash(START, "make check", "/tmp/anywhere")];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
     expect(projectMarksOf(draft)).toEqual(["test —", "check —"]);
+  });
+
+  it.each([
+    ['cd "/work/a"/sub && make check', `${PROJECT_A}/"${PROJECT_A}"/sub`],
+    ["cd '/work/a'/sub && make check", `${PROJECT_A}/'${PROJECT_A}'/sub`],
+    ["cd /work/a'b' && make check", `${PROJECT_A}'b'`],
+    ["cd /work/a\\b && make check", `${PROJECT_A}\\b`],
+  ])(
+    "не принимает путь с кавычками внутри за настоящий каталог: «%s»",
+    (command, pathAsWritten) => {
+      const raw = [bash(START, command, PROJECT_A)];
+      const projects = new Map([...PROJECTS_BY_DIRECTORY, [pathAsWritten, "wrong"]]);
+
+      const draft = toDraft(raw, { sessionId: "s1", projectsByDirectory: projects });
+
+      expect(projectMarksOf(draft)).toEqual(["test —", "check —"]);
+    },
+  );
+
+  it("снимает кавычки со всего пути, а не с его начала", () => {
+    const raw = [bash(START, `cd "${PROJECT_B}" && make check`, PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["test b", "check b"]);
+  });
+
+  it("берёт проект из cd в двойных кавычках с пробелом в пути", () => {
+    const raw = [bash(START, 'cd "/work/c d" && make check', PROJECT_A)];
+
+    const draft = toDraft(raw, {
+      sessionId: "s1",
+      projectsByDirectory: new Map([["/work/c d", "c"]]),
+    });
+
+    expect(projectMarksOf(draft)).toEqual(["test c", "check c"]);
+  });
+
+  it("распознаёт git -C с кавычками и пробелом в пути как выпуск проекта", () => {
+    const raw = [bash(START, 'git -C "/work/c d" commit -m x', PROJECT_A)];
+
+    const draft = toDraft(raw, {
+      sessionId: "s1",
+      projectsByDirectory: new Map([["/work/c d", "c"]]),
+    });
+
+    expect(projectMarksOf(draft)).toEqual(["ship c"]);
+  });
+
+  it("оставляет без проекта git -C с кавычками внутри пути", () => {
+    const raw = [bash(START, 'git -C "/work/b"/src commit -m x', PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["ship —"]);
+  });
+
+  it("возвращает место после подоболочки в неизвестное, а не в начальное", () => {
+    const raw = [bash(START, `(cd ${PROJECT_B}) && make check`, PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["test —", "check —"]);
+  });
+
+  it.each(["cat > notes.md <<'EOF'", "cat > notes.md <<EOF", "cat > notes.md <<-EOF"])(
+    "не разбирает тело heredoc («%s») как команды",
+    (start) => {
+      const raw = [
+        bash(START, `${start}\ncd ${PROJECT_B}\nmake check\ngit commit -m x\nEOF`, PROJECT_A),
+      ];
+
+      const draft = toDraft(raw, meta);
+
+      expect(projectMarksOf(draft)).toEqual([]);
+    },
+  );
+
+  it("возвращается к командам после конца heredoc", () => {
+    const raw = [bash(START, `cat <<'EOF'\ncd ${PROJECT_B}\nEOF\nmake check`, PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["test a", "check a"]);
+  });
+
+  it("узнаёт коммит с heredoc в сообщении и не берёт этапы из его текста", () => {
+    const command = `git commit -m "$(cat <<'EOF'\nfeat: x\nmake check\nEOF\n)"`;
+    const raw = [bash(START, command, PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["ship a"]);
+  });
+
+  it("не считает heredoc строку <<<", () => {
+    const raw = [bash(START, "cat <<< EOF\nmake check", PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["test a", "check a"]);
   });
 
   it("ставит проект и на провал проверок", () => {
@@ -1503,6 +1636,14 @@ describe("toolDirectories", () => {
     expect(directories).toEqual([PROJECT_A, `${PROJECT_B}/src`, PROJECT_B]);
   });
 
+  it("не берёт каталоги из тела heredoc", () => {
+    const raw = [bash(START, `cat <<EOF\ncd ${PROJECT_B}\nmake check\nEOF`, PROJECT_A)];
+
+    const directories = toolDirectories(raw);
+
+    expect(directories).toEqual([]);
+  });
+
   it("не называет каталоги нераспознанных мест и вызовов без этапа", () => {
     const raw: RawEvent[] = [
       bash(START, "cd ~/x && make check", PROJECT_A),
@@ -1519,6 +1660,52 @@ describe("toolDirectories", () => {
     ];
 
     const directories = toolDirectories(raw);
+
+    expect(directories).toEqual([]);
+  });
+});
+
+describe("directoriesOutsideProjects", () => {
+  it("называет каталоги вызовов вне проектов без повторов", () => {
+    const raw = [
+      bash(START, "make check", "/tmp/a"),
+      edit(START + 1_000, "/tmp/b/x.ts", PROJECT_A),
+      bash(START + 2_000, "cd /tmp/a && make check", PROJECT_A),
+      bash(START + 3_000, "make check", PROJECT_A),
+    ];
+
+    const directories = directoriesOutsideProjects(raw, PROJECTS_BY_DIRECTORY);
+
+    expect(directories).toEqual(["/tmp/a", "/tmp/b"]);
+  });
+
+  it("не называет каталоги проектов и нераспознанные места", () => {
+    const raw = [
+      bash(START, "make check", PROJECT_B),
+      bash(START + 1_000, "cd ~/x && make check", "/tmp/a"),
+      bash(START + 2_000, "cd - && make check", "/tmp/a"),
+    ];
+
+    const directories = directoriesOutsideProjects(raw, PROJECTS_BY_DIRECTORY);
+
+    expect(directories).toEqual([]);
+  });
+
+  it("не называет каталоги вызовов без этапа", () => {
+    const raw = [bash(START, "ls", "/tmp/a")];
+
+    const directories = directoriesOutsideProjects(raw, PROJECTS_BY_DIRECTORY);
+
+    expect(directories).toEqual([]);
+  });
+
+  it("не называет каталоги вызовов станции", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
+      bash(START + 1_000, "make check", "/tmp/a", "r1"),
+    ];
+
+    const directories = directoriesOutsideProjects(raw, PROJECTS_BY_DIRECTORY);
 
     expect(directories).toEqual([]);
   });

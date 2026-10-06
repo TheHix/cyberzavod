@@ -10,7 +10,8 @@ import { RecordingError, type Recording } from "@cyberzavod/core";
 import { DraftError, parseDraft, publishBuild } from "../draft.ts";
 import { fromFactoryHome, newestFile, RECORDINGS_DIRS } from "./paths.ts";
 
-// Makefile передаёт оба аргумента в кавычках: пустая строка значит «не задано».
+// Makefile всегда передаёт DRAFT (пустой, если не задан) и добавляет BUILD, только если он указан
+// в командной строке: пустая строка значит «не задано», а отсутствие аргумента — тоже.
 const draftPath = process.argv[2] || (await newestFile(RECORDINGS_DIRS.drafts, ".json"));
 const buildId = process.argv[3] || undefined;
 if (draftPath === undefined) {

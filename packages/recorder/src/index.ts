@@ -11,6 +11,7 @@ export {
   type SessionStartEvent,
 } from "./raw-event.ts";
 export {
+  directoriesOutsideProjects,
   isHumanPrompt,
   routeMessages,
   runTranscriptPaths,

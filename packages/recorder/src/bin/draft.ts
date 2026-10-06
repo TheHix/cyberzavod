@@ -20,6 +20,7 @@ import {
 } from "../draft.ts";
 import { parseRawLog } from "../raw-event.ts";
 import {
+  directoriesOutsideProjects,
   routeMessages,
   runTranscriptPaths,
   sessionTranscriptPath,
@@ -221,13 +222,14 @@ if (rawPath === undefined) {
 const rawEvents = parseRawLog(await readFile(rawPath, "utf8"));
 const session = await textsFromSessionTranscript(sessionTranscriptPath(rawEvents));
 const reports = await reportsFromStationTranscripts(stationTranscriptPaths(rawEvents));
+const projectsByDirectory = await projectsOfDirectories(toolDirectories(rawEvents));
 const fresh = toDraft(rawEvents, {
   sessionId: path.basename(rawPath, ".jsonl"),
   runTokens: await tokensOfRuns(runTranscriptPaths(rawEvents)),
   sessionUsages: await usagesOfSession(sessionTranscriptPaths(rawEvents)),
   ...session,
   reports,
-  projectsByDirectory: await projectsOfDirectories(toolDirectories(rawEvents)),
+  projectsByDirectory,
 });
 const draftPath = path.join(RECORDINGS_DIRS.drafts, `${fresh.id}.json`);
 const previous = await readEarlierDraft(draftPath);
@@ -252,6 +254,11 @@ for (const build of draft.builds) {
 for (const line of unfilledHeader(draft)) console.log(`  не заполнено: ${line}`);
 for (const project of projectsWithoutBuild(draft)) {
   console.warn(`команды проекта ${project} без сборки: достанутся сборке по времени`);
+}
+for (const directory of directoriesOutsideProjects(rawEvents, projectsByDirectory)) {
+  console.warn(
+    `каталог ${directory} не принадлежит проекту завода: его этапы и проверки не попали в черновик`,
+  );
 }
 console.log(`ждут редактуры: ${waiting.length}`);
 for (const event of waiting) console.log(`  • ${describeWaiting(event)}`);

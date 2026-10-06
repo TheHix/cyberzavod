@@ -30,6 +30,10 @@ const TOOL_STAGES: Readonly<Record<string, Stage>> = {
   ExitPlanMode: "spec",
 };
 
+// Путь одним аргументом оболочки: в двойных кавычках, в простых или без них. Общая часть `cd X`
+// и `git -C X`, чтобы путь с пробелом читался одинаково везде.
+const PATH_ARGUMENT = String.raw`"[^"]*"|'[^']*'|\S+`;
+
 // Программы, по запуску которых видно этап. Сравнивается начало каждой команды в цепочке
 // (`cd apps/api && go test ./...`), а не любая подстрока: `cat eslint.config.js`
 // или `grep vitest` — не проверки.
@@ -40,20 +44,33 @@ const COMMAND_STAGES: readonly { pattern: RegExp; stage: Stage }[] = [
   { pattern: /^go test\b/, stage: "test" },
   { pattern: /^golangci-lint run\b/, stage: "test" },
   { pattern: /^node --test\b/, stage: "test" },
-  { pattern: /^git (?:-C \S+ )?(?:commit|push)\b/, stage: "ship" },
+  { pattern: new RegExp(`^git (?:-C (?:${PATH_ARGUMENT}) )?(?:commit|push)\\b`), stage: "ship" },
 ];
 
 // Разделители команд в одном вызове Bash, включая перевод строки в многострочной команде.
 const COMMAND_SEPARATOR = /\s*(?:&&|\|\||;|\||\n)\s*/;
 // Присваивания переменных перед командой: `CI=1 pnpm test`.
 const LEADING_ENV_ASSIGNMENTS = /^(?:\w+=\S*\s+)*/;
-// Смена каталога в цепочке: `cd X`, где X — единственный аргумент, в простых кавычках или без.
+// Смена каталога в цепочке: `cd X`, где X — единственный аргумент.
 const CHANGE_DIRECTORY = /^cd(?:\s|$)/;
-const CHANGE_DIRECTORY_TARGET = /^cd\s+("[^"]*"|'[^']*'|\S+)$/;
+const CHANGE_DIRECTORY_TARGET = new RegExp(`^cd\\s+(${PATH_ARGUMENT})$`);
+// Подоболочка, `pushd` и составные команды меняют каталог так, что по тексту команды его не
+// проследить: `{ cd /b; }`, `if …; then cd /b; fi`, `do cd /b`, `command cd /b`. Слова
+// составных команд (`{`, `then`, `do`, `else`) и `command cd` стоят перед настоящей командой
+// сегмента, поэтому он целиком получает неизвестное место. Другие `command` (`command -v jq`)
+// каталог не меняют и место не трогают.
+const UNTRACKABLE_DIRECTORY_CHANGE = /^(?:\(|(?:pushd|\{|then|do|else|command\s+cd)(?:\s|$))/;
 // Каталог одной команды git: `git -C X commit`.
-const GIT_DIRECTORY_TARGET = /^git -C ("[^"]*"|'[^']*'|\S+)\s/;
+const GIT_DIRECTORY_TARGET = new RegExp(`^git -C (${PATH_ARGUMENT})\\s`);
 // Каталог, который не вычислить без оболочки: домашний (`~`), переменная, подстановка команды.
 const UNRESOLVABLE_DIRECTORY = /[~$`]/;
+// Кавычки и обратная косая в пути после снятия внешних кавычек (`"/p/a"/sub`, `/a\ b`): оболочка
+// склеит или экранирует их по-своему, и путь, как он записан, уже не настоящий.
+const LEFTOVER_QUOTING = /["'\\]/;
+// Начало heredoc: `<<EOF`, `<<-EOF`, `<<'EOF'`, `<<"EOF"`; `<<<` — строка, а не heredoc.
+const HEREDOC_START =
+  /(?<!<)<<(?!<)(-?)\s*(?:'([A-Za-z_]\w*)'|"([A-Za-z_]\w*)"|\\?([A-Za-z_]\w*))/g;
+const LEADING_TABS = /^\t+/;
 const PREVIOUS_DIRECTORY = "-";
 const PARENT_SEGMENT = "..";
 const SURROUNDING_QUOTES = /^(["'])(.*)\1$/;
@@ -146,14 +163,13 @@ interface PlacedStage {
   place: ToolPlace;
 }
 
-function withoutQuotes(target: string): string {
-  return SURROUNDING_QUOTES.exec(target)?.[2] ?? target;
+function withoutQuotes(word: string): string {
+  return SURROUNDING_QUOTES.exec(word)?.[2] ?? word;
 }
 
-// Место после перехода в `target`. Относительный путь от каталога сессии остаётся каталогом
+// Место после перехода в `directory`. Относительный путь от каталога сессии остаётся каталогом
 // сессии, пока не выходит за её пределы: выше неё проект уже не угадать.
-function placeAfterMove(place: ToolPlace, target: string): ToolPlace {
-  const directory = withoutQuotes(target);
+function placeAfterMove(place: ToolPlace, directory: string): ToolPlace {
   if (
     directory === "" ||
     directory === PREVIOUS_DIRECTORY ||
@@ -176,6 +192,13 @@ function placeAfterMove(place: ToolPlace, target: string): ToolPlace {
   }
 }
 
+// Место после перехода в каталог, записанный словом оболочки: внешние кавычки снимаются, а путь,
+// в котором после этого остались кавычки или обратная косая, не вычислить.
+function placeAfterShellMove(place: ToolPlace, word: string): ToolPlace {
+  const directory = withoutQuotes(word);
+  return LEFTOVER_QUOTING.test(directory) ? UNKNOWN_PLACE : placeAfterMove(place, directory);
+}
+
 // Начальное место вызова: каталог из `cwd` хука, а без него (старый журнал) — каталог сессии.
 function startPlaceOf(cwd: string | undefined): ToolPlace {
   return cwd === undefined ? SESSION_PLACE : placeAfterMove(UNKNOWN_PLACE, cwd);
@@ -184,13 +207,48 @@ function startPlaceOf(cwd: string | undefined): ToolPlace {
 // Место команды `cd`: без аргумента или с лишними ключами оболочка идёт туда, куда не угадать.
 function placeAfterChangeDirectory(program: string, place: ToolPlace): ToolPlace {
   const target = CHANGE_DIRECTORY_TARGET.exec(program)?.[1];
-  return target === undefined ? UNKNOWN_PLACE : placeAfterMove(place, target);
+  return target === undefined ? UNKNOWN_PLACE : placeAfterShellMove(place, target);
 }
 
 // `git -C X` задаёт каталог только своей команде, а не всей цепочке.
 function placeOfProgram(program: string, place: ToolPlace): ToolPlace {
   const target = GIT_DIRECTORY_TARGET.exec(program)?.[1];
-  return target === undefined ? place : placeAfterMove(place, target);
+  return target === undefined ? place : placeAfterShellMove(place, target);
+}
+
+// Конец heredoc, которого ждёт оболочка: строка из одного ограничителя, у `<<-` — с отступом
+// из табуляций.
+interface HeredocEnd {
+  delimiter: string;
+  indented: boolean;
+}
+
+function heredocsStartedBy(line: string): HeredocEnd[] {
+  return [...line.matchAll(HEREDOC_START)].flatMap(([, dash, single, double, bare]) => {
+    const delimiter = single ?? double ?? bare;
+    return delimiter === undefined ? [] : [{ delimiter, indented: dash === "-" }];
+  });
+}
+
+function endsHeredoc(line: string, end: HeredocEnd): boolean {
+  return (end.indented ? line.replace(LEADING_TABS, "") : line) === end.delimiter;
+}
+
+// Тело heredoc — данные для команды, а не команды цепочки: `cat <<'EOF'` с `make check` внутри
+// проверок не запускает. Строка с `<<EOF` остаётся: она сама команда.
+function withoutHeredocBodies(command: string): string {
+  const kept: string[] = [];
+  const awaited: HeredocEnd[] = [];
+  for (const line of command.split("\n")) {
+    const [end] = awaited;
+    if (end !== undefined) {
+      if (endsHeredoc(line, end)) awaited.shift();
+      continue;
+    }
+    kept.push(line);
+    awaited.push(...heredocsStartedBy(line));
+  }
+  return kept.join("\n");
 }
 
 // Этапы распознанных команд цепочки по порядку, каждый — с местом: `make check && git commit` —
@@ -198,8 +256,12 @@ function placeOfProgram(program: string, place: ToolPlace): ToolPlace {
 function stagesOfCommand(command: string, start: ToolPlace): PlacedStage[] {
   const placed: PlacedStage[] = [];
   let place = start;
-  for (const segment of command.split(COMMAND_SEPARATOR)) {
+  for (const segment of withoutHeredocBodies(command).split(COMMAND_SEPARATOR)) {
     const program = segment.trim().replace(LEADING_ENV_ASSIGNMENTS, "");
+    if (UNTRACKABLE_DIRECTORY_CHANGE.test(program)) {
+      place = UNKNOWN_PLACE;
+      continue;
+    }
     if (CHANGE_DIRECTORY.test(program)) {
       place = placeAfterChangeDirectory(program, place);
       continue;
@@ -253,6 +315,42 @@ function agentWindowKey(
   event: Extract<RawEvent, { kind: "subagent_start" | "subagent_stop" }>,
 ): string {
   return event.agentId ?? event.agent;
+}
+
+// Окна станций с этапом. Инструменты сабагента приходят в той же сессии; пока работает сабагент
+// со своим этапом, этап задаёт он: make check внутри ревьюера — часть ревью, а не возврат
+// к тестам. Окна ведутся по agentId; остановка без парного старта (служебные сабагенты
+// Claude Code) ничего не закрывает.
+interface StationWindows {
+  // Учитывает старт или остановку станции; true, если набор работающих станций изменился.
+  observe(event: RawEvent): boolean;
+  // Вызов сабагента со станцией приходит с его agentId, вызов основной сессии — без agentId, но
+  // с cwd. В старом журнале нет ни того, ни другого, и отличить их нельзя: пока работает
+  // станция, все вызовы считаются её.
+  isStationCall(event: ToolEvent): boolean;
+}
+
+function stationWindows(): StationWindows {
+  const running = new Set<string>();
+  return {
+    observe(event) {
+      switch (event.kind) {
+        case "subagent_start":
+          if (stageOfAgent(event.agent) === undefined) return false;
+          running.add(agentWindowKey(event));
+          return true;
+        case "subagent_stop":
+          return running.delete(agentWindowKey(event));
+        default:
+          return false;
+      }
+    },
+    isStationCall(event) {
+      if (event.agentId !== undefined) return running.has(event.agentId);
+      if (event.cwd !== undefined) return false;
+      return running.size > 0;
+    },
+  };
 }
 
 // Этап в момент t — этап последнего входа на станцию; до первого входа деталь у постановки.
@@ -531,6 +629,16 @@ function projectOfPlace(
   }
 }
 
+// Каталог вызова, который известен, но не принадлежит ни одному проекту (черновики в /tmp):
+// его этап ничей, и по времени он достался бы чужой сборке. Без карты проектов судить не о чем.
+function directoryOutsideProjects(
+  place: ToolPlace,
+  projectsByDirectory: ReadonlyMap<string, string> | undefined,
+): string | undefined {
+  if (place.in !== "directory" || projectsByDirectory === undefined) return undefined;
+  return projectsByDirectory.has(place.directory) ? undefined : place.directory;
+}
+
 function projectMark(project: string | undefined): { project?: string } {
   return project === undefined ? {} : { project };
 }
@@ -572,7 +680,10 @@ function withSessionUsages(
  * их заполняет редактор. В черновике одна сборка с `id` черновика; проект и версия завода
  * берутся из первого начала сессии, где они есть, без них остаются пустыми. Другие сборки
  * добавляет редактор. События основной сессии из инструментов получают пометку `project`
- * по каталогу команды, если он есть в `meta.projectsByDirectory`.
+ * по каталогу команды, если он есть в `meta.projectsByDirectory`. Этап вызова из известного
+ * каталога, которого в этой карте нет (вне любого проекта), в черновик не попадает, в том числе
+ * проверки: они не влияют на исход сборки. Какие каталоги отброшены, говорит
+ * `directoriesOutsideProjects`. Без карты проектов этапы не отбрасываются.
  * @param {RawEvent[]} rawEvents События журнала в любом порядке.
  * @param {DraftMeta} meta Данные сборки, которых нет в журнале.
  * @returns {Draft} Черновик с id вида `2026-10-04-744e7547`: день начала по UTC и начало
@@ -588,10 +699,7 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
 
   const draftEvents: DraftEvent[] = [];
   const sessionProject = projectOf(events).project;
-  // Инструменты сабагента приходят в той же сессии. Пока работает сабагент со своим этапом,
-  // этап задаёт он: make check внутри ревьюера — часть ревью, а не возврат к тестам. Окна ведутся
-  // по agent_id; остановка без парного старта (служебные сабагенты Claude Code) ничего не закрывает.
-  const stagedAgentWindows = new Set<string>();
+  const windows = stationWindows();
   // Этап, на котором инструменты основной сессии оставили сборку каждого проекта: правок много,
   // а этап один. Проект без пометки — тоже ключ. Станция сбрасывает этапы: после неё первая
   // команда снова входит на свой этап.
@@ -615,15 +723,6 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
     if (stagesByProject.get(project) === stage) return;
     stagesByProject.set(project, stage);
     draftEvents.push({ t: at(ts), type: "stage_enter", stage, ...projectMark(project) });
-  };
-
-  // Вызов сабагента со станцией приходит с его agentId, вызов основной сессии — без agentId, но
-  // с cwd. В старом журнале нет ни того, ни другого, и отличить их нельзя: пока работает станция,
-  // все вызовы считаются её.
-  const isStationCall = (event: ToolEvent): boolean => {
-    if (event.agentId !== undefined) return stagedAgentWindows.has(event.agentId);
-    if (event.cwd !== undefined) return false;
-    return stagedAgentWindows.size > 0;
   };
 
   const judge = (agent: string, run: string, line: string | undefined, ts: number) => {
@@ -666,7 +765,7 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
         judgedRuns.delete(run);
         const stage = stageOfAgent(event.agent);
         if (stage === undefined) break;
-        stagedAgentWindows.add(run);
+        windows.observe(event);
         stagesByProject.clear();
         draftEvents.push({ t: at(event.ts), type: "stage_enter", stage, run });
         const window: DraftRun = {
@@ -682,7 +781,7 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
       }
       case "subagent_stop": {
         const run = agentWindowKey(event);
-        if (stagedAgentWindows.delete(run)) stagesByProject.clear();
+        if (windows.observe(event)) stagesByProject.clear();
         const window = openRuns.get(run);
         if (window !== undefined) window.until = at(event.ts);
         openRuns.delete(run);
@@ -696,8 +795,9 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
         break;
       }
       case "tool": {
-        if (isStationCall(event)) break;
+        if (windows.isStationCall(event)) break;
         for (const { stage, place } of stagesReachedByTool(event)) {
+          if (directoryOutsideProjects(place, meta.projectsByDirectory) !== undefined) continue;
           const mark = projectMark(projectOfPlace(place, sessionProject, meta.projectsByDirectory));
           enterStageByTool(stage, mark.project, event.ts);
           if (stage !== "test") continue;
@@ -775,6 +875,36 @@ export function toolDirectories(events: RawEvent[]): string[] {
     if (event.kind !== "tool") continue;
     for (const { place } of stagesReachedByTool(event)) {
       if (place.in === "directory") directories.add(place.directory);
+    }
+  }
+  return [...directories];
+}
+
+/**
+ * Находит каталоги, этапы вызовов из которых `toDraft` отбрасывает: каталог известен, но не
+ * принадлежит проекту (другой путь, dev-контейнер, битый или отсутствующий конфиг). Вместе
+ * с этапом пропадают и проверки, а они решают исход сборки, поэтому о таких каталогах
+ * предупреждают. Вызовы станций не учитываются: их `toDraft` пропускает по другой причине.
+ * @param {RawEvent[]} rawEvents События журнала в любом порядке.
+ * @param {ReadonlyMap<string, string>} projectsByDirectory Проект по каталогу, как его получает
+ *   `toDraft`.
+ * @returns {string[]} Каталоги без повторов по порядку журнала.
+ */
+export function directoriesOutsideProjects(
+  rawEvents: RawEvent[],
+  projectsByDirectory: ReadonlyMap<string, string>,
+): string[] {
+  const windows = stationWindows();
+  const directories = new Set<string>();
+  for (const event of [...rawEvents].sort((a, b) => a.ts - b.ts)) {
+    if (event.kind !== "tool") {
+      windows.observe(event);
+      continue;
+    }
+    if (windows.isStationCall(event)) continue;
+    for (const { place } of stagesReachedByTool(event)) {
+      const outside = directoryOutsideProjects(place, projectsByDirectory);
+      if (outside !== undefined) directories.add(outside);
     }
   }
   return [...directories];

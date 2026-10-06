@@ -57,6 +57,15 @@ describe("findProjectId", () => {
     expect(id).toBe("lab");
   });
 
+  it("поднимается выше, когда на пути лежит файл, а не каталог", async () => {
+    await writeConfig(root, JSON.stringify({ id: "lab", factory: "0.1.0" }));
+    await writeFile(path.join(root, "file.txt"), "");
+
+    const id = await findProjectId(path.join(root, "file.txt", "inside"));
+
+    expect(id).toBe("lab");
+  });
+
   it("возвращает undefined, когда конфига нет на всём пути", async () => {
     const id = await findProjectId(root);
 

@@ -23,13 +23,26 @@ export const RECORDINGS_DIRS = {
   published: path.join(recordingsDir, "published"),
 } as const;
 
+const FILE_NOT_FOUND = "ENOENT";
+const NOT_A_DIRECTORY = "ENOTDIR";
+
 /**
  * Отличает «файла нет» от остальных ошибок файловой системы.
  * @param {unknown} err Ошибка из node:fs.
  * @returns {boolean} true, если файла или каталога нет.
  */
 export function isNotFound(err: unknown): boolean {
-  return err instanceof Error && "code" in err && err.code === "ENOENT";
+  return hasErrorCode(err, FILE_NOT_FOUND);
+}
+
+function hasErrorCode(err: unknown, code: string): boolean {
+  return err instanceof Error && "code" in err && err.code === code;
+}
+
+// Для конфига «нет» и тогда, когда на пути лежит файл вместо каталога: путь из команды может
+// вести сквозь файл (ENOTDIR), и проект ищется выше.
+function isConfigMissing(err: unknown): boolean {
+  return isNotFound(err) || hasErrorCode(err, NOT_A_DIRECTORY);
 }
 
 // Каталога ещё нет — значит, и файлов в нём нет; другие ошибки не глотаются.
@@ -54,7 +67,7 @@ export async function findProjectId(directory: string): Promise<string | undefin
     try {
       return parseProjectConfig(JSON.parse(await readFile(configPath, "utf8"))).id;
     } catch (err) {
-      if (!isNotFound(err)) {
+      if (!isConfigMissing(err)) {
         console.warn(`конфиг проекта ${configPath} не прочитан: ${String(err)}`);
         return undefined;
       }
