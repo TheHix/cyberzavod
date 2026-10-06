@@ -26,6 +26,7 @@
 - `recordings/` — `raw/` (сырые журналы) и `drafts/` (черновики с исходными текстами промптов) вне git; `published/` — опубликованные записи в git, сайт берёт их при сборке.
 - `.cyberzavod/project.json` — конфиг проекта: `id`, версия завода `factory` и `checks` (команда проверок и каталоги с кодом для хука остановки); сборка несёт в записи `id` и `factory`.
 - `projects/` — карточки проектов для сайта (название, описание, ссылки), в git; сайт берёт их при сборке.
+- `guides/` — гайды для сайта в Markdown, в git; сайт берёт их при сборке; новый гайд — новый файл.
 - `factory/` — подключение внешних проектов: `project-init.sh` (его запускает `make project-init`), шаблон их настроек Claude Code `project-settings.json` и тест `project-init.test.sh`.
 - `apps/web` — сайт: Astro + SolidJS + Nano Stores, слои FSD, свой ui-kit на Kobalte, цех на весь экран на canvas через PixiJS.
 - `apps/api` — API на Go с Postgres.
