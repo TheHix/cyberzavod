@@ -65,10 +65,12 @@ check-deploy: ## Деплой, dev-контейнер и хуки: compose, shel
 		/mnt/deploy/server/cyberzavod-deploy.test.sh /mnt/deploy/server/cyberzavod-backup \
 		/mnt/.devcontainer/init-firewall.sh /mnt/.claude/hooks/lib.sh /mnt/.claude/hooks/turn-start.sh \
 		/mnt/.claude/hooks/stop-gate.sh /mnt/.claude/hooks/stop-gate.test.sh /mnt/.claude/hooks/format-go.sh \
-		/mnt/.claude/hooks/format-go.test.sh \
+		/mnt/.claude/hooks/format-go.test.sh /mnt/.claude/hooks/session-start.sh \
+		/mnt/.claude/hooks/session-start.test.sh \
 		/mnt/factory/project-init.sh /mnt/factory/project-init.test.sh
 	docker run --rm -v "$(CURDIR)/deploy/server:/s:ro" bash:5 /s/cyberzavod-deploy.test.sh
 	.claude/hooks/stop-gate.test.sh
+	.claude/hooks/session-start.test.sh
 	deploy/check-nginx.sh
 
 server-bootstrap: ## Привести VPS к состоянию из deploy/ (идемпотентно)
