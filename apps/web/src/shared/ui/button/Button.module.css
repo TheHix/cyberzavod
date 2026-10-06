@@ -131,7 +131,6 @@
     box-shadow: none;
   }
 
-  .tile:hover,
   .tile:active {
     background: var(--paper-deep);
     transform: none;
@@ -142,6 +141,15 @@
     flex: none;
     width: var(--tile-icon-size);
     height: var(--tile-icon-size);
+  }
+}
+
+/* Подсветка при наведении — только там, где есть мышь: на телефоне она «залипла» бы после нажатия. */
+@media (hover: hover) and ((max-width: 48rem) or (max-height: 40rem)) {
+  .tile:hover {
+    background: var(--paper-deep);
+    transform: none;
+    box-shadow: none;
   }
 }
 

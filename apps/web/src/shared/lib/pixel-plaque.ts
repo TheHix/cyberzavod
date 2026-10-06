@@ -42,6 +42,7 @@ const LETTER_GAP = 1;
 const LINE_GAP = 1;
 const PADDING_X = 2;
 const PADDING_Y = 1;
+const OUTLINE = 1;
 const SHADOW = 1;
 const { ink: INK, paper: PAPER, paperShade: PAPER_SHADE, blank: BLANK } = PLAQUE_INKS;
 
@@ -75,7 +76,7 @@ function paperRows(count: number, width: number): string[] {
 
 // Верхний и нижний контур со срезанными углами; тень повторяет нижний.
 function edgeRow(width: number): string {
-  return BLANK + INK.repeat(width - 2) + BLANK;
+  return BLANK + INK.repeat(width - 2 * OUTLINE) + BLANK;
 }
 
 /**
@@ -94,11 +95,11 @@ export function plaqueArt(lines: readonly string[]): PlaqueArt {
   ]);
   const inner = [...paperRows(PADDING_Y, textWidth), ...text];
   const margin = PAPER.repeat(PADDING_X);
-  const width = textWidth + 2 * PADDING_X + 2;
+  const width = textWidth + 2 * (PADDING_X + OUTLINE);
   return [
     edgeRow(width),
     ...inner.map((row) => INK + margin + row + margin + INK),
-    ...Array.from({ length: PADDING_Y }, () => INK + PAPER_SHADE.repeat(width - 2) + INK),
+    ...Array.from({ length: PADDING_Y }, () => INK + PAPER_SHADE.repeat(width - 2 * OUTLINE) + INK),
     edgeRow(width),
     ...Array.from({ length: SHADOW }, () => edgeRow(width)),
   ];
@@ -121,11 +122,17 @@ const INK_OF_LETTER: Readonly<Record<string, PlaqueInk>> = {
   [PAPER_SHADE]: "paperShade",
 };
 
+function inkOf(letter: string): PlaqueInk {
+  const ink = INK_OF_LETTER[letter];
+  if (ink === undefined) throw new Error(`в рисунке таблички нет краски «${letter}»`);
+  return ink;
+}
+
 function rowRuns(row: string, y: number): PlaqueRun[] {
   const runs: PlaqueRun[] = [];
   for (const [x, letter] of [...row].entries()) {
-    const ink = INK_OF_LETTER[letter];
-    if (ink === undefined) continue;
+    if (letter === BLANK) continue;
+    const ink = inkOf(letter);
     const last = runs.at(-1);
     if (last?.ink === ink && last.x + last.width === x) {
       runs[runs.length - 1] = { ...last, width: last.width + 1 };
@@ -140,6 +147,7 @@ function rowRuns(row: string, y: number): PlaqueRun[] {
  * Делит рисунок таблички на отрезки одной краски по строкам; пустые пиксели пропускает.
  * @param {PlaqueArt} art Рисунок таблички.
  * @returns {PlaqueRun[]} Отрезки сверху вниз и слева направо.
+ * @throws {Error} Если в рисунке есть буква не из `PLAQUE_INKS`.
  */
 export function plaqueRuns(art: PlaqueArt): PlaqueRun[] {
   return art.flatMap(rowRuns);

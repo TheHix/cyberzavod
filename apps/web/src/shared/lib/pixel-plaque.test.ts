@@ -81,6 +81,12 @@ describe("plaqueRuns", () => {
     ]);
   });
 
+  it("отклоняет букву не из красок таблички", () => {
+    const act = () => plaqueRuns(["kxk"]);
+
+    expect(act).toThrow(/нет краски «x»/);
+  });
+
   it("не склеивает одну краску через пустой пиксель", () => {
     const runs = plaqueRuns(["k.k"]);
 
