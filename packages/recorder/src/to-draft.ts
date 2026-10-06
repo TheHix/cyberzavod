@@ -67,9 +67,19 @@ const UNRESOLVABLE_DIRECTORY = /[~$`]/;
 // Кавычки и обратная косая в пути после снятия внешних кавычек (`"/p/a"/sub`, `/a\ b`): оболочка
 // склеит или экранирует их по-своему, и путь, как он записан, уже не настоящий.
 const LEFTOVER_QUOTING = /["'\\]/;
+// Текст в кавычках на одной строке: `'…'`, `"…"` и экранированный символ вне кавычек (`\"`).
+// Подстановка `$(…)` в двойных кавычках — часть текста, если закрыта на этой же строке и без
+// скобок и двойных кавычек внутри (`"$(pwd)"`). Незакрытая `$(` текстом не считается:
+// в `"$(cat <<'EOF'` оболочка начинает настоящий heredoc, и пропустить его значило бы разбирать
+// тело коммита как команды.
+const QUOTED_TEXT = String.raw`'[^']*'|"(?:[^"\\$]|\\.|\$\([^()"]*\)|\$(?!\())*"|\\.`;
 // Начало heredoc: `<<EOF`, `<<-EOF`, `<<'EOF'`, `<<"EOF"`; `<<<` — строка, а не heredoc.
-const HEREDOC_START =
-  /(?<!<)<<(?!<)(-?)\s*(?:'([A-Za-z_]\w*)'|"([A-Za-z_]\w*)"|\\?([A-Za-z_]\w*))/g;
+// Строка читается слева направо за один проход, и текст в кавычках съедается целиком раньше, чем
+// в нём найдётся `<<`: `echo "a << b"` heredoc не начинает. У такого совпадения групп нет.
+const HEREDOC_START_OR_QUOTED_TEXT = new RegExp(
+  String.raw`(?<!<)<<(?!<)(-?)\s*(?:'([A-Za-z_]\w*)'|"([A-Za-z_]\w*)"|\\?([A-Za-z_]\w*))|${QUOTED_TEXT}`,
+  "g",
+);
 const LEADING_TABS = /^\t+/;
 const PREVIOUS_DIRECTORY = "-";
 const PARENT_SEGMENT = "..";
@@ -224,10 +234,12 @@ interface HeredocEnd {
 }
 
 function heredocsStartedBy(line: string): HeredocEnd[] {
-  return [...line.matchAll(HEREDOC_START)].flatMap(([, dash, single, double, bare]) => {
-    const delimiter = single ?? double ?? bare;
-    return delimiter === undefined ? [] : [{ delimiter, indented: dash === "-" }];
-  });
+  return [...line.matchAll(HEREDOC_START_OR_QUOTED_TEXT)].flatMap(
+    ([, dash, single, double, bare]) => {
+      const delimiter = single ?? double ?? bare;
+      return delimiter === undefined ? [] : [{ delimiter, indented: dash === "-" }];
+    },
+  );
 }
 
 function endsHeredoc(line: string, end: HeredocEnd): boolean {

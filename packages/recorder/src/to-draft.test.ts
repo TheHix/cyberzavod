@@ -1521,8 +1521,39 @@ describe("toDraft: проект команды", () => {
     expect(projectMarksOf(draft)).toEqual(["ship a"]);
   });
 
+  it("узнаёт heredoc после подстановки в кавычках и перед перенаправлением в кавычках", () => {
+    const command = `python3 - "$(pwd)" <<'EOF' > "out.txt"\ncd ${PROJECT_B}\nmake check\nEOF`;
+    const raw = [bash(START, command, PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual([]);
+  });
+
   it("не считает heredoc строку <<<", () => {
     const raw = [bash(START, "cat <<< EOF\nmake check", PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["test a", "check a"]);
+  });
+
+  it.each([
+    "echo '<<EOF'\nmake check",
+    'echo "a << b"\nmake check',
+    'echo "a \\" << b"\nmake check',
+    "echo $'<<EOF'\nmake check",
+  ])("не принимает `<<` в кавычках («%s») за начало heredoc", (command) => {
+    const raw = [bash(START, command, PROJECT_A)];
+
+    const draft = toDraft(raw, meta);
+
+    expect(projectMarksOf(draft)).toEqual(["test a", "check a"]);
+  });
+
+  it("пропускает тела двух heredoc подряд", () => {
+    const command = `cat <<A <<'B'\ncd ${PROJECT_B}\nA\nmake check\nB\nmake check`;
+    const raw = [bash(START, command, PROJECT_A)];
 
     const draft = toDraft(raw, meta);
 
