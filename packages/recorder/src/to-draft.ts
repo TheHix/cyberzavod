@@ -2,12 +2,19 @@
 // Этапы выводятся из действий агента по таблицам ниже; новый признак этапа — новая строка в таблице.
 
 import path from "node:path";
-import { FOREMAN, STAGES, type Speaker, type Stage } from "@cyberzavod/core";
+import {
+  FOREMAN,
+  STAGES,
+  type InterventionReason,
+  type Speaker,
+  type Stage,
+} from "@cyberzavod/core";
 import { eventBuilds } from "./builds.ts";
 import type {
   Draft,
   DraftBuild,
   DraftEvent,
+  DraftIntervention,
   DraftMessage,
   DraftRun,
   MessageSource,
@@ -111,6 +118,16 @@ const VERDICTS: Readonly<Record<string, Readonly<Record<string, Verdict>>>> = {
     "НА ДОРАБОТКУ": { passed: false, reason: "ревью вернуло на доработку" },
   },
 };
+
+// Станции, после которых автоматика ждёт человека, а не зовёт следующую: постановка уходит
+// на одобрение. Возврат станции (вердикт-отказ) тоже ждёт человека, но он берётся из `VERDICTS`.
+// По таблице видно причину вызова, текст промпта для этого не разбирается.
+const AGENT_HUMAN_CALLS: Readonly<Record<string, InterventionReason>> = {
+  analyst: "spec_review",
+};
+const REWORK_CALL: InterventionReason = "rework_limit";
+const ANSWER_CALL: InterventionReason = "question";
+const STOP_GATE_CALL: InterventionReason = "stop_gate";
 
 // Среда Claude Code доставляет отчёты сабагентов и уведомления тем же событием, что и
 // сообщения человека. По этим началам их отличаем: в записи — только промпты человека.
@@ -315,6 +332,11 @@ export function isHumanPrompt(text: string): boolean {
   return !SERVICE_MESSAGE_PREFIXES.some((prefix) => start.startsWith(prefix));
 }
 
+// Причина вызова человека после остановки станции; Object.hasOwn — как в stageOfAgent.
+function humanCallOfAgent(agent: string): InterventionReason | undefined {
+  return Object.hasOwn(AGENT_HUMAN_CALLS, agent) ? AGENT_HUMAN_CALLS[agent] : undefined;
+}
+
 // Вердикт агента по строке из журнала; Object.hasOwn на обоих уровнях — чтобы «constructor»
 // не нашёлся в прототипе.
 function verdictFor(agent: string, line: string | undefined): Verdict | undefined {
@@ -460,7 +482,9 @@ function reportRemarks(
   });
 }
 
-// Ход — от промпта человека до следующего промпта человека (или до конца журнала).
+// Ход — от промпта человека (в том числе ставшего вмешательством) до следующего промпта человека
+// или до конца журнала. Ответ на вопрос модели ход не начинает: вопрос задан внутри хода, и модель
+// продолжает его. То же правило у `startsTurn` для черновика.
 interface Turn {
   from: number;
   to: number;
@@ -527,6 +551,15 @@ function routeOf(
   }
 }
 
+// Ход начинает промпт человека, в том числе ставший вмешательством, кроме ответа на вопрос
+// модели: тот же ход, что у `turnsOf` по сырому журналу.
+function startsTurn(event: DraftEvent): boolean {
+  return (
+    event.type === "draft_prompt" ||
+    (event.type === "draft_intervention" && event.reason !== ANSWER_CALL)
+  );
+}
+
 // Ремарки делятся на ходы по промптам человека: ход длится от промпта до следующего, а то,
 // что прозвучало до первого промпта, образует свой ход.
 function splitIntoTurns<T extends { remark: Remark }>(
@@ -589,9 +622,7 @@ export function routeMessages(draft: Draft): Draft {
       owners[index] === build.id ? [{ event, index }] : [],
     );
     const buildEvents = own.map(({ event }) => event);
-    const promptTimes = buildEvents.flatMap((event) =>
-      event.type === "draft_prompt" ? [event.t] : [],
-    );
+    const promptTimes = buildEvents.flatMap((event) => (startsTurn(event) ? [event.t] : []));
     const spoken = own.flatMap(({ event, index }) =>
       event.type === "draft_message"
         ? [{ message: event, index, remark: remarkOfMessage(event, buildEvents) }]
@@ -655,9 +686,16 @@ function projectMark(project: string | undefined): { project?: string } {
   return project === undefined ? {} : { project };
 }
 
-// Событие привязывает сборку к своему месту в черновике: промпт человека или событие запуска.
+// Событие привязывает сборку к своему месту в черновике: промпт или вмешательство человека
+// или событие запуска.
 function isBuildAnchor(event: DraftEvent): boolean {
-  return event.type === "draft_prompt" || event.run !== undefined;
+  return (
+    event.type === "draft_prompt" || event.type === "draft_intervention" || event.run !== undefined
+  );
+}
+
+function draftIntervention(t: number, reason: InterventionReason, said: string): DraftIntervention {
+  return { t, type: "draft_intervention", reason, said, line: "", text: "" };
 }
 
 // Токены основной сессии ложатся в черновик по участкам между соседними привязками сборки:
@@ -737,6 +775,12 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
     draftEvents.push({ t: at(ts), type: "stage_enter", stage, ...projectMark(project) });
   };
 
+  // Что остановило автоматику (`pendingCall`) и чего она теперь ждёт от человека
+  // (`awaitingHuman`): остановка основной сессии делает первое вторым, старт станции сбрасывает
+  // оба, промпт человека забирает.
+  let pendingCall: InterventionReason | undefined;
+  let awaitingHuman: InterventionReason | undefined;
+
   const judge = (agent: string, run: string, line: string | undefined, ts: number) => {
     const stage = stageOfAgent(agent);
     const verdict = verdictFor(agent, line);
@@ -744,6 +788,7 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
     judgedRuns.add(run);
     draftEvents.push({ t: at(ts), type: "draft_check", ok: verdict.passed, run });
     if (!verdict.passed) {
+      pendingCall = REWORK_CALL;
       draftEvents.push({ t: at(ts), type: "stage_fail", stage, reason: verdict.reason, run });
     }
   };
@@ -760,6 +805,13 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
     switch (event.kind) {
       case "prompt":
         if (isHumanPrompt(event.text)) {
+          const reason = event.afterStopGate === true ? STOP_GATE_CALL : awaitingHuman;
+          pendingCall = undefined;
+          awaitingHuman = undefined;
+          if (reason !== undefined) {
+            draftEvents.push(draftIntervention(at(event.ts), reason, event.text));
+            break;
+          }
           const model = modelAnswering(meta.replies ?? [], event.ts);
           draftEvents.push({
             t: at(event.ts),
@@ -777,6 +829,8 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
         judgedRuns.delete(run);
         const stage = stageOfAgent(event.agent);
         if (stage === undefined) break;
+        pendingCall = undefined;
+        awaitingHuman = undefined;
         windows.observe(event);
         stagesByProject.clear();
         draftEvents.push({ t: at(event.ts), type: "stage_enter", stage, run });
@@ -797,6 +851,7 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
         const window = openRuns.get(run);
         if (window !== undefined) window.until = at(event.ts);
         openRuns.delete(run);
+        if (stageOfAgent(event.agent) !== undefined) pendingCall = humanCallOfAgent(event.agent);
         judge(event.agent, run, event.verdict, event.ts);
         countRunTokens(event);
         break;
@@ -826,8 +881,13 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
         }
         break;
       }
-      case "session_start":
+      case "question_answer":
+        draftEvents.push(draftIntervention(at(event.ts), ANSWER_CALL, event.text));
+        break;
       case "stop":
+        awaitingHuman = pendingCall;
+        break;
+      case "session_start":
         break;
       default:
         event satisfies never;

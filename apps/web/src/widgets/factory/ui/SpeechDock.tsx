@@ -1,10 +1,11 @@
 import { Match, Show, Switch, type JSX } from "solid-js";
+import { labelOf } from "@/entities/intervention";
 import { routeOf } from "@/entities/message";
 import { recipientOf } from "@/entities/prompt";
 import { useStoreValue } from "@/shared/lib/use-store-value.ts";
 import { BulletList, Button, Chip, Title } from "@/shared/ui";
 import { useFactoryModel } from "./model-context.ts";
-import { showMessageDetails } from "./open-journal.ts";
+import { showInterventionDetails, showMessageDetails } from "./open-journal.ts";
 import styles from "./SpeechDock.module.css";
 
 /** Сколько строк текста держит полка: больше обрезается, полный текст — в журнале. */
@@ -21,11 +22,12 @@ interface Props {
  * прыгает от смены реплик.
  * @param {Props} props Свойства компонента.
  * @param {string} props.title Название сборки для паузы между репликами.
- * @returns {JSX.Element} Полка с промптом, репликой или названием сборки.
+ * @returns {JSX.Element} Полка с вмешательством, промптом, репликой или названием сборки.
  */
 export function SpeechDock(props: Props): JSX.Element {
   const model = useFactoryModel();
   const prompt = useStoreValue(model.$prompt);
+  const intervention = useStoreValue(model.$intervention);
   const message = useStoreValue(model.$message);
   const detailsOpen = useStoreValue(model.$promptDetailsOpen);
 
@@ -43,6 +45,24 @@ export function SpeechDock(props: Props): JSX.Element {
               </div>
               <Title size="m" lines={LINE_COUNT}>
                 {current().message.line}
+              </Title>
+            </>
+          )}
+        </Match>
+        <Match when={intervention()}>
+          {(current) => (
+            <>
+              <div class={styles.route}>
+                <Chip tone="sun">{labelOf(current().intervention)}</Chip>
+                <Button
+                  variant="link"
+                  onClick={() => showInterventionDetails(model, current().index)}
+                >
+                  подробнее
+                </Button>
+              </div>
+              <Title size="m" lines={LINE_COUNT}>
+                {current().intervention.line}
               </Title>
             </>
           )}

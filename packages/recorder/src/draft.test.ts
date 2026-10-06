@@ -17,7 +17,12 @@ import {
   type EditableDraftEvent,
 } from "./draft.ts";
 import { IDLE_GAP_MS } from "./builds.ts";
-import { FIRST_BUILD_ID, interleavedDraft, SECOND_BUILD_ID } from "./draft.fixtures.ts";
+import {
+  FIRST_BUILD_ID,
+  interleavedDraft,
+  intervention,
+  SECOND_BUILD_ID,
+} from "./draft.fixtures.ts";
 
 function promptsOnly(edits: EditableDraftEvent[]) {
   return edits.flatMap((edit) => (edit.type === "draft_prompt" ? [edit] : []));
@@ -378,6 +383,39 @@ describe("parseDraft", () => {
     expect(act).toThrow(/joined/);
   });
 
+  it.each(["question", "spec_review", "rework_limit", "stop_gate"] as const)(
+    "принимает вмешательство с причиной %s",
+    (reason) => {
+      const event = intervention({ t: 2_000, reason, line: "", text: "" });
+      const raw = { ...uneditedDraft(), events: [event] };
+
+      const draft = parseDraft(raw);
+
+      expect(draft.events).toEqual([event]);
+    },
+  );
+
+  it.each([
+    ["неизвестная причина", { reason: "approval" }, /причина approval/],
+    ["без исходного текста", { said: undefined }, /said/],
+    ["строка не строкой", { line: 5 }, /line/],
+    ["сборка не строкой", { build: 1 }, /build/],
+  ])("отклоняет вмешательство: %s", (_name, patch, message) => {
+    const event = { ...intervention({ t: 2_000 }), ...patch };
+
+    const act = () => parseDraft({ ...uneditedDraft(), events: [event] });
+
+    expect(act).toThrow(message);
+  });
+
+  it("отклоняет вмешательство со ссылкой на неизвестную сборку", () => {
+    const event = intervention({ t: 2_000, build: "nowhere" });
+
+    const act = () => parseDraft({ ...uneditedDraft(), events: [event] });
+
+    expect(act).toThrow(/неизвестная сборка/);
+  });
+
   it("отклоняет событие цеха не по формату ядра", () => {
     const raw = { ...editedDraft(), events: [{ t: 0, type: "stage_enter", stage: "deploy" }] };
 
@@ -578,6 +616,35 @@ describe("carryOverEdits: реплики и склейка", () => {
   });
 });
 
+describe("carryOverEdits: вмешательства", () => {
+  it("переносит строку, текст и сборку вмешательства", () => {
+    const previous = draftWith(intervention({ t: 2_000, build: BUILD_ID }));
+    const next = draftWith(intervention({ t: 2_000, line: "", text: "" }));
+
+    const draft = carryOverEdits(previous, next);
+
+    expect(draft.events[0]).toEqual(intervention({ t: 2_000, build: BUILD_ID }));
+  });
+
+  it("берёт причину из пересобранного черновика", () => {
+    const previous = draftWith(intervention({ t: 2_000, reason: "spec_review" }));
+    const next = draftWith(intervention({ t: 2_000, reason: "stop_gate", line: "", text: "" }));
+
+    const draft = carryOverEdits(previous, next);
+
+    expect(draft.events[0]).toMatchObject({ reason: "stop_gate", line: "Одобряю, делай по плану" });
+  });
+
+  it("оставляет пустым вмешательство с другим исходным текстом", () => {
+    const previous = draftWith(intervention({ t: 2_000 }));
+    const next = draftWith(intervention({ t: 2_000, said: "другое", line: "", text: "" }));
+
+    const draft = carryOverEdits(previous, next);
+
+    expect(draft.events[0]).toMatchObject({ line: "", text: "" });
+  });
+});
+
 describe("orphanedEdits", () => {
   it("находит редактуру промпта, исходный текст которого поменялся", () => {
     const previous = editedDraft();
@@ -709,6 +776,42 @@ describe("publishBuild", () => {
       requirements: ["Показывай его над цехом"],
       model: "claude-opus-5-5",
     });
+  });
+
+  it("публикует вмешательство без исходного текста", () => {
+    const draft = editedDraft();
+    draft.events.push(intervention({ t: 2_500, reason: "question" }));
+
+    const recording = publishOnly(draft);
+
+    expect(recording.events.filter((event) => event.type === "intervention")).toEqual([
+      {
+        t: 1_500,
+        type: "intervention",
+        reason: "question",
+        line: "Одобряю, делай по плану",
+        text: "Одобряю постановку, делай по плану.",
+      },
+    ]);
+  });
+
+  it("отклоняет вмешательство с пустой строкой", () => {
+    const draft = editedDraft();
+    draft.events.push(intervention({ t: 2_500, line: "" }));
+
+    const act = () => publishOnly(draft);
+
+    expect(act).toThrow(RecordingError);
+    expect(act).toThrow(/line/);
+  });
+
+  it("не публикует адрес сервера в тексте вмешательства", () => {
+    const draft = editedDraft();
+    draft.events.push(intervention({ t: 2_500, text: "Зайди на 203.0.113.7" }));
+
+    const act = () => publishOnly(draft);
+
+    expect(act).toThrow(/IP-адрес/);
   });
 
   it("не публикует черновик без чистовой версии промпта", () => {

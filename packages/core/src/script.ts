@@ -17,6 +17,7 @@ import {
   type Point,
 } from "./layout.ts";
 import {
+  briefIntervention,
   briefMessage,
   FOREMAN,
   NO_TALLY,
@@ -24,6 +25,7 @@ import {
   succeeded,
   tally,
   type BriefFactoryEvent,
+  type BriefInterventionEvent,
   type BriefMessageEvent,
   type BriefRecording,
   type PromptEvent,
@@ -52,6 +54,8 @@ export interface Pacing {
   readonly turnMs: number;
   /** Сколько промпт висит над рабочим, мс. */
   readonly promptMs: number;
+  /** Сколько вмешательство человека висит над мастером, мс. */
+  readonly interventionMs: number;
   /** Сколько реплика висит над говорящим, мс. */
   readonly messageMs: number;
   /** Сколько мастер стоит у станка после разговора, прежде чем уйти в кабинет, мс. */
@@ -71,6 +75,7 @@ export const DEFAULT_PACING: Pacing = {
   liftMs: 400,
   turnMs: 200,
   promptMs: 5_000,
+  interventionMs: 5_000,
   messageMs: 4_000,
   foremanLingerMs: 5_000,
   finaleMs: 2_500,
@@ -125,7 +130,20 @@ export interface PromptCue {
   readonly index: number;
 }
 
-/** Реплика над говорящим от `start` до `end` мс сцены; промпты и реплики идут по одному. */
+/**
+ * Вмешательство человека, которое мастер говорит у станции текущего визита, от `start` до `end`
+ * мс сцены: работа на станции стоит до решения.
+ */
+export interface InterventionCue {
+  readonly start: number;
+  readonly end: number;
+  readonly station: Stage;
+  readonly intervention: BriefInterventionEvent;
+  /** Номер вмешательства в записи, с нуля. */
+  readonly index: number;
+}
+
+/** Реплика над говорящим от `start` до `end` мс сцены; промпты, вмешательства и реплики идут по одному. */
 export interface MessageCue {
   readonly start: number;
   readonly end: number;
@@ -173,6 +191,7 @@ export interface FactoryScript {
   readonly workers: Readonly<Record<Stage, readonly WorkerMove[]>>;
   readonly part: readonly PartMove[];
   readonly prompts: readonly PromptCue[];
+  readonly interventions: readonly InterventionCue[];
   readonly messages: readonly MessageCue[];
   /**
    * Ходьба и разговоры мастера; вне них он стоит там, где кончилось последнее действие, а до
@@ -235,9 +254,14 @@ function isBetween(message: BriefMessageEvent, a: Stage, b: Stage): boolean {
   return (message.from === a && message.to === b) || (message.from === b && message.to === a);
 }
 
-// Речь визита, кроме разговора отдающего с получателем: промпт или реплика не между станциями.
+// Речь визита, кроме разговора отдающего с получателем: промпт, вмешательство или реплика
+// не между станциями.
 function isOtherSpeech(event: BriefFactoryEvent, a: Stage, b: Stage): boolean {
-  return event.type === "prompt" || (event.type === "message" && !isBetween(event, a, b));
+  return (
+    event.type === "prompt" ||
+    event.type === "intervention" ||
+    (event.type === "message" && !isBetween(event, a, b))
+  );
 }
 
 // Разговор отдающего с получателем звучит у места передачи, а не в работе: переносим его из
@@ -303,6 +327,19 @@ interface Span {
   readonly end: number;
 }
 
+// Отрезки работы между паузами: пауза стоит, пока ждут решения человека. Паузы идут по порядку
+// и могут налезать друг на друга, потому что пузыри стоят в очереди; отрезков нулевой длины нет.
+function workSegments(start: number, end: number, pauses: readonly Span[]): Span[] {
+  const segments: Span[] = [];
+  let from = start;
+  for (const pause of pauses) {
+    if (pause.start > from) segments.push({ start: from, end: pause.start });
+    from = Math.max(from, pause.end);
+  }
+  if (end > from) segments.push({ start: from, end });
+  return segments;
+}
+
 // Как мастер участвует в реплике: у какой станции стоит и говорит он или слушает.
 interface ForemanTalk {
   readonly station: Stage;
@@ -332,8 +369,11 @@ class Director {
   readonly #homeAt = perStation(() => 0);
   readonly #part: PartMove[] = [];
   readonly #prompts: PromptCue[] = [];
+  readonly #interventions: InterventionCue[] = [];
   readonly #messages: MessageCue[] = [];
   readonly #foreman: ForemanMove[] = [];
+  // Паузы станции текущего визита: от доли работы, на которую пришлось вмешательство, до конца пузыря.
+  #pauses: Span[] = [];
   // Когда событие видно на сцене: для речи — начало пузыря, для остальных — доля работы.
   readonly #shownAt = new Map<BriefFactoryEvent, number>();
   // Визиты и когда у них кончилась работа: из них в конце собираются отметки.
@@ -375,13 +415,15 @@ class Director {
   }
 
   // Работа у станка на весь визит; события визита ложатся на время работы пропорционально.
-  // Пока у станка говорят, работа не кончается: деталь не уходит посреди разговора.
+  // Пока у станка говорят, работа не кончается: деталь не уходит посреди разговора. Пока ждут
+  // решения человека, рабочий стоит: работа идёт отрезками вокруг пауз.
   work(visit: Visit): number {
     const { station } = visit;
     const plan = this.#layout.stations[station];
     const start = this.#clock;
     const end = start + workDuration(visit.to - visit.from, this.#pacing);
     this.#partStatus = "ok";
+    this.#pauses = [];
     this.#movePart(start, start, machineOf(station), machineOf(station));
 
     const span = visit.to - visit.from;
@@ -390,7 +432,9 @@ class Director {
       this.#cue(event, at, station);
     }
     const workEnd = Math.max(end, this.#speechEnd);
-    this.#act(station, stand(start, workEnd, "work", plan.post, plan.facing, false));
+    for (const segment of workSegments(start, workEnd, this.#pauses)) {
+      this.#act(station, stand(segment.start, segment.end, "work", plan.post, plan.facing, false));
+    }
     this.#worked.push({ visit, workEnd });
     return workEnd;
   }
@@ -400,6 +444,9 @@ class Director {
     switch (event.type) {
       case "prompt":
         this.#sayPrompt(event, at, station);
+        return;
+      case "intervention":
+        this.#intervene(event, at, station);
         return;
       case "message":
         this.#sayMessage(event, at);
@@ -431,6 +478,19 @@ class Director {
       station,
       prompt: { ...prompt, requirements: [...prompt.requirements] },
       index: this.#prompts.length,
+    });
+  }
+
+  // Вмешательство говорит мастер рабочему станции, как промпт; станция стоит до конца пузыря.
+  #intervene(intervention: BriefInterventionEvent, at: number, station: Stage): void {
+    const span = this.#foremanSpeaks(station, "talk", at, this.#pacing.interventionMs);
+    this.#shownAt.set(intervention, span.start);
+    this.#pauses.push({ start: at, end: span.end });
+    this.#interventions.push({
+      ...span,
+      station,
+      intervention: briefIntervention(intervention),
+      index: this.#interventions.length,
     });
   }
 
@@ -623,6 +683,7 @@ class Director {
       workers: this.#workers,
       part: this.#part,
       prompts: this.#prompts,
+      interventions: this.#interventions,
       messages: this.#messages,
       foreman: this.#foreman,
       marks: this.#marks(),

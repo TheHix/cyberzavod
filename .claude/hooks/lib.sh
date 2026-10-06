@@ -46,3 +46,9 @@ state_file() {
   safe_session=$(tr -cd 'A-Za-z0-9_-' <<< "$session")
   echo "${TMPDIR:-/tmp}/factory-${name}-${safe_session:-unknown}"
 }
+
+# Отметка «хук остановки сдался и позвал человека»: её читает рекордер завода, поэтому имя
+# `human-call` общее для хука и рекордера.
+human_call_marker() {
+  state_file "$1" human-call
+}

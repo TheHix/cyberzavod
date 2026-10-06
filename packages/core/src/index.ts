@@ -3,6 +3,7 @@
 
 export {
   STAGES,
+  INTERVENTION_REASONS,
   RecordingError,
   parseFactoryEvent,
   parseRecording,
@@ -20,7 +21,10 @@ export {
   type Speaker,
   type PromptEvent,
   type MessageEvent,
+  type InterventionEvent,
+  type InterventionReason,
   type BriefMessageEvent,
+  type BriefInterventionEvent,
   type BriefFactoryEvent,
   type BriefRecording,
   type FactoryEvent,
@@ -47,6 +51,7 @@ export {
   type FactoryScript,
   type ForemanActivity,
   type ForemanMove,
+  type InterventionCue,
   type Mark,
   type MessageCue,
   type Pacing,
@@ -59,6 +64,7 @@ export {
 export {
   sceneAt,
   type ForemanFrame,
+  type InterventionFrame,
   type MessageFrame,
   type PartFrame,
   type PromptFrame,

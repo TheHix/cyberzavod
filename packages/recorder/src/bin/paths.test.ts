@@ -1,8 +1,14 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { findProjectId, PROJECT_CONFIG_FILE } from "./paths.ts";
+import {
+  claimHumanCallMarker,
+  findProjectId,
+  humanCallMarkerPath,
+  PROJECT_CONFIG_FILE,
+} from "./paths.ts";
 
 let root: string;
 
@@ -79,5 +85,91 @@ describe("findProjectId", () => {
     const id = await findProjectId(root);
 
     expect([id, warn.mock.calls.length]).toEqual([undefined, 1]);
+  });
+});
+
+describe("humanCallMarkerPath", () => {
+  const HOOKS_LIB = path.resolve(import.meta.dirname, "../../../../.claude/hooks/lib.sh");
+
+  // Имя отметки считает human_call_marker из lib.sh — та же функция, что вызывает stop-gate.sh.
+  function hookMarkerOf(sessionId: string, tmpDir: string): string {
+    return execFileSync(
+      "bash",
+      ["-c", `. "$1" && human_call_marker "$2"`, "bash", HOOKS_LIB, sessionId],
+      { env: { ...process.env, TMPDIR: tmpDir }, encoding: "utf8" },
+    ).trim();
+  }
+
+  it.each(["test-session", "4365c610-eb0b-5804-9f56-76a794755af5", "a_b-1"])(
+    "совпадает с отметкой хука остановки: %s",
+    (sessionId) => {
+      const tmpDir = "/var/tmp/cz";
+
+      const markerPath = humanCallMarkerPath(sessionId, tmpDir);
+
+      expect(markerPath).toBe(hookMarkerOf(sessionId, tmpDir));
+    },
+  );
+
+  it("убирает из id сессии всё, кроме безопасных символов, как хук остановки", () => {
+    const tmpDir = "/var/tmp/cz";
+
+    const markerPath = humanCallMarkerPath("../s 1/", tmpDir);
+
+    expect(markerPath).toBe(hookMarkerOf("../s 1/", tmpDir));
+  });
+
+  it("называет пустой id сессии unknown, как хук остановки", () => {
+    const tmpDir = "/var/tmp/cz";
+
+    const markerPath = humanCallMarkerPath("", tmpDir);
+
+    expect(markerPath).toBe("/var/tmp/cz/factory-human-call-unknown");
+  });
+});
+
+describe("claimHumanCallMarker", () => {
+  beforeEach(async () => {
+    root = await mkdtemp(path.join(tmpdir(), "cyberzavod-marker-"));
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it("удаляет отметку и сообщает, что она была", async () => {
+    const markerPath = humanCallMarkerPath("s1", root);
+    await writeFile(markerPath, "4");
+
+    const claimed = await claimHumanCallMarker("s1", root);
+
+    expect({
+      claimed,
+      left: await access(markerPath).then(
+        () => true,
+        () => false,
+      ),
+    }).toEqual({
+      claimed: true,
+      left: false,
+    });
+  });
+
+  it("без отметки возвращает false и молчит", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const claimed = await claimHumanCallMarker("s1", root);
+
+    expect({ claimed, warnings: warn.mock.calls.length }).toEqual({ claimed: false, warnings: 0 });
+  });
+
+  it("при другой ошибке предупреждает и возвращает false", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await mkdir(humanCallMarkerPath("s1", root));
+
+    const claimed = await claimHumanCallMarker("s1", root);
+
+    expect({ claimed, warnings: warn.mock.calls.length }).toEqual({ claimed: false, warnings: 1 });
   });
 });

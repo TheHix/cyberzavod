@@ -3,11 +3,14 @@
 // публикация убирает исходный текст и пропускает запись через проверку ядра.
 
 import {
+  INTERVENTION_REASONS,
   isRecordingId,
   isSpeaker,
   parseFactoryEvent,
   parseRecording,
   type FactoryEvent,
+  type InterventionEvent,
+  type InterventionReason,
   type Recording,
   type RecordingError,
   type Speaker,
@@ -45,6 +48,10 @@ const MESSAGE_SOURCES = ["assignment", "report", "answer"] as const;
  */
 export type MessageSource = (typeof MESSAGE_SOURCES)[number];
 
+function isInterventionReason(value: unknown): value is InterventionReason {
+  return (INTERVENTION_REASONS as readonly unknown[]).includes(value);
+}
+
 function isMessageSource(value: unknown): value is MessageSource {
   return (MESSAGE_SOURCES as readonly unknown[]).includes(value);
 }
@@ -65,6 +72,21 @@ export interface DraftMessage {
   /** Запуск станции, чьё задание или отчёт это; определяет сборка черновика. */
   run?: string;
   /** Сборка, к которой редактор отнёс реплику вместо наследуемой; перекрывает `run`. */
+  build?: string;
+}
+
+/**
+ * Вмешательство человека в черновике: исходный текст, из которого редактор пишет строку для
+ * цеха и полный текст журнала. Причину ставит сборка черновика, редактор её не меняет.
+ */
+export interface DraftIntervention {
+  t: number;
+  type: "draft_intervention";
+  reason: InterventionReason;
+  said: string;
+  line: string;
+  text: string;
+  /** Сборка, к которой редактор отнёс вмешательство вместо наследуемой. */
   build?: string;
 }
 
@@ -101,11 +123,12 @@ export type DraftEvent =
   | (FactoryEvent & { run?: string; project?: string })
   | DraftPrompt
   | DraftMessage
+  | DraftIntervention
   | DraftRun
   | DraftCheck;
 
-/** Событие черновика, которое правит редактор: промпт или реплика. */
-export type EditableDraftEvent = DraftPrompt | DraftMessage;
+/** Событие черновика, которое правит редактор: промпт, реплика или вмешательство. */
+export type EditableDraftEvent = DraftPrompt | DraftMessage | DraftIntervention;
 
 /**
  * Сборка в черновике: одна будущая запись. Сессия может нести несколько задач, и тогда
@@ -213,6 +236,31 @@ function parseDraftMessage(raw: Record<string, unknown>, index: number): DraftMe
   };
 }
 
+function parseDraftIntervention(raw: Record<string, unknown>, index: number): DraftIntervention {
+  const { t, reason, said, line, text, build } = raw;
+  if (typeof t !== "number" || typeof said !== "string") {
+    throw new DraftError(`событие #${index}: у вмешательства должны быть t и said`);
+  }
+  if (!isInterventionReason(reason)) {
+    throw new DraftError(`событие #${index}: неизвестная причина ${String(reason)}`);
+  }
+  if (typeof line !== "string" || typeof text !== "string") {
+    throw new DraftError(`событие #${index}: line и text вмешательства должны быть строками`);
+  }
+  if (build !== undefined && typeof build !== "string") {
+    throw new DraftError(`событие #${index}: build должна быть строкой`);
+  }
+  return {
+    t,
+    type: "draft_intervention",
+    reason,
+    said,
+    line,
+    text,
+    ...(build === undefined ? {} : { build }),
+  };
+}
+
 function parseDraftRun(raw: Record<string, unknown>, index: number): DraftRun {
   const { t, run, agent, until } = raw;
   if (typeof t !== "number" || typeof run !== "string" || typeof agent !== "string") {
@@ -251,6 +299,9 @@ function parseEventMarks(raw: unknown, index: number): { run?: string; project?:
 function parseDraftEvent(raw: unknown, index: number): DraftEvent {
   if (isObject(raw) && raw.type === "draft_prompt") return parseDraftPrompt(raw, index);
   if (isObject(raw) && raw.type === "draft_message") return parseDraftMessage(raw, index);
+  if (isObject(raw) && raw.type === "draft_intervention") {
+    return parseDraftIntervention(raw, index);
+  }
   if (isObject(raw) && raw.type === "draft_run") return parseDraftRun(raw, index);
   if (isObject(raw) && raw.type === "draft_check") return parseDraftCheck(raw, index);
   return { ...parseFactoryEvent(raw, index), ...parseEventMarks(raw, index) };
@@ -314,10 +365,18 @@ function checkRunsAreUnique(builds: readonly DraftBuild[]): void {
   }
 }
 
+function isEditable(event: DraftEvent): event is EditableDraftEvent {
+  return (
+    event.type === "draft_prompt" ||
+    event.type === "draft_message" ||
+    event.type === "draft_intervention"
+  );
+}
+
 function checkEventBuilds(builds: readonly DraftBuild[], events: readonly DraftEvent[]): void {
   const known = new Set(builds.map(({ id }) => id));
   events.forEach((event, index) => {
-    if (event.type !== "draft_prompt" && event.type !== "draft_message") return;
+    if (!isEditable(event)) return;
     if (event.build !== undefined && !known.has(event.build)) {
       throw new DraftError(`событие #${index}: неизвестная сборка ${event.build}`);
     }
@@ -357,14 +416,12 @@ function sameSaid(a: EditableDraftEvent, b: EditableDraftEvent): boolean {
 }
 
 function editableEventsOf(draft: Draft): EditableDraftEvent[] {
-  return draft.events.filter(
-    (event) => event.type === "draft_prompt" || event.type === "draft_message",
-  );
+  return draft.events.filter(isEditable);
 }
 
 // Отредактированным считается промпт, в котором заполнено хоть что-то из чистовой версии,
-// который склеен с предыдущим или которому редактор назначил сборку, и реплика с заполненной
-// строкой или текстом или с назначенной сборкой.
+// который склеен с предыдущим или которому редактор назначил сборку, а реплика и вмешательство —
+// с заполненной строкой или текстом или с назначенной сборкой.
 function isEdited(event: EditableDraftEvent): boolean {
   switch (event.type) {
     case "draft_prompt":
@@ -375,6 +432,7 @@ function isEdited(event: EditableDraftEvent): boolean {
         event.build !== undefined
       );
     case "draft_message":
+    case "draft_intervention":
       return event.line !== "" || event.text !== "" || event.build !== undefined;
     default:
       return event satisfies never;
@@ -411,8 +469,15 @@ function carryOverMessage(earlier: DraftMessage, fresh: DraftMessage): DraftMess
   return { ...fresh, line: earlier.line, text: earlier.text, ...buildMark(earlier) };
 }
 
+function carryOverIntervention(
+  earlier: DraftIntervention,
+  fresh: DraftIntervention,
+): DraftIntervention {
+  return { ...fresh, line: earlier.line, text: earlier.text, ...buildMark(earlier) };
+}
+
 function carryOverEvent(event: DraftEvent, edited: readonly EditableDraftEvent[]): DraftEvent {
-  if (event.type !== "draft_prompt" && event.type !== "draft_message") return event;
+  if (!isEditable(event)) return event;
   const earlier = edited.find((candidate) => sameSaid(candidate, event));
   if (earlier === undefined) return event;
   // sameSaid проверил, что типы совпадают, а сузить пару через него компилятор не может.
@@ -421,6 +486,9 @@ function carryOverEvent(event: DraftEvent, edited: readonly EditableDraftEvent[]
   }
   if (event.type === "draft_message" && earlier.type === "draft_message") {
     return carryOverMessage(earlier, event);
+  }
+  if (event.type === "draft_intervention" && earlier.type === "draft_intervention") {
+    return carryOverIntervention(earlier, event);
   }
   return event;
 }
@@ -443,7 +511,7 @@ function carryOverBuilds(previous: Draft, next: Draft): DraftBuild[] {
 /**
  * Переносит редактуру из прошлого черновика той же сессии в пересобранный: сборки с их
  * заголовками, проектами, версиями завода и запусками, чистовые промпты, пометки «склеен»,
- * реплики и сборки у промптов и реплик. Пустые проект и версия завода у сборки с `id` первой
+ * реплики, вмешательства и сборки у промптов, реплик и вмешательств. Пустые проект и версия завода у сборки с `id` первой
  * сборки пересобранного черновика берутся из журнала. Новые промпты и реплики остаются пустыми.
  * @param {Draft} previous Прошлый черновик с уже сделанной редактурой.
  * @param {Draft} next Черновик, только что собранный из журнала.
@@ -523,6 +591,14 @@ function toPublishedPrompt(
   return { t, type: "prompt", goal, requirements, ...(model === undefined ? {} : { model }) };
 }
 
+function toPublishedIntervention(
+  intervention: Pick<InterventionEvent, "reason" | "line" | "text">,
+  t: number,
+): FactoryEvent {
+  const { reason, line, text } = intervention;
+  return { t, type: "intervention", reason, line, text };
+}
+
 function toPublishedMessage(
   message: Pick<DraftMessage, "from" | "to" | "line" | "text">,
   t: number,
@@ -558,6 +634,10 @@ function toPublishedEvents(
       case "draft_message":
       case "message":
         published.push(toPublishedMessage(event, at(event.t)));
+        return;
+      case "draft_intervention":
+      case "intervention":
+        published.push(toPublishedIntervention(event, at(event.t)));
         return;
       case "stage_enter":
         if (event.stage === currentStage) return;
@@ -596,6 +676,7 @@ function textsOf(event: FactoryEvent): string[] {
     case "stage_fail":
       return [event.reason];
     case "message":
+    case "intervention":
       return [event.line, event.text];
     case "build_start":
     case "stage_enter":
@@ -632,7 +713,7 @@ function buildOf(draft: Draft, buildId: string): DraftBuild {
 /**
  * Превращает одну сборку отредактированного черновика в запись для сайта: только события
  * этой сборки, время от её первого события и без долгих пауз, без исходных текстов промптов
- * и реплик, без пометок `project`, без склеенных промптов и служебных событий черновика.
+ * и реплик, без исходных текстов вмешательств, без пометок `project`, без склеенных промптов и служебных событий черновика.
  * @param {Draft} draft Черновик с заполненными заголовком, проектом, версией завода,
  *   чистовыми промптами и репликами публикуемой сборки.
  * @param {string} buildId Идентификатор публикуемой сборки.

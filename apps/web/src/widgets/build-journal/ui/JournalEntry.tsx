@@ -17,9 +17,9 @@ interface Props {
  * дошёл до этой речи, и получает кнопку «показать в цехе»: она перематывает цех и закрывает
  * журнал, чтобы сцена была видна. Без JS — та же разметка без них.
  * @param {Props} props Свойства компонента.
- * @param {Speech} props.speech Какой промпт или реплика записи.
+ * @param {Speech} props.speech Какой промпт, вмешательство или реплика записи.
  * @param {string} props.clock Время записи в сборке, например `01:30`.
- * @param {string} props.route Маршрут: от кого и кому.
+ * @param {string} props.route Маршрут: от кого и кому или метка вмешательства.
  * @param {JSX.Element} props.children Статичное тело записи из `.astro`.
  * @returns {JSX.Element} Запись журнала.
  */

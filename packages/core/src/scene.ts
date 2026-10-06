@@ -1,5 +1,5 @@
-// Кадр цеха в момент сцены: где каждый рабочий и мастер, чем заняты, где деталь, какие промпт
-// и реплика висят.
+// Кадр цеха в момент сцены: где каждый рабочий и мастер, чем заняты, где деталь, какие промпт,
+// вмешательство и реплика висят.
 // Считается из сценария двоичным поиском, без состояния: перемотка в любую точку бесплатна,
 // а кадр стоит O(log n) от длины записи.
 
@@ -11,6 +11,7 @@ import type {
   FactoryScript,
   ForemanActivity,
   ForemanMove,
+  InterventionCue,
   MessageCue,
   PartPlace,
   PartStatus,
@@ -42,6 +43,12 @@ export interface PromptFrame {
   readonly elapsed: number;
 }
 
+/** Вмешательство, которое мастер сейчас говорит у станции, и сколько мс оно уже видно. */
+export interface InterventionFrame {
+  readonly cue: InterventionCue;
+  readonly elapsed: number;
+}
+
 /** Реплика, которая сейчас висит над говорящим, и сколько мс она уже видна. */
 export interface MessageFrame {
   readonly cue: MessageCue;
@@ -66,6 +73,7 @@ export interface Scene {
   readonly workers: readonly WorkerFrame[];
   readonly part: PartFrame;
   readonly prompt: PromptFrame | null;
+  readonly intervention: InterventionFrame | null;
   readonly message: MessageFrame | null;
   readonly foreman: ForemanFrame;
   readonly counts: Tally;
@@ -169,6 +177,12 @@ function promptAt(script: FactoryScript, time: number): PromptFrame | null {
   return { cue, elapsed: time - cue.start };
 }
 
+function interventionAt(script: FactoryScript, time: number): InterventionFrame | null {
+  const cue = script.interventions[lastStartedIndex(script.interventions, time, (c) => c.start)];
+  if (cue === undefined || time >= cue.end) return null;
+  return { cue, elapsed: time - cue.start };
+}
+
 function messageAt(script: FactoryScript, time: number): MessageFrame | null {
   const cue = script.messages[lastStartedIndex(script.messages, time, (c) => c.start)];
   if (cue === undefined || time >= cue.end) return null;
@@ -214,7 +228,7 @@ function recordingTimeAt(script: FactoryScript, index: number, time: number): nu
  * Считает кадр цеха в момент сцены.
  * @param {FactoryScript} script Сценарий цеха.
  * @param {number} time Момент сцены, мс; вне сцены прижимается к её началу или концу.
- * @returns {Scene} Кадр: рабочие, мастер, деталь, промпт, реплика, счётчики и время записи.
+ * @returns {Scene} Кадр: рабочие, мастер, деталь, промпт, вмешательство, реплика, счётчики и время записи.
  */
 export function sceneAt(script: FactoryScript, time: number): Scene {
   const clamped = Math.min(script.duration, Math.max(0, time));
@@ -227,12 +241,14 @@ export function sceneAt(script: FactoryScript, time: number): Scene {
     workers,
     part: partAt(script, workers, clamped),
     prompt: promptAt(script, clamped),
+    intervention: interventionAt(script, clamped),
     message: messageAt(script, clamped),
     foreman: foremanAt(script, clamped),
     counts: {
       tokens: mark?.tokens ?? 0,
       prompts: mark?.prompts ?? 0,
       reworks: mark?.reworks ?? 0,
+      interventions: mark?.interventions ?? 0,
     },
     finished: clamped >= script.finishAt,
   };

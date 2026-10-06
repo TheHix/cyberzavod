@@ -1,7 +1,7 @@
 // Фабрики черновиков для тестов: сессия с двумя задачами в разных проектах по образцу реальной,
 // где запуски станций идут вперемешку, а между ними человек молчит.
 
-import type { Draft, DraftEvent, DraftMessage } from "./draft.ts";
+import type { Draft, DraftEvent, DraftIntervention, DraftMessage } from "./draft.ts";
 
 /** Идентификатор первой сборки черновика `interleavedDraft` — он же `id` самого черновика. */
 export const FIRST_BUILD_ID = "2026-10-04-744e7547";
@@ -24,6 +24,26 @@ export function message(patch: Partial<DraftMessage> & Pick<DraftMessage, "t">):
     said: "Исходный текст",
     line: "Принял, берусь",
     text: "Принял задание и берусь за него.",
+    ...patch,
+  };
+}
+
+/**
+ * Вмешательство черновика с заполненными строкой и текстом; пустое делают поправкой `line`
+ * и `text`.
+ * @param {Partial<DraftIntervention> & Pick<DraftIntervention, "t">} patch Поля вмешательства,
+ *   которые отличаются от обычных; время обязательно.
+ * @returns {DraftIntervention} Новое вмешательство.
+ */
+export function intervention(
+  patch: Partial<DraftIntervention> & Pick<DraftIntervention, "t">,
+): DraftIntervention {
+  return {
+    type: "draft_intervention",
+    reason: "spec_review",
+    said: "ну давай, одобряю",
+    line: "Одобряю, делай по плану",
+    text: "Одобряю постановку, делай по плану.",
     ...patch,
   };
 }

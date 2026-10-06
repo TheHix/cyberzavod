@@ -63,6 +63,7 @@ export const PLAIN_PACING: Pacing = {
   liftMs: 200,
   turnMs: 150,
   promptMs: 1_000,
+  interventionMs: 1_000,
   messageMs: 1_000,
   foremanLingerMs: 500,
   finaleMs: 500,
@@ -163,6 +164,30 @@ export function earlyExchangeRecording(): Recording {
   return { ...reworkRecording(), events };
 }
 
+/**
+ * Запись для тестов с вмешательством человека: проверки провалились, ревью остановилось, и
+ * мастер решает, что делать дальше, а потом ревью продолжает.
+ * @returns {Recording} Запись сборки.
+ */
+export function interventionRecording(): Recording {
+  const events: FactoryEvent[] = [
+    { t: 0, type: "build_start" },
+    { t: 1_000, type: "stage_enter", stage: "test" },
+    { t: 2_000, type: "stage_fail", stage: "test", reason: "проверки не прошли" },
+    { t: 2_000, type: "stage_enter", stage: "review" },
+    {
+      t: 4_000,
+      type: "intervention",
+      reason: "rework_limit",
+      line: "Откати кэш, сделай без него",
+      text: "Откати кэш и сделай без него.\n\nПроверки тогда пройдут.",
+    },
+    messageAt(6_000, "review", "foreman"),
+    { t: 10_000, type: "build_end", ok: true },
+  ];
+  return { ...reworkRecording(), events };
+}
+
 /** Записи с речью для тестов времени: с обменом при передаче и без. */
 export const SPEECH_RECORDINGS: readonly {
   readonly name: string;
@@ -171,6 +196,7 @@ export const SPEECH_RECORDINGS: readonly {
   { name: "с мастером и обменом", recording: chatRecording() },
   { name: "с обменом при возврате с браком", recording: defectExchangeRecording() },
   { name: "с репликой перед другой речью", recording: earlyExchangeRecording() },
+  { name: "с вмешательством человека", recording: interventionRecording() },
 ];
 
 /** План и темп для тестов: свой для тестов и каждый план цеха в темпе по умолчанию. */

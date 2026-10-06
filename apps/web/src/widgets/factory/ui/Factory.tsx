@@ -11,6 +11,7 @@ import {
 import { createFactoryModel, type FactoryModel } from "../model/factory.ts";
 import { startFrameClock } from "./frame-clock.ts";
 import { Hud } from "./Hud.tsx";
+import { InterventionBubble } from "./InterventionBubble.tsx";
 import { MessageBubble } from "./MessageBubble.tsx";
 import { FactoryModelProvider } from "./model-context.ts";
 import { PromptBubble } from "./PromptBubble.tsx";
@@ -72,7 +73,7 @@ function fieldWithin(host: HTMLElement, field: HTMLElement): Frame {
 
 /**
  * Живой цех на весь экран: проигрывает запись сборки — рабочие у станков, бег с деталью,
- * кабинет мастера, промпты и реплики над говорящими, HUD сборки справа со ссылкой на проект.
+ * кабинет мастера, промпты, вмешательства и реплики над говорящими, HUD сборки справа со ссылкой на проект.
  * Графика грузится только в браузере.
  * @param {Props} props Свойства компонента.
  * @param {BriefRecording} props.recording Запись сборки, которую проигрывает цех.
@@ -148,7 +149,7 @@ export function Factory(props: Props): JSX.Element {
   return (
     <FactoryModelProvider value={model}>
       <div class={styles.factory}>
-        {/* Картинка — только холст: пузыри промпта и реплики рядом, их читают программы чтения */}
+        {/* Картинка — только холст: пузыри промпта, вмешательства и реплики рядом, их читают программы чтения */}
         <div
           ref={(element) => (canvasHost = element)}
           class={styles.canvas}
@@ -170,6 +171,7 @@ export function Factory(props: Props): JSX.Element {
         />
         <div class={styles.overlay}>
           <PromptBubble graphics={graphics()} field={field()} />
+          <InterventionBubble graphics={graphics()} field={field()} />
           <MessageBubble graphics={graphics()} field={field()} />
         </div>
       </div>

@@ -131,3 +131,82 @@ describe("speechStart", () => {
     expect(start).toBeUndefined();
   });
 });
+
+// Вмешательство между промптом и репликой: все три вида речи в одном списке.
+function scriptWithIntervention(): FactoryScript {
+  const recording: Recording = {
+    version: 2,
+    id: "test",
+    project: "test",
+    factory: "0.0.0",
+    startedAt: "2026-10-04T00:00:00.000Z",
+    title: "Тест",
+    events: [
+      { t: 0, type: "build_start" },
+      { t: 60_000, type: "prompt", goal: "Добавь счётчик", requirements: [] },
+      { t: 120_000, type: "stage_enter", stage: "code" },
+      {
+        t: 150_000,
+        type: "intervention",
+        reason: "question",
+        line: "Возьми вариант с таблицей",
+        text: "Возьми вариант с таблицей.",
+      },
+      {
+        t: 180_000,
+        type: "message",
+        from: "code",
+        to: "test",
+        line: "Держи, счётчик готов",
+        text: "Держи, счётчик токенов готов.",
+      },
+      { t: 240_000, type: "build_end", ok: true },
+    ],
+  };
+  return buildScript(recording);
+}
+
+describe("speechTimeline: вмешательства", () => {
+  it("ставит вмешательство в общий список по началу пузыря", () => {
+    const script = scriptWithIntervention();
+
+    const timeline = speechTimeline(script);
+
+    expect(timeline.map((mark) => mark.speech)).toEqual([
+      { kind: "prompt", index: 0 },
+      { kind: "intervention", index: 0 },
+      { kind: "message", index: 0 },
+    ]);
+    expect(timeline[1]?.start).toBe(script.interventions[0]?.start);
+  });
+});
+
+describe("speechAt: вмешательства", () => {
+  it("даёт вмешательство в момент начала его пузыря", () => {
+    const script = scriptWithIntervention();
+    const timeline = speechTimeline(script);
+
+    const speech = speechAt(timeline, script.interventions[0]?.start ?? 0);
+
+    expect(speech).toEqual({ kind: "intervention", index: 0 });
+  });
+});
+
+describe("speechStart: вмешательства", () => {
+  it("даёт начало пузыря вмешательства", () => {
+    const script = scriptWithIntervention();
+    const timeline = speechTimeline(script);
+
+    const start = speechStart(timeline, { kind: "intervention", index: 0 });
+
+    expect(start).toBe(script.interventions[0]?.start);
+  });
+
+  it("не находит неизвестное вмешательство", () => {
+    const timeline = speechTimeline(scriptWithIntervention());
+
+    const start = speechStart(timeline, { kind: "intervention", index: 3 });
+
+    expect(start).toBeUndefined();
+  });
+});

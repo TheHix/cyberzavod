@@ -1,3 +1,4 @@
+import { interventionAnchor } from "@/entities/intervention";
 import { messageAnchor } from "@/entities/message";
 import { PANELS } from "@/shared/config/panels.ts";
 import type { FactoryModel } from "../model/factory.ts";
@@ -21,4 +22,15 @@ export function openJournalAt(anchor: string): void {
 export function showMessageDetails(model: FactoryModel, index: number): void {
   model.pause();
   openJournalAt(messageAnchor(index));
+}
+
+/**
+ * Показывает полный текст вмешательства: ставит цех на паузу, чтобы его прочитать, и открывает
+ * журнал на этом вмешательстве.
+ * @param {FactoryModel} model Модель цеха, которую нужно остановить.
+ * @param {number} index Номер вмешательства в записи (`InterventionCue.index`).
+ */
+export function showInterventionDetails(model: FactoryModel, index: number): void {
+  model.pause();
+  openJournalAt(interventionAnchor(index));
 }

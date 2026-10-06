@@ -248,6 +248,110 @@ describe("createFactoryModel: реплики", () => {
   });
 });
 
+// Вмешательства на тех же минутах: решение у станка постановки, потом у станка кода.
+function recordingWithInterventions(): Recording {
+  return {
+    ...recordingWithPrompt(),
+    events: [
+      { t: 0, type: "build_start" },
+      {
+        t: 60_000,
+        type: "intervention",
+        reason: "spec_review",
+        line: "Одобряю, делай по плану",
+        text: "Одобряю, делай по плану.",
+      },
+      { t: 120_000, type: "stage_enter", stage: "code" },
+      {
+        t: 180_000,
+        type: "intervention",
+        reason: "question",
+        line: "Возьми вариант с таблицей",
+        text: "Возьми вариант с таблицей.",
+      },
+      { t: 240_000, type: "build_end", ok: true },
+    ],
+  };
+}
+
+// Момент сцены, когда висит вмешательство с номером `index`: чуть позже его начала.
+function duringIntervention(model: FactoryModel, index: number): number {
+  return (model.$script.get().interventions[index]?.start ?? 0) + 100;
+}
+
+describe("createFactoryModel: вмешательства", () => {
+  it("показывает вмешательство, которое висит в этот момент", () => {
+    const model = createFactoryModel(briefOf(recordingWithInterventions()));
+
+    model.seek(duringIntervention(model, 1));
+
+    expect(model.$intervention.get()?.intervention.line).toBe("Возьми вариант с таблицей");
+  });
+
+  it("не показывает вмешательство вне его времени", () => {
+    const model = createFactoryModel(briefOf(recordingWithInterventions()));
+
+    model.seek(0);
+
+    expect(model.$intervention.get()).toBeNull();
+  });
+
+  it("ставит пузырь над мастером у станции визита", () => {
+    const model = createFactoryModel(briefOf(recordingWithInterventions()));
+
+    model.seek(duringIntervention(model, 0));
+
+    expect(model.$interventionPosition.get()).toEqual(
+      model.$script.get().layout.stations.spec.foremanPost,
+    );
+    expect(model.$interventionPosition.get()).toEqual(model.$scene.get().foreman.position);
+  });
+
+  it("не ищет место, когда мастер не говорит вмешательство", () => {
+    const model = createFactoryModel(briefOf(recordingWithInterventions()));
+
+    model.seek(0);
+
+    expect(model.$interventionPosition.get()).toBeNull();
+  });
+
+  it("не путает вмешательство с промптом и репликой", () => {
+    const model = createFactoryModel(briefOf(recordingWithInterventions()));
+
+    model.seek(duringIntervention(model, 0));
+
+    expect([model.$prompt.get(), model.$message.get()]).toEqual([null, null]);
+  });
+
+  it("считает вмешательства в итогах сборки", () => {
+    const model = createFactoryModel(briefOf(recordingWithInterventions()));
+
+    expect(model.summary.interventions).toBe(2);
+  });
+
+  it("ставит сцену на начало пузыря вмешательства, и $speech указывает на него", () => {
+    const model = createFactoryModel(briefOf(recordingWithInterventions()));
+
+    model.seekToSpeech({ kind: "intervention", index: 1 });
+
+    expect(model.$scene.get().time).toBe(model.$script.get().interventions[1]?.start);
+    expect(model.$speech.get()).toEqual({ kind: "intervention", index: 1 });
+    expect(model.$intervention.get()?.index).toBe(1);
+  });
+
+  it.each([true, false])(
+    "перемотка к вмешательству не меняет «идёт или пауза» (идёт: %s)",
+    (playing) => {
+      const model = createFactoryModel(briefOf(recordingWithInterventions()));
+      model.start(playing);
+
+      model.seekToSpeech({ kind: "intervention", index: 0 });
+
+      expect(model.$playing.get()).toBe(playing);
+    },
+  );
+});
+
 describe("createFactoryModel: журнал", () => {
   it("не указывает на речь в начале сцены", () => {
     const model = createFactoryModel(recordingWithMessages());
@@ -317,14 +421,20 @@ describe("createFactoryModel: журнал", () => {
   });
 });
 
-// Время события в журнале и то, куда перематывает «показать в цехе»: по промптам и репликам.
+// Время события в журнале и то, куда перематывает «показать в цехе»: по промптам, репликам
+// и вмешательствам.
 function speechTimes(recording: Recording): { speech: Speech; t: number }[] {
   const prompts = recording.events.filter((event) => event.type === "prompt");
   const messages = recording.events.filter((event) => event.type === "message");
+  const interventions = recording.events.filter((event) => event.type === "intervention");
   return [
     ...prompts.map((event, index) => ({ speech: { kind: "prompt", index } as const, t: event.t })),
     ...messages.map((event, index) => ({
       speech: { kind: "message", index } as const,
+      t: event.t,
+    })),
+    ...interventions.map((event, index) => ({
+      speech: { kind: "intervention", index } as const,
       t: event.t,
     })),
   ];
@@ -344,6 +454,7 @@ describe("createFactoryModel: время записи", () => {
   it.each([
     ["recordingWithMessages", recordingWithMessages],
     ["recordingWithPrompt", recordingWithPrompt],
+    ["recordingWithInterventions", recordingWithInterventions],
   ])("после seekToSpeech равно времени события: %s", (_name, recordingOf) => {
     const recording = recordingOf();
 

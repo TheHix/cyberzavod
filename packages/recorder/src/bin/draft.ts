@@ -141,9 +141,19 @@ async function projectsOfDirectories(directories: string[]): Promise<Map<string,
   return projects;
 }
 
-// Как назвать правку в предупреждении: у промпта — цель, у реплики — строка.
+// Как назвать правку в предупреждении: у промпта — цель, у реплики — строка, у вмешательства —
+// причина и строка.
 function titleOf(edit: EditableDraftEvent): string {
-  return edit.type === "draft_prompt" ? edit.goal : edit.line;
+  switch (edit.type) {
+    case "draft_prompt":
+      return edit.goal;
+    case "draft_message":
+      return edit.line;
+    case "draft_intervention":
+      return `вмешательство (${edit.reason}): ${edit.line}`;
+    default:
+      return edit satisfies never;
+  }
 }
 
 // Битый прошлый черновик не перезаписывается молча: в нём может быть несохранённая редактура.
@@ -173,13 +183,14 @@ function withEarlierEdits(fresh: Draft, previous: Draft | undefined): Draft {
   return carryOverEdits(previous, fresh);
 }
 
-// Что ещё ждёт редактуры: промпт без чистовой версии (склеенный её не требует) и реплика,
-// у которой не заполнена строка или текст: публикации нужны оба поля.
+// Что ещё ждёт редактуры: промпт без чистовой версии (склеенный её не требует), реплика
+// и вмешательство, у которых не заполнена строка или текст: публикации нужны оба поля.
 function awaitsEditing(event: DraftEvent): event is EditableDraftEvent {
   switch (event.type) {
     case "draft_prompt":
       return event.goal === "" && event.joined !== true;
     case "draft_message":
+    case "draft_intervention":
       return event.line === "" || event.text === "";
     default:
       return false;
@@ -188,9 +199,16 @@ function awaitsEditing(event: DraftEvent): event is EditableDraftEvent {
 
 function describeWaiting(event: EditableDraftEvent): string {
   const said = event.said.replace(/\s+/g, " ");
-  return event.type === "draft_prompt"
-    ? said
-    : `${event.from} → ${event.to} (${event.source}): ${said}`;
+  switch (event.type) {
+    case "draft_prompt":
+      return said;
+    case "draft_message":
+      return `${event.from} → ${event.to} (${event.source}): ${said}`;
+    case "draft_intervention":
+      return `вмешательство (${event.reason}): ${said}`;
+    default:
+      return event satisfies never;
+  }
 }
 
 const MS_PER_SECOND = 1000;
@@ -240,10 +258,13 @@ await writeFile(draftPath, `${JSON.stringify(draft, null, 2)}\n`);
 
 const prompts = draft.events.filter((event) => event.type === "draft_prompt");
 const messages = draft.events.filter((event) => event.type === "draft_message");
+const interventions = draft.events.filter((event) => event.type === "draft_intervention");
 const waiting = draft.events.filter(awaitsEditing);
 const owners = eventBuilds(draft);
 console.log(`черновик: ${fromFactoryHome(draftPath)}`);
-console.log(`промптов: ${prompts.length}, реплик: ${messages.length}`);
+console.log(
+  `промптов: ${prompts.length}, реплик: ${messages.length}, вмешательств: ${interventions.length}`,
+);
 for (const build of draft.builds) {
   const eventCount = owners.filter((owner) => owner === build.id).length;
   console.log(

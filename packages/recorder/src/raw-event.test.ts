@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   fromHookPayload,
   isSafeSessionId,
+  markAfterStopGate,
   parseRawLog,
   RawLogError,
   stampProject,
@@ -253,6 +254,93 @@ describe("fromHookPayload", () => {
 
     expect(event).toBeNull();
   });
+
+  function askPayload(patch: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      hook_event_name: "PostToolUse",
+      tool_name: "AskUserQuestion",
+      tool_input: { questions: [{ question: "Какой кэш?", options: [] }] },
+      tool_response: { answers: { "Какой кэш?": "Без кэша", "Где хранить?": "В памяти" } },
+      ...patch,
+    };
+  }
+
+  it("пишет ответ на AskUserQuestion текстом вопросов и ответов", () => {
+    const payload = askPayload();
+
+    const event = fromHookPayload(payload, TS);
+
+    expect(event).toEqual({
+      ts: TS,
+      kind: "question_answer",
+      text: "Какой кэш? — Без кэша\nГде хранить? — В памяти",
+    });
+  });
+
+  it("берёт ответы из входа инструмента, если в ответе их нет", () => {
+    const payload = askPayload({
+      tool_input: { answers: { "Какой кэш?": "Без кэша" } },
+      tool_response: "User has answered",
+    });
+
+    const event = fromHookPayload(payload, TS);
+
+    expect(event).toEqual({ ts: TS, kind: "question_answer", text: "Какой кэш? — Без кэша" });
+  });
+
+  it("сохраняет сабагента, который задал вопрос", () => {
+    const payload = askPayload({ agent_id: "a1" });
+
+    const event = fromHookPayload(payload, TS);
+
+    expect(event).toMatchObject({ kind: "question_answer", agentId: "a1" });
+  });
+
+  it.each([
+    ["нет ответов", { tool_response: {} }],
+    ["ответ не объект", { tool_response: { answers: "Без кэша" } }],
+    ["ответы не строки", { tool_response: { answers: { "Какой кэш?": 5 } } }],
+    ["ответы пустые", { tool_response: { answers: { "Какой кэш?": " " } } }],
+    ["ответ строкой", { tool_response: "User has answered your questions" }],
+  ])("без ответов оставляет AskUserQuestion вызовом инструмента: %s", (_name, patch) => {
+    const payload = askPayload({ tool_input: { questions: [] }, ...patch });
+
+    const event = fromHookPayload(payload, TS);
+
+    expect(event).toEqual({ ts: TS, kind: "tool", tool: "AskUserQuestion", ok: true });
+  });
+});
+
+describe("fromHookPayload: ответы чужих инструментов", () => {
+  it("не принимает за ответ человека поле answers у другого инструмента", () => {
+    const payload = {
+      hook_event_name: "PostToolUse",
+      tool_name: "Bash",
+      tool_response: { answers: { "Какой кэш?": "Без кэша" } },
+    };
+
+    const event = fromHookPayload(payload, TS);
+
+    expect(event).toEqual({ ts: TS, kind: "tool", tool: "Bash", ok: true });
+  });
+});
+
+describe("markAfterStopGate", () => {
+  it("помечает промпт и не меняет остальное", () => {
+    const prompt = { ts: TS, kind: "prompt", text: "Продолжай" } as const;
+
+    const marked = markAfterStopGate(prompt);
+
+    expect(marked).toEqual({ ts: TS, kind: "prompt", text: "Продолжай", afterStopGate: true });
+  });
+
+  it("не меняет исходный промпт", () => {
+    const prompt = { ts: TS, kind: "prompt", text: "Продолжай" } as const;
+
+    markAfterStopGate(prompt);
+
+    expect(prompt).toEqual({ ts: TS, kind: "prompt", text: "Продолжай" });
+  });
 });
 
 describe("isSafeSessionId", () => {
@@ -333,6 +421,34 @@ describe("parseRawLog", () => {
     '{"ts":1,"kind":"session_start","factory":"0.1.0"}\n',
     '{"ts":1,"kind":"session_start","project":"cyberzavod","factory":1}\n',
   ])("отклоняет начало сессии с одним полем проекта или не строкой: %s", (log) => {
+    const act = () => parseRawLog(log);
+
+    expect(act).toThrow(RawLogError);
+  });
+
+  it("принимает question_answer и afterStopGate", () => {
+    const log =
+      '{"ts":1,"kind":"question_answer","text":"Какой кэш? — Без кэша"}\n{"ts":2,"kind":"prompt","text":"Продолжай","afterStopGate":true}\n';
+
+    const events = parseRawLog(log);
+
+    expect(events).toEqual([
+      { ts: 1, kind: "question_answer", text: "Какой кэш? — Без кэша" },
+      { ts: 2, kind: "prompt", text: "Продолжай", afterStopGate: true },
+    ]);
+  });
+
+  it.each([false, "yes"])("отклоняет afterStopGate не true: %s", (afterStopGate) => {
+    const log = `${JSON.stringify({ ts: 1, kind: "prompt", text: "Продолжай", afterStopGate })}\n`;
+
+    const act = () => parseRawLog(log);
+
+    expect(act).toThrow(RawLogError);
+  });
+
+  it("отклоняет question_answer без текста", () => {
+    const log = '{"ts":1,"kind":"question_answer"}\n';
+
     const act = () => parseRawLog(log);
 
     expect(act).toThrow(RawLogError);

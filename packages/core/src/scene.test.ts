@@ -4,6 +4,7 @@ import { headingTo } from "./layout.ts";
 import type { Recording } from "./recording.ts";
 import {
   chatRecording,
+  interventionRecording,
   LINE_LAYOUT,
   messageAt,
   PLAIN_PACING,
@@ -106,9 +107,9 @@ describe("sceneAt", () => {
   });
 
   it.each([
-    [500, { tokens: 0, prompts: 0, reworks: 0 }],
-    [40_000, { tokens: 0, prompts: 0, reworks: 1 }],
-    [71_000, { tokens: 1_200, prompts: 0, reworks: 1 }],
+    [500, { tokens: 0, prompts: 0, reworks: 0, interventions: 0 }],
+    [40_000, { tokens: 0, prompts: 0, reworks: 1, interventions: 0 }],
+    [71_000, { tokens: 1_200, prompts: 0, reworks: 1, interventions: 0 }],
   ])("считает счётчики на момент %i", (time, counts) => {
     const script = reworkScript();
 
@@ -277,6 +278,7 @@ describe.each(SPEECH_RECORDINGS)("sceneAt: время записи, запись
 
     const mismatches = [
       ...script.prompts.map(({ start, prompt }) => ({ start, t: prompt.t })),
+      ...script.interventions.map(({ start, intervention }) => ({ start, t: intervention.t })),
       ...script.messages.map(({ start, message }) => ({ start, t: message.t })),
     ].filter(({ start, t }) => sceneAt(script, start).recordingTime !== t);
 
@@ -310,5 +312,62 @@ describe("sceneAt: время записи при обмене", () => {
       expect.toSatisfy((time: number) => time > 1_500 && time < 3_000),
       3_000,
     ]);
+  });
+});
+
+describe("sceneAt: вмешательства", () => {
+  function interventionScript(): FactoryScript {
+    return buildScript(interventionRecording(), LINE_LAYOUT, PLAIN_PACING);
+  }
+
+  it("показывает вмешательство и не показывает промпт и реплику", () => {
+    const script = interventionScript();
+    const cue = script.interventions[0];
+
+    const scene = sceneAt(script, cue?.start ?? 0);
+
+    expect({
+      intervention: scene.intervention?.cue.index,
+      prompt: scene.prompt,
+      message: scene.message,
+    }).toEqual({ intervention: 0, prompt: null, message: null });
+  });
+
+  it("скрывает вмешательство после пузыря", () => {
+    const script = interventionScript();
+    const cue = script.interventions[0];
+
+    const scene = sceneAt(script, cue?.end ?? 0);
+
+    expect(scene.intervention).toBeNull();
+  });
+
+  it("в начале пузыря время записи равно t", () => {
+    const script = interventionScript();
+    const cue = script.interventions[0];
+
+    const scene = sceneAt(script, cue?.start ?? 0);
+
+    expect(scene.recordingTime).toBe(cue?.intervention.t);
+  });
+
+  it("увеличивает счётчик вмешательств", () => {
+    const script = interventionScript();
+    const cue = script.interventions[0];
+
+    const counts = [(cue?.start ?? 0) - 1, cue?.end ?? 0].map(
+      (time) => sceneAt(script, time).counts.interventions,
+    );
+
+    expect(counts).toEqual([0, 1]);
+  });
+
+  it("не считает вмешательство промптом", () => {
+    const script = interventionScript();
+    const cue = script.interventions[0];
+
+    const scene = sceneAt(script, cue?.end ?? 0);
+
+    expect(scene.counts.prompts).toBe(0);
   });
 });

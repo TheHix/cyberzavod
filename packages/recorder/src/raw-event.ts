@@ -14,7 +14,23 @@ export type RawEvent =
       /** Версия завода из `.cyberzavod/project.json`; приходит вместе с `project`. */
       factory?: string;
     }
-  | { ts: number; kind: "prompt"; text: string }
+  | {
+      ts: number;
+      kind: "prompt";
+      text: string;
+      /**
+       * Хук остановки сдался перед этим промптом и позвал человека: промпт — вызов хуком
+       * остановки. Ставит `markAfterStopGate`, когда находит отметку хука.
+       */
+      afterStopGate?: true;
+    }
+  | {
+      ts: number;
+      kind: "question_answer";
+      /** Ответы человека на вопросы модели строками «вопрос — ответ». */
+      text: string;
+      agentId?: string;
+    }
   | {
       ts: number;
       kind: "tool";
@@ -40,6 +56,9 @@ export type RawEvent =
   | { ts: number; kind: "subagent_report"; agentId: string; verdict?: string }
   | { ts: number; kind: "stop"; transcriptPath?: string };
 
+/** Промпт человека в журнале сборки. */
+export type PromptRawEvent = Extract<RawEvent, { kind: "prompt" }>;
+
 /** Начало сессии в журнале сборки. */
 export type SessionStartEvent = Extract<RawEvent, { kind: "session_start" }>;
 
@@ -63,6 +82,9 @@ const SUBAGENT_REPORT = /^<agent-message from="([^"]+)">\s*\[Subagent hand-back\
 const REPORT_START = "The report follows:";
 // session_id уходит в имя файла журнала — пропускаются только безопасные символы.
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+// Вопросы человеку задаёт этот инструмент; его ответы — текст человека, как промпт.
+const QUESTION_TOOL = "AskUserQuestion";
+const ANSWER_SEPARATOR = " — ";
 
 type HookPayload = Record<string, unknown>;
 
@@ -93,6 +115,34 @@ function toolEvent(payload: HookPayload, ts: number, ok: boolean): RawEvent {
       cwd: stringField(payload, "cwd"),
       agentId: stringField(payload, "agent_id"),
     },
+  );
+}
+
+// Ответы на вопросы: объект «вопрос → ответ». Формат ответа инструмента в документации хуков
+// не описан (там `answers` стоит во входе), поэтому ищем и в ответе, и во входе; не объект
+// и не строки — нет ответов. Разбор терпимый: лишнее и непонятное пропускается.
+function answersOf(payload: HookPayload): [string, string][] {
+  for (const source of [payload.tool_response, payload.tool_input]) {
+    const answers = isPayload(source) ? source.answers : undefined;
+    if (!isPayload(answers)) continue;
+    const pairs = Object.entries(answers).filter(
+      (pair): pair is [string, string] => typeof pair[1] === "string" && pair[1].trim() !== "",
+    );
+    if (pairs.length > 0) return pairs;
+  }
+  return [];
+}
+
+// Вызов AskUserQuestion с ответами человека — текст человека, а не вызов инструмента. Без ответов
+// (отказ, отмена, незнакомый формат) остаётся вызов инструмента.
+function questionAnswerEvent(payload: HookPayload, ts: number): RawEvent | undefined {
+  if (stringField(payload, "tool_name") !== QUESTION_TOOL) return undefined;
+  const answers = answersOf(payload);
+  if (answers.length === 0) return undefined;
+  const text = answers.map(([question, answer]) => `${question}${ANSWER_SEPARATOR}${answer}`);
+  return withOptional<Extract<RawEvent, { kind: "question_answer" }>>(
+    { ts, kind: "question_answer", text: text.join("\n") },
+    { agentId: stringField(payload, "agent_id") },
   );
 }
 
@@ -149,7 +199,7 @@ export function fromHookPayload(payload: unknown, ts: number): RawEvent | null {
       return subagentReport(text, ts) ?? { ts, kind: "prompt", text };
     }
     case "PostToolUse":
-      return toolEvent(payload, ts, true);
+      return questionAnswerEvent(payload, ts) ?? toolEvent(payload, ts, true);
     case "PostToolUseFailure":
       return toolEvent(payload, ts, false);
     case "SubagentStart":
@@ -187,6 +237,15 @@ export function stampProject(event: SessionStartEvent, project: ProjectConfig): 
 }
 
 /**
+ * Помечает промпт вызовом хуком остановки: хук сдался перед ним и позвал человека.
+ * @param {PromptRawEvent} event Промпт человека.
+ * @returns {PromptRawEvent} Новый промпт с `afterStopGate`.
+ */
+export function markAfterStopGate(event: PromptRawEvent): PromptRawEvent {
+  return { ...event, afterStopGate: true };
+}
+
+/**
  * Проверяет, что id сессии можно использовать в имени файла журнала.
  * @param {unknown} value Значение session_id из полезной нагрузки хука.
  * @returns {value is string} true, если id можно подставить в имя файла журнала.
@@ -201,7 +260,10 @@ const RAW_EVENT_SHAPES: Record<RawEvent["kind"], (value: HookPayload) => boolean
   session_start: (value) =>
     (value.project === undefined && value.factory === undefined) ||
     (typeof value.project === "string" && typeof value.factory === "string"),
-  prompt: (value) => typeof value.text === "string",
+  prompt: (value) =>
+    typeof value.text === "string" &&
+    (value.afterStopGate === undefined || value.afterStopGate === true),
+  question_answer: (value) => typeof value.text === "string",
   tool: (value) => typeof value.tool === "string" && typeof value.ok === "boolean",
   subagent_start: (value) => typeof value.agent === "string",
   subagent_stop: (value) => typeof value.agent === "string",

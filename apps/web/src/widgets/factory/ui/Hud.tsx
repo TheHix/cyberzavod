@@ -33,6 +33,7 @@ export function Hud(props: Props): JSX.Element {
     { label: "Токены", value: formatTokens(model.summary.tokens) },
     { label: "Промпты", value: String(model.summary.prompts) },
     { label: "Возвраты", value: String(model.summary.reworks) },
+    { label: "Вмешательства", value: String(model.summary.interventions) },
   ];
 
   return (

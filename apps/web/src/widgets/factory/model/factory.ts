@@ -12,6 +12,7 @@ import {
   type BuildStats,
   type FactoryLayout,
   type FactoryScript,
+  type InterventionCue,
   type MessageCue,
   type Point,
   type PromptCue,
@@ -49,7 +50,7 @@ export interface FactoryModel extends JournalScene {
   readonly $script: ReadableAtom<FactoryScript>;
   /** План цеха, по которому построен сценарий. Сравнивается по ссылке: у сценария своя копия. */
   readonly $layout: ReadableAtom<FactoryLayout>;
-  /** Итоги всей сборки: время, токены, промпты, возвраты. */
+  /** Итоги всей сборки: время, токены, промпты, возвраты, вмешательства. */
   readonly summary: BuildStats;
   readonly $status: ReadableAtom<GraphicsStatus>;
   readonly $playback: ReadableAtom<Playback>;
@@ -62,11 +63,15 @@ export interface FactoryModel extends JournalScene {
   readonly $prompt: ReadableAtom<PromptCue | null>;
   /** Где мастер, говорящий висящий промпт, — точка плана, над которой висит пузырь. */
   readonly $promptPosition: ReadableAtom<Point | null>;
+  /** Вмешательство человека, которое сейчас говорит мастер: станция стоит до его решения. */
+  readonly $intervention: ReadableAtom<InterventionCue | null>;
+  /** Где мастер, говорящий вмешательство, — точка плана, над которой висит пузырь. */
+  readonly $interventionPosition: ReadableAtom<Point | null>;
   /** Реплика, которая сейчас висит над говорящим. */
   readonly $message: ReadableAtom<MessageCue | null>;
   /** Где говорящий — мастер или рабочий, — точка плана, над которой висит реплика. */
   readonly $messagePosition: ReadableAtom<Point | null>;
-  /** Последний промпт или реплика, начавшиеся к этому моменту: их подсвечивает журнал. */
+  /** Последний промпт, вмешательство или реплика, начавшиеся к этому моменту: их подсвечивает журнал. */
   readonly $speech: ReadableAtom<Speech | null>;
   /** Раскрыты ли уточнения висящего промпта; со сменой промпта закрываются. */
   readonly $promptDetailsOpen: ReadableAtom<boolean>;
@@ -84,7 +89,7 @@ export interface FactoryModel extends JournalScene {
   setSpeed(speed: Speed): void;
   /** Раскрывает или сворачивает уточнения висящего промпта; раскрытие ставит паузу. */
   togglePromptDetails(): void;
-  /** Перематывает к началу пузыря промпта или реплики; «идёт или пауза» не меняется. */
+  /** Перематывает к началу пузыря промпта, вмешательства или реплики; «идёт или пауза» не меняется. */
   seekToSpeech(speech: Speech): void;
   /**
    * Переносит цех на другой план: сценарий строится заново, а момент записи, «идёт или пауза»
@@ -96,7 +101,8 @@ export interface FactoryModel extends JournalScene {
 /**
  * Создаёт модель цеха для записи: сценарий, сторы и действия. На каждый цех на странице —
  * своя модель.
- * @param {BriefRecording} recording Запись сборки без полных текстов реплик — их цеху не нужно.
+ * @param {BriefRecording} recording Запись сборки без полных текстов реплик и вмешательств:
+ *   они цеху не нужны.
  * @param {FactoryLayout} layout План цеха в начале; потом его меняет `setLayout`.
  * @returns {FactoryModel} Модель, ещё не запущенная: ждёт готовности графики.
  */
@@ -124,6 +130,12 @@ export function createFactoryModel(
   // Промпт говорит мастер, и пузырь висит над ним, там, где он стоит у станка.
   const $promptPosition = computed($scene, (scene) =>
     scene.prompt === null ? null : scene.foreman.position,
+  );
+
+  const $intervention = computed($scene, (scene) => scene.intervention?.cue ?? null);
+  // Вмешательство, как промпт, говорит мастер: пузырь висит над ним у станции, где стоит работа.
+  const $interventionPosition = computed($scene, (scene) =>
+    scene.intervention === null ? null : scene.foreman.position,
   );
 
   const $message = computed($scene, (scene) => scene.message?.cue ?? null);
@@ -166,6 +178,8 @@ export function createFactoryModel(
     $recordingTime,
     $prompt,
     $promptPosition,
+    $intervention,
+    $interventionPosition,
     $message,
     $messagePosition,
     $speech,

@@ -98,6 +98,70 @@ test_agent_is_released_after_three_blocks() {
   rm -rf "$repo"
 }
 
+test_agent_released_after_three_blocks_leaves_human_call_marker() {
+  local repo
+  repo=$(make_repo)
+  run_hook "$repo" turn-start.sh
+  touch "$repo/apps/broken"
+  for _ in 1 2 3; do run_hook "$repo" stop-gate.sh; done
+
+  run_hook "$repo" stop-gate.sh
+
+  check "оставляет отметку вызова человека после трёх отказов" "[[ -f '$repo/factory-human-call-$SESSION' ]]"
+  rm -rf "$repo"
+}
+
+test_unwritable_human_call_marker_is_named_in_message() {
+  # На месте файла отметки каталог — записать нельзя; агент всё равно отпускается.
+  local repo code
+  repo=$(make_repo)
+  run_hook "$repo" turn-start.sh
+  touch "$repo/apps/broken"
+  mkdir "$repo/factory-human-call-$SESSION"
+  for _ in 1 2 3; do run_hook "$repo" stop-gate.sh; done
+
+  run_hook "$repo" stop-gate.sh
+  code=$?
+
+  check "без отметки агент отпускается с сообщением о ней" "[[ $code -eq $RELEASED ]] && grep -q 'Отметка для записи не сохранена' '$repo/out'"
+  rm -rf "$repo"
+}
+
+test_green_checks_leave_no_human_call_marker() {
+  local repo
+  repo=$(make_repo)
+  run_hook "$repo" turn-start.sh
+  echo changed > "$repo/apps/main.ts"
+
+  run_hook "$repo" stop-gate.sh
+
+  check "не оставляет отметку при зелёных проверках" "[[ ! -e '$repo/factory-human-call-$SESSION' ]]"
+  rm -rf "$repo"
+}
+
+test_release_without_code_changes_leaves_no_human_call_marker() {
+  local repo
+  repo=$(make_repo)
+  run_hook "$repo" turn-start.sh
+
+  run_hook "$repo" stop-gate.sh
+
+  check "не оставляет отметку при отпуске без изменений кода" "[[ ! -e '$repo/factory-human-call-$SESSION' ]]"
+  rm -rf "$repo"
+}
+
+test_block_does_not_leave_human_call_marker() {
+  local repo
+  repo=$(make_repo)
+  run_hook "$repo" turn-start.sh
+  touch "$repo/apps/broken"
+
+  run_hook "$repo" stop-gate.sh
+
+  check "не оставляет отметку, пока агента ещё возвращают к работе" "[[ ! -e '$repo/factory-human-call-$SESSION' ]]"
+  rm -rf "$repo"
+}
+
 test_new_turn_counts_attempts_again() {
   # Прошлый ход исчерпал попытки и отпустил агента.
   local repo code
@@ -343,6 +407,11 @@ test_turn_start_without_jq_remembers_nothing() {
 
 test_agent_edits_with_red_checks_block_stop
 test_agent_is_released_after_three_blocks
+test_agent_released_after_three_blocks_leaves_human_call_marker
+test_unwritable_human_call_marker_is_named_in_message
+test_green_checks_leave_no_human_call_marker
+test_release_without_code_changes_leaves_no_human_call_marker
+test_block_does_not_leave_human_call_marker
 test_new_turn_counts_attempts_again
 test_work_before_turn_does_not_block
 test_commit_inside_turn_is_checked

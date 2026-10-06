@@ -11,6 +11,7 @@ import {
 
 const FIRST_PROMPT: Speech = { kind: "prompt", index: 0 };
 const FIRST_MESSAGE: Speech = { kind: "message", index: 0 };
+const FIRST_INTERVENTION: Speech = { kind: "intervention", index: 0 };
 
 // Сцена-заглушка: речь задаёт тест, а перемотку он видит по вызовам.
 function stubScene(speech: Speech | null = null) {
@@ -141,6 +142,10 @@ describe("isSameSpeech", () => {
     [FIRST_PROMPT, { kind: "prompt", index: 0 }, true],
     [FIRST_PROMPT, { kind: "prompt", index: 1 }, false],
     [FIRST_PROMPT, FIRST_MESSAGE, false],
+    [FIRST_INTERVENTION, { kind: "intervention", index: 0 }, true],
+    [FIRST_INTERVENTION, { kind: "intervention", index: 1 }, false],
+    [FIRST_INTERVENTION, FIRST_PROMPT, false],
+    [FIRST_INTERVENTION, FIRST_MESSAGE, false],
     [null, FIRST_PROMPT, false],
   ] as const)("сравнивает %o и %o: %s", (current, candidate, expected) => {
     const same = isSameSpeech(current, candidate);

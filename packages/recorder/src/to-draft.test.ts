@@ -1846,6 +1846,50 @@ describe("routeMessages", () => {
     ]);
   });
 
+  it("ответ на вопрос модели ход не начинает", () => {
+    const question: DraftEvent = {
+      t: 1_500,
+      type: "draft_intervention",
+      reason: "question",
+      said: "вопрос — ответ",
+      line: "",
+      text: "",
+    };
+    const draft = routedDraft(
+      [say(1_000, "spec", "report", "a1"), question, say(2_000, "test", "assignment", "a2")],
+      ["b1"],
+    );
+
+    const routed = routeMessages(draft);
+
+    expect(routes(routed)).toEqual([
+      [1_000, "spec", "test"],
+      [2_000, "test", "spec"],
+    ]);
+  });
+
+  it("вмешательство начинает новый ход", () => {
+    const intervention: DraftEvent = {
+      t: 1_500,
+      type: "draft_intervention",
+      reason: "spec_review",
+      said: "одобряю",
+      line: "",
+      text: "",
+    };
+    const draft = routedDraft(
+      [say(1_000, "spec", "report", "a1"), intervention, say(2_000, "test", "assignment", "a2")],
+      ["b1"],
+    );
+
+    const routed = routeMessages(draft);
+
+    expect(routes(routed)).toEqual([
+      [1_000, "spec", "foreman"],
+      [2_000, "test", "foreman"],
+    ]);
+  });
+
   it("берёт этап ответа из событий его сборки", () => {
     const draft = routedDraft(
       [
@@ -1873,5 +1917,247 @@ describe("routeMessages", () => {
     const routed = routeMessages(draft);
 
     expect(routed.events).toEqual(draft.events.map((event) => ({ ...event, to: "foreman" })));
+  });
+});
+
+function interventionsOf(draft: Draft) {
+  return draft.events.flatMap((event) =>
+    event.type === "draft_intervention" ? [[event.t, event.reason, event.said]] : [],
+  );
+}
+
+function promptsOf(draft: Draft) {
+  return draft.events.flatMap((event) => (event.type === "draft_prompt" ? [event.said] : []));
+}
+
+function stationRun(ts: number, agent: string, agentId: string, verdict?: string): RawEvent[] {
+  return [
+    { ts, kind: "subagent_start", agent, agentId },
+    {
+      ts: ts + 1_000,
+      kind: "subagent_stop",
+      agent,
+      agentId,
+      ...(verdict === undefined ? {} : { verdict }),
+    },
+  ];
+}
+
+describe("toDraft: вмешательства", () => {
+  it("распознаёт ответ на вопрос и вызов хуком остановки", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "session_start" },
+      { ts: START + 1_000, kind: "prompt", text: "Добавь кэш" },
+      { ts: START + 5_000, kind: "question_answer", text: "Какой кэш? — Без кэша" },
+      { ts: START + 9_000, kind: "stop" },
+      { ts: START + 20_000, kind: "prompt", text: "Продолжай", afterStopGate: true },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect({ interventions: interventionsOf(draft), prompts: promptsOf(draft) }).toEqual({
+      interventions: [
+        [5_000, "question", "Какой кэш? — Без кэша"],
+        [20_000, "stop_gate", "Продолжай"],
+      ],
+      prompts: ["Добавь кэш"],
+    });
+  });
+
+  it("даёт один итоговый ответ на ход, в котором был вопрос модели", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "prompt", text: "Добавь кэш" },
+      { ts: START + 5_000, kind: "question_answer", text: "Какой кэш? — Без кэша" },
+      { ts: START + 20_000, kind: "stop" },
+    ];
+    const answers = [answer(4_000, "Какой кэш?"), answer(18_000, "Сделал без кэша")];
+
+    const draft = toDraft(raw, { sessionId: "s1", answers });
+
+    expect(draft.events.filter((event) => event.type === "draft_message")).toEqual([
+      expect.objectContaining({ t: 18_000, source: "answer", said: "Сделал без кэша" }),
+    ]);
+  });
+
+  it("оставляет у вмешательства пустые строку и текст для редактора", () => {
+    const raw: RawEvent[] = [{ ts: START, kind: "question_answer", text: "Какой кэш? — Без кэша" }];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(draft.events).toContainEqual({
+      t: 0,
+      type: "draft_intervention",
+      reason: "question",
+      said: "Какой кэш? — Без кэша",
+      line: "",
+      text: "",
+    });
+  });
+
+  it("распознаёт решение по постановке после analyst", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "prompt", text: "/feature 16" },
+      ...stationRun(START + 1_000, "analyst", "a1"),
+      { ts: START + 9_000, kind: "stop" },
+      { ts: START + 20_000, kind: "prompt", text: "Одобряю" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect({ interventions: interventionsOf(draft), prompts: promptsOf(draft) }).toEqual({
+      interventions: [[20_000, "spec_review", "Одобряю"]],
+      prompts: ["/feature 16"],
+    });
+  });
+
+  it.each([
+    ["reviewer", "НА ДОРАБОТКУ"],
+    ["tester", "ДЕФЕКТ"],
+  ])("распознаёт вызов после возврата: %s «%s»", (agent, verdict) => {
+    const raw: RawEvent[] = [
+      ...stationRun(START, agent, "r1", verdict),
+      { ts: START + 9_000, kind: "stop" },
+      { ts: START + 20_000, kind: "prompt", text: "Откати кэш" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(interventionsOf(draft)).toEqual([[20_000, "rework_limit", "Откати кэш"]]);
+  });
+
+  it("берёт возврат из отчёта, пришедшего сообщением в сессию", () => {
+    const raw: RawEvent[] = [
+      ...stationRun(START, "reviewer", "r1"),
+      { ts: START + 2_000, kind: "subagent_report", agentId: "r1", verdict: "НА ДОРАБОТКУ" },
+      { ts: START + 9_000, kind: "stop" },
+      { ts: START + 20_000, kind: "prompt", text: "Откати кэш" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(interventionsOf(draft)).toEqual([[20_000, "rework_limit", "Откати кэш"]]);
+  });
+
+  it("ставит вызов хуком остановки выше причины по станции", () => {
+    const raw: RawEvent[] = [
+      ...stationRun(START, "analyst", "a1"),
+      { ts: START + 9_000, kind: "stop" },
+      { ts: START + 20_000, kind: "prompt", text: "Продолжай", afterStopGate: true },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(interventionsOf(draft)).toEqual([[20_000, "stop_gate", "Продолжай"]]);
+  });
+
+  it.each([
+    [
+      "станция стартовала до промпта",
+      [
+        ...stationRun(START, "analyst", "a1"),
+        ...stationRun(START + 2_000, "coder", "c1"),
+        { ts: START + 9_000, kind: "stop" },
+        { ts: START + 20_000, kind: "prompt", text: "Дальше" },
+      ] satisfies RawEvent[],
+    ],
+    [
+      "до промпта не было остановки",
+      [
+        ...stationRun(START, "analyst", "a1"),
+        { ts: START + 20_000, kind: "prompt", text: "Дальше" },
+      ] satisfies RawEvent[],
+    ],
+    [
+      "последняя станция сдана без возврата",
+      [
+        ...stationRun(START, "reviewer", "r1", "ПРИНЯТО"),
+        { ts: START + 9_000, kind: "stop" },
+        { ts: START + 20_000, kind: "prompt", text: "Дальше" },
+      ] satisfies RawEvent[],
+    ],
+  ])("не считает вмешательством промпт: %s", (_name, raw) => {
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect({ interventions: interventionsOf(draft), prompts: promptsOf(draft) }).toEqual({
+      interventions: [],
+      prompts: ["Дальше"],
+    });
+  });
+
+  it("не считает вмешательством промпт, пока запущенная после остановки станция не кончила", () => {
+    const raw: RawEvent[] = [
+      ...stationRun(START, "analyst", "a1"),
+      { ts: START + 9_000, kind: "stop" },
+      { ts: START + 10_000, kind: "subagent_start", agent: "coder", agentId: "c1" },
+      { ts: START + 20_000, kind: "prompt", text: "Дальше" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect({ interventions: interventionsOf(draft), prompts: promptsOf(draft) }).toEqual({
+      interventions: [],
+      prompts: ["Дальше"],
+    });
+  });
+
+  it("не даёт агенту вне станций сбросить вызов после analyst", () => {
+    const raw: RawEvent[] = [
+      ...stationRun(START, "analyst", "a1"),
+      ...stationRun(START + 2_000, "general-purpose", "g1"),
+      { ts: START + 9_000, kind: "stop" },
+      { ts: START + 20_000, kind: "prompt", text: "Одобряю" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(interventionsOf(draft)).toEqual([[20_000, "spec_review", "Одобряю"]]);
+  });
+
+  it("не считает вмешательством второй промпт после ответа на вызов", () => {
+    const raw: RawEvent[] = [
+      ...stationRun(START, "analyst", "a1"),
+      { ts: START + 9_000, kind: "stop" },
+      { ts: START + 20_000, kind: "prompt", text: "Одобряю" },
+      { ts: START + 30_000, kind: "stop" },
+      { ts: START + 40_000, kind: "prompt", text: "Ещё" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect({ interventions: interventionsOf(draft), prompts: promptsOf(draft) }).toEqual({
+      interventions: [[20_000, "spec_review", "Одобряю"]],
+      prompts: ["Ещё"],
+    });
+  });
+
+  it("служебное сообщение не забирает ожидание человека", () => {
+    const raw: RawEvent[] = [
+      ...stationRun(START, "analyst", "a1"),
+      { ts: START + 9_000, kind: "stop" },
+      { ts: START + 10_000, kind: "prompt", text: "<task-notification>\nготово" },
+      { ts: START + 20_000, kind: "prompt", text: "Одобряю" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect({ interventions: interventionsOf(draft), prompts: promptsOf(draft) }).toEqual({
+      interventions: [[20_000, "spec_review", "Одобряю"]],
+      prompts: [],
+    });
+  });
+
+  it("служебное сообщение с отметкой хука не становится вмешательством", () => {
+    const raw: RawEvent[] = [
+      {
+        ts: START,
+        kind: "prompt",
+        text: "<task-notification>\nготово",
+        afterStopGate: true,
+      },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(interventionsOf(draft)).toEqual([]);
   });
 });

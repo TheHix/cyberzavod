@@ -4,9 +4,11 @@
 export {
   fromHookPayload,
   isSafeSessionId,
+  markAfterStopGate,
   parseRawLog,
   RawLogError,
   stampProject,
+  type PromptRawEvent,
   type RawEvent,
   type SessionStartEvent,
 } from "./raw-event.ts";
@@ -36,6 +38,7 @@ export {
   type DraftBuild,
   type DraftCheck,
   type DraftEvent,
+  type DraftIntervention,
   type DraftMessage,
   type DraftPrompt,
   type DraftRun,

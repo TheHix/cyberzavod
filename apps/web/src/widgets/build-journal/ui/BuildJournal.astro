@@ -1,11 +1,12 @@
 ---
-// Журнал сборки: промпты человека и реплики цеха одним списком по времени. Промпт — как
+// Журнал сборки: промпты и вмешательства человека и реплики цеха одним списком по времени. Промпт — как
 // сообщение модели, которая его получила: главное указание видно сразу, уточнения раскрываются
-// без JS через <details>. Реплика раскрыта целиком: строка из цеха и полный текст абзацами.
+// без JS через <details>. Вмешательство и реплика раскрыты целиком: строка из цеха и полный текст абзацами.
 // Каждая запись — остров client:visible со статичным телом в слоте: пока журнал закрыт, его
 // не видно и JS не грузится. Подсветка записи, до которой дошёл цех, и кнопка «показать в цехе»
 // появляются только с JS, когда запись на экране; без него остаётся эта же разметка.
-import type { MessageEvent, PromptEvent, Recording } from "@cyberzavod/core";
+import type { InterventionEvent, MessageEvent, PromptEvent, Recording } from "@cyberzavod/core";
+import { interventionAnchor, labelOf } from "@/entities/intervention";
 import { recipientOf } from "@/entities/prompt";
 import { messageAnchor, paragraphsOf, routeOf } from "@/entities/message";
 import type { Speech } from "@/features/journal-sync";
@@ -20,77 +21,124 @@ interface Props {
 
 type Entry =
   | { kind: "prompt"; prompt: PromptEvent; speech: Extract<Speech, { kind: "prompt" }> }
+  | {
+      kind: "intervention";
+      intervention: InterventionEvent;
+      speech: Extract<Speech, { kind: "intervention" }>;
+    }
   | { kind: "message"; message: MessageEvent; speech: Extract<Speech, { kind: "message" }> };
 
 const { recording } = Astro.props;
 
-// Номера промптов и реплик — те же, что у пузырей в цехе: по ним цех и журнал находят друг
-// друга, а по номеру реплики «подробнее» находит запись.
-const entries: Entry[] = [];
-let promptIndex = 0;
-let messageIndex = 0;
-for (const event of recording.events) {
-  if (event.type === "prompt") {
-    entries.push({
-      kind: "prompt",
-      prompt: event,
-      speech: { kind: "prompt", index: promptIndex++ },
-    });
-  }
-  if (event.type === "message") {
-    entries.push({
-      kind: "message",
-      message: event,
-      speech: { kind: "message", index: messageIndex++ },
-    });
-  }
+// Номера промптов, вмешательств и реплик — те же, что у пузырей в цехе: по ним цех и журнал находят друг
+// друга, а по номеру вмешательства или реплики «подробнее» находит запись.
+function entriesOf(events: Recording["events"]): Entry[] {
+  let promptIndex = 0;
+  let interventionIndex = 0;
+  let messageIndex = 0;
+  return events.flatMap((event): Entry[] => {
+    switch (event.type) {
+      case "prompt":
+        return [
+          { kind: "prompt", prompt: event, speech: { kind: "prompt", index: promptIndex++ } },
+        ];
+      case "intervention":
+        return [
+          {
+            kind: "intervention",
+            intervention: event,
+            speech: { kind: "intervention", index: interventionIndex++ },
+          },
+        ];
+      case "message":
+        return [
+          { kind: "message", message: event, speech: { kind: "message", index: messageIndex++ } },
+        ];
+      case "build_start":
+      case "stage_enter":
+      case "stage_fail":
+      case "usage":
+      case "build_end":
+        return [];
+      default:
+        // Новый тип события не скомпилируется, пока здесь не решат, попадает ли он в журнал.
+        return event satisfies never;
+    }
+  });
 }
+
+const entries = entriesOf(recording.events);
 ---
 
 {entries.length === 0 ? (
-  <p class="empty">В этой сборке нет промптов и реплик.</p>
+  <p class="empty">В этой сборке нет промптов, вмешательств и реплик.</p>
 ) : (
   <ol class="timeline">
-    {entries.map((entry) =>
-      entry.kind === "prompt" ? (
-        <li>
-          <JournalEntry
-            client:visible
-            speech={entry.speech}
-            clock={formatClock(entry.prompt.t)}
-            route={`человек → ${recipientOf(entry.prompt)}`}
-          >
-            {entry.prompt.requirements.length === 0 ? (
-              <Title>{entry.prompt.goal}</Title>
-            ) : (
-              <details class="details">
-                <summary>
-                  <Title as="span">{entry.prompt.goal}</Title>
-                  <span class={`more ${buttonClass({ variant: "link" })}`}>подробнее</span>
-                </summary>
-                <BulletList items={entry.prompt.requirements} />
-              </details>
-            )}
-          </JournalEntry>
-        </li>
-      ) : (
-        <li id={messageAnchor(entry.speech.index)}>
-          <JournalEntry
-            client:visible
-            speech={entry.speech}
-            clock={formatClock(entry.message.t)}
-            route={routeOf(entry.message)}
-          >
-            <Title>{entry.message.line}</Title>
-            <div class="text">
-              {paragraphsOf(entry.message.text).map((paragraph) => (
-                <p>{paragraph}</p>
-              ))}
-            </div>
-          </JournalEntry>
-        </li>
-      ),
-    )}
+    {entries.map((entry) => {
+      switch (entry.kind) {
+        case "prompt":
+          return (
+            <li>
+              <JournalEntry
+                client:visible
+                speech={entry.speech}
+                clock={formatClock(entry.prompt.t)}
+                route={`человек → ${recipientOf(entry.prompt)}`}
+              >
+                {entry.prompt.requirements.length === 0 ? (
+                  <Title>{entry.prompt.goal}</Title>
+                ) : (
+                  <details class="details">
+                    <summary>
+                      <Title as="span">{entry.prompt.goal}</Title>
+                      <span class={`more ${buttonClass({ variant: "link" })}`}>подробнее</span>
+                    </summary>
+                    <BulletList items={entry.prompt.requirements} />
+                  </details>
+                )}
+              </JournalEntry>
+            </li>
+          );
+        case "intervention":
+          return (
+            <li id={interventionAnchor(entry.speech.index)}>
+              <JournalEntry
+                client:visible
+                speech={entry.speech}
+                clock={formatClock(entry.intervention.t)}
+                route={labelOf(entry.intervention)}
+              >
+                <Title>{entry.intervention.line}</Title>
+                <div class="text">
+                  {paragraphsOf(entry.intervention.text).map((paragraph) => (
+                    <p>{paragraph}</p>
+                  ))}
+                </div>
+              </JournalEntry>
+            </li>
+          );
+        case "message":
+          return (
+            <li id={messageAnchor(entry.speech.index)}>
+              <JournalEntry
+                client:visible
+                speech={entry.speech}
+                clock={formatClock(entry.message.t)}
+                route={routeOf(entry.message)}
+              >
+                <Title>{entry.message.line}</Title>
+                <div class="text">
+                  {paragraphsOf(entry.message.text).map((paragraph) => (
+                    <p>{paragraph}</p>
+                  ))}
+                </div>
+              </JournalEntry>
+            </li>
+          );
+        default:
+          return entry satisfies never;
+      }
+    })}
   </ol>
 )}
 
@@ -103,7 +151,7 @@ for (const event of recording.events) {
     list-style: none;
   }
 
-  /* Реплику, к которой пришли по «подробнее», не прячет под край панели. */
+  /* Вмешательство или реплику, к которой пришли по «подробнее», не прячет под край панели. */
   .timeline > li {
     scroll-margin: var(--space-l);
   }

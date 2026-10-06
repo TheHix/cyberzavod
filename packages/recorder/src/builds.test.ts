@@ -7,7 +7,13 @@ import {
   unassignedRuns,
 } from "./builds.ts";
 import type { Draft, DraftEvent } from "./draft.ts";
-import { FIRST_BUILD_ID, interleavedDraft, message, SECOND_BUILD_ID } from "./draft.fixtures.ts";
+import {
+  FIRST_BUILD_ID,
+  interleavedDraft,
+  intervention,
+  message,
+  SECOND_BUILD_ID,
+} from "./draft.fixtures.ts";
 
 function draftOf(events: DraftEvent[]): Draft {
   return {
@@ -73,6 +79,18 @@ describe("eventBuilds", () => {
     const builds = eventBuilds(draft);
 
     expect(builds).toEqual(["first", "second", "first"]);
+  });
+
+  it("вмешательство относится к сборке из поля build", () => {
+    const draft = draftOf([
+      prompt(1),
+      intervention({ t: 2, build: "second" }),
+      intervention({ t: 3 }),
+    ]);
+
+    const builds = eventBuilds(draft);
+
+    expect(builds).toEqual(["first", "second", "second"]);
   });
 
   it("отдаёт остальные события основной сессии сборке ближайшего предыдущего события", () => {

@@ -3,14 +3,15 @@
 
 import { atom, type ReadableAtom } from "nanostores";
 
-/** Промпт или реплика записи: `index` — номер среди таких же, с нуля, как у реплик цеха. */
+/** Промпт, вмешательство или реплика записи: `index` — номер среди таких же, с нуля, как в цехе. */
 export type Speech =
   | { readonly kind: "prompt"; readonly index: number }
+  | { readonly kind: "intervention"; readonly index: number }
   | { readonly kind: "message"; readonly index: number };
 
 /** То, что журналу нужно от цеха: до какой речи дошла сцена и как перемотать к речи. */
 export interface JournalScene {
-  /** Последний промпт или реплика, начавшиеся к моменту сцены. */
+  /** Последний промпт, вмешательство или реплика, начавшиеся к моменту сцены. */
   readonly $speech: ReadableAtom<Speech | null>;
   /** Перематывает сцену к началу речи. */
   seekToSpeech(speech: Speech): void;
@@ -61,7 +62,7 @@ export function connectScene(scene: JournalScene): () => void {
 
 /**
  * Просит подключённый цех перемотать сцену к речи; без цеха ничего не делает.
- * @param {Speech} speech Промпт или реплика записи.
+ * @param {Speech} speech Промпт, вмешательство или реплика записи.
  */
 export function seekScene(speech: Speech): void {
   connection?.scene.seekToSpeech(speech);

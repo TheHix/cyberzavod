@@ -41,11 +41,41 @@ export interface MessageEvent {
   text: string;
 }
 
+/**
+ * Что остановило автоматику и позвало человека: ответ на вопрос модели, решение по постановке,
+ * вызов после возвратов, вызов хуком остановки. Что решил человек, лежит в `line` и `text`.
+ */
+export const INTERVENTION_REASONS = [
+  "question",
+  "spec_review",
+  "rework_limit",
+  "stop_gate",
+] as const;
+
+/** Причина вмешательства человека — одна из `INTERVENTION_REASONS`. */
+export type InterventionReason = (typeof INTERVENTION_REASONS)[number];
+
+/**
+ * Вмешательство человека: станция стоит до его решения. В цехе мастер выходит к станции,
+ * где стоит работа, и говорит решение: строка `line` — в пузыре, полный `text` — в журнале.
+ * Идёт вместо промпта, а не рядом с ним.
+ */
+export interface InterventionEvent {
+  t: number;
+  type: "intervention";
+  reason: InterventionReason;
+  /** Одна строка над мастером в цехе: решение человека, обращённое к рабочему. */
+  line: string;
+  /** Полный текст: абзацы через пустую строку, без разметки. */
+  text: string;
+}
+
 /** Событие записи сборки; `t` — миллисекунды от начала сборки. */
 export type FactoryEvent =
   | { t: number; type: "build_start" }
   | PromptEvent
   | MessageEvent
+  | InterventionEvent
   | { t: number; type: "stage_enter"; stage: Stage }
   | { t: number; type: "stage_fail"; stage: Stage; reason: string }
   | { t: number; type: "usage"; tokens: number }
@@ -69,19 +99,29 @@ export interface Recording {
 /** Реплика без полного текста: цеху нужна только строка над говорящим. */
 export type BriefMessageEvent = Omit<MessageEvent, "text">;
 
-/** Событие записи, как его видит цех: у реплик нет полного текста. */
-export type BriefFactoryEvent = Exclude<FactoryEvent, MessageEvent> | BriefMessageEvent;
+/** Вмешательство без полного текста: цеху нужна только строка над мастером. */
+export type BriefInterventionEvent = Omit<InterventionEvent, "text">;
+
+/** Событие записи, как его видит цех: у реплик и вмешательств нет полного текста. */
+export type BriefFactoryEvent =
+  | Exclude<FactoryEvent, MessageEvent | InterventionEvent>
+  | BriefMessageEvent
+  | BriefInterventionEvent;
 
 /** Запись без полных текстов реплик: её получает цех, а полный текст остаётся в журнале. */
 export interface BriefRecording extends Omit<Recording, "events"> {
   events: BriefFactoryEvent[];
 }
 
-/** Счётчики сборки на какой-то момент: токены, промпты человека и возвраты на доработку. */
+/**
+ * Счётчики сборки на какой-то момент: токены, промпты человека, возвраты на доработку
+ * и вмешательства человека (их промпты не считаются).
+ */
 export interface Tally {
   tokens: number;
   prompts: number;
   reworks: number;
+  interventions: number;
 }
 
 /** Счётчики сборки, которые показываются над цехом. */
@@ -91,7 +131,7 @@ export interface BuildStats extends Tally {
 }
 
 /** Счётчики до первого события. */
-export const NO_TALLY: Tally = { tokens: 0, prompts: 0, reworks: 0 };
+export const NO_TALLY: Tally = { tokens: 0, prompts: 0, reworks: 0, interventions: 0 };
 
 /** Ошибка формата записи: запись пришла извне и не прошла проверку. */
 export class RecordingError extends Error {}
@@ -107,6 +147,10 @@ function isStage(value: unknown): value is Stage {
  */
 export function isSpeaker(value: unknown): value is Speaker {
   return value === FOREMAN || isStage(value);
+}
+
+function isInterventionReason(value: unknown): value is InterventionReason {
+  return (INTERVENTION_REASONS as readonly unknown[]).includes(value);
 }
 
 function isLines(value: unknown): value is string[] {
@@ -168,6 +212,16 @@ function parseMessage(raw: Record<string, unknown>, t: number, fail: Fail): Mess
   return { t, type: "message", from, to, line, text };
 }
 
+function parseIntervention(raw: Record<string, unknown>, t: number, fail: Fail): InterventionEvent {
+  const { reason, line, text } = raw;
+  if (!isInterventionReason(reason)) throw fail(`неизвестная причина ${String(reason)}`);
+  if (!isLine(line)) throw fail("line должна быть непустой строкой без переводов строки");
+  if (typeof text !== "string" || text.trim() === "") {
+    throw fail("text должен быть непустой строкой");
+  }
+  return { t, type: "intervention", reason, line, text };
+}
+
 /**
  * Проверяет одно событие записи, пришедшее извне.
  * @param {unknown} raw Разобранный JSON события.
@@ -189,6 +243,8 @@ export function parseFactoryEvent(raw: unknown, index: number): FactoryEvent {
       return parsePrompt(raw, t, fail);
     case "message":
       return parseMessage(raw, t, fail);
+    case "intervention":
+      return parseIntervention(raw, t, fail);
     case "stage_enter":
       if (!isStage(raw.stage)) throw fail(`неизвестный этап ${String(raw.stage)}`);
       return { t, type, stage: raw.stage };
@@ -269,6 +325,8 @@ export function tally(counts: Tally, event: BriefFactoryEvent): Tally {
       return { ...counts, tokens: counts.tokens + event.tokens };
     case "prompt":
       return { ...counts, prompts: counts.prompts + 1 };
+    case "intervention":
+      return { ...counts, interventions: counts.interventions + 1 };
     case "stage_fail":
       return { ...counts, reworks: counts.reworks + 1 };
     case "build_start":
@@ -295,7 +353,7 @@ export function succeeded(recording: BriefRecording): boolean {
 /**
  * Считает счётчики сборки по её записи.
  * @param {BriefRecording} recording Проверенная запись сборки.
- * @returns {BuildStats} Длительность, токены, число промптов и возвратов, итог сборки.
+ * @returns {BuildStats} Длительность, токены, число промптов, возвратов и вмешательств, итог сборки.
  */
 export function summarize(recording: BriefRecording): BuildStats {
   const { events } = recording;
@@ -317,13 +375,40 @@ export function briefMessage(event: BriefMessageEvent): BriefMessageEvent {
 }
 
 /**
- * Убирает у реплик полный текст: цеху он не нужен, а в страницу с цехом попадать не должен.
+ * Убирает у вмешательства полный текст.
+ * @param {BriefInterventionEvent} event Вмешательство; на деле может нести и `text`.
+ * @returns {BriefInterventionEvent} Новое вмешательство только с полями, которые нужны цеху.
+ */
+export function briefIntervention(event: BriefInterventionEvent): BriefInterventionEvent {
+  const { t, type, reason, line } = event;
+  return { t, type, reason, line };
+}
+
+function briefEvent(event: FactoryEvent): BriefFactoryEvent {
+  switch (event.type) {
+    case "message":
+      return briefMessage(event);
+    case "intervention":
+      return briefIntervention(event);
+    case "build_start":
+    case "prompt":
+    case "stage_enter":
+    case "stage_fail":
+    case "usage":
+    case "build_end":
+      return event;
+    default:
+      // Новый тип события не скомпилируется, пока не решат, нужен ли у него полный текст.
+      return event satisfies never;
+  }
+}
+
+/**
+ * Убирает у реплик и вмешательств полный текст: цеху он не нужен, а в страницу с цехом
+ * попадать не должен.
  * @param {Recording} recording Полная запись сборки.
- * @returns {BriefRecording} Та же запись, у реплик которой нет `text`.
+ * @returns {BriefRecording} Та же запись, у реплик и вмешательств которой нет `text`.
  */
 export function briefOf(recording: Recording): BriefRecording {
-  const events = recording.events.map((event): BriefFactoryEvent => {
-    return event.type === "message" ? briefMessage(event) : event;
-  });
-  return { ...recording, events };
+  return { ...recording, events: recording.events.map(briefEvent) };
 }

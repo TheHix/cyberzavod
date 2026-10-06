@@ -3,7 +3,7 @@ import { alignMarks } from "./marks.ts";
 import type { Mark } from "./script.ts";
 
 function markOf(at: number, recordingTime: number, tokens = 0): Mark {
-  return { at, recordingTime, tokens, prompts: 0, reworks: 0 };
+  return { at, recordingTime, tokens, prompts: 0, reworks: 0, interventions: 0 };
 }
 
 describe("alignMarks", () => {

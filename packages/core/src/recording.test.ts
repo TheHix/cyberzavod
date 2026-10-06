@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   briefOf,
+  INTERVENTION_REASONS,
   NO_TALLY,
   parseRecording,
   RecordingError,
@@ -201,7 +202,24 @@ describe("summarize", () => {
 
     const stats = summarize(recording);
 
-    expect(stats).toEqual({ durationMs: 90, tokens: 2000, prompts: 1, reworks: 1, ok: true });
+    expect(stats).toEqual({
+      durationMs: 90,
+      tokens: 2000,
+      prompts: 1,
+      reworks: 1,
+      interventions: 0,
+      ok: true,
+    });
+  });
+
+  it("считает вмешательства отдельно от промптов", () => {
+    const raw = validRecording();
+    raw.events.splice(3, 0, interventionEvent(), interventionEvent({ t: 26 }));
+    const recording = parseRecording(raw);
+
+    const stats = summarize(recording);
+
+    expect(stats).toMatchObject({ prompts: 1, interventions: 2 });
   });
 });
 
@@ -279,6 +297,21 @@ describe("briefOf", () => {
       ...recording.events.slice(4),
     ]);
   });
+
+  it("убирает полный текст у вмешательства", () => {
+    const raw = validRecording();
+    raw.events.splice(3, 0, interventionEvent());
+    const recording = parseRecording(raw);
+
+    const brief = briefOf(recording);
+
+    expect(brief.events[3]).toEqual({
+      t: 25,
+      type: "intervention",
+      reason: "question",
+      line: "Возьми вариант с таблицей",
+    });
+  });
 });
 
 describe("tally", () => {
@@ -294,5 +327,72 @@ describe("tally", () => {
     const counts = tally(NO_TALLY, event);
 
     expect(counts).toEqual(NO_TALLY);
+  });
+
+  it("считает вмешательство отдельно от остального", () => {
+    const event = {
+      t: 1,
+      type: "intervention",
+      reason: "stop_gate",
+      line: "Продолжай",
+    } as const;
+
+    const counts = tally(NO_TALLY, event);
+
+    expect(counts).toEqual({ ...NO_TALLY, interventions: 1 });
+  });
+});
+
+function interventionEvent(patch: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    t: 25,
+    type: "intervention",
+    reason: "question",
+    line: "Возьми вариант с таблицей",
+    text: "Возьми вариант с таблицей.\n\nКэш не нужен.",
+    ...patch,
+  };
+}
+
+describe("parseRecording: вмешательства", () => {
+  it.each(INTERVENTION_REASONS)("принимает причину %s", (reason) => {
+    const raw = validRecording();
+    raw.events.splice(3, 0, interventionEvent({ reason }));
+
+    const recording = parseRecording(raw);
+
+    expect(recording.events[3]).toMatchObject({ type: "intervention", reason });
+  });
+
+  it("отклоняет неизвестную причину", () => {
+    const raw = validRecording();
+    raw.events.splice(3, 0, interventionEvent({ reason: "approval" }));
+
+    const act = () => parseRecording(raw);
+
+    expect(act).toThrow(/причина approval/);
+  });
+
+  it.each([
+    ["пустая строка", { line: "  " }, /line/],
+    ["многострочная строка", { line: "раз\nдва" }, /line/],
+    ["пустой текст", { text: " \n " }, /text/],
+    ["текст не строка", { text: 5 }, /text/],
+  ])("отклоняет вмешательство: %s", (_name, patch, message) => {
+    const raw = validRecording();
+    raw.events.splice(3, 0, interventionEvent(patch));
+
+    const act = () => parseRecording(raw);
+
+    expect(act).toThrow(message);
+  });
+
+  it("сохраняет переводы строк в полном тексте", () => {
+    const raw = validRecording();
+    raw.events.splice(3, 0, interventionEvent());
+
+    const recording = parseRecording(raw);
+
+    expect(recording.events[3]).toMatchObject({ text: expect.stringContaining("\n\n") });
   });
 });

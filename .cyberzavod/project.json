@@ -1,5 +1,5 @@
 {
   "id": "cyberzavod",
-  "factory": "0.1.0",
+  "factory": "0.2.0",
   "checks": { "command": "make check-web check-api", "paths": ["apps", "packages"] }
 }

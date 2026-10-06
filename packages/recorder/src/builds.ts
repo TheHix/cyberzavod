@@ -12,7 +12,9 @@ import type { Draft, DraftEvent, DraftRun } from "./draft.ts";
 export const IDLE_GAP_MS = 2 * 60 * 1000;
 
 function runOf(event: DraftEvent): string | undefined {
-  return event.type === "draft_prompt" ? undefined : event.run;
+  return event.type === "draft_prompt" || event.type === "draft_intervention"
+    ? undefined
+    : event.run;
 }
 
 // Проект события основной сессии: его ставит `make recording-draft` по каталогу команды.
@@ -20,6 +22,7 @@ function projectOfEvent(event: DraftEvent): string | undefined {
   switch (event.type) {
     case "draft_prompt":
     case "draft_message":
+    case "draft_intervention":
     case "draft_run":
       return undefined;
     default:
@@ -27,7 +30,7 @@ function projectOfEvent(event: DraftEvent): string | undefined {
   }
 }
 
-// Сборка, которую событие называет само: промпт и реплика — полем `build` (у реплики оно
+// Сборка, которую событие называет само: промпт, реплика и вмешательство — полем `build` (у реплики оно
 // перекрывает запуск), события станций — запуском. Остальные события сборки не называют.
 function namedBuild(
   event: DraftEvent,
@@ -35,7 +38,9 @@ function namedBuild(
   firstBuild: string,
 ): string | undefined {
   if (
-    (event.type === "draft_prompt" || event.type === "draft_message") &&
+    (event.type === "draft_prompt" ||
+      event.type === "draft_message" ||
+      event.type === "draft_intervention") &&
     event.build !== undefined
   ) {
     return event.build;
@@ -46,7 +51,7 @@ function namedBuild(
 
 /**
  * Определяет сборку каждого события черновика по порядку правил:
- * 1. промпт и реплика — сборка из их поля `build`;
+ * 1. промпт, реплика и вмешательство — сборка из их поля `build`;
  * 2. событие станции — сборка, в чьём списке `runs` указан запуск, а не указанный нигде — первая;
  * 3. событие основной сессии с пометкой `project` — сборка этого проекта, к которой относилось
  *    ближайшее предыдущее событие, а если таких не было — первая по порядку сборка проекта;

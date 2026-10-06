@@ -3,10 +3,11 @@ import { aisleStop } from "./aisle.ts";
 import { FACTORY_LAYOUTS, distance, headingTo, type Point } from "./layout.ts";
 import { STAGES, type Recording } from "./recording.ts";
 import { sceneAt } from "./scene.ts";
-import type { ForemanMove } from "./script.ts";
+import type { FactoryScript, ForemanMove, WorkerMove } from "./script.ts";
 import {
   chatRecording,
   earlyExchangeRecording,
+  interventionRecording,
   LINE_LAYOUT,
   PLAYBACK_SETUPS,
   SPEECH_RECORDINGS,
@@ -718,12 +719,19 @@ describe("buildScript: отметки", () => {
 
       const onStage = [
         ...script.prompts.map(({ start, prompt }) => ({ start, key: `prompt ${prompt.t}` })),
+        ...script.interventions.map(({ start, intervention }) => ({
+          start,
+          key: `intervention ${intervention.t}`,
+        })),
         ...script.messages.map(({ start, message }) => ({ start, key: `message ${message.t}` })),
       ]
         .sort((a, b) => a.start - b.start)
         .map(({ key }) => key);
       const recorded = recording.events
-        .filter((event) => event.type === "prompt" || event.type === "message")
+        .filter(
+          (event) =>
+            event.type === "prompt" || event.type === "intervention" || event.type === "message",
+        )
         .map((event) => `${event.type} ${event.t}`);
       expect(onStage).toEqual(recorded);
     });
@@ -755,5 +763,132 @@ describe("buildScript: планы", () => {
       .filter((move) => move.activity === "walk" && move.carrying)
       .map((move) => move.to);
     expect(route).toEqual([{ x: 0, y: 2 }, corner, { x: 20, y: 12 }, { x: 21, y: 12 }]);
+  });
+});
+
+describe("buildScript: вмешательства", () => {
+  const reviewPost = LINE_LAYOUT.stations.review.foremanPost;
+
+  function reviewWork(script: FactoryScript): WorkerMove[] {
+    return script.workers.review.filter((move) => move.activity === "work");
+  }
+
+  it("мастер выходит из кабинета к станции текущего визита", () => {
+    const recording = interventionRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect({
+      cue: script.interventions.map(({ station, index }) => ({ station, index })),
+      first: script.foreman[0]?.from,
+      talk: script.foreman.find((move) => move.activity === "talk")?.to,
+    }).toEqual({
+      cue: [{ station: "review", index: 0 }],
+      first: LINE_LAYOUT.foreman.post,
+      talk: reviewPost,
+    });
+  });
+
+  it("не кладёт в сценарий полный текст вмешательства", () => {
+    const recording = interventionRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect(script.interventions[0]?.intervention).toEqual({
+      t: 4_000,
+      type: "intervention",
+      reason: "rework_limit",
+      line: "Откати кэш, сделай без него",
+    });
+  });
+
+  it("рабочий стоит от вмешательства до конца пузыря", () => {
+    const recording = interventionRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    const cue = script.interventions[0];
+    const pausedAt = reviewWork(script)[0]?.end ?? Infinity;
+    const standing = script.workers.review.filter(
+      (move) => move.start < (cue?.end ?? 0) && move.end > pausedAt,
+    );
+    expect({ standing, pausedBeforeBubble: pausedAt <= (cue?.start ?? 0) }).toEqual({
+      standing: [],
+      pausedBeforeBubble: true,
+    });
+  });
+
+  it("работа продолжается после пузыря", () => {
+    const recording = interventionRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    const cue = script.interventions[0];
+    const resumed = reviewWork(script).filter((move) => move.start >= (cue?.end ?? 0));
+    expect(resumed).toHaveLength(1);
+  });
+
+  it("обмен при передаче не обгоняет вмешательство", () => {
+    const recording = recordingOf([
+      { t: 0, type: "build_start" },
+      { t: 100, type: "stage_enter", stage: "code" },
+      {
+        t: 500,
+        type: "intervention",
+        reason: "question",
+        line: "Бери вариант с таблицей",
+        text: "Бери вариант с таблицей.",
+      },
+      messageAt(900, "code", "test"),
+      { t: 1_000, type: "stage_enter", stage: "test" },
+      { t: 2_000, type: "build_end", ok: true },
+    ]);
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    const cue = script.interventions[0];
+    expect(script.messages[0]?.start).toBeGreaterThanOrEqual(cue?.end ?? Infinity);
+  });
+
+  it("обмен перед вмешательством остаётся в работе, а не уходит к передаче", () => {
+    const recording = recordingOf([
+      { t: 0, type: "build_start" },
+      { t: 100, type: "stage_enter", stage: "code" },
+      messageAt(300, "code", "test"),
+      {
+        t: 500,
+        type: "intervention",
+        reason: "question",
+        line: "Бери вариант с таблицей",
+        text: "Бери вариант с таблицей.",
+      },
+      { t: 1_000, type: "stage_enter", stage: "test" },
+      { t: 2_000, type: "build_end", ok: true },
+    ]);
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    expect(script.messages[0]?.start).toBeLessThan(script.interventions[0]?.start ?? -Infinity);
+  });
+
+  it("держит пузырь вмешательства столько, сколько задано в темпе", () => {
+    const recording = interventionRecording();
+    const pacing = { ...PLAIN_PACING, interventionMs: 2_500, promptMs: 700 };
+
+    const script = buildScript(recording, LINE_LAYOUT, pacing);
+
+    const cue = script.interventions[0];
+    expect((cue?.end ?? 0) - (cue?.start ?? 0)).toBe(2_500);
+  });
+
+  it("запись без вмешательств даёт одно действие работы на визит", () => {
+    const recording = reworkRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    const works = STAGES.map(
+      (stage) => script.workers[stage].filter((move) => move.activity === "work").length,
+    );
+    expect(works).toEqual([1, 2, 1, 0, 0]);
   });
 });
