@@ -79,6 +79,9 @@ describe("layoutFor", () => {
   it.each([
     [872, 860],
     [1332, 1040],
+    [496, 215],
+    [596, 215],
+    [700, 245],
   ])("оставляет широкий план полю %i×%i", (width, height) => {
     const layout = layoutFor(width, height);
 

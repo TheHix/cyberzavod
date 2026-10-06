@@ -63,8 +63,10 @@
   box-shadow: none;
 }
 
-/* Текстовая кнопка внутри содержимого: «подробнее», «свернуть». */
+/* Текстовая кнопка внутри содержимого: «подробнее», «свернуть». В тесной строке не сжимается:
+   уступают соседи, а действие остаётся видно и кликабельно целиком. */
 .link {
+  flex: none;
   min-height: auto;
   padding: 0;
   font-size: var(--text-s);
@@ -107,6 +109,8 @@
 
 /* Плитка меню: иконка над подписью. На узком или низком экране сжимается. */
 .tile {
+  --tile-icon-size: 1.25rem;
+
   flex-direction: column;
   gap: var(--space-2xs);
   width: 100%;
@@ -130,5 +134,21 @@
     padding-inline: 0;
     font-size: var(--text-2xs);
     letter-spacing: -0.03em;
+  }
+}
+
+/* На низком экране столбик «иконка над подписью» не помещает шесть пунктов меню в 360px:
+   плитка становится строкой, подпись остаётся видимой. */
+@media (height <= 40rem) {
+  .tile {
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: var(--space-xs);
+  }
+
+  .tile svg {
+    flex: none;
+    width: var(--tile-icon-size);
+    height: var(--tile-icon-size);
   }
 }

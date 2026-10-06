@@ -56,16 +56,10 @@
   margin-top: auto;
 }
 
-/* На узком экране меню — строкой сверху; плитки сжимает сам kit. */
-@media (width <= 48rem) and (height > 40rem) {
+/* На узком и низком экране логотип без подписи и со значком меньше. */
+@media (max-width: 48rem), (max-height: 40rem) {
   .sidebar {
     --badge-size: 2.4rem;
-
-    flex-direction: row;
-    gap: var(--space-2xs);
-    align-items: center;
-    padding: var(--space-xs) var(--space-s);
-    overflow: visible;
   }
 
   .logoText {
@@ -74,6 +68,17 @@
 
   .badge {
     font-size: var(--text-m);
+  }
+}
+
+/* На узком экране меню — строкой сверху; плитки сжимает сам kit. */
+@media (width <= 48rem) and (height > 40rem) {
+  .sidebar {
+    flex-direction: row;
+    gap: var(--space-2xs);
+    align-items: center;
+    padding: var(--space-xs) var(--space-s);
+    overflow: visible;
   }
 
   .menu {
@@ -93,5 +98,17 @@
     flex: 0 0 auto;
     width: auto;
     margin: 0;
+  }
+}
+
+/* На низком экране меню остаётся слева, но должно поместиться без прокрутки: отступы меньше. */
+@media (height <= 40rem) {
+  .sidebar {
+    gap: var(--space-xs);
+    padding: var(--space-xs);
+  }
+
+  .menu {
+    gap: var(--space-xs);
   }
 }

@@ -32,8 +32,8 @@
   font-weight: 700;
 }
 
-/* На узком экране скорость не нужна: HUD отдаёт место полке речи. */
-@media (width <= 48rem) and (height > 40rem) {
+/* На узком и низком экране скорость не нужна: HUD отдаёт место полке речи. */
+@media (max-width: 48rem), (max-height: 40rem) {
   .speed {
     display: none;
   }

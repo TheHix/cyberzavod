@@ -1,6 +1,9 @@
-/* Метка-таблетка: «человек → Claude Opus 5.5», дата, время. */
+/* Метка-таблетка: «человек → Claude Opus 5.5», дата, время. В тесной строке она сжимается с
+   многоточием, а не вытесняет соседей; полный текст остаётся в разметке. */
 .chip {
   display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 0 var(--space-s);
   color: var(--ink);
   font-family: var(--font-display);
