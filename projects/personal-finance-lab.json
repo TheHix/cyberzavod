@@ -2,5 +2,6 @@
   "id": "personal-finance-lab",
   "name": "Personal Finance Lab",
   "description": "Финансовая лаборатория для моделирования будущего: сценарии «что если», таймлайн капитала, цели и запас прочности без дохода. Первый внешний проект завода.",
-  "repo": "https://github.com/bysavelii/personal-finance-lab"
+  "repo": "https://github.com/bysavelii/personal-finance-lab",
+  "website": "https://finance.bysavelii.com"
 }
