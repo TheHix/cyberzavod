@@ -14,7 +14,7 @@ export interface Frame extends ScreenPoint {
 
 /**
  * Графика цеха — как выглядят пол, станки, рабочие и деталь. Модель и интерфейс над цехом
- * знают только этот интерфейс, поэтому графику можно заменить целиком (фигуры, спрайты, 3D),
+ * знают только этот интерфейс, поэтому графику можно заменить целиком (пиксели, фигуры, 3D),
  * не трогая ядро, модель и компоненты.
  */
 export interface FactoryGraphics {
@@ -44,6 +44,6 @@ export interface FactoryGraphics {
  * @returns {Promise<FactoryGraphics>} Графика, ещё не встроенная в страницу.
  */
 export async function loadFactoryGraphics(): Promise<FactoryGraphics> {
-  const { ShapesGraphics } = await import("./shapes/shapes-graphics.ts");
-  return new ShapesGraphics();
+  const { PixelGraphics } = await import("./pixel/pixel-graphics.ts");
+  return new PixelGraphics();
 }

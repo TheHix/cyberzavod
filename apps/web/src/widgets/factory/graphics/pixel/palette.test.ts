@@ -27,6 +27,8 @@ function tokens(overrides: Record<string, string> = {}): TokenSource {
     "--belt",
     "--lamp-on",
     "--danger",
+    "--foreman-helmet",
+    "--white",
   ];
   const values = Object.fromEntries(
     names.map((name, index) => [name, `#0000${index.toString(16).padStart(2, "0")}`]),
@@ -41,7 +43,13 @@ describe("parseColor", () => {
     expect(color).toBe(0x1d1b33);
   });
 
-  it.each(["", "red", "#fff", "rgb(0 0 0)"])("отклоняет «%s»", (value) => {
+  it("разворачивает короткую запись, до которой сборка сжимает белый", () => {
+    const color = parseColor("#fA0");
+
+    expect(color).toBe(0xffaa00);
+  });
+
+  it.each(["", "red", "#ffff", "#ffffff0", "rgb(0 0 0)"])("отклоняет «%s»", (value) => {
     const act = () => parseColor(value);
 
     expect(act).toThrow(/#rrggbb/);
@@ -72,6 +80,14 @@ describe("readPalette", () => {
 
     expect(Object.values(palette.stations)).not.toContain(palette.foreman);
     expect(palette.foreman).toBe(0xd7263d);
+  });
+
+  it("берёт белый и каску мастера из токенов, а не из кода", () => {
+    const source = tokens({ "--white": "#fefefe", "--foreman-helmet": "#eeeeee" });
+
+    const palette = readPalette(source);
+
+    expect([palette.white, palette.foremanHelmet]).toEqual([0xfefefe, 0xeeeeee]);
   });
 
   it("падает, если токена нет", () => {
