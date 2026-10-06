@@ -1,6 +1,6 @@
 // Станки: у каждого этапа свой рисунок 40×20 — корпус цвета этапа с тёмной передней гранью и
 // декором на крышке (чертёж, терминал, пробирки, лупа, конвейер). Подвижное — отдельные спрайты:
-// две накладки работы (показана одна, пока рабочий бьёт у станка), лампа погасшая всегда
+// накладки работы (показана одна, пока рабочий бьёт у станка), лампа погасшая всегда
 // на месте, горящая появляется, пока станок держит деталь. Остальное в кадре не меняется.
 
 import type { Stage, StationPlan } from "@cyberzavod/core";
@@ -146,11 +146,14 @@ export const LAMP_ON_ART: SpriteArt = [".kkk.", "kO*Ok", "kOOOk", "kOOOk", ".kkk
 /** Где лампа на рисунке станка: левый верхний угол, пиксели от угла рисунка. */
 export const LAMP_AT = { x: 33, y: 2 } as const;
 
-/** Накладка работы станка: два кадра поверх корпуса, которые сменяют друг друга в такт удару. */
+/** Накладка работы станка: кадры поверх корпуса, которые сменяют друг друга в такт удару. */
 export interface MachineWorkArt {
   /** Левый верхний угол накладки, пиксели от угла рисунка станка, как у `LAMP_AT`. */
   readonly at: { readonly x: number; readonly y: number };
-  /** Кадры работы; точка прозрачна, остальное закрывает корпус. Оба кадра одного размера. */
+  /**
+   * Кадры работы: в кадре только пиксели, которые в работе отличаются от корпуса, остальное —
+   * точка. Все кадры одного размера.
+   */
   readonly frames: Readonly<Record<WorkBeat, SpriteArt>>;
 }
 
@@ -163,8 +166,8 @@ export const MACHINE_WORK_ART: Readonly<Record<Stage, MachineWorkArt>> = {
   spec: {
     at: { x: 9, y: 5 },
     frames: {
-      workA: ["pppppp", "11kppp", "p22ppp"],
-      workB: ["pppppp", "1111kp", "p22ppp"],
+      workA: ["......", "11k...", "......"],
+      workB: ["......", "1111k.", "......"],
     },
   },
   code: {
@@ -176,7 +179,7 @@ export const MACHINE_WORK_ART: Readonly<Record<Stage, MachineWorkArt>> = {
         ".......................",
         ".......................",
         ".......................",
-        "33333*ggggggggggggggggg",
+        "33333*.................",
       ],
       workB: [
         "...........gggg........",
@@ -184,7 +187,7 @@ export const MACHINE_WORK_ART: Readonly<Record<Stage, MachineWorkArt>> = {
         "............ggggg......",
         ".......................",
         "...................gg..",
-        "3333333333*gggggggggggg",
+        "3333333333*............",
       ],
     },
   },
@@ -192,28 +195,28 @@ export const MACHINE_WORK_ART: Readonly<Record<Stage, MachineWorkArt>> = {
     at: { x: 21, y: 3 },
     frames: {
       workA: [
-        "***kbbk***",
-        "G**kbbkG**",
-        "***kbbk***",
-        "***kbbk***",
-        "***kbbk***",
-        "111kbbk555",
-        "111kbbk5*5",
-        "1*1kbbk555",
-        "111kbbk55*",
-        "*11kbbk555",
+        "..........",
+        "..........",
+        "..........",
+        "..........",
+        "..........",
+        "..........",
+        "........*.",
+        ".*........",
+        ".........*",
+        "*.........",
       ],
       workB: [
-        "***kbbk***",
-        "G**kbbkG**",
-        "***kbbk***",
-        "***kbbk***",
-        "***kbbk***",
-        "1*1kbbk55*",
-        "111kbbk555",
-        "111kbbk*55",
-        "11*kbbk555",
-        "111kbbk5*5",
+        "..........",
+        "..........",
+        "..........",
+        "..........",
+        "..........",
+        ".*.......*",
+        "..........",
+        ".......*..",
+        "..*.......",
+        "........*.",
       ],
     },
   },
@@ -248,20 +251,20 @@ export const MACHINE_WORK_ART: Readonly<Record<Stage, MachineWorkArt>> = {
     at: { x: 3, y: 7 },
     frames: {
       workA: [
-        "itt.........itttt.........ttittttt",
-        "itt.........itttt.........ttittttt",
-        "itt.........itttt.........ttittttt",
-        "itt.........itttt.........ttittttt",
-        "itt.........itttt.........ttittttt",
-        "itttitttitttitttitttitttitttittttt",
+        "it..........it..............it....",
+        "it..........it..............it....",
+        "it..........it..............it....",
+        "it..........it..............it....",
+        "it..........it..............it....",
+        "it..it..it..it..it..it..it..it....",
       ],
       workB: [
-        "tti.........ttitt.........ttttittt",
-        "tti.........ttitt.........ttttittt",
-        "tti.........ttitt.........ttttittt",
-        "tti.........ttitt.........ttttittt",
-        "tti.........ttitt.........ttttittt",
-        "ttitttitttitttitttitttitttitttittt",
+        ".ti..........ti..............ti...",
+        ".ti..........ti..............ti...",
+        ".ti..........ti..............ti...",
+        ".ti..........ti..............ti...",
+        ".ti..........ti..............ti...",
+        ".ti..ti..ti..ti..ti..ti..ti..ti...",
       ],
     },
   },
@@ -318,18 +321,18 @@ export function drawMachine(
   const lampOn = spriteOf(LAMP_ON_ART, inks, lampX, lampY);
   lampOn.visible = false;
   const { at, frames } = MACHINE_WORK_ART[stage];
-  const work = {
-    workA: spriteOf(frames.workA, inks, left + at.x, top + at.y),
-    workB: spriteOf(frames.workB, inks, left + at.x, top + at.y),
-  };
-  work.workA.visible = false;
-  work.workB.visible = false;
+  const work = Object.fromEntries(
+    Object.entries(frames).map(([beat, frame]) => {
+      const sprite = spriteOf(frame, inks, left + at.x, top + at.y);
+      sprite.visible = false;
+      return [beat, sprite];
+    }),
+  ) as Record<WorkBeat, Sprite>;
   // Накладки лежат на корпусе и под лампами: лампа остаётся видна поверх любого кадра работы.
   const root = new Container({
     children: [
       spriteOf(art, inks, left, top),
-      work.workA,
-      work.workB,
+      ...Object.values(work),
       spriteOf(LAMP_OFF_ART, inks, lampX, lampY),
       lampOn,
     ],
@@ -342,11 +345,10 @@ export function drawMachine(
 }
 
 /**
- * Показывает кадр работы станка: одну накладку из двух или ни одной, пока станок стоит.
+ * Показывает кадр работы станка: накладку текущего такта или ни одной, пока станок стоит.
  * @param {MachineSprites} sprites Подвижные части станка.
  * @param {MachineWork} work Кадр работы или покой.
  */
 export function showMachineWork(sprites: MachineSprites, work: MachineWork): void {
-  sprites.work.workA.visible = work === "workA";
-  sprites.work.workB.visible = work === "workB";
+  for (const [beat, sprite] of Object.entries(sprites.work)) sprite.visible = beat === work;
 }

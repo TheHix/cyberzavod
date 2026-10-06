@@ -92,7 +92,7 @@ export interface FigureBox {
  * на постах человек стоит, бьёт, тянется и жестикулирует, а шагает и несёт деталь мимо них.
  * Новая поза — новая строка: компилятор не даст её пропустить.
  */
-export const ACTOR_POSE_IN_PLACE: Readonly<Record<ActorPose, boolean>> = {
+const ACTOR_POSE_IN_PLACE: Readonly<Record<ActorPose, boolean>> = {
   stand: true,
   walkA: false,
   walkB: false,

@@ -162,32 +162,62 @@ describe("MACHINE_ART", () => {
 describe("MACHINE_WORK_ART", () => {
   const LAMP_SIZE = artSize(LAMP_OFF_ART);
 
-  it.each(STAGES)("рисует кадры работы станка %s одного размера и разными", (stage) => {
-    const { workA, workB } = MACHINE_WORK_ART[stage].frames;
+  it.each(STAGES)("рисует кадры работы станка %s одного размера", (stage) => {
+    const frames = Object.values(MACHINE_WORK_ART[stage].frames);
 
-    expect(artSize(workA)).toEqual(artSize(workB));
-    expect(workA).not.toEqual(workB);
+    const sizes = new Set(frames.map((art) => JSON.stringify(artSize(art))));
+
+    expect(sizes.size).toBe(1);
+  });
+
+  it.each(STAGES)("рисует кадры работы станка %s разными", (stage) => {
+    const frames = Object.values(MACHINE_WORK_ART[stage].frames);
+
+    const distinctArts = new Set(frames.map((art) => art.join("\n")));
+
+    expect(distinctArts.size).toBe(frames.length);
   });
 
   it.each(STAGES)("кладёт накладку станка %s внутрь его рисунка", (stage) => {
     const { at, frames } = MACHINE_WORK_ART[stage];
-    const { width, height } = artSize(frames.workA);
     const machine = artSize(MACHINE_ART[stage]);
 
     expect(at.x).toBeGreaterThanOrEqual(0);
     expect(at.y).toBeGreaterThanOrEqual(0);
-    expect(at.x + width).toBeLessThanOrEqual(machine.width);
-    expect(at.y + height).toBeLessThanOrEqual(machine.height);
+    for (const { width, height } of Object.values(frames).map(artSize)) {
+      expect(at.x + width).toBeLessThanOrEqual(machine.width);
+      expect(at.y + height).toBeLessThanOrEqual(machine.height);
+    }
   });
 
   it.each(STAGES)("не заводит накладку станка %s на лампу", (stage) => {
     const { at, frames } = MACHINE_WORK_ART[stage];
-    const { width, height } = artSize(frames.workA);
 
-    const apartHorizontally = at.x + width <= LAMP_AT.x || LAMP_AT.x + LAMP_SIZE.width <= at.x;
-    const apartVertically = at.y + height <= LAMP_AT.y || LAMP_AT.y + LAMP_SIZE.height <= at.y;
+    for (const { width, height } of Object.values(frames).map(artSize)) {
+      const apartHorizontally = at.x + width <= LAMP_AT.x || LAMP_AT.x + LAMP_SIZE.width <= at.x;
+      const apartVertically = at.y + height <= LAMP_AT.y || LAMP_AT.y + LAMP_SIZE.height <= at.y;
 
-    expect(apartHorizontally || apartVertically).toBe(true);
+      expect(apartHorizontally || apartVertically).toBe(true);
+    }
+  });
+
+  it.each(STAGES)("не повторяет в накладке станка %s пиксели корпуса", (stage) => {
+    const { at, frames } = MACHINE_WORK_ART[stage];
+    const body = MACHINE_ART[stage];
+
+    const repeats = Object.entries(frames).flatMap(([beat, art]) =>
+      art.flatMap((line, row) =>
+        [...line]
+          .map((letter, column) => ({ letter, column }))
+          .filter(
+            ({ letter, column }) =>
+              ART_LEGEND[letter] !== null && letter === body[at.y + row]?.[at.x + column],
+          )
+          .map(({ column }) => `${beat} ${column}:${row}`),
+      ),
+    );
+
+    expect(repeats).toEqual([]);
   });
 });
 
