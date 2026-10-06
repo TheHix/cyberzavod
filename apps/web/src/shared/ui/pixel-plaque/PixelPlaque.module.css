@@ -1,0 +1,23 @@
+/* Табличка в пикселях рисунка: размер пикселя (`--plaque-pixel`) и цвет бумаги (`--plaque-face`,
+   по умолчанию как у табличек цеха) задаёт тот, кто ставит табличку, на ней или на её предке. */
+.plaque {
+  /* Тень бумаги — та же ступень, что у табличек цеха (`SHADE_PAPER` в графике). */
+  --plaque-paper-shade: color-mix(in srgb, var(--plaque-face, var(--paper)) 88%, black);
+
+  display: block;
+  flex: none;
+  width: calc(var(--plaque-width) * var(--plaque-pixel, 3px));
+  height: calc(var(--plaque-height) * var(--plaque-pixel, 3px));
+}
+
+.ink {
+  fill: var(--ink);
+}
+
+.paper {
+  fill: var(--plaque-face, var(--paper));
+}
+
+.paperShade {
+  fill: var(--plaque-paper-shade);
+}

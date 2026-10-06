@@ -69,27 +69,47 @@ describe.each(
   });
 });
 
+const DESKTOP_SCREEN = { width: 1440, height: 900 };
+
 describe("layoutFor", () => {
   it("отдаёт портретный план полю телефона 351×487", () => {
-    const layout = layoutFor(351, 487);
+    const layout = layoutFor({ width: 351, height: 487 }, { width: 375, height: 667 });
+
+    expect(layout).toBe(PORTRAIT_LAYOUT);
+  });
+
+  it("отдаёт портретный план почти квадратному полю на портретном экране iPhone в Safari", () => {
+    const layout = layoutFor({ width: 406, height: 421 }, { width: 430, height: 739 });
 
     expect(layout).toBe(PORTRAIT_LAYOUT);
   });
 
   it.each([
-    [872, 860],
-    [1332, 1040],
-    [496, 215],
-    [596, 215],
-    [700, 245],
-  ])("оставляет широкий план полю %i×%i", (width, height) => {
-    const layout = layoutFor(width, height);
+    [872, 860, 1440, 900],
+    [1332, 1040, 1920, 1080],
+    [496, 215, 740, 360],
+    [596, 215, 844, 390],
+    [700, 245, 932, 430],
+  ])(
+    "оставляет широкий план полю %i×%i на экране %i×%i",
+    (width, height, screenWidth, screenHeight) => {
+      const layout = layoutFor({ width, height }, { width: screenWidth, height: screenHeight });
 
-    expect(layout).toBe(WIDE_LAYOUT);
+      expect(layout).toBe(WIDE_LAYOUT);
+    },
+  );
+
+  it("отдаёт портретный план узкому полю на альбомном экране", () => {
+    const layout = layoutFor({ width: 456, height: 728 }, { width: 1024, height: 768 });
+
+    expect(layout).toBe(PORTRAIT_LAYOUT);
   });
 
-  it("отдаёт самый узкий план полю без площади", () => {
-    const layout = layoutFor(0, 0);
+  it.each([
+    ["поля", { width: 0, height: 0 }, DESKTOP_SCREEN],
+    ["экрана", { width: 872, height: 860 }, { width: 0, height: 0 }],
+  ])("отдаёт самый узкий план без площади %s", (_case, field, screen) => {
+    const layout = layoutFor(field, screen);
 
     expect(layout).toBe(PORTRAIT_LAYOUT);
   });
@@ -98,13 +118,16 @@ describe("layoutFor", () => {
     const first = { ...WIDE_LAYOUT, minFieldAspect: 5 };
     const last = { ...PORTRAIT_LAYOUT, minFieldAspect: 3 };
 
-    const layout = layoutFor(100, 100, [first, last]);
+    const layout = layoutFor({ width: 100, height: 100 }, DESKTOP_SCREEN, [first, last]);
 
     expect(layout).toBe(last);
   });
 
-  it("берёт широкий план на самой границе соотношения", () => {
-    const layout = layoutFor(WIDE_LAYOUT.minFieldAspect * 100, 100);
+  it("берёт широкий план на самой границе обоих соотношений", () => {
+    const field = { width: WIDE_LAYOUT.minFieldAspect * 100, height: 100 };
+    const screen = { width: WIDE_LAYOUT.minScreenAspect * 100, height: 100 };
+
+    const layout = layoutFor(field, screen);
 
     expect(layout).toBe(WIDE_LAYOUT);
   });
@@ -113,7 +136,7 @@ describe("layoutFor", () => {
     const first = { ...PORTRAIT_LAYOUT, minFieldAspect: 0 };
     const second = { ...PORTRAIT_LAYOUT, minFieldAspect: 0 };
 
-    const layout = layoutFor(100, 100, [first, second]);
+    const layout = layoutFor({ width: 100, height: 100 }, DESKTOP_SCREEN, [first, second]);
 
     expect(layout).toBe(first);
   });

@@ -42,6 +42,7 @@ export {
   type FactoryLayout,
   type ForemanPlan,
   type Point,
+  type Size,
   type StationPlan,
 } from "./layout.ts";
 export {

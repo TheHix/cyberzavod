@@ -15,7 +15,7 @@ import {
   paletteInks,
   type SpriteArt,
 } from "./art.ts";
-import { PLAQUE_GLYPHS } from "./glyphs.ts";
+import { PLAQUE_GLYPHS } from "@/shared/lib/pixel-plaque.ts";
 import { LAMP_AT, LAMP_OFF_ART, LAMP_ON_ART, MACHINE_ART, MACHINE_WORK_ART } from "./machines.ts";
 import { DESK_ART } from "./office.ts";
 import { testPalette } from "./test-palette.ts";

@@ -30,6 +30,12 @@ export interface ForemanPlan {
   readonly door: Point;
 }
 
+/** Размер прямоугольника на экране: поля под план или всего окна, пикселей. */
+export interface Size {
+  readonly width: number;
+  readonly height: number;
+}
+
 /** План цеха: размер пола, проход, станок каждого этапа и кабинет мастера. */
 export interface FactoryLayout {
   readonly width: number;
@@ -39,6 +45,11 @@ export interface FactoryLayout {
    * `layoutFor`); у последнего плана в `FACTORY_LAYOUTS` — 0.
    */
   readonly minFieldAspect: number;
+  /**
+   * Наименьшее соотношение ширины экрана к высоте, при котором берётся этот план (см.
+   * `layoutFor`); у последнего плана в `FACTORY_LAYOUTS` — 0.
+   */
+  readonly minScreenAspect: number;
   /** Проход — ломаная из точек плана: с места к проходу идут по кратчайшей, дальше вдоль него. */
   readonly aisle: Aisle;
   readonly stations: Readonly<Record<Stage, StationPlan>>;
@@ -57,6 +68,10 @@ function stationOf(machine: Point, post: Point, facing: number): StationPlan {
 // Поле 351×487 на телефоне — соотношение 0,72, и ему нужен портретный план; поле десктопа
 // 852×860 — 0,99, там остаётся широкий вид цеха. Граница лежит между ними.
 const WIDE_MIN_FIELD_ASPECT = 0.8;
+// Одной формы поля мало: в Safari на iPhone панели браузера съедают высоту, и поле под меню и
+// HUD выходит почти квадратным, как на десктопе. Экран в портретной ориентации — всегда
+// портретный план.
+const WIDE_MIN_SCREEN_ASPECT = 1;
 
 /**
  * Широкий план: петля на полу 16×9. Сверху слева направо — постановка, код, проверки;
@@ -67,6 +82,7 @@ export const WIDE_LAYOUT: FactoryLayout = {
   width: 16,
   height: 9,
   minFieldAspect: WIDE_MIN_FIELD_ASPECT,
+  minScreenAspect: WIDE_MIN_SCREEN_ASPECT,
   aisle: [
     { x: 0, y: 4.5 },
     { x: 16, y: 4.5 },
@@ -97,6 +113,7 @@ export const PORTRAIT_LAYOUT: FactoryLayout = {
   width: 7,
   height: 10,
   minFieldAspect: 0,
+  minScreenAspect: 0,
   aisle: [
     { x: 3.5, y: 0 },
     { x: 3.5, y: 10 },
@@ -150,23 +167,37 @@ export const FACTORY_LAYOUTS: readonly [FactoryLayout, ...FactoryLayout[]] = [
   PORTRAIT_LAYOUT,
 ];
 
+function aspectOf(size: Size): number {
+  return size.width / size.height;
+}
+
+function hasArea(size: Size): boolean {
+  return size.width > 0 && size.height > 0;
+}
+
 /**
- * Выбирает план по форме поля: первый, у которого `minFieldAspect` не больше отношения
- * ширины поля к высоте. Если не подходит ни один, остаётся самый узкий — последний.
- * @param {number} width Ширина поля, пикселей.
- * @param {number} height Высота поля, пикселей.
- * @param {readonly [FactoryLayout, ...FactoryLayout[]]} layouts Планы от широкого к узкому; у последнего `minFieldAspect` 0.
- * @returns {FactoryLayout} Подходящий план; у поля без площади — последний.
+ * Выбирает план по форме поля и экрана: первый, у которого `minFieldAspect` не больше
+ * отношения ширины поля к высоте, а `minScreenAspect` — того же у экрана. Если не подходит
+ * ни один, остаётся самый узкий — последний.
+ * @param {Size} field Поле, в которое вписывается план.
+ * @param {Size} screen Всё окно.
+ * @param {readonly [FactoryLayout, ...FactoryLayout[]]} layouts Планы от широкого к узкому; у последнего оба порога 0.
+ * @returns {FactoryLayout} Подходящий план; у поля или экрана без площади — последний.
  */
 export function layoutFor(
-  width: number,
-  height: number,
+  field: Size,
+  screen: Size,
   layouts: readonly [FactoryLayout, ...FactoryLayout[]] = FACTORY_LAYOUTS,
 ): FactoryLayout {
   const narrowest = layouts[layouts.length - 1] ?? layouts[0];
-  if (width <= 0 || height <= 0) return narrowest;
-  const aspect = width / height;
-  return layouts.find((layout) => layout.minFieldAspect <= aspect) ?? narrowest;
+  if (!hasArea(field) || !hasArea(screen)) return narrowest;
+  const fieldAspect = aspectOf(field);
+  const screenAspect = aspectOf(screen);
+  return (
+    layouts.find(
+      (layout) => layout.minFieldAspect <= fieldAspect && layout.minScreenAspect <= screenAspect,
+    ) ?? narrowest
+  );
 }
 
 /**

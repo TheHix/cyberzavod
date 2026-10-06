@@ -33,6 +33,7 @@ export const LINE_LAYOUT: FactoryLayout = {
   width: 50,
   height: 10,
   minFieldAspect: 0,
+  minScreenAspect: 0,
   aisle: [
     { x: -10, y: AISLE },
     { x: 60, y: AISLE },

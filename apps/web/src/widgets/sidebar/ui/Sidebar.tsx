@@ -7,7 +7,7 @@ import MessageSquareText from "lucide-solid/icons/message-square-text";
 import { Show, type JSX } from "solid-js";
 import { PANELS } from "@/shared/config/panels.ts";
 import { site } from "@/shared/config/site.ts";
-import { Button, ButtonLink } from "@/shared/ui";
+import { Button, ButtonLink, PixelPlaque } from "@/shared/ui";
 import { GithubMark } from "./GithubMark.tsx";
 import styles from "./Sidebar.module.css";
 
@@ -19,6 +19,9 @@ interface Props {
 }
 
 const ICON_STROKE = 2.5;
+// Логотип — табличка пиксельным шрифтом, как у станков в цехе; на тесном экране — сокращение.
+const LOGO_LINES = ["Кибер", "завод"];
+const LOGO_SHORT_LINES = ["КЗ"];
 
 /**
  * Меню сайта слева: логотип, цех, панели записей, журнала сборки, проекта, гайдов и «о заводе»,
@@ -33,14 +36,8 @@ export function Sidebar(props: Props): JSX.Element {
   return (
     <nav class={styles.sidebar} aria-label="Меню">
       <a class={styles.logo} href="/" aria-label={`${site.name} — цех`}>
-        <span class={styles.badge} aria-hidden="true">
-          КЗ
-        </span>
-        <span class={styles.logoText}>
-          Кибер
-          <br />
-          завод
-        </span>
+        <PixelPlaque class={styles.logoFull} lines={LOGO_LINES} />
+        <PixelPlaque class={styles.logoShort} lines={LOGO_SHORT_LINES} />
       </a>
       <ul class={styles.menu}>
         <li>

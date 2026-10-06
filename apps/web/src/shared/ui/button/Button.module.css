@@ -119,11 +119,29 @@
   font-size: var(--text-s);
 }
 
+/* На узком или низком экране плитки плоские, как вкладки: без своей рамки и тени, иконка меньше.
+   Рамку даёт меню вокруг них, а ряд толстых плашек на телефоне выглядит громоздко. */
 @media (max-width: 48rem), (max-height: 40rem) {
   .tile {
     padding: var(--space-xs) var(--space-2xs);
     font-size: var(--text-xs);
     white-space: nowrap;
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .tile:hover,
+  .tile:active {
+    background: var(--paper-deep);
+    transform: none;
+    box-shadow: none;
+  }
+
+  .tile svg {
+    flex: none;
+    width: var(--tile-icon-size);
+    height: var(--tile-icon-size);
   }
 }
 
@@ -144,11 +162,5 @@
     flex-direction: row;
     justify-content: flex-start;
     padding: var(--space-2xs) var(--space-xs);
-  }
-
-  .tile svg {
-    flex: none;
-    width: var(--tile-icon-size);
-    height: var(--tile-icon-size);
   }
 }

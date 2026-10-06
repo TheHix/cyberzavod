@@ -1,6 +1,4 @@
 .sidebar {
-  --badge-size: 3.4rem;
-
   position: relative;
   /* Выше пузырей речи (.overlay в Factory.module.css, z-index 2): пузырь не должен закрывать
      меню и перехватывать его нажатия. */
@@ -17,31 +15,19 @@
   box-shadow: var(--lift-large);
 }
 
-/* Логотип — шестигранный значок станка и название в два слова. */
+/* Логотип — пиксельная табличка; на тесном экране вместо полной — сокращение. Пиксель
+   таблички — 3 CSS-пикселя: целое число, края чёткие. Бумага жёлтая: светлая слилась бы с меню. */
 .logo {
+  --plaque-pixel: 3px;
+  --plaque-face: var(--sun);
+
   display: grid;
-  gap: var(--space-2xs);
   justify-items: center;
-  color: var(--ink);
-  font-family: var(--font-display);
-  font-size: var(--text-xs);
-  font-weight: 900;
-  line-height: 1;
-  text-align: center;
   text-decoration: none;
-  text-transform: uppercase;
 }
 
-.badge {
-  display: grid;
-  place-items: center;
-  width: var(--badge-size);
-  height: var(--badge-size);
-  color: var(--ink);
-  font-size: var(--text-l);
-  background: var(--tangerine);
-  border: var(--outline);
-  clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%);
+.logo > .logoShort {
+  display: none;
 }
 
 .menu {
@@ -56,18 +42,14 @@
   margin-top: auto;
 }
 
-/* На узком и низком экране логотип без подписи и со значком меньше. */
+/* На узком и низком экране — короткая табличка. */
 @media (max-width: 48rem), (max-height: 40rem) {
-  .sidebar {
-    --badge-size: 2.4rem;
-  }
-
-  .logoText {
+  .logo > .logoFull {
     display: none;
   }
 
-  .badge {
-    font-size: var(--text-m);
+  .logo > .logoShort {
+    display: block;
   }
 }
 
@@ -75,17 +57,11 @@
    плитки «Код» нет: ссылка на код есть в панели «О заводе», а на 360px плитки иначе тесны. */
 @media (width <= 48rem) and (height > 40rem) {
   .sidebar {
-    --badge-size: 1.8rem;
-
     flex-direction: row;
     gap: var(--space-2xs);
     align-items: center;
     padding: var(--space-xs) var(--space-2xs);
     overflow: visible;
-  }
-
-  .badge {
-    font-size: var(--text-s);
   }
 
   .menu {

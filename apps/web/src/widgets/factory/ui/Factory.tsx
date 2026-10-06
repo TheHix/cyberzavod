@@ -91,10 +91,10 @@ export function Factory(props: Props): JSX.Element {
   let canvasHost!: HTMLDivElement;
   let fieldElement!: HTMLDivElement;
 
-  // У скрытого поля нет формы: план остаётся прежним.
+  // У скрытого поля нет формы: план остаётся прежним. Холст на всё окно, его размер — экран.
   const layoutForField = (frame: Frame) =>
     frame.width > 0 && frame.height > 0
-      ? layoutFor(frame.width, frame.height)
+      ? layoutFor(frame, { width: canvasHost.clientWidth, height: canvasHost.clientHeight })
       : model.$layout.get();
 
   // Сначала графика подстраивается под размер, потом размер видят компоненты: иначе
