@@ -34,7 +34,8 @@ export class PixelGraphics implements FactoryGraphics {
   readonly #renderer: FactoryRenderer = createRenderer(isWebGLSupported());
   readonly #stage = new Container();
   readonly #world = new Container();
-  // Рабочие, мастер и деталь сортируются по y: кто ниже на экране, тот ближе к зрителю.
+  // Рабочие, мастер и деталь сортируются по y: кто ниже на экране, тот ближе к зрителю. Деталь в
+  // руках — от y несущего, на полпикселя над ним или под ним (crateLayerOf).
   readonly #actors = new Container({ sortableChildren: true });
   // Неподвижный план — пол, станки, кабинет, таблички: при смене плана он заменяется целиком.
   #plan: Container | undefined;
@@ -113,7 +114,7 @@ export class PixelGraphics implements FactoryGraphics {
       if (machine !== undefined) showMachineWork(machine, machineWorkOf(worker));
     }
     if (this.#foreman !== undefined) placeForeman(this.#foreman, scene.foreman);
-    if (this.#crate !== undefined) placeCrate(this.#crate, scene.part, scene.time);
+    if (this.#crate !== undefined) placeCrate(this.#crate, scene);
     const lit = lampLit(scene.time);
     for (const [stage, machine] of this.#machines) {
       const working = scene.part.holder === stage && !scene.part.carried && !scene.finished;

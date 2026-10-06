@@ -7,6 +7,8 @@ import {
   type ForemanFrame,
   type PartFrame,
   type PartStatus,
+  type Point,
+  type Scene,
   type Stage,
   type WorkerFrame,
 } from "@cyberzavod/core";
@@ -24,6 +26,7 @@ import {
 } from "./art.ts";
 import { ACTOR_ART } from "./actor-art.ts";
 import {
+  facingOf,
   foremanFrameOf,
   glowLit,
   workerFrameOf,
@@ -136,8 +139,21 @@ export const ACTOR_FIGURE: FigureBox = figureBoxOf(
       .map(([, art]) => art),
   ),
 );
-// Деталь в руках рисуется поверх всех: она всегда впереди несущего, куда бы он ни смотрел.
-const CARRIED_LAYER = 100_000;
+
+/**
+ * Лежит ли деталь в руках над несущим, когда он смотрит в эту сторону. Вниз ящик перед грудью
+ * и закрывает руки, но не лицо; вверх и вбок руки рисуются поверх ящика. Новая сторона —
+ * новая строка: компилятор не даст её пропустить.
+ */
+const CARRIED_IN_FRONT: Readonly<Record<Facing, boolean>> = {
+  down: true,
+  up: false,
+  side: false,
+};
+
+// Слой людей — целый пиксель `y`, поэтому полпикселя ставят деталь вплотную к несущему,
+// но не между ним и соседом по соседнему ряду пикселей.
+const CARRIED_LAYER_STEP = 0.5;
 
 type PoseTextures = Readonly<Record<Facing, Readonly<Record<ActorPose, Texture>>>>;
 
@@ -247,15 +263,15 @@ function createActor(textures: PoseTextures, shadow: Texture): ActorSprites {
   return { root: new Container({ children: [shadowSprite, body] }), body, textures };
 }
 
-function placeActor(
-  sprites: ActorSprites,
-  position: { x: number; y: number },
-  frame: ActorFrame,
-): void {
-  const x = Math.round(position.x * PIXELS_PER_UNIT);
-  const y = Math.round(position.y * PIXELS_PER_UNIT);
-  sprites.root.position.set(x, y);
-  sprites.root.zIndex = y;
+// Слой по целому пикселю `y`: так сортируются люди, и деталь встаёт относительно них.
+function layerOf(position: Point): number {
+  return Math.round(position.y * PIXELS_PER_UNIT);
+}
+
+function placeActor(sprites: ActorSprites, position: Point, frame: ActorFrame): void {
+  const layer = layerOf(position);
+  sprites.root.position.set(Math.round(position.x * PIXELS_PER_UNIT), layer);
+  sprites.root.zIndex = layer;
   sprites.body.texture = sprites.textures[frame.facing][frame.pose];
   sprites.body.scale.x = frame.mirrored ? -1 : 1;
 }
@@ -315,17 +331,34 @@ export function createCrate(textures: ActorTextures, palette: Palette): CrateSpr
 }
 
 /**
- * Ставит деталь в кадр: место и свечение состояния, которое мигает своим цветом.
- * @param {CrateSprites} sprites Спрайты детали.
+ * Слой детали для порядка рисования. На станке и без несущего деталь сортируется по своему `y`,
+ * как всё в цехе; в руках она встаёт вплотную к несущему: над ним, если он смотрит вниз,
+ * иначе под ним, чтобы его руки были поверх ящика.
  * @param {PartFrame} part Деталь в кадре.
- * @param {number} time Момент сцены, мс, — для мигания свечения.
+ * @param {WorkerFrame | undefined} holder Рабочий, у которого деталь, если он есть в кадре.
+ * @returns {number} Слой: чем больше, тем ближе к зрителю.
  */
-export function placeCrate(sprites: CrateSprites, part: PartFrame, time: number): void {
-  const x = Math.round(part.position.x * PIXELS_PER_UNIT);
-  const y = Math.round(part.position.y * PIXELS_PER_UNIT);
-  sprites.root.position.set(x, y);
-  sprites.root.zIndex = part.carried ? CARRIED_LAYER + y : y;
+export function crateLayerOf(part: PartFrame, holder: WorkerFrame | undefined): number {
+  if (!part.carried || holder === undefined) return layerOf(part.position);
+  const front = CARRIED_IN_FRONT[facingOf(holder.heading).facing];
+  return layerOf(holder.position) + (front ? CARRIED_LAYER_STEP : -CARRIED_LAYER_STEP);
+}
+
+/**
+ * Ставит деталь в кадр: место, слой относительно несущего и свечение состояния, которое мигает
+ * своим цветом.
+ * @param {CrateSprites} sprites Спрайты детали.
+ * @param {Scene} scene Кадр цеха: деталь, её несущий и момент сцены для мигания.
+ */
+export function placeCrate(sprites: CrateSprites, scene: Scene): void {
+  const { part } = scene;
+  const holder = scene.workers.find((worker) => worker.station === part.holder);
+  sprites.root.position.set(
+    Math.round(part.position.x * PIXELS_PER_UNIT),
+    Math.round(part.position.y * PIXELS_PER_UNIT),
+  );
+  sprites.root.zIndex = crateLayerOf(part, holder);
   const glow = sprites.glowColors[part.status];
-  sprites.glow.visible = glow !== null && glowLit(time);
+  sprites.glow.visible = glow !== null && glowLit(scene.time);
   if (glow !== null) sprites.glow.tint = glow;
 }
