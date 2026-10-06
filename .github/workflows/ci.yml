@@ -91,6 +91,10 @@ jobs:
     needs: images
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # packages: read — временный токен job'а скачивает приватные образы на сервере и умирает вместе с job.
+    permissions:
+      contents: read
+      packages: read
     environment:
       name: production
       url: https://cyberzavod.com
@@ -128,11 +132,14 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
           chmod 600 ~/.ssh/deploy
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      # Токен идёт на stdin, а не в аргументах: их видно в ps и журналах сервера.
       - name: Выкатка
         if: steps.freshness.outputs.latest == 'true'
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          REGISTRY_TOKEN: ${{ github.token }}
         run: >-
+          printf '%s' "$REGISTRY_TOKEN" |
           ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes
           -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4
           "deploy@$DEPLOY_HOST" "$GITHUB_SHA"
