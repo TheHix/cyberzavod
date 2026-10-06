@@ -7,7 +7,9 @@ import {
   LINE_LAYOUT,
   messageAt,
   PLAIN_PACING,
+  PLAYBACK_SETUPS,
   reworkRecording,
+  SPEECH_RECORDINGS,
 } from "./script.fixtures.ts";
 import { buildScript, type FactoryScript } from "./script.ts";
 
@@ -263,5 +265,50 @@ describe("sceneAt: мастер и реплики", () => {
     }
 
     expect(together).toEqual([]);
+  });
+});
+
+// Шаг выборки кадров при проверке, что время записи не идёт назад, мс.
+const FRAME_STEP_MS = 20;
+
+describe.each(SPEECH_RECORDINGS)("sceneAt: время записи, запись $name", ({ recording }) => {
+  it.each(PLAYBACK_SETUPS)("в начале каждой речи равно времени события: $name", (setup) => {
+    const script = buildScript(recording, setup.layout, setup.pacing);
+
+    const mismatches = [
+      ...script.prompts.map(({ start, prompt }) => ({ start, t: prompt.t })),
+      ...script.messages.map(({ start, message }) => ({ start, t: message.t })),
+    ].filter(({ start, t }) => sceneAt(script, start).recordingTime !== t);
+
+    expect(mismatches).toEqual([]);
+  });
+
+  it.each(PLAYBACK_SETUPS)("не убывает по всей сцене: $name", (setup) => {
+    const script = buildScript(recording, setup.layout, setup.pacing);
+
+    const goingBack: number[] = [];
+    let previous = 0;
+    for (let time = 0; time <= script.duration; time += FRAME_STEP_MS) {
+      const { recordingTime } = sceneAt(script, time);
+      if (recordingTime < previous) goingBack.push(time);
+      previous = recordingTime;
+    }
+
+    expect(goingBack).toEqual([]);
+  });
+});
+
+describe("sceneAt: время записи при обмене", () => {
+  it("доходит до времени первой реплики обмена за время бега", () => {
+    const script = buildScript(chatRecording(), LINE_LAYOUT, PLAIN_PACING);
+    const first = script.messages.find(({ index }) => index === 2);
+    const start = first?.start ?? 0;
+
+    const times = [start - 1_000, start].map((time) => sceneAt(script, time).recordingTime);
+
+    expect(times).toEqual([
+      expect.toSatisfy((time: number) => time > 1_500 && time < 3_000),
+      3_000,
+    ]);
   });
 });

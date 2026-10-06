@@ -1,8 +1,8 @@
 // Общие данные для тестов сценария и кадра.
 
-import type { FactoryLayout, StationPlan } from "./layout.ts";
+import { FACTORY_LAYOUTS, type FactoryLayout, type StationPlan } from "./layout.ts";
 import type { FactoryEvent, MessageEvent, Recording, Speaker } from "./recording.ts";
-import type { Pacing } from "./script.ts";
+import { DEFAULT_PACING, type Pacing } from "./script.ts";
 
 // Станки в ряд через 10 единиц, проход в двух единицах от рабочих мест, бег — единица
 // в секунду, работа у станка длится столько же, сколько в записи: моменты сцены считаются
@@ -125,3 +125,64 @@ export function chatRecording(): Recording {
   ];
   return { ...reworkRecording(), events };
 }
+
+/**
+ * Запись для тестов с обменом при возврате с браком: проверки и код говорят между собой
+ * до и после провала, и деталь идёт на доработку с этим разговором.
+ * @returns {Recording} Запись сборки.
+ */
+export function defectExchangeRecording(): Recording {
+  const events: FactoryEvent[] = [
+    { t: 0, type: "build_start" },
+    { t: 100, type: "stage_enter", stage: "test" },
+    messageAt(1_500, "test", "code"),
+    { t: 1_600, type: "stage_fail", stage: "test", reason: "проверки не прошли" },
+    messageAt(1_700, "code", "test"),
+    { t: 2_000, type: "stage_enter", stage: "code" },
+    { t: 3_000, type: "build_end", ok: true },
+  ];
+  return { ...reworkRecording(), events };
+}
+
+/**
+ * Запись для тестов с репликой кода проверкам перед другой речью визита: она звучит у станка,
+ * а не у места встречи, и обмен остаётся только у реплики после промпта и слов мастера.
+ * @returns {Recording} Запись сборки.
+ */
+export function earlyExchangeRecording(): Recording {
+  const events: FactoryEvent[] = [
+    { t: 0, type: "build_start" },
+    { t: 100, type: "stage_enter", stage: "code" },
+    messageAt(500, "code", "test"),
+    { t: 600, type: "prompt", goal: "Добавь счётчик", requirements: ["Над цехом"] },
+    messageAt(700, "foreman", "code"),
+    messageAt(900, "test", "code"),
+    { t: 1_000, type: "stage_enter", stage: "test" },
+    { t: 2_000, type: "build_end", ok: true },
+  ];
+  return { ...reworkRecording(), events };
+}
+
+/** Записи с речью для тестов времени: с обменом при передаче и без. */
+export const SPEECH_RECORDINGS: readonly {
+  readonly name: string;
+  readonly recording: Recording;
+}[] = [
+  { name: "с мастером и обменом", recording: chatRecording() },
+  { name: "с обменом при возврате с браком", recording: defectExchangeRecording() },
+  { name: "с репликой перед другой речью", recording: earlyExchangeRecording() },
+];
+
+/** План и темп для тестов: свой для тестов и каждый план цеха в темпе по умолчанию. */
+export const PLAYBACK_SETUPS: readonly {
+  readonly name: string;
+  readonly layout: FactoryLayout;
+  readonly pacing: Pacing;
+}[] = [
+  { name: "линейный", layout: LINE_LAYOUT, pacing: PLAIN_PACING },
+  ...FACTORY_LAYOUTS.map((layout) => ({
+    name: `${layout.width}×${layout.height}`,
+    layout,
+    pacing: DEFAULT_PACING,
+  })),
+];

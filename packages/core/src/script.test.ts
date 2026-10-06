@@ -6,7 +6,10 @@ import { sceneAt } from "./scene.ts";
 import type { ForemanMove } from "./script.ts";
 import {
   chatRecording,
+  earlyExchangeRecording,
   LINE_LAYOUT,
+  PLAYBACK_SETUPS,
+  SPEECH_RECORDINGS,
   messageAt,
   PLAIN_PACING,
   reworkRecording,
@@ -472,7 +475,7 @@ describe("buildScript: реплики", () => {
     expect(script.duration).toBe(2_000 + PLAIN_PACING.finaleMs);
   });
 
-  it("нумерует реплики по записи, а не по порядку звучания", () => {
+  it("нумерует реплики по записи и ставит их в порядке записи", () => {
     const recording = recordingOf([
       { t: 0, type: "build_start" },
       { t: 100, type: "stage_enter", stage: "code" },
@@ -484,7 +487,23 @@ describe("buildScript: реплики", () => {
 
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
-    expect(script.messages.map(({ index }) => index)).toEqual([1, 0]);
+    expect(script.messages.map(({ index }) => index)).toEqual([0, 1]);
+  });
+
+  it("говорит реплику кода проверкам у станка кода, если после неё есть другая речь визита", () => {
+    const recording = earlyExchangeRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    const liftStart = script.part.find(
+      (move) =>
+        move.from.on === "machine" && move.from.station === "code" && move.to.on === "hands",
+    )?.start;
+    const [early, , exchange] = script.messages;
+    expect({
+      earlyBeforeLift: (early?.end ?? Infinity) <= (liftStart ?? 0),
+      exchangeAfterLift: (exchange?.start ?? 0) > (liftStart ?? Infinity),
+    }).toEqual({ earlyBeforeLift: true, exchangeAfterLift: true });
   });
 });
 
@@ -664,6 +683,50 @@ describe.each(
     }
 
     expect(jump).toBeLessThanOrEqual(MAX_PART_STEP);
+  });
+});
+
+describe("buildScript: отметки", () => {
+  it("кладёт отметку промпта в начало его пузыря вместе с посчитанным промптом", () => {
+    const recording = chatRecording();
+
+    const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
+
+    const mark = script.marks.find((candidate) => candidate.recordingTime === 500);
+    expect(mark).toMatchObject({ at: script.prompts[0]?.start, prompts: 1 });
+  });
+
+  describe.each(SPEECH_RECORDINGS)("запись $name", ({ recording }) => {
+    it.each(PLAYBACK_SETUPS)(
+      "не убывает ни по времени сцены, ни по времени записи: $name",
+      (setup) => {
+        const script = buildScript(recording, setup.layout, setup.pacing);
+
+        const steps = script.marks.slice(1).map((mark, index) => {
+          const previous = script.marks[index];
+          return [
+            mark.at - (previous?.at ?? 0),
+            mark.recordingTime - (previous?.recordingTime ?? 0),
+          ];
+        });
+        expect(steps.filter((step) => step.some((delta) => delta < 0))).toEqual([]);
+      },
+    );
+
+    it.each(PLAYBACK_SETUPS)("ставит речь на сцене в порядке записи: $name", (setup) => {
+      const script = buildScript(recording, setup.layout, setup.pacing);
+
+      const onStage = [
+        ...script.prompts.map(({ start, prompt }) => ({ start, key: `prompt ${prompt.t}` })),
+        ...script.messages.map(({ start, message }) => ({ start, key: `message ${message.t}` })),
+      ]
+        .sort((a, b) => a.start - b.start)
+        .map(({ key }) => key);
+      const recorded = recording.events
+        .filter((event) => event.type === "prompt" || event.type === "message")
+        .map((event) => `${event.type} ${event.t}`);
+      expect(onStage).toEqual(recorded);
+    });
   });
 });
 

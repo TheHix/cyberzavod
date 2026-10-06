@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { FACTORY_LAYOUTS, PORTRAIT_LAYOUT, WIDE_LAYOUT, type Recording } from "@cyberzavod/core";
+import {
+  briefOf,
+  FACTORY_LAYOUTS,
+  PORTRAIT_LAYOUT,
+  WIDE_LAYOUT,
+  type FactoryLayout,
+  type Recording,
+} from "@cyberzavod/core";
+import { publishedRecordings } from "@/entities/recording";
 import { createFactoryModel, type FactoryModel } from "./factory.ts";
+import type { Speech } from "@/features/journal-sync";
 
 // Темп по умолчанию сжимает минуту записи в секунду сцены: постановка работает 0–2 000 мс.
 // Первый промпт мастер говорит, дойдя до станка постановки; второй приходит, когда деталь
@@ -305,6 +314,55 @@ describe("createFactoryModel: журнал", () => {
 
     expect(listener).toHaveBeenCalledOnce();
     expect(model.$speech.get()).toEqual({ kind: "message", index: 1 });
+  });
+});
+
+// Время события в журнале и то, куда перематывает «показать в цехе»: по промптам и репликам.
+function speechTimes(recording: Recording): { speech: Speech; t: number }[] {
+  const prompts = recording.events.filter((event) => event.type === "prompt");
+  const messages = recording.events.filter((event) => event.type === "message");
+  return [
+    ...prompts.map((event, index) => ({ speech: { kind: "prompt", index } as const, t: event.t })),
+    ...messages.map((event, index) => ({
+      speech: { kind: "message", index } as const,
+      t: event.t,
+    })),
+  ];
+}
+
+// Речи, у которых после перемотки время записи не равно времени события.
+function mismatchedSpeech(recording: Recording, layout: FactoryLayout): unknown[] {
+  const model = createFactoryModel(briefOf(recording), layout);
+  return speechTimes(recording).flatMap(({ speech, t }) => {
+    model.seekToSpeech(speech);
+    const shown = model.$recordingTime.get();
+    return shown === t ? [] : [{ speech, t, shown }];
+  });
+}
+
+describe("createFactoryModel: время записи", () => {
+  it.each([
+    ["recordingWithMessages", recordingWithMessages],
+    ["recordingWithPrompt", recordingWithPrompt],
+  ])("после seekToSpeech равно времени события: %s", (_name, recordingOf) => {
+    const recording = recordingOf();
+
+    const mismatched = mismatchedSpeech(recording, WIDE_LAYOUT);
+
+    expect(mismatched).toEqual([]);
+  });
+
+  describe.each(
+    FACTORY_LAYOUTS.map((layout) => ({ name: `${layout.width}×${layout.height}`, layout })),
+  )("опубликованные записи на плане $name", ({ layout }) => {
+    it.each(publishedRecordings.map((recording) => ({ id: recording.id, recording })))(
+      "после seekToSpeech время записи равно времени события: $id",
+      ({ recording }) => {
+        const mismatched = mismatchedSpeech(recording, layout);
+
+        expect(mismatched).toEqual([]);
+      },
+    );
   });
 });
 

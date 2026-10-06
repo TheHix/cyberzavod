@@ -7,6 +7,7 @@
 // начинается, когда работа закончена и получатель вернулся на своё место.
 
 import { aisleStop, aisleWalk, type Aisle } from "./aisle.ts";
+import { alignMarks } from "./marks.ts";
 import {
   distance,
   headingTo,
@@ -151,7 +152,10 @@ export interface ForemanMove {
   readonly turnFrom: number;
 }
 
-/** Отметка на шкале сцены: какое время записи ей соответствует и счётчики на этот момент. */
+/**
+ * Отметка на шкале сцены: какое время записи ей соответствует и счётчики на этот момент.
+ * У речи `at` — начало её пузыря, а `recordingTime` — время события в журнале.
+ */
 export interface Mark extends Tally {
   readonly at: number;
   readonly recordingTime: number;
@@ -175,6 +179,7 @@ export interface FactoryScript {
    * первого — в кабинете у стола лицом к `layout.foreman.facing`.
    */
   readonly foreman: readonly ForemanMove[];
+  /** Отметки в порядке записи: `at` и `recordingTime` не убывают, у речи `at` — начало пузыря. */
   readonly marks: readonly Mark[];
 }
 
@@ -183,7 +188,10 @@ interface Visit {
   readonly station: Stage;
   readonly from: number;
   readonly to: number;
+  /** События визита, которые идут в работу у станка: обмен звучит позже. */
   readonly events: readonly BriefFactoryEvent[];
+  /** Все события визита в порядке записи, обмен тоже. */
+  readonly recorded: readonly BriefFactoryEvent[];
   /** Реплики с рабочим следующего визита: они звучат у места передачи детали. */
   readonly exchange: readonly BriefMessageEvent[];
 }
@@ -198,14 +206,28 @@ function splitIntoVisits(events: readonly BriefFactoryEvent[]): Visit[] {
   let visitEvents: BriefFactoryEvent[] = [];
   for (const event of events) {
     if (event.type === "stage_enter" && event.stage !== station) {
-      visits.push({ station, from, to: event.t, events: visitEvents, exchange: [] });
+      visits.push({
+        station,
+        from,
+        to: event.t,
+        events: visitEvents,
+        recorded: visitEvents,
+        exchange: [],
+      });
       station = event.stage;
       from = event.t;
       visitEvents = [];
     }
     visitEvents.push(event);
   }
-  visits.push({ station, from, to: events.at(-1)?.t ?? from, events: visitEvents, exchange: [] });
+  visits.push({
+    station,
+    from,
+    to: events.at(-1)?.t ?? from,
+    events: visitEvents,
+    recorded: visitEvents,
+    exchange: [],
+  });
   return visits;
 }
 
@@ -213,14 +235,27 @@ function isBetween(message: BriefMessageEvent, a: Stage, b: Stage): boolean {
   return (message.from === a && message.to === b) || (message.from === b && message.to === a);
 }
 
+// Речь визита, кроме разговора отдающего с получателем: промпт или реплика не между станциями.
+function isOtherSpeech(event: BriefFactoryEvent, a: Stage, b: Stage): boolean {
+  return event.type === "prompt" || (event.type === "message" && !isBetween(event, a, b));
+}
+
 // Разговор отдающего с получателем звучит у места передачи, а не в работе: переносим его из
-// событий визита в обмен.
+// событий визита в обмен. Но только после последней другой речи визита: очередь пузырей
+// общая, и обмен раньше неё поставил бы речь на сцене не в том порядке, что в записи.
 function withExchanges(visits: readonly Visit[]): Visit[] {
   return visits.map((visit, index) => {
     const next = visits[index + 1];
     if (next === undefined) return visit;
-    const exchange = visit.events.flatMap((event) =>
-      event.type === "message" && isBetween(event, visit.station, next.station) ? [event] : [],
+    const lastOtherSpeech = visit.events.findLastIndex((event) =>
+      isOtherSpeech(event, visit.station, next.station),
+    );
+    const exchange = visit.events.flatMap((event, position) =>
+      position > lastOtherSpeech &&
+      event.type === "message" &&
+      isBetween(event, visit.station, next.station)
+        ? [event]
+        : [],
     );
     const spoken = new Set<BriefFactoryEvent>(exchange);
     const events = visit.events.filter((event) => !spoken.has(event));
@@ -299,8 +334,10 @@ class Director {
   readonly #prompts: PromptCue[] = [];
   readonly #messages: MessageCue[] = [];
   readonly #foreman: ForemanMove[] = [];
-  readonly #marks: Mark[] = [];
-  #counts: Tally = NO_TALLY;
+  // Когда событие видно на сцене: для речи — начало пузыря, для остальных — доля работы.
+  readonly #shownAt = new Map<BriefFactoryEvent, number>();
+  // Визиты и когда у них кончилась работа: из них в конце собираются отметки.
+  readonly #worked: { readonly visit: Visit; readonly workEnd: number }[] = [];
   #partStatus: PartStatus = "ok";
   #clock = 0;
   // Когда кончился последний пузырь, промпт или реплика: следующий не начнётся раньше.
@@ -350,13 +387,11 @@ class Director {
     const span = visit.to - visit.from;
     for (const event of visit.events) {
       const at = span === 0 ? start : start + ((event.t - visit.from) / span) * (end - start);
-      this.#counts = tally(this.#counts, event);
-      this.#marks.push({ at, recordingTime: event.t, ...this.#counts });
       this.#cue(event, at, station);
     }
     const workEnd = Math.max(end, this.#speechEnd);
     this.#act(station, stand(start, workEnd, "work", plan.post, plan.facing, false));
-    this.#marks.push({ at: workEnd, recordingTime: visit.to, ...this.#counts });
+    this.#worked.push({ visit, workEnd });
     return workEnd;
   }
 
@@ -370,6 +405,7 @@ class Director {
         this.#sayMessage(event, at);
         return;
       case "stage_fail":
+        this.#shownAt.set(event, at);
         this.#partStatus = "defect";
         this.#movePart(at, at, machineOf(station), machineOf(station));
         return;
@@ -377,6 +413,7 @@ class Director {
       case "stage_enter":
       case "usage":
       case "build_end":
+        this.#shownAt.set(event, at);
         return;
       default:
         // Новый тип события не скомпилируется, пока не решат, как он выглядит в цехе.
@@ -387,6 +424,7 @@ class Director {
   // Промпт говорит мастер рабочему станции: он приходит и говорит, когда дойдёт его очередь.
   #sayPrompt(prompt: PromptEvent, at: number, station: Stage): void {
     const { start, end } = this.#foremanSpeaks(station, "talk", at, this.#pacing.promptMs);
+    this.#shownAt.set(prompt, start);
     this.#prompts.push({
       start,
       end,
@@ -404,6 +442,7 @@ class Director {
       foremanTalk === undefined
         ? this.#queueSpeech(at, messageMs)
         : this.#foremanSpeaks(foremanTalk.station, foremanTalk.activity, at, messageMs);
+    this.#shownAt.set(message, span.start);
     this.#messages.push({
       ...span,
       speaker: message.from,
@@ -543,6 +582,29 @@ class Director {
     return legs.at(-1)?.end ?? start;
   }
 
+  // Отметки по порядку записи: каждому событию — счётчики после него и момент, когда его видно;
+  // после событий визита — его конец. Обогнанные очередью речи отметки выравнивает alignMarks.
+  #marks(): Mark[] {
+    let counts = NO_TALLY;
+    const marks: Mark[] = [];
+    for (const { visit, workEnd } of this.#worked) {
+      for (const event of visit.recorded) {
+        counts = tally(counts, event);
+        marks.push({ at: this.#shownAtOf(event), recordingTime: event.t, ...counts });
+      }
+      marks.push({ at: workEnd, recordingTime: visit.to, ...counts });
+    }
+    return alignMarks(marks);
+  }
+
+  #shownAtOf(event: BriefFactoryEvent): number {
+    const at = this.#shownAt.get(event);
+    if (at === undefined) {
+      throw new Error(`у события ${event.type} (t=${event.t}) нет момента на сцене`);
+    }
+    return at;
+  }
+
   finish(station: Stage, at: number, ok: boolean): FactoryScript {
     this.#partStatus = ok ? "done" : "scrap";
     this.#movePart(at, at, machineOf(station), machineOf(station));
@@ -563,7 +625,7 @@ class Director {
       prompts: this.#prompts,
       messages: this.#messages,
       foreman: this.#foreman,
-      marks: this.#marks,
+      marks: this.#marks(),
     });
   }
 }
