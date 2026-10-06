@@ -4,7 +4,7 @@
 
 import { STAGES, type FactoryLayout, type Point } from "@cyberzavod/core";
 import type { Frame, ScreenPoint } from "../factory-graphics.ts";
-import { ACTOR_ART } from "./actors.ts";
+import { ACTOR_ART } from "./actor-art.ts";
 import { artSize } from "./art.ts";
 import { padRects } from "./floor.ts";
 import { plaquePlacements, plaqueRect } from "./plaques.ts";

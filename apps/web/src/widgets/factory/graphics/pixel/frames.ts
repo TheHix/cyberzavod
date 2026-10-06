@@ -6,8 +6,21 @@ import type { ForemanFrame, WorkerFrame } from "@cyberzavod/core";
 /** С какой стороны виден персонаж: лицом к зрителю, спиной или боком (вправо). */
 export type Facing = "down" | "up" | "side";
 
-/** Поза персонажа: стоит или один из двух кадров шага. */
-export type ActorPose = "stand" | "walkA" | "walkB";
+/** Кадр удара у станка: замах и удар сменяют друг друга. */
+export type WorkBeat = "workA" | "workB";
+
+/** Кадр жеста мастера, пока он говорит: руки поднимаются поочерёдно. */
+export type TalkBeat = "talkA" | "talkB";
+
+/**
+ * Поза персонажа: стоит, шагает, шагает с деталью в руках (`carryA`, `carryB`), протягивает руки
+ * при передаче (`reach`), бьёт у станка или жестикулирует. Каждый кадр пары — свой рисунок.
+ */
+export type ActorPose =
+  "stand" | "walkA" | "walkB" | "carryA" | "carryB" | "reach" | WorkBeat | TalkBeat;
+
+/** Что делает станок: бьёт в такт рабочему или стоит. */
+export type MachineWork = WorkBeat | "rest";
 
 /** Кадр персонажа: сторона, зеркало (бок влево) и поза. */
 export interface ActorFrame {
@@ -18,7 +31,11 @@ export interface ActorFrame {
 
 /** Сколько мс длится один кадр шага: `walkA` и `walkB` сменяют друг друга. */
 export const STEP_FRAME_MS = 200;
-const FRAMES_IN_STEP = 2;
+/** Сколько мс длится один кадр удара у станка: замах и удар сменяют друг друга. */
+export const WORK_FRAME_MS = 300;
+/** Сколько мс длится один кадр жеста мастера: медленнее шага, чтобы руки не мельтешили. */
+export const TALK_FRAME_MS = 400;
+const FRAMES_IN_BEAT = 2;
 // Лампа работающего станка и свечение детали мигают: полупериод — столько мс горит и гаснет.
 const LAMP_BLINK_MS = 450;
 const GLOW_BLINK_MS = 600;
@@ -38,12 +55,24 @@ export function facingOf(heading: number): Pick<ActorFrame, "facing" | "mirrored
   return { facing: down > 0 ? "down" : "up", mirrored: false };
 }
 
-function stepPose(elapsed: number): ActorPose {
-  return Math.floor(elapsed / STEP_FRAME_MS) % FRAMES_IN_STEP === 0 ? "walkA" : "walkB";
+// Два кадра по очереди, первый — в начале действия: `elapsed` отсчитывается от его начала.
+function alternating<First extends ActorPose, Second extends ActorPose>(
+  elapsed: number,
+  frameMs: number,
+  first: First,
+  second: Second,
+): First | Second {
+  return Math.floor(elapsed / frameMs) % FRAMES_IN_BEAT === 0 ? first : second;
+}
+
+// Удар рабочего и работа его станка идут одним тактом: оба берут кадр отсюда.
+function workBeatOf(elapsed: number): WorkBeat {
+  return alternating(elapsed, WORK_FRAME_MS, "workA", "workB");
 }
 
 /**
- * Кадр рабочего: на ходу ноги сменяются, в остальных занятиях он стоит.
+ * Кадр рабочего: на ходу ноги сменяются, с деталью в руках — тоже; при передаче руки протянуты,
+ * у станка он бьёт; в ожидании стоит.
  * @param {WorkerFrame} worker Рабочий в кадре сцены.
  * @returns {ActorFrame} Сторона, зеркало и поза.
  */
@@ -54,9 +83,13 @@ export function workerFrameOf(worker: WorkerFrame): ActorFrame {
 function workerPoseOf(worker: WorkerFrame): ActorPose {
   switch (worker.activity) {
     case "walk":
-      return stepPose(worker.elapsed);
-    case "work":
+      return worker.carrying
+        ? alternating(worker.elapsed, STEP_FRAME_MS, "carryA", "carryB")
+        : alternating(worker.elapsed, STEP_FRAME_MS, "walkA", "walkB");
     case "handoff":
+      return "reach";
+    case "work":
+      return workBeatOf(worker.elapsed);
     case "idle":
       return "stand";
     default:
@@ -65,7 +98,8 @@ function workerPoseOf(worker: WorkerFrame): ActorPose {
 }
 
 /**
- * Кадр мастера: на ходу ноги сменяются, говоря, слушая и в кабинете он стоит.
+ * Кадр мастера: на ходу ноги сменяются, пока говорит — руки жестикулируют, слушая и в кабинете
+ * он стоит: неподвижный слушатель рядом с жестикулирующим сразу показывает, кто говорит.
  * @param {ForemanFrame} foreman Мастер в кадре сцены.
  * @returns {ActorFrame} Сторона, зеркало и поза.
  */
@@ -76,13 +110,32 @@ export function foremanFrameOf(foreman: ForemanFrame): ActorFrame {
 function foremanPoseOf(foreman: ForemanFrame): ActorPose {
   switch (foreman.activity) {
     case "walk":
-      return stepPose(foreman.elapsed);
+      return alternating(foreman.elapsed, STEP_FRAME_MS, "walkA", "walkB");
     case "talk":
+      return alternating(foreman.elapsed, TALK_FRAME_MS, "talkA", "talkB");
     case "listen":
     case "idle":
       return "stand";
     default:
       return foreman.activity satisfies never;
+  }
+}
+
+/**
+ * Что делает станок рабочего: пока тот работает, станок бьёт в такт его удару, иначе стоит.
+ * @param {WorkerFrame} worker Рабочий этого станка в кадре сцены.
+ * @returns {MachineWork} Кадр работы станка или покой.
+ */
+export function machineWorkOf(worker: WorkerFrame): MachineWork {
+  switch (worker.activity) {
+    case "work":
+      return workBeatOf(worker.elapsed);
+    case "walk":
+    case "handoff":
+    case "idle":
+      return "rest";
+    default:
+      return worker.activity satisfies never;
   }
 }
 

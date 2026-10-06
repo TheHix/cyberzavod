@@ -21,8 +21,8 @@ import {
 } from "./actors.ts";
 import { fitPixelPlan, planBounds, type PlanBounds } from "./bounds.ts";
 import { drawFloor } from "./floor.ts";
-import { lampLit } from "./frames.ts";
-import { drawMachine, type MachineSprites } from "./machines.ts";
+import { lampLit, machineWorkOf } from "./frames.ts";
+import { drawMachine, showMachineWork, type MachineSprites } from "./machines.ts";
 import { drawOffice } from "./office.ts";
 import { readPalette, type Palette } from "./palette.ts";
 import { drawPlaques } from "./plaques.ts";
@@ -109,6 +109,8 @@ export class PixelGraphics implements FactoryGraphics {
     for (const worker of scene.workers) {
       const sprites = this.#workers.get(worker.station);
       if (sprites !== undefined) placeWorker(sprites, worker);
+      const machine = this.#machines.get(worker.station);
+      if (machine !== undefined) showMachineWork(machine, machineWorkOf(worker));
     }
     if (this.#foreman !== undefined) placeForeman(this.#foreman, scene.foreman);
     if (this.#crate !== undefined) placeCrate(this.#crate, scene.part, scene.time);

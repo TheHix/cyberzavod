@@ -1,7 +1,7 @@
 // Станки: у каждого этапа свой рисунок 40×20 — корпус цвета этапа с тёмной передней гранью и
-// декором на крышке (чертёж, терминал, пробирки, лупа, конвейер). Лампа — отдельные спрайты:
-// погасшая всегда на месте, горящая появляется, пока станок работает. Остальное в кадре
-// не меняется.
+// декором на крышке (чертёж, терминал, пробирки, лупа, конвейер). Подвижное — отдельные спрайты:
+// две накладки работы (показана одна, пока рабочий бьёт у станка), лампа погасшая всегда
+// на месте, горящая появляется, пока станок держит деталь. Остальное в кадре не меняется.
 
 import type { Stage, StationPlan } from "@cyberzavod/core";
 import { Container, Sprite } from "pixi.js";
@@ -15,6 +15,7 @@ import {
   type Inks,
   type SpriteArt,
 } from "./art.ts";
+import type { MachineWork, WorkBeat } from "./frames.ts";
 import type { Palette } from "./palette.ts";
 import { textureOf } from "./textures.ts";
 import { PIXELS_PER_UNIT } from "./units.ts";
@@ -145,6 +146,127 @@ export const LAMP_ON_ART: SpriteArt = [".kkk.", "kO*Ok", "kOOOk", "kOOOk", ".kkk
 /** Где лампа на рисунке станка: левый верхний угол, пиксели от угла рисунка. */
 export const LAMP_AT = { x: 33, y: 2 } as const;
 
+/** Накладка работы станка: два кадра поверх корпуса, которые сменяют друг друга в такт удару. */
+export interface MachineWorkArt {
+  /** Левый верхний угол накладки, пиксели от угла рисунка станка, как у `LAMP_AT`. */
+  readonly at: { readonly x: number; readonly y: number };
+  /** Кадры работы; точка прозрачна, остальное закрывает корпус. Оба кадра одного размера. */
+  readonly frames: Readonly<Record<WorkBeat, SpriteArt>>;
+}
+
+/**
+ * Накладки работы станков по этапам. Новый этап — новая строка. Постановка — перо ведёт линию
+ * по чертежу, код — строки в терминале то растут, то сжимаются, мигает курсор, проверки — пузырьки в колбах,
+ * ревью — блик ходит по линзе лупы, выпуск — полосы ленты сдвигаются.
+ */
+export const MACHINE_WORK_ART: Readonly<Record<Stage, MachineWorkArt>> = {
+  spec: {
+    at: { x: 9, y: 5 },
+    frames: {
+      workA: ["pppppp", "11kppp", "p22ppp"],
+      workB: ["pppppp", "1111kp", "p22ppp"],
+    },
+  },
+  code: {
+    at: { x: 5, y: 4 },
+    frames: {
+      workA: [
+        ".......................",
+        ".......................",
+        ".......................",
+        ".......................",
+        ".......................",
+        "33333*ggggggggggggggggg",
+      ],
+      workB: [
+        "...........gggg........",
+        ".......................",
+        "............ggggg......",
+        ".......................",
+        "...................gg..",
+        "3333333333*gggggggggggg",
+      ],
+    },
+  },
+  test: {
+    at: { x: 21, y: 3 },
+    frames: {
+      workA: [
+        "***kbbk***",
+        "G**kbbkG**",
+        "***kbbk***",
+        "***kbbk***",
+        "***kbbk***",
+        "111kbbk555",
+        "111kbbk5*5",
+        "1*1kbbk555",
+        "111kbbk55*",
+        "*11kbbk555",
+      ],
+      workB: [
+        "***kbbk***",
+        "G**kbbkG**",
+        "***kbbk***",
+        "***kbbk***",
+        "***kbbk***",
+        "1*1kbbk55*",
+        "111kbbk555",
+        "111kbbk*55",
+        "11*kbbk555",
+        "111kbbk5*5",
+      ],
+    },
+  },
+  review: {
+    at: { x: 4, y: 3 },
+    frames: {
+      workA: [
+        ".........",
+        ".........",
+        ".*.......",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+      ],
+      workB: [
+        ".........",
+        ".GG......",
+        "G........",
+        "G........",
+        ".........",
+        "......**.",
+        ".......*.",
+        ".........",
+        ".........",
+      ],
+    },
+  },
+  ship: {
+    at: { x: 3, y: 7 },
+    frames: {
+      workA: [
+        "itt.........itttt.........ttittttt",
+        "itt.........itttt.........ttittttt",
+        "itt.........itttt.........ttittttt",
+        "itt.........itttt.........ttittttt",
+        "itt.........itttt.........ttittttt",
+        "itttitttitttitttitttitttitttittttt",
+      ],
+      workB: [
+        "tti.........ttitt.........ttttittt",
+        "tti.........ttitt.........ttttittt",
+        "tti.........ttitt.........ttttittt",
+        "tti.........ttitt.........ttttittt",
+        "tti.........ttitt.........ttttittt",
+        "ttitttitttitttitttitttitttitttittt",
+      ],
+    },
+  },
+};
+
 /** Размер самого большого станка: от него считается отступ табличек и границы цеха. */
 export const MACHINE_SIZE: ArtSize = Object.values(MACHINE_ART)
   .map(artSize)
@@ -153,8 +275,9 @@ export const MACHINE_SIZE: ArtSize = Object.values(MACHINE_ART)
     height: Math.max(largest.height, size.height),
   }));
 
-/** Подвижная часть станка в кадре: горящая лампа. */
+/** Подвижные части станка в кадре: накладки работы и горящая лампа. */
 export interface MachineSprites {
+  readonly work: Readonly<Record<WorkBeat, Sprite>>;
   readonly lampOn: Sprite;
 }
 
@@ -194,12 +317,36 @@ export function drawMachine(
   const lampY = top + LAMP_AT.y;
   const lampOn = spriteOf(LAMP_ON_ART, inks, lampX, lampY);
   lampOn.visible = false;
+  const { at, frames } = MACHINE_WORK_ART[stage];
+  const work = {
+    workA: spriteOf(frames.workA, inks, left + at.x, top + at.y),
+    workB: spriteOf(frames.workB, inks, left + at.x, top + at.y),
+  };
+  work.workA.visible = false;
+  work.workB.visible = false;
+  // Накладки лежат на корпусе и под лампами: лампа остаётся видна поверх любого кадра работы.
   const root = new Container({
-    children: [spriteOf(art, inks, left, top), spriteOf(LAMP_OFF_ART, inks, lampX, lampY), lampOn],
+    children: [
+      spriteOf(art, inks, left, top),
+      work.workA,
+      work.workB,
+      spriteOf(LAMP_OFF_ART, inks, lampX, lampY),
+      lampOn,
+    ],
   });
   root.position.set(
     Math.round(plan.machine.x * PIXELS_PER_UNIT),
     Math.round(plan.machine.y * PIXELS_PER_UNIT),
   );
-  return { root, sprites: { lampOn } };
+  return { root, sprites: { work, lampOn } };
+}
+
+/**
+ * Показывает кадр работы станка: одну накладку из двух или ни одной, пока станок стоит.
+ * @param {MachineSprites} sprites Подвижные части станка.
+ * @param {MachineWork} work Кадр работы или покой.
+ */
+export function showMachineWork(sprites: MachineSprites, work: MachineWork): void {
+  sprites.work.workA.visible = work === "workA";
+  sprites.work.workB.visible = work === "workB";
 }

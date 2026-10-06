@@ -5,7 +5,10 @@ import {
   foremanFrameOf,
   glowLit,
   lampLit,
+  machineWorkOf,
   STEP_FRAME_MS,
+  TALK_FRAME_MS,
+  WORK_FRAME_MS,
   workerFrameOf,
 } from "./frames.ts";
 
@@ -57,8 +60,32 @@ describe("workerFrameOf", () => {
     expect(poses).toEqual(["walkA", "walkB", "walkA"]);
   });
 
-  it.each(["work", "handoff", "idle"] as const)("стоит, пока занят: %s", (activity) => {
-    const frame = workerFrameOf(workerFrame({ activity, elapsed: STEP_FRAME_MS }));
+  it("шагает с деталью кадрами carryA и carryB через STEP_FRAME_MS", () => {
+    const poses = [0, STEP_FRAME_MS, STEP_FRAME_MS * 2].map(
+      (elapsed) => workerFrameOf(workerFrame({ carrying: true, elapsed })).pose,
+    );
+
+    expect(poses).toEqual(["carryA", "carryB", "carryA"]);
+  });
+
+  it.each([true, false])("тянется при передаче, с деталью: %s", (carrying) => {
+    const frame = workerFrameOf(
+      workerFrame({ activity: "handoff", carrying, elapsed: STEP_FRAME_MS }),
+    );
+
+    expect(frame.pose).toBe("reach");
+  });
+
+  it("бьёт у станка кадрами workA и workB через WORK_FRAME_MS", () => {
+    const poses = [0, WORK_FRAME_MS - 1, WORK_FRAME_MS, WORK_FRAME_MS * 2].map(
+      (elapsed) => workerFrameOf(workerFrame({ activity: "work", elapsed })).pose,
+    );
+
+    expect(poses).toEqual(["workA", "workA", "workB", "workA"]);
+  });
+
+  it("стоит, пока ничем не занят", () => {
+    const frame = workerFrameOf(workerFrame({ activity: "idle", elapsed: STEP_FRAME_MS }));
 
     expect(frame.pose).toBe("stand");
   });
@@ -69,13 +96,16 @@ describe("workerFrameOf", () => {
     expect(frame).toMatchObject({ facing: "side", mirrored: true });
   });
 
-  it("даёт одинаковый кадр на одинаковый кадр сцены", () => {
-    const worker = workerFrame({ elapsed: 777, heading: 1 });
+  it.each(["walk", "work", "handoff"] as const)(
+    "даёт одинаковый кадр на одинаковый кадр сцены: %s",
+    (activity) => {
+      const worker = workerFrame({ activity, elapsed: 777, heading: 1, carrying: true });
 
-    const [first, second] = [worker, { ...worker }].map(workerFrameOf);
+      const [first, second] = [worker, { ...worker }].map(workerFrameOf);
 
-    expect(first).toEqual(second);
-  });
+      expect(first).toEqual(second);
+    },
+  );
 });
 
 describe("foremanFrameOf", () => {
@@ -87,19 +117,52 @@ describe("foremanFrameOf", () => {
     expect(poses).toEqual(["walkA", "walkB"]);
   });
 
-  it.each(["talk", "listen", "idle"] as const)("стоит, пока не идёт: %s", (activity) => {
-    const frame = foremanFrameOf(foremanFrame({ activity, elapsed: STEP_FRAME_MS }));
+  it("жестикулирует, пока говорит, через TALK_FRAME_MS", () => {
+    const poses = [0, TALK_FRAME_MS - 1, TALK_FRAME_MS, TALK_FRAME_MS * 2].map(
+      (elapsed) => foremanFrameOf(foremanFrame({ activity: "talk", elapsed })).pose,
+    );
+
+    expect(poses).toEqual(["talkA", "talkA", "talkB", "talkA"]);
+  });
+
+  it.each(["listen", "idle"] as const)("стоит, пока не идёт и не говорит: %s", (activity) => {
+    const frame = foremanFrameOf(foremanFrame({ activity, elapsed: TALK_FRAME_MS }));
 
     expect(frame.pose).toBe("stand");
   });
 
-  it("даёт одинаковый кадр на одинаковый кадр сцены", () => {
-    const foreman = foremanFrame({ elapsed: 321, heading: -1 });
+  it.each(["walk", "talk"] as const)(
+    "даёт одинаковый кадр на одинаковый кадр сцены: %s",
+    (activity) => {
+      const foreman = foremanFrame({ activity, elapsed: 321, heading: -1 });
 
-    const [first, second] = [foreman, { ...foreman }].map(foremanFrameOf);
+      const [first, second] = [foreman, { ...foreman }].map(foremanFrameOf);
 
-    expect(first).toEqual(second);
-  });
+      expect(first).toEqual(second);
+    },
+  );
+});
+
+describe("machineWorkOf", () => {
+  it.each(["walk", "handoff", "idle"] as const)(
+    "стоит, пока рабочий не работает: %s",
+    (activity) => {
+      const work = machineWorkOf(workerFrame({ activity, elapsed: WORK_FRAME_MS }));
+
+      expect(work).toBe("rest");
+    },
+  );
+
+  it.each([0, WORK_FRAME_MS - 1, WORK_FRAME_MS, WORK_FRAME_MS * 3, 12_345])(
+    "работает в такт удару рабочего: elapsed %d",
+    (elapsed) => {
+      const worker = workerFrame({ activity: "work", elapsed });
+
+      const work = machineWorkOf(worker);
+
+      expect(work).toBe(workerFrameOf(worker).pose);
+    },
+  );
 });
 
 describe("lampLit", () => {

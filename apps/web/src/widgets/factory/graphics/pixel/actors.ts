@@ -22,6 +22,7 @@ import {
   type Inks,
   type SpriteArt,
 } from "./art.ts";
+import { ACTOR_ART } from "./actor-art.ts";
 import {
   foremanFrameOf,
   glowLit,
@@ -33,181 +34,6 @@ import {
 import type { Palette } from "./palette.ts";
 import { textureOf } from "./textures.ts";
 import { PIXELS_PER_UNIT } from "./units.ts";
-
-/**
- * Рисунки человека 16×16 по сторонам и позам: каска, форма, кожа, контур. Буквы — по `ART_LEGEND`:
- * `u`, `U`, `v` — форма, её тень и блик; `h`, `H`, `j` — каска, её тень и блик.
- */
-export const ACTOR_ART: Readonly<Record<Facing, Readonly<Record<ActorPose, SpriteArt>>>> = {
-  down: {
-    stand: [
-      ".....kkkkkk.....",
-      "....kjjhhhhk....",
-      "...kjhhhhhhHk...",
-      "...khhhhhhhHk...",
-      "..kHHHHHHHHHHk..",
-      "...kssssssssk...",
-      "...kssksskssk...",
-      "...kssssssssk...",
-      "....kssssssk....",
-      "...kkuvvvvukk...",
-      "..kUkuuuuuukUk..",
-      "..kskuuUUuuksk..",
-      "....kUk..kUk....",
-      "....kkk..kkk....",
-      "................",
-      "................",
-    ],
-    walkA: [
-      "................",
-      ".....kkkkkk.....",
-      "....kjjhhhhk....",
-      "...kjhhhhhhHk...",
-      "...khhhhhhhHk...",
-      "..kHHHHHHHHHHk..",
-      "...kssssssssk...",
-      "...kssksskssk...",
-      "...kssssssssk...",
-      "....kssssssk....",
-      "...kkuvvvvukk...",
-      "..kUkuuuuuukUk..",
-      "..kskuuUUuuksk..",
-      "....kUk..kkk....",
-      "....kkk.........",
-      "................",
-    ],
-    walkB: [
-      ".....kkkkkk.....",
-      "....kjjhhhhk....",
-      "...kjhhhhhhHk...",
-      "...khhhhhhhHk...",
-      "..kHHHHHHHHHHk..",
-      "...kssssssssk...",
-      "...kssksskssk...",
-      "...kssssssssk...",
-      "....kssssssk....",
-      "...kkuvvvvukk...",
-      "..kUkuuuuuukUk..",
-      "..kskuuUUuuksk..",
-      "....kkk..kUk....",
-      ".........kkk....",
-      "................",
-      "................",
-    ],
-  },
-  up: {
-    stand: [
-      ".....kkkkkk.....",
-      "....kjhhhhhk....",
-      "...kjhhhhhhHk...",
-      "...khhhhhhhHk...",
-      "..kHHHHHHHHHHk..",
-      "...kHHHHHHHHk...",
-      "...kHHHHHHHHk...",
-      "....kHHHHHHk....",
-      ".....kssssk.....",
-      "...kkuuuuuukk...",
-      "..kUkuuuuuukUk..",
-      "..kskuuUUuuksk..",
-      "....kUk..kUk....",
-      "....kkk..kkk....",
-      "................",
-      "................",
-    ],
-    walkA: [
-      "................",
-      ".....kkkkkk.....",
-      "....kjhhhhhk....",
-      "...kjhhhhhhHk...",
-      "...khhhhhhhHk...",
-      "..kHHHHHHHHHHk..",
-      "...kHHHHHHHHk...",
-      "...kHHHHHHHHk...",
-      "....kHHHHHHk....",
-      ".....kssssk.....",
-      "...kkuuuuuukk...",
-      "..kUkuuuuuukUk..",
-      "..kskuuUUuuksk..",
-      "....kUk..kkk....",
-      "....kkk.........",
-      "................",
-    ],
-    walkB: [
-      ".....kkkkkk.....",
-      "....kjhhhhhk....",
-      "...kjhhhhhhHk...",
-      "...khhhhhhhHk...",
-      "..kHHHHHHHHHHk..",
-      "...kHHHHHHHHk...",
-      "...kHHHHHHHHk...",
-      "....kHHHHHHk....",
-      ".....kssssk.....",
-      "...kkuuuuuukk...",
-      "..kUkuuuuuukUk..",
-      "..kskuuUUuuksk..",
-      "....kkk..kUk....",
-      ".........kkk....",
-      "................",
-      "................",
-    ],
-  },
-  side: {
-    stand: [
-      ".....kkkkkk.....",
-      "....kjjhhhhk....",
-      "...kjhhhhhhHk...",
-      "...khhhhhhhHHk..",
-      "...kHHHHHHHHHHkk",
-      "...kHHssssssk...",
-      "...kHHssskssk...",
-      "...kHHssssssk...",
-      "....kHsssssk....",
-      "....kuvvvvuk....",
-      "....kuuuUUuk....",
-      "....kuuuuuUsk...",
-      ".....kUUUUk.....",
-      ".....kkkkkk.....",
-      "................",
-      "................",
-    ],
-    walkA: [
-      "................",
-      ".....kkkkkk.....",
-      "....kjjhhhhk....",
-      "...kjhhhhhhHk...",
-      "...khhhhhhhHHk..",
-      "...kHHHHHHHHHHkk",
-      "...kHHssssssk...",
-      "...kHHssskssk...",
-      "...kHHssssssk...",
-      "....kHsssssk....",
-      "....kuvvvvuk....",
-      "....kuuuUUuk....",
-      "....kuuuuuUsk...",
-      "...kUk....kUk...",
-      "...kkk.....kkk..",
-      "................",
-    ],
-    walkB: [
-      ".....kkkkkk.....",
-      "....kjjhhhhk....",
-      "...kjhhhhhhHk...",
-      "...khhhhhhhHHk..",
-      "...kHHHHHHHHHHkk",
-      "...kHHssssssk...",
-      "...kHHssskssk...",
-      "...kHHssssssk...",
-      "....kHsssssk....",
-      "....kuvvvvuk....",
-      "....kuuuUUuk....",
-      "....kuuuuuUsk...",
-      "....kUk..kUk....",
-      "....kkk..kkk....",
-      "................",
-      "................",
-    ],
-  },
-};
 
 /** Деталь в руках и на станке: ящик 10×10. */
 export const CRATE_ART: SpriteArt = [
@@ -261,9 +87,27 @@ export interface FigureBox {
   readonly bottom: number;
 }
 
-// Видимая фигура стоящего человека по всем сторонам. Бок рисуется вправо, а влево зеркалится,
-// поэтому по горизонтали берётся больший из двух краёв. Шаг (`walkA` на пиксель ниже) и тень
-// не считаются: на постах человек стоит, а тень — затемнение пола.
+/**
+ * Стоит ли человек на месте в этой позе. У таких поз видимая фигура считается для табличек:
+ * на постах человек стоит, бьёт, тянется и жестикулирует, а шагает и несёт деталь мимо них.
+ * Новая поза — новая строка: компилятор не даст её пропустить.
+ */
+export const ACTOR_POSE_IN_PLACE: Readonly<Record<ActorPose, boolean>> = {
+  stand: true,
+  walkA: false,
+  walkB: false,
+  carryA: false,
+  carryB: false,
+  reach: true,
+  workA: true,
+  workB: true,
+  talkA: true,
+  talkB: true,
+};
+
+// Видимая фигура человека на месте по всем сторонам и позам, в том числе с поднятыми руками.
+// Бок рисуется вправо, а влево зеркалится, поэтому по горизонтали берётся больший из двух краёв.
+// Шаг (на пиксель ниже), деталь в руках и тень не считаются: тень — затемнение пола.
 function figureBoxOf(arts: readonly SpriteArt[]): FigureBox {
   const sizes = arts.map(artSize);
   const centerX = (sizes[0]?.width ?? 0) / 2;
@@ -285,11 +129,13 @@ function figureBoxOf(arts: readonly SpriteArt[]): FigureBox {
 }
 
 /** Где человек занимает место вокруг своей точки плана: по ней таблички обходят фигуру. */
-export const ACTOR_FIGURE: FigureBox = figureBoxOf([
-  ACTOR_ART.down.stand,
-  ACTOR_ART.up.stand,
-  ACTOR_ART.side.stand,
-]);
+export const ACTOR_FIGURE: FigureBox = figureBoxOf(
+  Object.values(ACTOR_ART).flatMap((poses) =>
+    Object.entries(poses)
+      .filter(([pose]) => ACTOR_POSE_IN_PLACE[pose as ActorPose])
+      .map(([, art]) => art),
+  ),
+);
 // Деталь в руках рисуется поверх всех: она всегда впереди несущего, куда бы он ни смотрел.
 const CARRIED_LAYER = 100_000;
 
@@ -335,12 +181,14 @@ function foremanInks(palette: Palette): Inks {
 
 function bakePoses(inks: Inks): PoseTextures {
   const bake = (art: SpriteArt) => textureOf(paintArt(art, inks));
-  const facing = (poses: Readonly<Record<ActorPose, SpriteArt>>) => ({
-    stand: bake(poses.stand),
-    walkA: bake(poses.walkA),
-    walkB: bake(poses.walkB),
-  });
-  return { down: facing(ACTOR_ART.down), up: facing(ACTOR_ART.up), side: facing(ACTOR_ART.side) };
+  const bakeFacing = (poses: Readonly<Record<ActorPose, SpriteArt>>) =>
+    Object.fromEntries(Object.entries(poses).map(([pose, art]) => [pose, bake(art)])) as Record<
+      ActorPose,
+      Texture
+    >;
+  return Object.fromEntries(
+    Object.entries(ACTOR_ART).map(([facing, poses]) => [facing, bakeFacing(poses)]),
+  ) as PoseTextures;
 }
 
 /**

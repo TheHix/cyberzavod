@@ -1,6 +1,7 @@
 import { STAGES } from "@cyberzavod/core";
 import { describe, expect, it } from "vitest";
-import { ACTOR_ART, CRATE_ART, GLOW_ART, SHADOW_ART } from "./actors.ts";
+import { ACTOR_ART } from "./actor-art.ts";
+import { CRATE_ART, GLOW_ART, SHADOW_ART } from "./actors.ts";
 import {
   ART_LEGEND,
   artSize,
@@ -15,7 +16,7 @@ import {
   type SpriteArt,
 } from "./art.ts";
 import { PLAQUE_GLYPHS } from "./glyphs.ts";
-import { LAMP_OFF_ART, LAMP_ON_ART, MACHINE_ART } from "./machines.ts";
+import { LAMP_AT, LAMP_OFF_ART, LAMP_ON_ART, MACHINE_ART, MACHINE_WORK_ART } from "./machines.ts";
 import { DESK_ART } from "./office.ts";
 import { testPalette } from "./test-palette.ts";
 
@@ -42,6 +43,12 @@ function namedArts(): [string, SpriteArt][] {
       ]),
     ),
     ...STAGES.map((stage): [string, SpriteArt] => [`станок ${stage}`, MACHINE_ART[stage]]),
+    ...STAGES.flatMap((stage) =>
+      Object.entries(MACHINE_WORK_ART[stage].frames).map(([beat, art]): [string, SpriteArt] => [
+        `работа станка ${stage} ${beat}`,
+        art,
+      ]),
+    ),
     ["стол", DESK_ART],
     ["ящик", CRATE_ART],
     ["свечение", GLOW_ART],
@@ -119,9 +126,20 @@ describe("ACTOR_ART", () => {
   it("рисует человека кадрами 16×16", () => {
     const sizes = Object.values(ACTOR_ART).flatMap((poses) => Object.values(poses).map(artSize));
 
-    expect(sizes).toHaveLength(9);
+    expect(sizes).toHaveLength(30);
     for (const size of sizes) expect(size).toEqual({ width: ACTOR_SIDE, height: ACTOR_SIDE });
   });
+
+  it.each(Object.entries(ACTOR_ART))(
+    "рисует каждую позу, кроме stand, не так, как stand: %s",
+    (_facing, poses) => {
+      const sameAsStand = Object.entries(poses)
+        .filter(([pose, art]) => pose !== "stand" && art.join() === poses.stand.join())
+        .map(([pose]) => pose);
+
+      expect(sameAsStand).toEqual([]);
+    },
+  );
 });
 
 describe("MACHINE_ART", () => {
@@ -138,6 +156,38 @@ describe("MACHINE_ART", () => {
     const holes = holesInside(MACHINE_ART[stage]);
 
     expect(holes).toEqual([]);
+  });
+});
+
+describe("MACHINE_WORK_ART", () => {
+  const LAMP_SIZE = artSize(LAMP_OFF_ART);
+
+  it.each(STAGES)("рисует кадры работы станка %s одного размера и разными", (stage) => {
+    const { workA, workB } = MACHINE_WORK_ART[stage].frames;
+
+    expect(artSize(workA)).toEqual(artSize(workB));
+    expect(workA).not.toEqual(workB);
+  });
+
+  it.each(STAGES)("кладёт накладку станка %s внутрь его рисунка", (stage) => {
+    const { at, frames } = MACHINE_WORK_ART[stage];
+    const { width, height } = artSize(frames.workA);
+    const machine = artSize(MACHINE_ART[stage]);
+
+    expect(at.x).toBeGreaterThanOrEqual(0);
+    expect(at.y).toBeGreaterThanOrEqual(0);
+    expect(at.x + width).toBeLessThanOrEqual(machine.width);
+    expect(at.y + height).toBeLessThanOrEqual(machine.height);
+  });
+
+  it.each(STAGES)("не заводит накладку станка %s на лампу", (stage) => {
+    const { at, frames } = MACHINE_WORK_ART[stage];
+    const { width, height } = artSize(frames.workA);
+
+    const apartHorizontally = at.x + width <= LAMP_AT.x || LAMP_AT.x + LAMP_SIZE.width <= at.x;
+    const apartVertically = at.y + height <= LAMP_AT.y || LAMP_AT.y + LAMP_SIZE.height <= at.y;
+
+    expect(apartHorizontally || apartVertically).toBe(true);
   });
 });
 
