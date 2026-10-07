@@ -1,16 +1,39 @@
 {
-  "name": "@cyberzavod/cli",
-  "private": true,
+  "name": "cyberzavod",
+  "version": "0.4.0",
+  "description": "Local-first, model-agnostic development harness for AI coding agents: process, checks and a journal of sessions in your repository.",
+  "keywords": [
+    "ai",
+    "agents",
+    "claude-code",
+    "harness",
+    "workflow"
+  ],
+  "homepage": "https://cyberzavod.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bysavelii/cyberzavod.git",
+    "directory": "packages/cli"
+  },
   "type": "module",
   "bin": {
-    "cyberzavod": "./src/bin/cyberzavod.ts"
+    "cyberzavod": "dist/cyberzavod.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
   },
   "scripts": {
-    "check": "tsc -p . && vitest run"
+    "build": "node scripts/build.ts",
+    "prepack": "node scripts/build.ts",
+    "check": "tsc -p . && vitest run && node scripts/build.ts"
   },
-  "dependencies": {
+  "devDependencies": {
     "@cyberzavod/adapter-claude": "workspace:*",
     "@cyberzavod/core": "workspace:*",
-    "@cyberzavod/storage": "workspace:*"
+    "@cyberzavod/storage": "workspace:*",
+    "esbuild": "0.28.2"
   }
 }

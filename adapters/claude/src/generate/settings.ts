@@ -1,6 +1,9 @@
 // Хуки адаптера в `.claude/settings.json` проекта. Настройки принадлежат проекту: адаптер
-// заменяет только свои обработчики — их команда ведёт в `adapters/claude/` установки
-// Cyberzavod — и дописывает свои запреты, остальное оставляет как есть.
+// заменяет только свои обработчики — их команда запускает CLI из проекта
+// (`.cyberzavod/bin/cyberzavod.mjs`) — и дописывает свои запреты, остальное оставляет как есть.
+
+import { TOOL_FILE } from "@cyberzavod/storage";
+import type { HookName } from "../hooks/index.ts";
 
 /** Обработчик хука Claude Code. */
 export interface HookHandler {
@@ -26,19 +29,8 @@ export class SettingsError extends Error {}
 /** Обработчики адаптера по событиям хуков. */
 export type AdapterHooks = Readonly<Record<string, HookGroup[]>>;
 
-/** Где лежит установка Cyberzavod относительно проекта. */
-export type InstallLocation =
-  /** Внутри проекта: путь от корня через `/`, пустой — сам корень. */
-  | { in: "project"; path: string }
-  /** Вне проекта: путь знает только `CYBERZAVOD_HOME` из локальных настроек. */
-  | { in: "home" };
-
-const ADAPTER_PATH = "adapters/claude";
 const TURN_START_TIMEOUT_SECONDS = 30;
 const STOP_GATE_TIMEOUT_SECONDS = 180;
-
-/** Переменная окружения с путём к установке Cyberzavod вне проекта. */
-export const HOME_VARIABLE = "CYBERZAVOD_HOME";
 
 /** Запреты адаптера: секреты не читаются и не правятся, сырые журналы сессий не правятся. */
 export const ADAPTER_DENY = [
@@ -50,44 +42,26 @@ export const ADAPTER_DENY = [
 ] as const;
 
 function isOwnHandler(handler: HookHandler): boolean {
-  return handler.command.includes(`${ADAPTER_PATH}/`);
+  return handler.command.includes(TOOL_FILE);
 }
 
-// Вне проекта хук без CYBERZAVOD_HOME молча ничего не делает: у человека, который не подключал
-// Cyberzavod на своей машине, сессия работает как обычно.
-function commandOf(location: InstallLocation, script: string, runner: string): string {
-  switch (location.in) {
-    case "project": {
-      const base =
-        location.path === "" ? "$CLAUDE_PROJECT_DIR" : `$CLAUDE_PROJECT_DIR/${location.path}`;
-      return `${runner}"${base}/${ADAPTER_PATH}/${script}"`;
-    }
-    case "home":
-      return `[ -z "$${HOME_VARIABLE}" ] || ${runner}"$${HOME_VARIABLE}/${ADAPTER_PATH}/${script}"`;
-    default:
-      return location satisfies never;
-  }
+// От $CLAUDE_PROJECT_DIR, а не от текущего каталога: сессия могла сделать cd. Кавычки — ради
+// пробелов в пути; такую запись понимают и Git Bash, и PowerShell, которыми Claude Code
+// запускает хуки на Windows.
+function hookCommand(hook: HookName): string {
+  return `node "$CLAUDE_PROJECT_DIR/${TOOL_FILE}" hook ${hook}`;
 }
 
-/**
- * Обработчики адаптера: запись сессии на каждом событии, начало хода и проверки при остановке.
- * @param {InstallLocation} location Где лежит установка Cyberzavod.
- * @returns {AdapterHooks} Группы обработчиков по событиям хуков.
- */
-export function adapterHooks(location: InstallLocation): AdapterHooks {
-  const record: HookHandler = {
-    type: "command",
-    command: commandOf(location, "src/bin/record.ts", "node "),
-    async: true,
-  };
+function adapterHooks(): AdapterHooks {
+  const record: HookHandler = { type: "command", command: hookCommand("record"), async: true };
   const turnStart: HookHandler = {
     type: "command",
-    command: commandOf(location, "hooks/turn-start.sh", ""),
+    command: hookCommand("turn-start"),
     timeout: TURN_START_TIMEOUT_SECONDS,
   };
   const stopGate: HookHandler = {
     type: "command",
-    command: commandOf(location, "hooks/stop-gate.sh", ""),
+    command: hookCommand("stop"),
     timeout: STOP_GATE_TIMEOUT_SECONDS,
     statusMessage: "Запускаю проверки проекта…",
   };
@@ -102,6 +76,9 @@ export function adapterHooks(location: InstallLocation): AdapterHooks {
     Stop: [{ hooks: [record, stopGate] }],
   };
 }
+
+/** Обработчики адаптера: запись сессии на каждом событии, начало хода и проверки при остановке. */
+export const ADAPTER_HOOKS: AdapterHooks = adapterHooks();
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -168,17 +145,4 @@ export function mergeSettings(settings: Settings, hooks: AdapterHooks): Settings
     permissions: mergedPermissions(settings.permissions),
     hooks: mergedHooks(settings.hooks, hooks),
   };
-}
-
-/**
- * Записывает путь установки Cyberzavod в локальные настройки проекта, которые не идут в git.
- * @param {Settings} settings Локальные настройки; пустой объект, если файла нет.
- * @param {string} home Абсолютный путь установки Cyberzavod на этой машине.
- * @returns {Settings} Новые локальные настройки.
- * @throws {SettingsError} Если `env` в настройках не объект.
- */
-export function withHome(settings: Settings, home: string): Settings {
-  const { env = {} } = settings;
-  if (!isObject(env)) throw new SettingsError("env должен быть объектом");
-  return { ...settings, env: { ...env, [HOME_VARIABLE]: home } };
 }

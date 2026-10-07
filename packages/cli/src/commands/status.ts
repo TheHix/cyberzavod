@@ -1,15 +1,10 @@
 // `cyberzavod status`: что за проект, по какому процессу он идёт и что лежит в журнале.
 
 import path from "node:path";
-import { DEFAULT_MODEL, type JournalRecord, type RecordType } from "@cyberzavod/core";
-import {
-  DirectoryRecordStore,
-  loadHarness,
-  RECORD_COLLECTIONS,
-  workflowOf,
-} from "@cyberzavod/storage";
-import { HARNESS_DIRECTORY, HARNESS_VERSION } from "../install.ts";
+import { DEFAULT_MODEL, type Harness, type JournalRecord, type RecordType } from "@cyberzavod/core";
+import { DirectoryRecordStore, RECORD_COLLECTIONS, workflowOf } from "@cyberzavod/storage";
 import type { CommandError } from "../errors.ts";
+import { HARNESS_VERSION, type Installation } from "../installation/installation.ts";
 import { requireProjectAt, type ProjectAt } from "./project.ts";
 
 const RECORD_TITLES: Readonly<Record<RecordType, string>> = {
@@ -18,8 +13,7 @@ const RECORD_TITLES: Readonly<Record<RecordType, string>> = {
   note: "заметки",
 };
 
-async function processLines(project: ProjectAt): Promise<string[]> {
-  const harness = await loadHarness(HARNESS_DIRECTORY);
+function processLines(project: ProjectAt, harness: Harness): string[] {
   const workflow = workflowOf(harness, project.config.workflow);
   const stages = workflow.stages.map((stage) => {
     const guide = harness.stages[stage];
@@ -51,10 +45,11 @@ function journalLines(project: ProjectAt, records: JournalRecord[]): string[] {
 /**
  * Печатает сводку проекта: конфиг, процесс, агенты этапов, проверки и журнал.
  * @param {string} directory Каталог внутри проекта.
+ * @param {Installation} installation Запущенная версия Cyberzavod.
  * @returns {Promise<void>} Готово, когда сводка напечатана.
  * @throws {CommandError} Если каталог не в проекте.
  */
-export async function printStatus(directory: string): Promise<void> {
+export async function printStatus(directory: string, installation: Installation): Promise<void> {
   const project = await requireProjectAt(directory);
   const { config } = project;
   const harness =
@@ -66,7 +61,7 @@ export async function printStatus(directory: string): Promise<void> {
   const lines = [
     `Проект: ${config.projectId} (${project.root})`,
     `Harness: ${harness}`,
-    ...(await processLines(project)),
+    ...processLines(project, installation.harness),
     `Проверки: ${checks.length === 0 ? "не заданы" : checks.join("; ")}`,
     ...journalLines(project, records),
   ];

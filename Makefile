@@ -24,12 +24,12 @@ format: ## Привести код к стилю: Prettier и ESLint --fix дл�
 
 check: check-web check-api check-docker check-scripts ## Все проверки: то же, что запускает CI
 
-# Сверка файлов агента с harness — здесь, а не в check-scripts: CLI нужны Node и зависимости
-# workspace, а job scripts их не ставит.
+# Сверка файлов агента и вендоренного CLI со сборкой — здесь, а не в check-scripts: сборке нужны
+# Node и зависимости workspace, а job scripts их не ставит. `pnpm -r run check` собирает CLI.
 check-web: ## Стиль, типы, тесты и сборка фронта и пакетов, файлы агента совпадают с harness
 	pnpm lint
 	pnpm -r run check
-	node packages/cli/src/bin/cyberzavod.ts sync --check
+	node packages/cli/dist/cyberzavod.mjs sync --check
 
 # Тест хука форматирования Go — здесь, а не в check-scripts: хуку нужны Go и golangci-lint,
 # а они есть везде, где запускается check-api (CI-job api, dev-контейнер).
@@ -41,12 +41,9 @@ check-docker: ## Сборка Docker-образов API и сайта
 	docker build -q -t cyberzavod-api:check apps/api >/dev/null
 	docker build -q -f apps/web/Dockerfile -t cyberzavod-web:check . >/dev/null
 
-check-scripts: ## Shell-скрипты dev-контейнера и хуков: shellcheck и тесты хуков
+check-scripts: ## Shell-скрипты dev-контейнера и хуков проекта: shellcheck и тесты хуков
 	docker run --rm -v "$(CURDIR):/mnt:ro" koalaman/shellcheck:stable -x \
-		/mnt/.devcontainer/init-firewall.sh /mnt/adapters/claude/hooks/lib.sh \
-		/mnt/adapters/claude/hooks/turn-start.sh /mnt/adapters/claude/hooks/stop-gate.sh \
-		/mnt/adapters/claude/hooks/stop-gate.test.sh /mnt/.claude/hooks/format-go.sh \
+		/mnt/.devcontainer/init-firewall.sh /mnt/.claude/hooks/format-go.sh \
 		/mnt/.claude/hooks/format-go.test.sh /mnt/.claude/hooks/session-start.sh \
 		/mnt/.claude/hooks/session-start.test.sh
-	adapters/claude/hooks/stop-gate.test.sh
 	.claude/hooks/session-start.test.sh

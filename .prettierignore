@@ -4,7 +4,7 @@
 **/dist
 **/.astro
 pnpm-lock.yaml
-journal
+.cyberzavod
 apps/api
 deploy
 .devcontainer

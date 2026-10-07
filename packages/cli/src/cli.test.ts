@@ -3,8 +3,18 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseProjectConfig } from "@cyberzavod/core";
-import { PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
+import { PROJECT_CONFIG_FILE, TOOL_FILE } from "@cyberzavod/storage";
 import { runCli } from "./cli.ts";
+
+// Из исходников CLI собранного себя не знает; тесту хватает любого текста на его месте.
+const BUILT_TOOL = "// собранный cyberzavod\n";
+
+vi.mock("./installation/assets.ts", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./installation/assets.ts")>();
+  return {
+    readAssets: async () => ({ ...(await original.readAssets()), tool: BUILT_TOOL }),
+  };
+});
 
 let workspace: string;
 let root: string;
@@ -14,7 +24,7 @@ async function initialized(): Promise<void> {
 }
 
 async function journalFiles(collection: string): Promise<string[]> {
-  return readdir(path.join(workspace, "shop.cyberzavod", collection));
+  return readdir(path.join(root, ".cyberzavod/journal", collection));
 }
 
 describe("runCli", () => {
@@ -66,6 +76,15 @@ describe("runCli", () => {
     });
   });
 
+  it("init кладёт в проект собранный CLI и прячет от git сырые журналы", async () => {
+    await runCli(["init", "--yes"], root);
+
+    expect({
+      tool: await readFile(path.join(root, TOOL_FILE), "utf8"),
+      gitignore: await readFile(path.join(root, ".gitignore"), "utf8"),
+    }).toEqual({ tool: BUILT_TOOL, gitignore: "/.cyberzavod/journal/capture/\n" });
+  });
+
   it("переносит написанный человеком CLAUDE.md в AGENTS.md", async () => {
     await writeFile(path.join(root, "CLAUDE.md"), "# Мои правила\n");
 
@@ -101,7 +120,7 @@ describe("runCli", () => {
     expect(await runCli(["sync", "--check"], root)).toBe(0);
   });
 
-  it("decision и note пишут записи в журнал рядом с проектом", async () => {
+  it("decision и note пишут записи в журнал проекта", async () => {
     await initialized();
 
     const codes = [

@@ -1,0 +1,38 @@
+# Выпуск npm-пакета `cyberzavod` по тегу vX.Y.Z: те же проверки, что в CI, затем публикация
+# собранного CLI. Тег должен совпадать с версией пакета, иначе выпуск останавливается.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  npm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Подпись происхождения пакета (npm provenance).
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+      - name: Тег совпадает с версией пакета
+        run: |
+          version=$(node -p 'require("./packages/cli/package.json").version')
+          if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "тег $GITHUB_REF_NAME, а версия пакета $version" >&2
+            exit 1
+          fi
+      - run: make check-web
+      - run: pnpm --filter cyberzavod publish --access public --provenance --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

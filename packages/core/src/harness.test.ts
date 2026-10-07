@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { HarnessError, parseStageGuide } from "./harness.ts";
+import { HarnessError, parseHarness, parseStageGuide, type HarnessFiles } from "./harness.ts";
+import { STAGES } from "./stage.ts";
 
 function stageFile(header: string, body = "Текст этапа."): string {
   return `---\n${header}\n---\n\n${body}\n`;
@@ -74,5 +75,72 @@ describe("parseStageGuide", () => {
     const act = () => parseStageGuide("implementation", text);
 
     expect(act).toThrow(/не поле/);
+  });
+});
+
+function harnessFiles(): Record<string, string> {
+  const stages = Object.fromEntries(
+    STAGES.map((stage) => [
+      `stages/${stage}.md`,
+      stageFile(`title: Этап ${stage}\ndescription: Делает ${stage}.`),
+    ]),
+  );
+  return {
+    ...stages,
+    "principles/safety.md": "## Безопасность\n",
+    "principles/architecture.md": "## Архитектура\n",
+    "workflows/default.json": JSON.stringify({ name: "default", stages: [...STAGES] }),
+    "conductor.md": "Ведущий.\n",
+  };
+}
+
+describe("parseHarness", () => {
+  it("собирает принципы по имени файла, этапы, процессы и правила ведущего", () => {
+    const files: HarnessFiles = harnessFiles();
+
+    const harness = parseHarness(files);
+
+    expect({
+      principles: harness.principles,
+      stages: Object.keys(harness.stages),
+      workflows: harness.workflows.map(({ name }) => name),
+      conductor: harness.conductor,
+    }).toEqual({
+      principles: [
+        { name: "architecture", text: "## Архитектура" },
+        { name: "safety", text: "## Безопасность" },
+      ],
+      stages: [...STAGES],
+      workflows: ["default"],
+      conductor: "Ведущий.",
+    });
+  });
+
+  it("отклоняет harness без файла этапа", () => {
+    const files = harnessFiles();
+    delete files["stages/review.md"];
+
+    const act = () => parseHarness(files);
+
+    expect(act).toThrow(HarnessError);
+  });
+
+  it("отклоняет процесс, имя которого не совпадает с именем файла", () => {
+    const files = {
+      ...harnessFiles(),
+      "workflows/short.json": JSON.stringify({ name: "long", stages: ["implementation"] }),
+    };
+
+    const act = () => parseHarness(files);
+
+    expect(act).toThrow(/short/);
+  });
+
+  it("не берёт файлы из вложенных каталогов", () => {
+    const files = { ...harnessFiles(), "principles/drafts/old.md": "## Старое" };
+
+    const harness = parseHarness(files);
+
+    expect(harness.principles.map(({ name }) => name)).toEqual(["architecture", "safety"]);
   });
 });

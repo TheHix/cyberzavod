@@ -11,7 +11,7 @@ import {
   type ProjectConfig,
   type Stage,
 } from "@cyberzavod/core";
-import { workflowOf } from "@cyberzavod/storage";
+import { DEFAULT_JOURNAL, workflowOf } from "@cyberzavod/storage";
 import { projectIdOf, type DetectedProject } from "./detect.ts";
 
 /** Кто отвечает на вопросы мастера: человек в терминале или значения по умолчанию. */
@@ -105,7 +105,6 @@ async function askAgents(
 
 /**
  * Собирает конфиг проекта из найденного и ответов человека.
- * @param {string} root Корень проекта.
  * @param {DetectedProject} detected Найденное в проекте.
  * @param {Harness} harness Harness: процессы и этапы.
  * @param {Prompter} prompter Кто отвечает на вопросы.
@@ -113,7 +112,6 @@ async function askAgents(
  * @throws {HarnessError} Если выбран процесс, которого нет в harness.
  */
 export async function askProjectConfig(
-  root: string,
   detected: DetectedProject,
   harness: Harness,
   prompter: Prompter,
@@ -123,10 +121,7 @@ export async function askProjectConfig(
   );
   const workflow = workflowOf(harness, await prompter.ask("Процесс", "default"));
   const agents = await askAgents(harness, workflow.stages, prompter);
-  const journal = await prompter.ask(
-    "Каталог журнала от корня проекта",
-    `../${path.basename(root)}.cyberzavod`,
-  );
+  const journal = await prompter.ask("Каталог журнала от корня проекта", DEFAULT_JOURNAL);
   const commands = await prompter.ask(
     `Команды проверки через «${LIST_SEPARATOR}»`,
     detected.verification.join(`${LIST_SEPARATOR} `),

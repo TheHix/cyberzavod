@@ -3,9 +3,11 @@
 
 export {
   HarnessError,
+  parseHarness,
   parseStageGuide,
   STAGE_ACCESS,
   type Harness,
+  type HarnessFiles,
   type Principle,
   type StageAccess,
   type StageGuide,

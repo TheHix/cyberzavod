@@ -1,5 +1,5 @@
 {
-  "name": "cyberzavod",
+  "name": "cyberzavod-workspace",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.32.1",
@@ -7,7 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "cyberzavod": "node packages/cli/src/bin/cyberzavod.ts",
+    "cyberzavod": "pnpm --filter cyberzavod build && node packages/cli/dist/cyberzavod.mjs",
     "dev": "pnpm --filter @cyberzavod/web dev",
     "lint": "prettier --check . && eslint . --max-warnings 0",
     "format": "prettier --write . && eslint --fix . && prettier --write .",
