@@ -1,0 +1,30 @@
+---
+// Страница галерей в поле: список и галерея автора приходят из API в браузере. При сборке
+// параметров адреса нет — в разметке общий список в загрузке.
+import type { Locale } from "@/shared/i18n/locale.ts";
+import { Panel } from "@/shared/ui";
+import { GalleryBoard } from "./GalleryBoard.tsx";
+
+interface Props {
+  /** Язык страницы. */
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+
+if (Astro.site === undefined) throw new Error("в astro.config.ts не задан site");
+
+const siteUrl = Astro.site.href;
+---
+
+<Panel scrollable>
+  <div class="article">
+    <GalleryBoard client:load locale={locale} siteUrl={siteUrl} />
+  </div>
+</Panel>
+
+<style>
+  .article {
+    max-width: 48rem;
+  }
+</style>

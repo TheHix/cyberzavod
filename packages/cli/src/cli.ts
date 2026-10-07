@@ -1,7 +1,7 @@
 // Разбор командной строки: имя команды выбирает обработчик из таблицы, обработчик получает
 // аргументы и каталог, из которого запущен CLI, и возвращает код выхода.
 
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { parseArgs } from "node:util";
 import {
   draftSession,
@@ -13,12 +13,17 @@ import {
 } from "@cyberzavod/adapter-claude";
 import { RecordError } from "@cyberzavod/core";
 import { JournalError, ProjectFileError } from "@cyberzavod/storage";
+import { galleryAccessOf, showGallery } from "./commands/gallery.ts";
 import { initProject } from "./commands/init.ts";
 import { recordDecision, recordNote } from "./commands/journal.ts";
+import { login, logout } from "./commands/login.ts";
+import { shareRecording, unshareRecording } from "./commands/share.ts";
 import { printStatus } from "./commands/status.ts";
 import { checkProject, syncProject } from "./commands/sync.ts";
 import { CommandError } from "./errors.ts";
 import { readInstallation } from "./installation/installation.ts";
+import { ApiError } from "./sharing/api.ts";
+import { createSharing, type Sharing } from "./sharing/services.ts";
 import { defaultsPrompter, terminalPrompter } from "./wizard.ts";
 
 const SUCCESS = 0;
@@ -48,6 +53,10 @@ function requiredText(value: string | undefined, what: string): string {
   if (value === undefined || value.trim() === "") throw new CommandError(`нужен ${what}`);
 
   return value;
+}
+
+function defaultSharing(): Sharing {
+  return createSharing({ env: process.env, platform: process.platform, homeDirectory: homedir() });
 }
 
 const COMMANDS: Readonly<Record<string, Command>> = {
@@ -159,6 +168,65 @@ const COMMANDS: Readonly<Record<string, Command>> = {
       return published ? SUCCESS : FAILURE;
     },
   },
+  login: {
+    usage: "login",
+    summary:
+      "войти через GitHub, чтобы публиковать записи в галерею (адрес сервера — CYBERZAVOD_API_URL)",
+    run: async () => {
+      await login(defaultSharing());
+
+      return SUCCESS;
+    },
+  },
+  logout: {
+    usage: "logout",
+    summary: "забыть сохранённый токен GitHub",
+    run: async () => {
+      await logout(defaultSharing());
+
+      return SUCCESS;
+    },
+  },
+  share: {
+    usage: "share <id записи>",
+    summary: "отправить запись сессии из журнала в вашу галерею и показать ссылку на неё",
+    run: async ({ args, directory }) => {
+      const { positionals } = parseArgs({ args, allowPositionals: true });
+      const [id] = positionals;
+
+      await shareRecording(defaultSharing(), directory, requiredText(id, "id записи"));
+
+      return SUCCESS;
+    },
+  },
+  unshare: {
+    usage: "unshare <id записи>",
+    summary: "убрать запись из вашей галереи",
+    run: async ({ args }) => {
+      const { positionals } = parseArgs({ args, allowPositionals: true });
+      const [id] = positionals;
+
+      await unshareRecording(defaultSharing(), requiredText(id, "id записи"));
+
+      return SUCCESS;
+    },
+  },
+  gallery: {
+    usage: "gallery [--public | --private]",
+    summary:
+      "ваши записи в галерее, лимит и ссылки; --public открывает галерею, --private закрывает",
+    run: async ({ args }) => {
+      const { values } = parseArgs({
+        args,
+        options: { public: { type: "boolean" }, private: { type: "boolean" } },
+      });
+      const access = galleryAccessOf(values.public === true, values.private === true);
+
+      await showGallery(defaultSharing(), access);
+
+      return SUCCESS;
+    },
+  },
   hook: {
     usage: `hook <${HOOK_NAMES.join("|")}>`,
     summary: "хук Claude Code: событие на stdin; его вызывают настройки проекта, а не человек",
@@ -195,7 +263,14 @@ export function usage(): string {
   return `Cyberzavod — процесс разработки с ИИ-агентами, локально.\n\n${lines.join("\n")}`;
 }
 
-const EXPECTED_ERRORS = [CommandError, GenerateError, ProjectFileError, JournalError, RecordError];
+const EXPECTED_ERRORS = [
+  CommandError,
+  ApiError,
+  GenerateError,
+  ProjectFileError,
+  JournalError,
+  RecordError,
+];
 const ARGUMENT_ERROR_PREFIX = "ERR_PARSE_ARGS";
 
 // Ошибки, которые человек исправляет сам: им хватает сообщения. Неверные аргументы parseArgs

@@ -18,7 +18,9 @@ import (
 
 	"github.com/bysavelii/cyberzavod/apps/api/internal/config"
 	"github.com/bysavelii/cyberzavod/apps/api/internal/db"
+	"github.com/bysavelii/cyberzavod/apps/api/internal/github"
 	"github.com/bysavelii/cyberzavod/apps/api/internal/httpapi"
+	"github.com/bysavelii/cyberzavod/apps/api/internal/store"
 )
 
 const (
@@ -78,7 +80,13 @@ func serve(ctx context.Context, stop context.CancelFunc, logger *slog.Logger) er
 	}
 	defer pool.Close()
 
-	handler := httpapi.NewHandler(httpapi.Deps{DB: pool, Logger: logger})
+	handler := httpapi.NewHandler(httpapi.Deps{
+		DB:             pool,
+		Galleries:      store.New(pool),
+		Tokens:         github.NewVerifier(cfg.GitHubAPIURL),
+		GitHubClientID: cfg.GitHubClientID,
+		Logger:         logger,
+	})
 	srv := newServer(cfg.Addr, handler)
 
 	errCh := make(chan error, 1)

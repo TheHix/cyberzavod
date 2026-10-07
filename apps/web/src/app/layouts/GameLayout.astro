@@ -1,18 +1,21 @@
 ---
-// Игровой экран: цех на всё окно, меню слева, панели записей, гайдов и «о заводе» поверх.
+// Игровой экран: цех на всё окно, меню слева, панели записей, гайдов и «о заводе» поверх. Вход
+// в галереи и аналитику — в панели записей: плитка в меню на 360px уже не помещается.
 // Содержимое страницы — цех со своим HUD — встаёт в поле справа от меню.
 import BaseLayout from "./BaseLayout.astro";
 import { GuideList } from "@/widgets/guide-list";
 import { RecordingList } from "@/widgets/recording-list";
 import { Sidebar } from "@/widgets/sidebar";
+import { galleriesUrl } from "@/entities/gallery";
 import { publishedGuides } from "@/entities/guide";
+import { statsUrl } from "@/entities/stats";
 import { publishedRecordings } from "@/entities/recording";
 import { PANELS } from "@/shared/config/panels.ts";
 import { site } from "@/shared/config/site.ts";
 import { LOCALE_NAMES, otherLocales, type Locale } from "@/shared/i18n/locale.ts";
 import { localizedPath, pathWithoutLocale } from "@/shared/i18n/path.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
-import { Drawer } from "@/shared/ui";
+import { ButtonLink, Drawer } from "@/shared/ui";
 
 interface Props {
   /** Язык страницы: на нём интерфейс, панели и мета-теги. */
@@ -56,7 +59,18 @@ const closeLabel = UI_TEXT.panels.close[locale];
   </div>
 
   <Drawer id={PANELS.records} title={UI_TEXT.panels.records[locale]} closeLabel={closeLabel}>
-    <RecordingList recordings={publishedRecordings} locale={locale} />
+    <div class="records">
+      <div class="other-builds">
+        <p>{UI_TEXT.lists.otherBuilds[locale]}</p>
+        <div class="links">
+          <ButtonLink href={galleriesUrl(locale)}>
+            {UI_TEXT.pages.galleriesTitle[locale]}
+          </ButtonLink>
+          <ButtonLink href={statsUrl(locale)}>{UI_TEXT.pages.statsTitle[locale]}</ButtonLink>
+        </div>
+      </div>
+      <RecordingList recordings={publishedRecordings} locale={locale} />
+    </div>
   </Drawer>
   <Drawer id={PANELS.guides} title={UI_TEXT.panels.guides[locale]} closeLabel={closeLabel}>
     <GuideList guides={publishedGuides} locale={locale} />
@@ -98,6 +112,28 @@ const closeLabel = UI_TEXT.panels.close[locale];
   .field {
     display: grid;
     min-height: 0;
+  }
+
+  .records {
+    display: grid;
+    gap: var(--space-l);
+  }
+
+  .other-builds {
+    display: grid;
+    gap: var(--space-s);
+  }
+
+  .other-builds p {
+    margin: 0;
+    color: var(--ink-soft);
+    font-weight: 700;
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-s);
   }
 
   .about p {

@@ -30,6 +30,21 @@ jobs:
 
   api:
     runs-on: ubuntu-latest
+    # Хранилище галерей проверяется на настоящем Postgres: без TEST_DATABASE_URL его тесты пропускаются.
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_USER: cyberzavod
+          POSTGRES_PASSWORD: cyberzavod
+          POSTGRES_DB: cyberzavod_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cyberzavod" --health-interval 2s --health-timeout 5s
+          --health-retries 15
+    env:
+      TEST_DATABASE_URL: postgres://cyberzavod:cyberzavod@localhost:5432/cyberzavod_test?sslmode=disable
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7

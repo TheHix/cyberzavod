@@ -1,0 +1,17 @@
+.details summary {
+  display: grid;
+  gap: var(--space-xs);
+  justify-items: start;
+  margin-bottom: var(--space-xs);
+  cursor: pointer;
+  list-style: none;
+}
+
+.details summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Раскрытый промпт сворачивается кликом по нему же — подсказка больше не нужна. */
+.details[open] .more {
+  display: none;
+}

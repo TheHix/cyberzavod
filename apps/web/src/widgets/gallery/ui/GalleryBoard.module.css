@@ -1,0 +1,46 @@
+.board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-l);
+}
+
+.list {
+  display: grid;
+  gap: var(--space-m);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: grid;
+  gap: var(--space-xs);
+  justify-items: start;
+}
+
+.note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
+}
+
+/* minmax(0, …): иначе колонка не уже строки Markdown, и панель прокручивается вбок. */
+.badge {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-s);
+}
+
+.badge img {
+  justify-self: start;
+}
+
+.badge p {
+  margin: 0;
+}

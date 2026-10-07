@@ -5,8 +5,27 @@ Go, Postgres через pgx, миграции goose. Один бинарник �
 ## Устройство
 
 - `cmd/api` — только запуск: чтение конфига, сборка зависимостей, сигналы. Логики здесь нет.
-- `internal/<пакет>` — пакет по ответственности (`httpapi`, `db`, `config`), а не по типу файла.
+- `internal/<пакет>` — пакет по ответственности, а не по типу файла:
+  - `config` — настройки из окружения;
+  - `db` — подключение к Postgres и миграции;
+  - `gallery` — предметная область галерей без базы и HTTP: автор, запись, сводка, предел `RecordingLimit`, проверка конверта записи (`ParseRecording`) и случайная ссылка (`NewSlug`). Полную проверку формата записи делает TypeScript-ядро в CLI и в браузере, второго описания формата на Go нет;
+  - `github` — проверка токена у GitHub (`GET /user`) с кэшем в памяти по sha256 токена на 10 минут;
+  - `store` — галереи в Postgres на pgx: авторы, записи, предел записей (загрузки автора идут по очереди под `SELECT … FOR UPDATE` его строки), сводка SQL по `jsonb`;
+  - `badge` — SVG-бейдж галереи для README;
+  - `httpapi` — маршруты `/api` поверх интерфейсов `Galleries` и `TokenVerifier`.
 - `migrations/` — SQL-миграции, вшиты в бинарник.
+
+## Окружение
+
+- `DATABASE_URL` — строка подключения к Postgres, обязательна для `serve` и `migrate`.
+- `API_ADDR` — адрес сервера, по умолчанию `:8080`.
+- `GITHUB_CLIENT_ID` — client_id OAuth-приложения GitHub с device flow для входа из CLI. Необязательна: без неё `GET /api/auth/github` отвечает `503 auth_unavailable`, остальное работает. Не секрет, но настоящее значение живёт только в окружении сервера.
+- `GITHUB_API_URL` — адрес API GitHub, по умолчанию `https://api.github.com`; нужен для тестов.
+
+## Тесты
+
+- Обработчики и проверка токена тестируются без сети и базы: фейковое хранилище, фейковая проверка токена, `httptest`-сервер вместо GitHub.
+- Тесты `internal/store` идут на настоящем Postgres из `TEST_DATABASE_URL` и без неё пропускаются. Тест сам применяет миграции и очищает таблицы галерей, поэтому база нужна отдельная, не рабочая: `TEST_DATABASE_URL=postgres://cyberzavod:cyberzavod@localhost:5432/cyberzavod_test?sslmode=disable go test ./internal/store/` (базу `cyberzavod_test` создать один раз: `createdb`).
 
 ## Правила
 

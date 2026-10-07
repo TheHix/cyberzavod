@@ -2,7 +2,9 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "astro/config";
 import sitemap from "@astrojs/sitemap";
 import solid from "@astrojs/solid-js";
+import { isUnindexedPath } from "./src/shared/config/routes.ts";
 import { DEFAULT_LOCALE, LOCALES } from "./src/shared/i18n/locale.ts";
+import { pathWithoutLocale } from "./src/shared/i18n/path.ts";
 
 export default defineConfig({
   site: "https://cyberzavod.com",
@@ -12,6 +14,8 @@ export default defineConfig({
     solid(),
     // Карта сайта со ссылками между языками (xhtml:link) строится по тем же LOCALES, что и маршруты.
     sitemap({
+      // Страницы с noindex поисковику не предлагаются.
+      filter: (page) => !isUnindexedPath(pathWithoutLocale(new URL(page).pathname)),
       i18n: {
         defaultLocale: DEFAULT_LOCALE,
         locales: Object.fromEntries(LOCALES.map((locale) => [locale, locale])),

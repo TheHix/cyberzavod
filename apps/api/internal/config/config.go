@@ -8,7 +8,10 @@ import (
 	"os"
 )
 
-const defaultAddr = ":8080"
+const (
+	defaultAddr         = ":8080"
+	defaultGitHubAPIURL = "https://api.github.com"
+)
 
 // Config — настройки API, прочитанные из окружения.
 type Config struct {
@@ -16,13 +19,21 @@ type Config struct {
 	Addr string
 	// DatabaseURL — строка подключения к Postgres.
 	DatabaseURL string
+	// GitHubClientID — client_id OAuth-приложения GitHub, через которое CLI входит по
+	// device flow. Пусто — вход недоступен, остальное API работает.
+	GitHubClientID string
+	// GitHubAPIURL — адрес API GitHub, у которого проверяются токены авторов.
+	GitHubAPIURL string
 }
 
-// Load читает настройки из переменных окружения. DATABASE_URL обязателен.
+// Load читает настройки из переменных окружения. DATABASE_URL обязателен,
+// GITHUB_CLIENT_ID и GITHUB_API_URL — нет.
 func Load() (Config, error) {
 	cfg := Config{
-		Addr:        Addr(),
-		DatabaseURL: os.Getenv("DATABASE_URL"),
+		Addr:           Addr(),
+		DatabaseURL:    os.Getenv("DATABASE_URL"),
+		GitHubClientID: os.Getenv("GITHUB_CLIENT_ID"),
+		GitHubAPIURL:   envOrDefault("GITHUB_API_URL", defaultGitHubAPIURL),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -33,12 +44,16 @@ func Load() (Config, error) {
 
 // Addr возвращает адрес HTTP-сервера. Отдельно от Load, потому что healthcheck база не нужна.
 func Addr() string {
-	addr := os.Getenv("API_ADDR")
-	if addr != "" {
-		return addr
+	return envOrDefault("API_ADDR", defaultAddr)
+}
+
+func envOrDefault(name, fallback string) string {
+	value := os.Getenv(name)
+	if value != "" {
+		return value
 	}
 
-	return defaultAddr
+	return fallback
 }
 
 // LocalURL строит адрес, по которому процесс достучится до своего же сервера:

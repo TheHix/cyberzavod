@@ -1,3 +1,4 @@
+export { BarList, type BarItem } from "./bar-list/BarList.tsx";
 export { BulletList } from "./bullet-list/BulletList.tsx";
 export {
   Button,

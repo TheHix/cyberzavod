@@ -81,6 +81,10 @@ export const UI_TEXT = {
   lists: {
     noRecordings: { en: "No builds yet.", ru: "Записей пока нет." },
     noGuides: { en: "No guides yet.", ru: "Гайдов пока нет." },
+    otherBuilds: {
+      en: "Builds of other projects are in the galleries of Cyberzavod users.",
+      ru: "Сборки других проектов — в галереях пользователей Киберзавода.",
+    },
     tokens: {
       en: { one: "token", other: "tokens" },
       ru: { one: "токен", few: "токена", many: "токенов" },
@@ -88,6 +92,10 @@ export const UI_TEXT = {
     prompts: {
       en: { one: "prompt", other: "prompts" },
       ru: { one: "промпт", few: "промпта", many: "промптов" },
+    },
+    builds: {
+      en: { one: "build", other: "builds" },
+      ru: { one: "сборка", few: "сборки", many: "сборок" },
     },
   },
   /** Карточка проекта. */
@@ -106,6 +114,21 @@ export const UI_TEXT = {
     projectTitle: {
       en: (name: string) => `Project “${name}”`,
       ru: (name: string) => `Проект «${name}»`,
+    },
+    sharedRecordingTitle: { en: "Recording from a gallery", ru: "Запись из галереи" },
+    sharedRecordingDescription: {
+      en: "A build recording shared from the Cyberzavod CLI: the floor of AI agents plays it back.",
+      ru: "Запись сборки, опубликованная из CLI Киберзавода: её проигрывает цех ИИ-агентов.",
+    },
+    galleriesTitle: { en: "Galleries", ru: "Галереи" },
+    galleriesDescription: {
+      en: "Open galleries of Cyberzavod users: build recordings of their projects on the floor of AI agents.",
+      ru: "Открытые галереи пользователей Киберзавода: записи сборок их проектов в цехе ИИ-агентов.",
+    },
+    statsTitle: { en: "Analytics", ru: "Аналитика" },
+    statsDescription: {
+      en: "Where the process stalls: reworks by stage, human interventions, tokens and build outcomes across open galleries.",
+      ru: "Где процесс буксует: возвраты по этапам, вмешательства человека, токены и исходы сборок по открытым галереям.",
     },
     recordingDescription: {
       en: (title: string) =>
@@ -137,6 +160,95 @@ export const UI_TEXT = {
       en: (language: string) => `recorded in ${language}`,
       ru: (language: string) => `язык записи: ${language}`,
     },
+  },
+  /** Запись из галереи по секретной ссылке: пока её нельзя показать — почему. */
+  sharedRecording: {
+    loading: { en: "Loading the recording…", ru: "Загружаем запись…" },
+    missing: {
+      en: "There is no such recording: the link has a typo or the author has removed it.",
+      ru: "Такой записи нет: в ссылке опечатка или автор её убрал.",
+    },
+    broken: {
+      en: "The recording did not pass the check — this floor cannot play it.",
+      ru: "Запись не прошла проверку — этот цех не может её проиграть.",
+    },
+    failed: {
+      en: "Could not load the recording — try reloading the page.",
+      ru: "Не удалось загрузить запись — попробуйте обновить страницу.",
+    },
+    // Карточки проекта у записи из галереи нет: автор и id проекта, как репозиторий на GitHub.
+    project: {
+      en: (owner: string, project: string) => `${owner} / ${project}`,
+      ru: (owner: string, project: string) => `${owner} / ${project}`,
+    },
+  },
+  /** Данные из API на страницах галерей и аналитики: пока их нельзя показать — почему. */
+  remote: {
+    loading: { en: "Loading…", ru: "Загружаем…" },
+    broken: {
+      en: "The server's answer did not pass the check.",
+      ru: "Ответ сервера не прошёл проверку.",
+    },
+    failed: {
+      en: "Could not load the data — try reloading the page.",
+      ru: "Не удалось загрузить данные — попробуйте обновить страницу.",
+    },
+  },
+  /** Галереи: общий список и галерея автора с бейджем. */
+  gallery: {
+    listHeading: { en: "Open galleries", ru: "Открытые галереи" },
+    listIntro: {
+      en: "Authors share build recordings from the CLI with cyberzavod share. A gallery is listed here once its author opens it.",
+      ru: "Авторы публикуют записи сборок из CLI командой cyberzavod share. Галерея попадает сюда, когда автор её откроет.",
+    },
+    noGalleries: { en: "No open galleries yet.", ru: "Открытых галерей пока нет." },
+    authorHeading: {
+      en: (login: string) => `${login}'s gallery`,
+      ru: (login: string) => `Галерея ${login}`,
+    },
+    noRecordings: { en: "No recordings in this gallery yet.", ru: "В галерее пока нет записей." },
+    missing: {
+      en: "This gallery is private or does not exist.",
+      ru: "Эта галерея закрыта или её нет.",
+    },
+    updated: {
+      en: (date: string) => `updated ${date}`,
+      ru: (date: string) => `обновлена ${date}`,
+    },
+    allGalleries: { en: "All galleries", ru: "Все галереи" },
+    badgeHeading: { en: "Badge for README", ru: "Бейдж для README" },
+    badgeHint: {
+      en: "Paste this line into your project's README: the badge shows the number of builds and links to this gallery.",
+      ru: "Вставьте строку в README проекта: бейдж показывает число сборок и ведёт в эту галерею.",
+    },
+    badgeAlt: {
+      en: (login: string) => `Cyberzavod badge: builds of ${login}`,
+      ru: (login: string) => `Бейдж Киберзавода: сборки ${login}`,
+    },
+    copyLabels: {
+      en: { idle: "Copy Markdown", copied: "Copied", failed: "Could not copy" },
+      ru: { idle: "Копировать Markdown", copied: "Скопировано", failed: "Не удалось скопировать" },
+    },
+  },
+  /** Аналитика по записям открытых галерей. */
+  stats: {
+    heading: { en: "Build analytics", ru: "Аналитика сборок" },
+    intro: {
+      en: "Builds from open galleries: where the process stalls, how many tokens it takes and when a human is called.",
+      ru: "Сборки из открытых галерей: где процесс буксует, сколько уходит токенов и когда зовут человека.",
+    },
+    empty: {
+      en: "There are no builds in open galleries yet — nothing to count.",
+      ru: "В открытых галереях пока нет сборок — считать нечего.",
+    },
+    builds: { en: "Builds", ru: "Сборки" },
+    authors: { en: "Authors", ru: "Авторы" },
+    returnsHeading: { en: "Reworks by stage", ru: "Возвраты по этапам" },
+    interventionsHeading: { en: "Interventions by reason", ru: "Вмешательства по причинам" },
+    outcomesHeading: { en: "Build outcomes", ru: "Исходы сборок" },
+    succeeded: { en: "succeeded", ru: "успешно" },
+    failed: { en: "failed", ru: "с ошибкой" },
+    none: { en: "None so far.", ru: "Пока не было." },
   },
   /** Остров цеха. */
   factory: {

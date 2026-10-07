@@ -16,6 +16,8 @@ services:
     environment:
       DATABASE_URL: postgres://cyberzavod:cyberzavod@db:5432/cyberzavod?sslmode=disable
       API_ADDR: ":8080"
+      # client_id OAuth-приложения GitHub для входа из CLI; пусто — вход недоступен.
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       CLAUDE_CONFIG_DIR: /home/node/.claude
       # Без телеметрии: меньше доменов в белом списке файрвола.
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"

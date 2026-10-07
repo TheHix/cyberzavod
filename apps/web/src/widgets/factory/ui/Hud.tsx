@@ -1,6 +1,5 @@
 import { Show, type JSX } from "solid-js";
 import type { BriefSessionRecord } from "@cyberzavod/core";
-import type { ProjectLink } from "@/entities/project";
 import { useLocale } from "@/shared/i18n/locale-context.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { formatDate, formatDuration, formatTokens } from "@/shared/lib/format.ts";
@@ -10,10 +9,19 @@ import { PlaybackControls } from "./PlaybackControls.tsx";
 import { SpeechDock } from "./SpeechDock.tsx";
 import styles from "./Hud.module.css";
 
+/**
+ * Проект сборки в HUD: название и адрес, если есть куда вести, — страница проекта (`ProjectLink`)
+ * или галерея автора записи; у записи из закрытой галереи адреса нет.
+ */
+export interface BuildProject {
+  readonly name: string;
+  readonly url: string | undefined;
+}
+
 interface Props {
   recording: BriefSessionRecord;
-  /** Проект, который собирали: ссылка на него стоит рядом с датой. */
-  project: ProjectLink;
+  /** Проект, который собирали: он стоит рядом с датой. */
+  project: BuildProject;
   /** Пометка о языке оригинала записи рядом с датой; нет, если запись на языке страницы. */
   languageNote: string | undefined;
   /** Уровень заголовка: на странице записи это главный заголовок, на главной — нет. */
@@ -26,7 +34,7 @@ interface Props {
  * полка речи.
  * @param {Props} props Свойства компонента.
  * @param {BriefSessionRecord} props.recording Запись, которую проигрывает цех.
- * @param {ProjectLink} props.project Проект, который собирали.
+ * @param {BuildProject} props.project Проект, который собирали.
  * @param {string | undefined} props.languageNote Пометка о языке оригинала записи.
  * @param {"h1" | "h2"} props.titleLevel Уровень заголовка с названием сборки.
  * @returns {JSX.Element} Панель сборки.
@@ -49,9 +57,13 @@ export function Hud(props: Props): JSX.Element {
           {props.recording.data.title}
         </Title>
         <p class={styles.date}>
-          <ButtonLink variant="link" href={props.project.url}>
-            {props.project.name}
-          </ButtonLink>{" "}
+          <Show when={props.project.url} fallback={props.project.name}>
+            {(url) => (
+              <ButtonLink variant="link" href={url()}>
+                {props.project.name}
+              </ButtonLink>
+            )}
+          </Show>{" "}
           · {formatDate(props.recording.timestamp, locale)}
           <Show when={props.languageNote}>{(note) => ` · ${note()}`}</Show>
         </p>

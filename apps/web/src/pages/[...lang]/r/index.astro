@@ -1,0 +1,42 @@
+---
+import type { GetStaticPaths } from "astro";
+import GameLayout from "@/app/layouts/GameLayout.astro";
+import { SharedFactory } from "@/widgets/factory";
+import { SharedBuildJournal } from "@/widgets/build-journal";
+import { LanguageQuery } from "@/features/language-query";
+import { PANELS } from "@/shared/config/panels.ts";
+import { LOCALES, type Locale } from "@/shared/i18n/locale.ts";
+import { localeParam } from "@/shared/i18n/path.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
+import { Drawer } from "@/shared/ui";
+
+export const getStaticPaths = (() =>
+  LOCALES.map((locale) => ({
+    params: { lang: localeParam(locale) },
+    props: { locale },
+  }))) satisfies GetStaticPaths;
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<GameLayout
+  locale={locale}
+  title={UI_TEXT.pages.sharedRecordingTitle[locale]}
+  description={UI_TEXT.pages.sharedRecordingDescription[locale]}
+  journal
+>
+  <SharedFactory client:load locale={locale} />
+  <LanguageQuery client:idle />
+  <Drawer
+    slot="drawers"
+    id={PANELS.journal}
+    title={UI_TEXT.panels.journal[locale]}
+    closeLabel={UI_TEXT.panels.close[locale]}
+  >
+    <SharedBuildJournal locale={locale} />
+  </Drawer>
+</GameLayout>
