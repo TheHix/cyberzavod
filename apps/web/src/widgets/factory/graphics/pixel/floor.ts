@@ -8,7 +8,8 @@ import { Container, Sprite, TilingSprite, type Texture } from "pixi.js";
 import { blankImage, clearPixel, fillRect, type PixelImage } from "./art.ts";
 import type { PlanBounds } from "./bounds.ts";
 import { laneRects } from "./lane.ts";
-import { shade, type Palette } from "./palette.ts";
+import { shade } from "@/shared/lib/color.ts";
+import type { Palette } from "./palette.ts";
 import { textureOf } from "./textures.ts";
 import { PIXELS_PER_UNIT } from "./units.ts";
 

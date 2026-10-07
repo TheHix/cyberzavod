@@ -2,7 +2,7 @@
    по умолчанию как у табличек цеха) задаёт тот, кто ставит табличку, на ней или на её предке. */
 .plaque {
   --plaque-pixel-size: var(--plaque-pixel, 3px);
-  /* Тень бумаги — та же ступень, что у табличек цеха (`SHADE_PAPER` в графике). */
+  /* Тень бумаги — та же ступень, что у табличек цеха (`PLAQUE_PAPER_SHADE` в `pixel-plaque.ts`). */
   --plaque-paper-shade: color-mix(in srgb, var(--plaque-face, var(--paper)) 88%, black);
 
   display: block;

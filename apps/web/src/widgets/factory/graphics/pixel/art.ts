@@ -1,7 +1,9 @@
 // Формат пиксельного рисунка: массив строк, буква — краска. Чистый код без Pixi: строки
 // превращаются в цвета здесь, а в текстуру — в textures.ts.
 
-import { shade, type Palette } from "./palette.ts";
+import { shade } from "@/shared/lib/color.ts";
+import { PLAQUE_PAPER_SHADE } from "@/shared/lib/pixel-plaque.ts";
+import type { Palette } from "./palette.ts";
 
 /** Смысловая краска рисунка: какой токен и какая ступень `shade()` лежат за буквой. */
 export type Ink =
@@ -94,7 +96,6 @@ const GREEN_SHIFT = 8;
 // Ступени объёма: тёмная грань и блик — от одной краски, чтобы вещь читалась одним цветом.
 const SHADE_DEEP = -0.3;
 const SHADE_LIGHT = 0.4;
-const SHADE_PAPER = -0.12;
 const SHADE_HELMET = -0.25;
 const SHADE_HELMET_LIGHT = 0.45;
 const SHADE_WOOD_LIGHT = 0.35;
@@ -152,7 +153,7 @@ export function paletteInks(palette: Palette): Inks {
     screen: palette.screen,
     screenGlass: palette.screenGlass,
     paper: palette.paper,
-    paperShade: shade(palette.paper, SHADE_PAPER),
+    paperShade: shade(palette.paper, PLAQUE_PAPER_SHADE),
     wood: palette.crate.wood,
     woodShade: palette.crate.plank,
     woodLight: shade(palette.crate.wood, SHADE_WOOD_LIGHT),
