@@ -103,3 +103,7 @@ The tool and the site share this repository but not code: the site only reads th
 Developing Cyberzavod itself: `pnpm install`, then `pnpm cyberzavod <command>` builds the CLI from source and runs it. `make dev` starts the site on http://localhost:4321 and the API, `make check` runs every check, and `make help` lists the rest. The project rules are in [AGENTS.md](AGENTS.md). There is an isolated dev container for AI agents; see [.devcontainer/README.md](.devcontainer/README.md).
 
 A step-by-step guide (in Russian) to connecting a project is on the site: https://cyberzavod.com/guides/connect-project/ (source: [guides/connect-project.md](guides/connect-project.md)).
+
+## License
+
+[MIT](LICENSE).
