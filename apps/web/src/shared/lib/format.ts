@@ -50,7 +50,17 @@ export function formatClock(ms: number): string {
   return `${hours}:${twoDigits(totalMinutes % HOUR_MINUTES)}:${seconds}`;
 }
 
-const TOKEN_FORMATTERS = byLocale((locale) => new Intl.NumberFormat(LOCALE_TAGS[locale]));
+const NUMBER_FORMATTERS = byLocale((locale) => new Intl.NumberFormat(LOCALE_TAGS[locale]));
+
+/**
+ * Форматирует число с разбиением по разрядам.
+ * @param {number} value Число.
+ * @param {Locale} locale Язык, по правилам которого разбиваются разряды.
+ * @returns {string} Строка вида «12 345»; по-английски «12,345».
+ */
+export function formatNumber(value: number, locale: Locale): string {
+  return NUMBER_FORMATTERS[locale].format(value);
+}
 
 /**
  * Форматирует число токенов с разбиением по разрядам.
@@ -59,7 +69,7 @@ const TOKEN_FORMATTERS = byLocale((locale) => new Intl.NumberFormat(LOCALE_TAGS[
  * @returns {string} Строка вида «1 234 567»; по-английски «1,234,567».
  */
 export function formatTokens(tokens: number, locale: Locale): string {
-  return TOKEN_FORMATTERS[locale].format(tokens);
+  return formatNumber(tokens, locale);
 }
 
 // Страницы собираются заранее, без часового пояса зрителя, поэтому день — по UTC, как и в id записи.

@@ -10,7 +10,7 @@ Cyberzavod is a local harness for development with AI agents. It does not write 
 
 The default process: task → plan → code → review → verify → record. The first agent the factory supports is Claude Code. Its hooks write the session log. The log becomes a session recording: stages, prompts, station messages, time and tokens. The floor on the site plays that recording back.
 
-Nothing goes over the network. The config, the tool itself and the log live in your repository. You don't need a clone of Cyberzavod: the factory site is just one of the showcases that can play a log back.
+Nothing goes over the network until you ask for it: only the commands that share a recording on the site talk to the server. The config, the tool itself and the log live in your repository. You don't need a clone of Cyberzavod: the factory site is just one of the showcases that can play a log back.
 
 ## What you need
 
@@ -133,12 +133,48 @@ If one session handled several tasks, each one is published as a separate record
 
 ### How a recording gets onto cyberzavod.com
 
-The site takes recordings from the factory's `.cyberzavod/journal/sessions/` and project cards from `projects/` at build time. This is the only case when you need a clone of the factory. To show your work, open a pull request to the [factory repository](https://github.com/bysavelii/cyberzavod) with two files:
+A published recording is shared from the CLI straight into your personal gallery on the site. You need neither a clone of the factory nor a pull request.
+
+1. Sign in with GitHub:
+
+   ```bash
+   node .cyberzavod/bin/cyberzavod.mjs login
+   ```
+
+   The command shows a code and the address `https://github.com/login/device`: open it, enter the code and confirm. The factory asks GitHub only for your public profile, to learn your login. The token is kept in your user settings directory (`~/.config/cyberzavod/credentials.json`, `%APPDATA%\cyberzavod` on Windows), outside the project; `logout` removes it.
+
+2. Share the recording by its `id` — the name of the file in `sessions/` of the log:
+
+   ```bash
+   node .cyberzavod/bin/cyberzavod.mjs share <id>
+   ```
+
+   Before sending, `share` checks the recording the same way the site does. In reply it prints a link like `https://cyberzavod.com/r/?id=<slug>`: the same floor and build log as on the factory's own recordings. Sharing the same `id` again replaces the recording, and the link stays the same.
+
+3. The gallery is private by default: a recording is visible only to those who have the link. To list the gallery on the site, open it:
+
+   ```bash
+   node .cyberzavod/bin/cyberzavod.mjs gallery --public
+   ```
+
+   An open gallery appears in the list of [galleries](/gallery/), gets its own page `/gallery/?user=<login>` and counts in the [analytics](/stats/) of builds: where the process stalls, how many tokens go, when a human is called. `gallery --private` closes it again; the links to recordings keep working.
+
+A gallery holds up to 5 recordings; replacing a recording doesn't count as a new one. When the limit is reached, `share` lists your recordings: free a slot with `unshare <id>`. `gallery` without flags shows the recordings with their links, whether the gallery is open, and the limit.
+
+For an open gallery, `gallery` also prints a badge line for the README: the "cyberzavod | N builds" badge links to the gallery. The same line with a copy button is on the gallery page.
+
+```markdown
+[![Built at Cyberzavod](https://cyberzavod.com/api/badges/<login>.svg)](https://cyberzavod.com/gallery/?user=<login>)
+```
+
+### A project on the factory's home page
+
+The home page and the project pages of the site are built from the factory repository: recordings from its `.cyberzavod/journal/sessions/` and project cards from `projects/`. To have your project there with a card, open a pull request to the [factory repository](https://github.com/bysavelii/cyberzavod) with two files:
 
 - the recording `.cyberzavod/journal/sessions/<id>.json` from your project log;
 - the card `projects/<id>.json`: `id`, `name` and a one-line `description` in every site language (`{ "en": …, "ru": … }`) and optional `repo` and `website`, `https` only.
 
-Before that, run `pnpm install` and `make check-web` in the clone: it builds the site and catches a broken card or recording. To preview the recording locally, run `pnpm dev` in the clone: the site opens at `http://localhost:4321`, and the recording is at `/recordings/<id>/`.
+Before that, run `pnpm install` and `make check-web` in the clone: it builds the site and catches a broken card or recording.
 
 ## If something doesn't work
 

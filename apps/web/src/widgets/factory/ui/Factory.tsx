@@ -1,7 +1,6 @@
 import { createSignal, onCleanup, onMount, Show, untrack, type JSX } from "solid-js";
 import { type BriefSessionRecord } from "@cyberzavod/core";
 import { layoutFor } from "@cyberzavod/player";
-import type { ProjectLink } from "@/entities/project";
 import { connectScene } from "@/features/journal-sync";
 import { LocaleProvider } from "@/shared/i18n/locale-context.ts";
 import type { Locale } from "@/shared/i18n/locale.ts";
@@ -14,7 +13,7 @@ import {
 } from "../graphics/factory-graphics.ts";
 import { createFactoryModel, type FactoryModel } from "../model/factory.ts";
 import { startFrameClock } from "./frame-clock.ts";
-import { Hud } from "./Hud.tsx";
+import { Hud, type BuildProject } from "./Hud.tsx";
 import { InterventionBubble } from "./InterventionBubble.tsx";
 import { MessageBubble } from "./MessageBubble.tsx";
 import { FactoryModelProvider } from "./model-context.ts";
@@ -25,8 +24,8 @@ interface Props {
   recording: BriefSessionRecord;
   /** Язык страницы: на нём подписи цеха, HUD и пузырей. */
   locale: Locale;
-  /** Проект, который собирали, — ссылка на его страницу в HUD. */
-  project: ProjectLink;
+  /** Проект, который собирали, — в HUD; ссылка на его страницу или галерею автора, если есть. */
+  project: BuildProject;
   /** Пометка о языке оригинала записи; нет, если запись на языке страницы. */
   languageNote: string | undefined;
   /** Уровень заголовка с названием сборки; по умолчанию — главный заголовок страницы. */
@@ -95,7 +94,7 @@ function fieldWithin(host: HTMLElement, field: HTMLElement): Frame {
  * @param {Props} props Свойства компонента.
  * @param {BriefSessionRecord} props.recording Запись сборки, которую проигрывает цех.
  * @param {Locale} props.locale Язык страницы.
- * @param {ProjectLink} props.project Проект, который собирали.
+ * @param {BuildProject} props.project Проект, который собирали.
  * @param {string | undefined} props.languageNote Пометка о языке оригинала записи.
  * @param {"h1" | "h2"} [props.titleLevel] Уровень заголовка с названием сборки.
  * @returns {JSX.Element} Цех с HUD.

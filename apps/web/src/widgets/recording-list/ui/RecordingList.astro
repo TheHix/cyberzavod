@@ -2,7 +2,8 @@
 // Список записей: заголовок, проект, день и главные счётчики каждой сборки.
 import { summarize, type SessionRecord } from "@cyberzavod/core";
 import { projectOf, projectUrl, publishedProjects } from "@/entities/project";
-import { languageNoteOf, recordingUrl } from "@/entities/recording";
+import { recordingUrl } from "@/entities/recording";
+import { languageNoteOf } from "@/shared/lib/language-note.ts";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { formatCount, formatDate, formatDuration } from "@/shared/lib/format.ts";

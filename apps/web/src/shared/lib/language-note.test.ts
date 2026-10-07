@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { languageNoteOf } from "./language.ts";
+import { languageNoteOf } from "./language-note.ts";
 
 describe("languageNoteOf", () => {
   it.each([

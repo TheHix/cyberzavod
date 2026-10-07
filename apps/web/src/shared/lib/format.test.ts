@@ -6,6 +6,7 @@ import {
   formatDuration,
   formatLanguage,
   formatModel,
+  formatNumber,
   formatTokens,
   type PluralWords,
 } from "./format.ts";
@@ -56,6 +57,18 @@ describe("formatClock", () => {
     const result = formatClock(3_725_000);
 
     expect(result).toBe("1:02:05");
+  });
+});
+
+describe("formatNumber", () => {
+  it.each([
+    ["en", "12,345"],
+    ["ru", "12 345"],
+  ] as const)("разбивает число по разрядам по правилам языка (%s)", (locale, expected) => {
+    const result = formatNumber(12_345, locale);
+
+    // Intl ставит неразрывные пробелы — сравниваем с обычными.
+    expect(result.replace(/\s/g, " ")).toBe(expected);
   });
 });
 

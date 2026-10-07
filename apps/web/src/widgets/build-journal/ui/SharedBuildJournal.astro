@@ -1,0 +1,15 @@
+---
+// Журнал сборки записи из галереи: запись приходит из API в браузере, и весь журнал — один
+// остров. Пока панель закрыта, его не видно: острову хватает времени простоя.
+import type { Locale } from "@/shared/i18n/locale.ts";
+import { SharedJournal } from "./SharedJournal.tsx";
+
+interface Props {
+  /** Язык страницы: на нём метки, подписи и сообщения журнала. */
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<SharedJournal client:idle locale={locale} />

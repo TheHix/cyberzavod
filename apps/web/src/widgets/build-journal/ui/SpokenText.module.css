@@ -1,0 +1,10 @@
+.text {
+  display: grid;
+  gap: var(--space-s);
+  margin-top: var(--space-xs);
+}
+
+.text p {
+  margin: 0;
+  white-space: pre-line;
+}

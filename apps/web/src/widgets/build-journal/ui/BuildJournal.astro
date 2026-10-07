@@ -1,22 +1,18 @@
 ---
-// Журнал сборки: промпты и вмешательства человека и реплики цеха одним списком по времени. Промпт — как
-// сообщение модели, которая его получила: главное указание видно сразу, уточнения раскрываются
-// без JS через <details>. Вмешательство и реплика раскрыты целиком: строка из цеха и полный текст абзацами.
-// Каждая запись — остров client:visible со статичным телом в слоте: пока журнал закрыт, его
-// не видно и JS не грузится. Подсветка записи, до которой дошёл цех, и кнопка «показать в цехе»
-// появляются только с JS, когда запись на экране; без него остаётся эта же разметка.
-import type { InterventionEvent, MessageEvent, PromptEvent, SessionRecord } from "@cyberzavod/core";
-import { interventionAnchor, labelOf } from "@/entities/intervention";
-import { recipientOf } from "@/entities/prompt";
-import { languageNoteOf } from "@/entities/recording";
-import { messageAnchor, routeOf } from "@/entities/message";
-import type { Speech } from "@/features/journal-sync";
+// Журнал сборки на странице записи из журнала проекта: промпты и вмешательства человека и
+// реплики цеха одним списком по времени. Каждая запись — остров client:visible со статичным
+// телом в слоте: пока журнал закрыт, его не видно и JS не грузится. Подсветка записи, до
+// которой дошёл цех, и кнопка «показать в цехе» появляются только с JS, когда запись на экране;
+// без него остаётся эта же разметка. Острова создаёт только Astro, поэтому список собран здесь,
+// а тело записи, шапка и стили — общие с `JournalTimeline`, журналом записи из API.
+import type { SessionRecord } from "@cyberzavod/core";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
-import { formatClock } from "@/shared/lib/format.ts";
-import { BulletList, buttonClass, Title } from "@/shared/ui";
+import { languageNoteOf } from "@/shared/lib/language-note.ts";
+import { headerOf, timelineOf } from "../lib/timeline.ts";
+import { EntryBody } from "./EntryBody.tsx";
 import { JournalEntry } from "./JournalEntry.tsx";
-import SpokenText from "./SpokenText.astro";
+import styles from "./Timeline.module.css";
 
 interface Props {
   /** Полная запись: в журнале, в отличие от цеха, есть полные тексты реплик. */
@@ -25,183 +21,34 @@ interface Props {
   locale: Locale;
 }
 
-type Entry =
-  | { kind: "prompt"; prompt: PromptEvent; speech: Extract<Speech, { kind: "prompt" }> }
-  | {
-      kind: "intervention";
-      intervention: InterventionEvent;
-      speech: Extract<Speech, { kind: "intervention" }>;
-    }
-  | { kind: "message"; message: MessageEvent; speech: Extract<Speech, { kind: "message" }> };
-
 const { recording, locale } = Astro.props;
-
-// Номера промптов, вмешательств и реплик — те же, что у пузырей в цехе: по ним цех и журнал находят друг
-// друга, а по номеру вмешательства или реплики «подробнее» находит запись.
-function entriesOf(events: SessionRecord["data"]["events"]): Entry[] {
-  let promptIndex = 0;
-  let interventionIndex = 0;
-  let messageIndex = 0;
-
-  return events.flatMap((event): Entry[] => {
-    switch (event.type) {
-      case "prompt":
-        return [
-          { kind: "prompt", prompt: event, speech: { kind: "prompt", index: promptIndex++ } },
-        ];
-      case "intervention":
-        return [
-          {
-            kind: "intervention",
-            intervention: event,
-            speech: { kind: "intervention", index: interventionIndex++ },
-          },
-        ];
-      case "message":
-        return [
-          { kind: "message", message: event, speech: { kind: "message", index: messageIndex++ } },
-        ];
-      case "build_start":
-      case "stage_enter":
-      case "stage_fail":
-      case "usage":
-      case "build_end":
-        return [];
-      default:
-        // Новый тип события не скомпилируется, пока здесь не решат, попадает ли он в журнал.
-        return event satisfies never;
-    }
-  });
-}
-
-const entries = entriesOf(recording.data.events);
+const entries = timelineOf(recording.data.events);
 const { language } = recording.data;
 const languageNote = languageNoteOf(language, locale);
 ---
 
-{languageNote !== undefined && <p class="language">{languageNote}</p>}
+{languageNote !== undefined && <p class={styles.language}>{languageNote}</p>}
 
 {entries.length === 0 ? (
-  <p class="empty">{UI_TEXT.journal.empty[locale]}</p>
+  <p class={styles.empty}>{UI_TEXT.journal.empty[locale]}</p>
 ) : (
-  <ol class="timeline">
+  <ol class={styles.timeline}>
     {entries.map((entry) => {
-      switch (entry.kind) {
-        case "prompt": {
-          const hasRequirements = entry.prompt.requirements.length > 0;
+      const { anchor, clock, route } = headerOf(entry, locale);
 
-          return (
-            <li>
-              <JournalEntry
-                client:visible
-                speech={entry.speech}
-                locale={locale}
-                clock={formatClock(entry.prompt.t)}
-                route={UI_TEXT.speech.humanTo[locale](recipientOf(entry.prompt, locale))}
-              >
-                {hasRequirements ? (
-                  <details class="details">
-                    <summary>
-                      <Title as="span" lang={language}>
-                        {entry.prompt.goal}
-                      </Title>
-                      <span class={`more ${buttonClass({ variant: "link" })}`}>
-                        {UI_TEXT.speech.more[locale]}
-                      </span>
-                    </summary>
-                    <BulletList items={entry.prompt.requirements} lang={language} />
-                  </details>
-                ) : (
-                  <Title lang={language}>{entry.prompt.goal}</Title>
-                )}
-              </JournalEntry>
-            </li>
-          );
-        }
-
-        case "intervention":
-          return (
-            <li id={interventionAnchor(entry.speech.index)}>
-              <JournalEntry
-                client:visible
-                speech={entry.speech}
-                locale={locale}
-                clock={formatClock(entry.intervention.t)}
-                route={labelOf(entry.intervention, locale)}
-              >
-                <SpokenText
-                  line={entry.intervention.line}
-                  text={entry.intervention.text}
-                  language={language}
-                />
-              </JournalEntry>
-            </li>
-          );
-        case "message":
-          return (
-            <li id={messageAnchor(entry.speech.index)}>
-              <JournalEntry
-                client:visible
-                speech={entry.speech}
-                locale={locale}
-                clock={formatClock(entry.message.t)}
-                route={routeOf(entry.message, locale)}
-              >
-                <SpokenText
-                  line={entry.message.line}
-                  text={entry.message.text}
-                  language={language}
-                />
-              </JournalEntry>
-            </li>
-          );
-        default:
-          return entry satisfies never;
-      }
+      return (
+        <li id={anchor}>
+          <JournalEntry
+            client:visible
+            speech={entry.speech}
+            locale={locale}
+            clock={clock}
+            route={route}
+          >
+            <EntryBody entry={entry} language={language} locale={locale} />
+          </JournalEntry>
+        </li>
+      );
     })}
   </ol>
 )}
-
-<style>
-  .timeline {
-    display: grid;
-    gap: var(--space-m);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  /* Вмешательство или реплику, к которой пришли по «подробнее», не прячет под край панели. */
-  .timeline > li {
-    scroll-margin: var(--space-l);
-  }
-
-  .details summary {
-    display: grid;
-    gap: var(--space-xs);
-    justify-items: start;
-    margin-bottom: var(--space-xs);
-    cursor: pointer;
-    list-style: none;
-  }
-
-  .details summary::-webkit-details-marker {
-    display: none;
-  }
-
-  /* Раскрытый промпт сворачивается кликом по нему же — подсказка больше не нужна. */
-  .details[open] .more {
-    display: none;
-  }
-
-  .empty {
-    margin: 0;
-    color: var(--ink-soft);
-  }
-
-  .language {
-    margin: 0 0 var(--space-m);
-    color: var(--ink-soft);
-    font-weight: 700;
-  }
-</style>

@@ -1,0 +1,44 @@
+---
+// Страница аналитики: заголовок и пояснение — в разметке, числа и диаграммы приходят из API
+// в браузере.
+import { galleriesUrl } from "@/entities/gallery";
+import type { Locale } from "@/shared/i18n/locale.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
+import { ButtonLink, Panel, Title } from "@/shared/ui";
+import { StatsBoard } from "./StatsBoard.tsx";
+
+interface Props {
+  /** Язык страницы. */
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<Panel scrollable>
+  <article class="article">
+    <Title as="h1" size="xl">
+      {UI_TEXT.stats.heading[locale]}
+    </Title>
+    <p class="intro">{UI_TEXT.stats.intro[locale]}</p>
+    <StatsBoard client:load locale={locale} />
+    <div class="links">
+      <ButtonLink href={galleriesUrl(locale)}>{UI_TEXT.pages.galleriesTitle[locale]}</ButtonLink>
+    </div>
+  </article>
+</Panel>
+
+<style>
+  .article {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-l);
+    max-width: 48rem;
+  }
+
+  .intro {
+    margin: 0;
+    color: var(--ink-soft);
+    font-weight: 700;
+  }
+</style>

@@ -1,6 +1,6 @@
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
-import { formatLanguage } from "@/shared/lib/format.ts";
+import { formatLanguage } from "./format.ts";
 
 /**
  * Пометка о языке оригинала записи: запись не переводится, и зритель на другом языке должен
