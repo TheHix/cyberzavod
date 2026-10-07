@@ -1,8 +1,9 @@
 // Harness — процесс разработки в текстах: принципы, этапы и ведущий. Здесь — модель этих текстов
-// и разбор файла этапа; читают файлы с диска и превращают тексты в файлы агента другие пакеты.
+// и их разбор; откуда взять тексты (каталог на диске или встроенные в сборку CLI), решают другие
+// пакеты.
 
 import { isLine } from "./guards.ts";
-import type { Stage, Workflow } from "./stage.ts";
+import { parseWorkflow, STAGES, type Stage, type Workflow } from "./stage.ts";
 
 /** Что может делать роль этапа: только читать или ещё и менять файлы. */
 export const STAGE_ACCESS = ["read", "write"] as const;
@@ -98,4 +99,77 @@ export function parseStageGuide(stage: Stage, text: string): StageGuide {
   return role === undefined
     ? { stage, title, description, body }
     : { stage, title, description, role, body };
+}
+
+/**
+ * Файлы harness: путь от корня harness через `/` → текст. Так harness одинаково приходит
+ * из каталога на диске и из сборки CLI, где он встроен.
+ */
+export type HarnessFiles = Readonly<Record<string, string>>;
+
+const MARKDOWN = ".md";
+const JSON_EXTENSION = ".json";
+const PRINCIPLES = "principles/";
+const STAGES_DIRECTORY = "stages/";
+const WORKFLOWS = "workflows/";
+const CONDUCTOR = "conductor.md";
+
+function requiredFile(files: HarnessFiles, name: string): string {
+  const text = files[name];
+  if (text === undefined) throw new HarnessError(`в harness нет файла ${name}`);
+  return text;
+}
+
+// Файлы прямо в каталоге, без вложенных: порядок по имени, чтобы тексты не зависели от того,
+// в каком порядке их отдал диск.
+function filesIn(files: HarnessFiles, directory: string, extension: string): [string, string][] {
+  return Object.entries(files)
+    .filter(([name]) => name.startsWith(directory) && name.endsWith(extension))
+    .map(([name, text]): [string, string] => [
+      name.slice(directory.length, -extension.length),
+      text,
+    ])
+    .filter(([name]) => !name.includes("/"))
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+}
+
+function workflowFrom(name: string, text: string): Workflow {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch (err) {
+    throw new HarnessError(`процесс ${name}: не JSON`, { cause: err });
+  }
+  const workflow = parseWorkflow(raw);
+  if (workflow.name !== name) {
+    throw new HarnessError(`процесс ${name}: name должен совпадать с именем файла`);
+  }
+  return workflow;
+}
+
+/**
+ * Собирает harness из его файлов: принципы, этап на каждый из `STAGES`, процессы и правила ведущего.
+ * @param {HarnessFiles} files Файлы harness.
+ * @returns {Harness} Harness.
+ * @throws {HarnessError} Если файла этапа или правил ведущего нет либо этап или процесс не прошёл
+ *   проверку.
+ */
+export function parseHarness(files: HarnessFiles): Harness {
+  const stages = Object.fromEntries(
+    STAGES.map((stage) => [
+      stage,
+      parseStageGuide(stage, requiredFile(files, `${STAGES_DIRECTORY}${stage}${MARKDOWN}`)),
+    ]),
+  ) as Record<Stage, StageGuide>;
+  return {
+    principles: filesIn(files, PRINCIPLES, MARKDOWN).map(([name, text]) => ({
+      name,
+      text: text.trim(),
+    })),
+    stages,
+    workflows: filesIn(files, WORKFLOWS, JSON_EXTENSION).map(([name, text]) =>
+      workflowFrom(name, text),
+    ),
+    conductor: requiredFile(files, CONDUCTOR).trim(),
+  };
 }

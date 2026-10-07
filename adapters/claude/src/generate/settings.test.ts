@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   ADAPTER_DENY,
-  adapterHooks,
+  ADAPTER_HOOKS,
   mergeSettings,
   SettingsError,
-  withHome,
   type HookGroup,
   type Settings,
 } from "./settings.ts";
@@ -19,7 +18,7 @@ function projectHooks(): Settings {
           hooks: [
             {
               type: "command",
-              command: 'node "$CLAUDE_PROJECT_DIR/adapters/claude/src/bin/record.ts"',
+              command: 'node "$CLAUDE_PROJECT_DIR/.cyberzavod/bin/cyberzavod.mjs" hook record',
             },
           ],
         },
@@ -34,22 +33,13 @@ function commandsOf(groups: unknown): string[] {
   return (groups as HookGroup[]).flatMap((group) => group.hooks.map(({ command }) => command));
 }
 
-describe("adapterHooks", () => {
-  it("внутри проекта ведёт хуки от CLAUDE_PROJECT_DIR", () => {
-    const hooks = adapterHooks({ in: "project", path: "tools/cyberzavod" });
+describe("ADAPTER_HOOKS", () => {
+  it("зовут CLI из проекта от CLAUDE_PROJECT_DIR", () => {
+    const stop = ADAPTER_HOOKS.Stop;
 
-    expect(commandsOf(hooks.Stop)).toEqual([
-      'node "$CLAUDE_PROJECT_DIR/tools/cyberzavod/adapters/claude/src/bin/record.ts"',
-      '"$CLAUDE_PROJECT_DIR/tools/cyberzavod/adapters/claude/hooks/stop-gate.sh"',
-    ]);
-  });
-
-  it("вне проекта ведёт хуки от CYBERZAVOD_HOME и молчит без него", () => {
-    const hooks = adapterHooks({ in: "home" });
-
-    expect(commandsOf(hooks.UserPromptSubmit)).toEqual([
-      '[ -z "$CYBERZAVOD_HOME" ] || node "$CYBERZAVOD_HOME/adapters/claude/src/bin/record.ts"',
-      '[ -z "$CYBERZAVOD_HOME" ] || "$CYBERZAVOD_HOME/adapters/claude/hooks/turn-start.sh"',
+    expect(commandsOf(stop)).toEqual([
+      'node "$CLAUDE_PROJECT_DIR/.cyberzavod/bin/cyberzavod.mjs" hook record',
+      'node "$CLAUDE_PROJECT_DIR/.cyberzavod/bin/cyberzavod.mjs" hook stop',
     ]);
   });
 });
@@ -58,18 +48,18 @@ describe("mergeSettings", () => {
   it("заменяет прежние обработчики адаптера и оставляет чужие", () => {
     const settings = projectHooks();
 
-    const merged = mergeSettings(settings, adapterHooks({ in: "project", path: "" }));
+    const merged = mergeSettings(settings, ADAPTER_HOOKS);
 
     expect(commandsOf((merged.hooks as Record<string, unknown>).SessionStart)).toEqual([
       "./setup.sh",
-      'node "$CLAUDE_PROJECT_DIR/adapters/claude/src/bin/record.ts"',
+      'node "$CLAUDE_PROJECT_DIR/.cyberzavod/bin/cyberzavod.mjs" hook record',
     ]);
   });
 
   it("не трогает события и настройки, о которых адаптер не знает", () => {
     const settings = projectHooks();
 
-    const merged = mergeSettings(settings, adapterHooks({ in: "project", path: "" }));
+    const merged = mergeSettings(settings, ADAPTER_HOOKS);
 
     expect({
       effortLevel: merged.effortLevel,
@@ -80,10 +70,7 @@ describe("mergeSettings", () => {
   it("дописывает запреты адаптера к запретам проекта без повторов", () => {
     const settings = projectHooks();
 
-    const twice = mergeSettings(
-      mergeSettings(settings, adapterHooks({ in: "home" })),
-      adapterHooks({ in: "home" }),
-    );
+    const twice = mergeSettings(mergeSettings(settings, ADAPTER_HOOKS), ADAPTER_HOOKS);
 
     expect(twice.permissions).toEqual({
       allow: ["Bash(ls)"],
@@ -92,7 +79,7 @@ describe("mergeSettings", () => {
   });
 
   it("создаёт настройки с нуля", () => {
-    const merged = mergeSettings({}, adapterHooks({ in: "home" }));
+    const merged = mergeSettings({}, ADAPTER_HOOKS);
 
     expect(Object.keys(merged.hooks as object)).toContain("Stop");
   });
@@ -102,18 +89,8 @@ describe("mergeSettings", () => {
     ["группа без обработчиков", { hooks: { Stop: [{ matcher: "x" }] } }],
     ["deny не список", { permissions: { deny: "Read(.env)" } }],
   ])("отклоняет настройки: %s", (_name, settings) => {
-    const act = () => mergeSettings(settings, adapterHooks({ in: "home" }));
+    const act = () => mergeSettings(settings, ADAPTER_HOOKS);
 
     expect(act).toThrow(SettingsError);
-  });
-});
-
-describe("withHome", () => {
-  it("добавляет путь установки к прочим переменным", () => {
-    const settings = { env: { OTHER: "1" }, model: "x" };
-
-    const local = withHome(settings, "/opt/cyberzavod");
-
-    expect(local).toEqual({ env: { OTHER: "1", CYBERZAVOD_HOME: "/opt/cyberzavod" }, model: "x" });
   });
 });

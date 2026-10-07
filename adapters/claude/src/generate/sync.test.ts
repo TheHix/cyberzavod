@@ -2,9 +2,12 @@ import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promise
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
+import { loadHarness, PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
 import { GENERATED_MARK } from "./files.ts";
-import { INSTALL_ROOT, syncClaude } from "./sync.ts";
+import { syncClaude, type ClaudeInstallation, type SyncOptions } from "./sync.ts";
+
+const REPOSITORY = path.resolve(import.meta.dirname, "../../../..");
+const TEMPLATES = path.join(REPOSITORY, "adapters/claude/templates");
 
 let root: string;
 
@@ -26,12 +29,26 @@ async function newProject(): Promise<void> {
     projectId: "lab",
     harness: "0.3.0",
     workflow: "default",
-    journal: "../lab.cyberzavod",
+    journal: ".cyberzavod/journal",
     verification: { commands: ["npm test"], paths: [] },
   };
   await writeProjectFile(PROJECT_CONFIG_FILE, JSON.stringify(config));
   await writeProjectFile("AGENTS.md", "# Правила\n");
   await writeProjectFile("src/AGENTS.md", "# Правила src\n");
+}
+
+async function installation(): Promise<ClaudeInstallation> {
+  return {
+    harness: await loadHarness(path.join(REPOSITORY, "harness")),
+    templates: {
+      publishRecording: await readFile(path.join(TEMPLATES, "publish-recording.md"), "utf8"),
+      recordingEditor: await readFile(path.join(TEMPLATES, "recording-editor.md"), "utf8"),
+    },
+  };
+}
+
+async function sync(mode: Pick<SyncOptions, "check" | "force"> = {}) {
+  return syncClaude({ projectDirectory: root, installation: await installation(), ...mode });
 }
 
 describe("syncClaude", () => {
@@ -44,31 +61,29 @@ describe("syncClaude", () => {
     await rm(path.dirname(root), { recursive: true, force: true });
   });
 
-  it("пишет файлы Claude Code и путь установки в локальные настройки", async () => {
-    const report = await syncClaude({ projectDirectory: root });
+  it("пишет CLAUDE.md рядом с каждым AGENTS.md, агентов и хуки", async () => {
+    const report = await sync();
 
-    const local: unknown = JSON.parse(
-      await readFile(path.join(root, ".claude/settings.local.json"), "utf8"),
-    );
+    const settings = await readFile(path.join(root, ".claude/settings.json"), "utf8");
     expect({
       changed: report.changed.includes("src/CLAUDE.md"),
       agent: await exists(".claude/agents/coder.md"),
-      local,
-    }).toEqual({ changed: true, agent: true, local: { env: { CYBERZAVOD_HOME: INSTALL_ROOT } } });
+      hook: settings.includes(".cyberzavod/bin/cyberzavod.mjs"),
+    }).toEqual({ changed: true, agent: true, hook: true });
   });
 
-  it("вне установки зовёт CLI через путь установки из локальных настроек", async () => {
-    await syncClaude({ projectDirectory: root });
+  it("зовёт в текстах CLI, который лежит в проекте", async () => {
+    await sync();
 
     const skill = await readFile(
       path.join(root, ".claude/skills/publish-recording/SKILL.md"),
       "utf8",
     );
-    expect(skill).toContain('`node "$CYBERZAVOD_HOME/packages/cli/src/bin/cyberzavod.ts" draft`');
+    expect(skill).toContain("`node .cyberzavod/bin/cyberzavod.mjs draft`");
   });
 
   it("в режиме проверки ничего не пишет и называет устаревшие файлы", async () => {
-    const report = await syncClaude({ projectDirectory: root, check: true });
+    const report = await sync({ check: true });
 
     expect({ claudeMd: await exists("CLAUDE.md"), changed: report.changed.length > 0 }).toEqual({
       claudeMd: false,
@@ -77,9 +92,9 @@ describe("syncClaude", () => {
   });
 
   it("после синхронизации проверка не находит расхождений", async () => {
-    await syncClaude({ projectDirectory: root });
+    await sync();
 
-    const report = await syncClaude({ projectDirectory: root, check: true });
+    const report = await sync({ check: true });
 
     expect(report).toEqual({ changed: [], removed: [], conflicts: [] });
   });
@@ -87,7 +102,7 @@ describe("syncClaude", () => {
   it("не пишет поверх файла человека и не меняет ничего", async () => {
     await writeProjectFile("CLAUDE.md", "Мои правила\n");
 
-    const act = () => syncClaude({ projectDirectory: root });
+    const act = () => sync();
 
     await expect(act).rejects.toThrow(/CLAUDE\.md/);
     expect(await exists(".claude/settings.json")).toBe(false);
@@ -96,7 +111,7 @@ describe("syncClaude", () => {
   it("с force пишет поверх файла человека", async () => {
     await writeProjectFile("CLAUDE.md", "Мои правила\n");
 
-    await syncClaude({ projectDirectory: root, force: true });
+    await sync({ force: true });
 
     expect(await readFile(path.join(root, "CLAUDE.md"), "utf8")).toContain(GENERATED_MARK);
   });
@@ -105,7 +120,7 @@ describe("syncClaude", () => {
     await writeProjectFile(".claude/agents/old-role.md", `<!-- ${GENERATED_MARK} -->\n`);
     await writeProjectFile(".claude/agents/mine.md", "Мой агент\n");
 
-    const report = await syncClaude({ projectDirectory: root });
+    const report = await sync();
 
     expect({
       removed: report.removed,

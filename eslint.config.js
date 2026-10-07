@@ -16,7 +16,7 @@ const TEST_FILES = ["**/*.{test,spec}.{ts,tsx}"];
 
 export default defineConfig(
   {
-    ignores: ["**/dist/**", "**/.astro/**", "**/node_modules/**", "journal/**", "apps/api/**"],
+    ignores: ["**/dist/**", "**/.astro/**", "**/node_modules/**", ".cyberzavod/**", "apps/api/**"],
   },
   js.configs.recommended,
   tseslint.configs.strict,

@@ -2,8 +2,8 @@ import { parseRecord, type JournalRecord, type SessionRecord } from "@cyberzavod
 import { newestFirst } from "./order.ts";
 
 // Записи читаются при сборке сайта: битая запись роняет сборку, а не страницу у зрителя.
-// Ровно один уровень каталогов (`journal/<коллекция>/<id>.json`): рабочие файлы адаптеров
-// лежат глубже, в `journal/capture/…`, и на сайт попадать не должны.
+// Ровно один уровень каталогов (`.cyberzavod/journal/<коллекция>/<id>.json`): рабочие файлы адаптеров
+// лежат глубже, в `capture/…`, и на сайт попадать не должны.
 const files = import.meta.glob<unknown>("@journal/*/*.json", { eager: true, import: "default" });
 
 function parsePublished([file, raw]: [string, unknown]): JournalRecord {

@@ -2,12 +2,14 @@
 // и как файлы лежат в файловой системе.
 
 export {
+  DEFAULT_JOURNAL,
   findProjectRoot,
   isNotFound,
   MARKER_DIRECTORY,
   PROJECT_CONFIG_FILE,
   ProjectFileError,
   readProjectConfig,
+  TOOL_FILE,
   writeProjectConfig,
 } from "./project.ts";
 export {
@@ -17,4 +19,4 @@ export {
   journalDirectory,
   RECORD_COLLECTIONS,
 } from "./journal.ts";
-export { loadHarness, workflowOf } from "./harness.ts";
+export { loadHarness, readHarnessFiles, workflowOf } from "./harness.ts";

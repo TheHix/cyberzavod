@@ -26,7 +26,7 @@ export default defineConfig({
     resolve: {
       // Журнал проекта, карточки проектов и гайды лежат в корне репозитория.
       alias: {
-        "@journal": fileURLToPath(new URL("../../journal", import.meta.url)),
+        "@journal": fileURLToPath(new URL("../../.cyberzavod/journal", import.meta.url)),
         "@projects": fileURLToPath(new URL("../../projects", import.meta.url)),
         "@guides": fileURLToPath(new URL("../../guides", import.meta.url)),
       },

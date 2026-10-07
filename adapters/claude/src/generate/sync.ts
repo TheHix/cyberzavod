@@ -4,7 +4,8 @@
 
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { isNotFound, loadHarness, workflowOf } from "@cyberzavod/storage";
+import type { Harness } from "@cyberzavod/core";
+import { isNotFound, TOOL_FILE, workflowOf } from "@cyberzavod/storage";
 import { captureDirectories, requireProject, type LocatedProject } from "../paths.ts";
 import { GenerateError } from "./claude.ts";
 import {
@@ -14,32 +15,27 @@ import {
   type ClaudeTemplates,
   type GeneratedFile,
 } from "./files.ts";
-import {
-  adapterHooks,
-  HOME_VARIABLE,
-  mergeSettings,
-  withHome,
-  type InstallLocation,
-  type Settings,
-} from "./settings.ts";
+import { ADAPTER_HOOKS, mergeSettings, type Settings } from "./settings.ts";
 
-/** Корень установки Cyberzavod, частью которой является этот адаптер. */
-export const INSTALL_ROOT = path.resolve(import.meta.dirname, "../../../..");
-
-const HARNESS_DIRECTORY = path.join(INSTALL_ROOT, "harness");
-const TEMPLATES_DIRECTORY = path.resolve(import.meta.dirname, "../../templates");
-const CLI_SCRIPT = "packages/cli/src/bin/cyberzavod.ts";
 const SETTINGS_FILE = ".claude/settings.json";
-const LOCAL_SETTINGS_FILE = ".claude/settings.local.json";
+// Хуки и сгенерированные тексты зовут CLI, который лежит в самом проекте.
+const PROJECT_CLI = `node ${TOOL_FILE}`;
 const RULES_FILE = "AGENTS.md";
 const ENTRYPOINT_FILE = "CLAUDE.md";
 const GENERATED_DIRECTORIES = [".claude/agents", ".claude/skills"];
 const SKIPPED_DIRECTORIES = new Set(["node_modules"]);
 
+/** Из чего генерировать: harness и шаблоны той версии Cyberzavod, что запущена. */
+export interface ClaudeInstallation {
+  harness: Harness;
+  templates: ClaudeTemplates;
+}
+
 /** Что делать: только сравнить или записать, и можно ли перезаписать написанное человеком. */
 export interface SyncOptions {
   /** Каталог внутри проекта. */
   projectDirectory: string;
+  installation: ClaudeInstallation;
   /** Только сравнить файлы на диске со сгенерированными, ничего не записывая. */
   check?: boolean;
   /** Перезаписать файлы, которые написал человек, а не генератор. */
@@ -62,24 +58,6 @@ function toPosix(relative: string): string {
 
 function relativeTo(root: string, target: string): string {
   return toPosix(path.relative(root, target));
-}
-
-function installLocationOf(root: string): InstallLocation {
-  const relative = path.relative(root, INSTALL_ROOT);
-  const inside = !relative.startsWith("..") && !path.isAbsolute(relative);
-  return inside ? { in: "project", path: toPosix(relative) } : { in: "home" };
-}
-
-function cliOf(location: InstallLocation): string {
-  switch (location.in) {
-    case "project":
-      return `node ${location.path === "" ? "" : `${location.path}/`}${CLI_SCRIPT}`;
-    case "home":
-      // Ту же переменную, что и хукам, Claude Code передаёт командам сессии из settings.local.json.
-      return `node "$${HOME_VARIABLE}/${CLI_SCRIPT}"`;
-    default:
-      return location satisfies never;
-  }
 }
 
 async function readOptional(file: string): Promise<string | undefined> {
@@ -115,21 +93,11 @@ function inDirectory(directory: string, fileName: string): string {
   return directory === "" ? fileName : `${directory}/${fileName}`;
 }
 
-async function readTemplates(): Promise<ClaudeTemplates> {
-  return {
-    publishRecording: await readFile(
-      path.join(TEMPLATES_DIRECTORY, "publish-recording.md"),
-      "utf8",
-    ),
-    recordingEditor: await readFile(path.join(TEMPLATES_DIRECTORY, "recording-editor.md"), "utf8"),
-  };
-}
-
 async function claudeProjectOf(
   project: LocatedProject,
-  location: InstallLocation,
+  installation: ClaudeInstallation,
 ): Promise<ClaudeProject> {
-  const harness = await loadHarness(HARNESS_DIRECTORY);
+  const { harness, templates } = installation;
   const capture = captureDirectories(project.journal);
   const claudeProject: ClaudeProject = {
     config: project.config,
@@ -140,8 +108,8 @@ async function claudeProjectOf(
       raw: relativeTo(project.root, capture.raw),
       drafts: relativeTo(project.root, capture.drafts),
     },
-    cli: cliOf(location),
-    templates: await readTemplates(),
+    cli: PROJECT_CLI,
+    templates,
   };
   return claudeProject;
 }
@@ -163,11 +131,11 @@ function settingsText(settings: Settings): string {
   return `${JSON.stringify(settings, null, 2)}\n`;
 }
 
-async function settingsFile(root: string, location: InstallLocation): Promise<GeneratedFile> {
+async function settingsFile(root: string): Promise<GeneratedFile> {
   const current = parseSettings(await readOptional(path.join(root, SETTINGS_FILE)), SETTINGS_FILE);
   return {
     path: SETTINGS_FILE,
-    content: settingsText(mergeSettings(current, adapterHooks(location))),
+    content: settingsText(mergeSettings(current, ADAPTER_HOOKS)),
   };
 }
 
@@ -227,16 +195,9 @@ async function writeFiles(root: string, files: GeneratedFile[], paths: string[])
   }
 }
 
-async function writeLocalHome(root: string): Promise<void> {
-  const file = path.join(root, ...LOCAL_SETTINGS_FILE.split("/"));
-  const current = parseSettings(await readOptional(file), LOCAL_SETTINGS_FILE);
-  await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, settingsText(withHome(current, INSTALL_ROOT)));
-}
-
 /**
  * Приводит файлы Claude Code проекта к harness и конфигу: CLAUDE.md рядом с каждым AGENTS.md,
- * агенты ролей, скиллы, хуки в настройках; вне проекта — путь установки в локальных настройках.
+ * агенты ролей, скиллы, хуки в настройках.
  * @param {SyncOptions} options Проект и режим.
  * @returns {Promise<SyncReport>} Что записано и удалено или, при проверке, что устарело.
  * @throws {GenerateError} Если генератор пишет поверх файлов человека без `force`, конфиг
@@ -244,9 +205,8 @@ async function writeLocalHome(root: string): Promise<void> {
  */
 export async function syncClaude(options: SyncOptions): Promise<SyncReport> {
   const project = await requireProject(options.projectDirectory);
-  const location = installLocationOf(project.root);
-  const claudeProject = await claudeProjectOf(project, location);
-  const files = [...claudeFiles(claudeProject), await settingsFile(project.root, location)];
+  const claudeProject = await claudeProjectOf(project, options.installation);
+  const files = [...claudeFiles(claudeProject), await settingsFile(project.root)];
   const { changed, conflicts } = await compare(project.root, files, options.force === true);
   const wanted = new Set(files.map(({ path: filePath }) => filePath));
   const removed = (await generatedOnDisk(project.root, project.journal)).filter(
@@ -261,6 +221,5 @@ export async function syncClaude(options: SyncOptions): Promise<SyncReport> {
   }
   await writeFiles(project.root, files, changed);
   for (const filePath of removed) await rm(path.join(project.root, ...filePath.split("/")));
-  if (location.in === "home") await writeLocalHome(project.root);
   return report;
 }

@@ -7,6 +7,6 @@
 .claude
 apps/api
 # Рабочие файлы адаптеров агентов: сырые журналы и черновики, сайт их не читает.
-journal/capture
+.cyberzavod/journal/capture
 *.md
 **/.env*

@@ -1,60 +1,30 @@
-// Harness на диске: `principles/*.md`, `stages/<этап>.md`, `workflows/*.json` и `conductor.md`.
-// Разбор текстов — в ядре, здесь — где они лежат и как их прочитать.
+// Harness на диске: каталог с `principles/*.md`, `stages/<этап>.md`, `workflows/*.json` и
+// `conductor.md`. Здесь — только чтение файлов; разбор текстов — в ядре.
 
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import {
   HarnessError,
-  parseStageGuide,
-  parseWorkflow,
-  STAGES,
+  parseHarness,
   type Harness,
-  type Principle,
-  type Stage,
-  type StageGuide,
+  type HarnessFiles,
   type Workflow,
 } from "@cyberzavod/core";
 
-const MARKDOWN = ".md";
-const JSON_EXTENSION = ".json";
-
-async function namesIn(directory: string, extension: string): Promise<string[]> {
-  const names = await readdir(directory);
-  return names.filter((name) => name.endsWith(extension)).sort();
-}
-
-async function readPrinciples(directory: string): Promise<Principle[]> {
-  const names = await namesIn(directory, MARKDOWN);
-  return Promise.all(
-    names.map(async (name) => ({
-      name: path.basename(name, MARKDOWN),
-      text: (await readFile(path.join(directory, name), "utf8")).trim(),
-    })),
-  );
-}
-
-async function readStages(directory: string): Promise<Record<Stage, StageGuide>> {
-  const guides = await Promise.all(
-    STAGES.map(async (stage) => {
-      const text = await readFile(path.join(directory, `${stage}${MARKDOWN}`), "utf8");
-      return [stage, parseStageGuide(stage, text)] as const;
-    }),
-  );
-  return Object.fromEntries(guides) as Record<Stage, StageGuide>;
-}
-
-async function readWorkflow(file: string): Promise<Workflow> {
-  const workflow = parseWorkflow(JSON.parse(await readFile(file, "utf8")));
-  const expected = path.basename(file, JSON_EXTENSION);
-  if (workflow.name !== expected) {
-    throw new HarnessError(`процесс ${file}: name должен совпадать с именем файла ${expected}`);
+/**
+ * Читает все файлы каталога harness: путь от каталога через `/` → текст.
+ * @param {string} directory Каталог harness.
+ * @returns {Promise<HarnessFiles>} Файлы harness.
+ */
+export async function readHarnessFiles(directory: string): Promise<HarnessFiles> {
+  const entries = await readdir(directory, { recursive: true, withFileTypes: true });
+  const files: Record<string, string> = {};
+  for (const entry of entries.filter((candidate) => candidate.isFile())) {
+    const file = path.join(entry.parentPath, entry.name);
+    const name = path.relative(directory, file).split(path.sep).join("/");
+    files[name] = await readFile(file, "utf8");
   }
-  return workflow;
-}
-
-async function readWorkflows(directory: string): Promise<Workflow[]> {
-  const names = await namesIn(directory, JSON_EXTENSION);
-  return Promise.all(names.map((name) => readWorkflow(path.join(directory, name))));
+  return files;
 }
 
 /**
@@ -64,12 +34,7 @@ async function readWorkflows(directory: string): Promise<Workflow[]> {
  * @throws {HarnessError} Если файл этапа или процесса не прошёл проверку.
  */
 export async function loadHarness(directory: string): Promise<Harness> {
-  return {
-    principles: await readPrinciples(path.join(directory, "principles")),
-    stages: await readStages(path.join(directory, "stages")),
-    workflows: await readWorkflows(path.join(directory, "workflows")),
-    conductor: (await readFile(path.join(directory, "conductor.md"), "utf8")).trim(),
-  };
+  return parseHarness(await readHarnessFiles(directory));
 }
 
 /**

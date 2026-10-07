@@ -1,11 +1,8 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { loadHarness } from "@cyberzavod/storage";
+import { readInstallation } from "./installation/installation.ts";
 import type { DetectedProject } from "./detect.ts";
-import { HARNESS_DIRECTORY } from "./install.ts";
 import { askProjectConfig, defaultsPrompter, describeDetected, type Prompter } from "./wizard.ts";
-
-const ROOT = path.join(path.sep, "work", "shop");
 
 function detected(): DetectedProject {
   return {
@@ -31,10 +28,10 @@ function scriptedPrompter(answers: Record<string, string>): Prompter {
 }
 
 describe("askProjectConfig", () => {
-  it("по умолчанию берёт найденное: имя, проверки, журнал рядом с проектом", async () => {
-    const harness = await loadHarness(HARNESS_DIRECTORY);
+  it("по умолчанию берёт найденное: имя, проверки, журнал в .cyberzavod", async () => {
+    const { harness } = await readInstallation();
 
-    const config = await askProjectConfig(ROOT, detected(), harness, defaultsPrompter());
+    const config = await askProjectConfig(detected(), harness, defaultsPrompter());
 
     expect({
       projectId: config.projectId,
@@ -46,7 +43,7 @@ describe("askProjectConfig", () => {
     }).toEqual({
       projectId: "acme-shop",
       workflow: "default",
-      journal: "../shop.cyberzavod",
+      journal: ".cyberzavod/journal",
       commands: ["pnpm run lint", "pnpm run test"],
       stages: ["planning", "implementation", "review", "verification"],
       stack: { languages: ["typescript"], frameworks: ["react"], packageManager: "pnpm" },
@@ -54,14 +51,14 @@ describe("askProjectConfig", () => {
   });
 
   it("принимает ответы человека: модель этапа, журнал и команды через точку с запятой", async () => {
-    const harness = await loadHarness(HARNESS_DIRECTORY);
+    const { harness } = await readInstallation();
     const prompter = scriptedPrompter({
       "Модель этапа «Код»": "opus",
       "Каталог журнала": "journal",
       "Команды проверки": "make check ;  ; make e2e",
     });
 
-    const config = await askProjectConfig(ROOT, detected(), harness, prompter);
+    const config = await askProjectConfig(detected(), harness, prompter);
 
     expect({
       model: config.agents.implementation,
@@ -75,10 +72,10 @@ describe("askProjectConfig", () => {
   });
 
   it("отклоняет процесс, которого нет в harness", async () => {
-    const harness = await loadHarness(HARNESS_DIRECTORY);
+    const { harness } = await readInstallation();
 
     const act = () =>
-      askProjectConfig(ROOT, detected(), harness, scriptedPrompter({ Процесс: "waterfall" }));
+      askProjectConfig(detected(), harness, scriptedPrompter({ Процесс: "waterfall" }));
 
     await expect(act).rejects.toThrow(/процесса waterfall нет/);
   });
@@ -88,7 +85,7 @@ describe("describeDetected", () => {
   it("называет и найденное, и ненайденное", () => {
     const project = { ...detected(), frameworks: [], git: false };
 
-    const lines = describeDetected(ROOT, project);
+    const lines = describeDetected(path.join(path.sep, "work", "shop"), project);
 
     expect(lines.filter((line) => /не найдены|нет$/.test(line))).toEqual([
       "Фреймворки: не найдены",

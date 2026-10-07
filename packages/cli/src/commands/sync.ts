@@ -2,12 +2,13 @@
 // файлы агента к harness. `--check` только сравнивает — так проверки проекта ловят устаревшие
 // файлы.
 
-import { syncClaude, type SyncReport } from "@cyberzavod/adapter-claude";
+import { syncClaude, type ClaudeInstallation, type SyncReport } from "@cyberzavod/adapter-claude";
 import type { ProjectConfig } from "@cyberzavod/core";
-import { PROJECT_CONFIG_FILE, writeProjectConfig } from "@cyberzavod/storage";
+import { PROJECT_CONFIG_FILE, TOOL_FILE, writeProjectConfig } from "@cyberzavod/storage";
 import { detectProject } from "../detect.ts";
-import { HARNESS_VERSION } from "../install.ts";
+import { HARNESS_VERSION, toolOf, type Installation } from "../installation/installation.ts";
 import { requireProjectAt } from "./project.ts";
+import { syncToolFile } from "./tool-file.ts";
 
 /** Режим синхронизации. */
 export interface SyncCommandOptions {
@@ -39,6 +40,14 @@ function printReport(report: SyncReport, check: boolean): void {
   }
 }
 
+function claudeInstallationOf(installation: Installation): ClaudeInstallation {
+  return { harness: installation.harness, templates: installation.claudeTemplates };
+}
+
+function withTool(report: SyncReport, toolChanged: boolean): SyncReport {
+  return toolChanged ? { ...report, changed: [TOOL_FILE, ...report.changed] } : report;
+}
+
 function isClean(report: SyncReport): boolean {
   return report.changed.length + report.removed.length + report.conflicts.length === 0;
 }
@@ -47,16 +56,23 @@ function isClean(report: SyncReport): boolean {
  * Синхронизирует проект с harness или проверяет, что синхронизировать нечего.
  * @param {string} directory Каталог внутри проекта.
  * @param {SyncCommandOptions} options Только проверить или записать; перезаписать ли файлы человека.
+ * @param {Installation} installation Запущенная версия Cyberzavod.
  * @returns {Promise<boolean>} true, если всё записано или, при проверке, всё актуально.
- * @throws {Error} Если проекта нет или файлы агента не собрать.
+ * @throws {Error} Если проекта нет, CLI запущен из исходников или файлы агента не собрать.
  */
 export async function syncProject(
   directory: string,
   options: SyncCommandOptions,
+  installation: Installation,
 ): Promise<boolean> {
   const project = await requireProjectAt(directory);
+  const tool = toolOf(installation);
+  const claude = claudeInstallationOf(installation);
   if (options.check) {
-    const report = await syncClaude({ projectDirectory: project.root, check: true });
+    const report = withTool(
+      await syncClaude({ projectDirectory: project.root, installation: claude, check: true }),
+      await syncToolFile(project.root, tool, true),
+    );
     const outdated = project.config.harness !== HARNESS_VERSION;
     if (outdated) {
       console.log(
@@ -69,6 +85,12 @@ export async function syncProject(
     return clean;
   }
   await writeProjectConfig(project.root, await refreshedConfig(project.root, project.config));
-  printReport(await syncClaude({ projectDirectory: project.root, force: options.force }), false);
+  const toolChanged = await syncToolFile(project.root, tool, false);
+  const report = await syncClaude({
+    projectDirectory: project.root,
+    installation: claude,
+    force: options.force,
+  });
+  printReport(withTool(report, toolChanged), false);
   return true;
 }

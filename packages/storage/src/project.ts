@@ -11,6 +11,15 @@ export const MARKER_DIRECTORY = ".cyberzavod";
 /** Путь конфига проекта относительно его корня. */
 export const PROJECT_CONFIG_FILE = path.join(MARKER_DIRECTORY, "project.json");
 
+/**
+ * Собранный CLI внутри проекта, от корня через `/`. Его запускают хуки агента: так им не нужны
+ * ни сеть, ни npm, ни установка Cyberzavod на машине.
+ */
+export const TOOL_FILE = `${MARKER_DIRECTORY}/bin/cyberzavod.mjs`;
+
+/** Журнал проекта по умолчанию, от корня через `/`: рядом с конфигом, в репозитории проекта. */
+export const DEFAULT_JOURNAL = `${MARKER_DIRECTORY}/journal`;
+
 /** Ошибка чтения конфига проекта: файл есть, но не читается или не прошёл проверку. */
 export class ProjectFileError extends Error {}
 

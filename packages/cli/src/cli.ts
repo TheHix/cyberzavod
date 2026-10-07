@@ -1,8 +1,16 @@
 // Разбор командной строки: имя команды выбирает обработчик из таблицы, обработчик получает
 // аргументы и каталог, из которого запущен CLI, и возвращает код выхода.
 
+import { tmpdir } from "node:os";
 import { parseArgs } from "node:util";
-import { draftSession, GenerateError, publishSessions } from "@cyberzavod/adapter-claude";
+import {
+  draftSession,
+  GenerateError,
+  HOOK_NAMES,
+  isHookName,
+  publishSessions,
+  runHook,
+} from "@cyberzavod/adapter-claude";
 import { RecordError } from "@cyberzavod/core";
 import { JournalError, ProjectFileError } from "@cyberzavod/storage";
 import { initProject } from "./commands/init.ts";
@@ -10,6 +18,7 @@ import { recordDecision, recordNote } from "./commands/journal.ts";
 import { printStatus } from "./commands/status.ts";
 import { syncProject } from "./commands/sync.ts";
 import { CommandError } from "./errors.ts";
+import { readInstallation } from "./installation/installation.ts";
 import { defaultsPrompter, terminalPrompter } from "./wizard.ts";
 
 const SUCCESS = 0;
@@ -27,6 +36,12 @@ interface Command {
   run(invocation: Invocation): Promise<number>;
 }
 
+async function readStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 function requiredText(value: string | undefined, what: string): string {
   if (value === undefined || value.trim() === "") throw new CommandError(`нужен ${what}`);
   return value;
@@ -40,7 +55,7 @@ const COMMANDS: Readonly<Record<string, Command>> = {
       const { values } = parseArgs({ args, options: { yes: { type: "boolean", short: "y" } } });
       const prompter = values.yes === true ? defaultsPrompter() : terminalPrompter();
       try {
-        await initProject(directory, prompter);
+        await initProject(directory, prompter, await readInstallation());
       } finally {
         prompter.close();
       }
@@ -56,14 +71,14 @@ const COMMANDS: Readonly<Record<string, Command>> = {
         options: { check: { type: "boolean" }, force: { type: "boolean" } },
       });
       const options = { check: values.check === true, force: values.force === true };
-      return (await syncProject(directory, options)) ? SUCCESS : FAILURE;
+      return (await syncProject(directory, options, await readInstallation())) ? SUCCESS : FAILURE;
     },
   },
   status: {
     usage: "status",
     summary: "проект, процесс, агенты этапов, проверки и журнал",
     run: async ({ directory }) => {
-      await printStatus(directory);
+      await printStatus(directory, await readInstallation());
       return SUCCESS;
     },
   },
@@ -120,6 +135,23 @@ const COMMANDS: Readonly<Record<string, Command>> = {
         ...(values.build === undefined ? {} : { buildId: values.build }),
       });
       return published ? SUCCESS : FAILURE;
+    },
+  },
+  hook: {
+    usage: `hook <${HOOK_NAMES.join("|")}>`,
+    summary: "хук Claude Code: событие на stdin; его вызывают настройки проекта, а не человек",
+    run: async ({ args, directory }) => {
+      const { positionals } = parseArgs({ args, allowPositionals: true });
+      const [name = ""] = positionals;
+      if (!isHookName(name)) throw new CommandError(`нет хука ${name}`);
+      const outcome = await runHook(name, {
+        payload: await readStdin(),
+        projectDirectory: process.env.CLAUDE_PROJECT_DIR || directory,
+        tmpDir: tmpdir(),
+      });
+      process.stdout.write(outcome.stdout);
+      process.stderr.write(outcome.stderr);
+      return outcome.exitCode;
     },
   },
 };

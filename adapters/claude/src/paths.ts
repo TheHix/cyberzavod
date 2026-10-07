@@ -1,8 +1,8 @@
 // Где адаптер держит свои файлы: сырые журналы сессий и черновики лежат в `capture/` журнала
-// проекта, отметка хука остановки — во временном каталоге. Каталог журнала задаёт конфиг
-// проекта, поэтому журнал может лежать и в репозитории, и рядом с ним.
+// проекта. Каталог журнала задаёт конфиг проекта, поэтому журнал может лежать и в репозитории,
+// и рядом с ним.
 
-import { readdir, stat, unlink } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import {
   CAPTURE_DIRECTORY,
@@ -13,11 +13,6 @@ import {
   readProjectConfig,
 } from "@cyberzavod/storage";
 import type { ProjectConfig } from "@cyberzavod/core";
-
-const DEFAULT_TMP_DIR = "/tmp";
-
-/** Каталог временных файлов хуков: `TMPDIR`, а если он не задан, `/tmp` — как у `state_file`. */
-export const TMP_DIR = process.env.TMPDIR || DEFAULT_TMP_DIR;
 
 /** Каталоги адаптера в журнале проекта: сырые журналы сессий и черновики записей. */
 export interface CaptureDirectories {
@@ -93,43 +88,6 @@ async function filesIn(dir: string): Promise<string[]> {
   } catch (err) {
     if (isNotFound(err)) return [];
     throw err;
-  }
-}
-
-// Имя отметки хука остановки совпадает с `state_file … human-call` из hooks/lib.sh:
-// session_id чистится так же, как там, и пустой остаётся `unknown`.
-const HUMAN_CALL_MARKER_PREFIX = "cyberzavod-human-call";
-const UNSAFE_SESSION_CHARACTERS = /[^A-Za-z0-9_-]/g;
-const UNKNOWN_SESSION = "unknown";
-
-/**
- * Путь отметки «хук остановки сдался и позвал человека»: её оставляет stop-gate.sh, а хук записи
- * забирает на следующем промпте человека.
- * @param {string} sessionId Идентификатор сессии из полезной нагрузки хука.
- * @param {string} tmpDir Каталог временных файлов: `TMPDIR` или `/tmp`.
- * @returns {string} Путь файла отметки, как его называет `state_file` хуков.
- */
-export function humanCallMarkerPath(sessionId: string, tmpDir: string): string {
-  const safeSession = sessionId.replace(UNSAFE_SESSION_CHARACTERS, "") || UNKNOWN_SESSION;
-  return path.join(tmpDir, `${HUMAN_CALL_MARKER_PREFIX}-${safeSession}`);
-}
-
-/**
- * Забирает отметку вызова человека: удаляет её файл. Удалось — отметка была, и промпт после
- * неё — вызов хуком остановки. Нет файла — отметки не было. Другая ошибка не роняет хук записи,
- * а становится предупреждением: промпт пишется как обычный.
- * @param {string} sessionId Идентификатор сессии из полезной нагрузки хука.
- * @param {string} tmpDir Каталог временных файлов: `TMPDIR` или `/tmp`.
- * @returns {Promise<boolean>} true, если отметка была и удалена.
- */
-export async function claimHumanCallMarker(sessionId: string, tmpDir: string): Promise<boolean> {
-  const markerPath = humanCallMarkerPath(sessionId, tmpDir);
-  try {
-    await unlink(markerPath);
-    return true;
-  } catch (err) {
-    if (!isNotFound(err)) console.warn(`отметка ${markerPath} не забрана: ${String(err)}`);
-    return false;
   }
 }
 
