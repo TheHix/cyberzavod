@@ -1,4 +1,4 @@
-import type { FactoryLayout, Point, Scene } from "@cyberzavod/core";
+import type { FactoryLayout, Point, Scene } from "@cyberzavod/player";
 import type { Locale } from "@/shared/i18n/locale.ts";
 
 /** Точка в координатах контейнера цеха, CSS-пиксели от его левого верхнего угла. */

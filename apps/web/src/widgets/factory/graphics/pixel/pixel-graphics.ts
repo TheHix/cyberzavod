@@ -3,7 +3,8 @@
 // в кадре у готовых спрайтов меняются текстура кадра, место, зеркало, видимость и `tint` —
 // без перерисовки и без новых объектов. Масштаб мира — целый в пикселях устройства.
 
-import { STAGES, type FactoryLayout, type Point, type Scene, type Stage } from "@cyberzavod/core";
+import { STAGES, type Stage } from "@cyberzavod/core";
+import { type FactoryLayout, type Point, type Scene } from "@cyberzavod/player";
 import { Container, isWebGLSupported } from "pixi.js";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import type { FactoryGraphics, Frame, ScreenPoint } from "../factory-graphics.ts";

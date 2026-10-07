@@ -1,5 +1,5 @@
-// Ядро Cyberzavod: доменная модель (этапы, процесс, агенты, конфиг проекта, записи журнала)
-// и проигрыватель цеха. Чистый TypeScript без зависимостей от фреймворков, браузера и Node.
+// Ядро Cyberzavod: доменная модель (этапы, процесс, агенты, конфиг проекта, harness, записи
+// журнала). Чистый TypeScript без зависимостей от фреймворков, браузера и Node.
 
 export {
   HarnessError,
@@ -39,6 +39,8 @@ export {
   summarize,
   tally,
   briefOf,
+  briefIntervention,
+  briefMessage,
   isSpeaker,
   isRecordId,
   isHarnessVersion,
@@ -67,43 +69,3 @@ export {
 } from "./record.ts";
 export type { RecordStore } from "./store.ts";
 export { ProjectError, parseProject, type Project } from "./project.ts";
-export type { Aisle } from "./aisle.ts";
-export { carryTime, ScriptMismatchError } from "./carry-time.ts";
-export {
-  FACTORY_LAYOUTS,
-  PORTRAIT_LAYOUT,
-  WIDE_LAYOUT,
-  layoutFor,
-  type FactoryLayout,
-  type ForemanPlan,
-  type Point,
-  type Size,
-  type StationPlan,
-} from "./layout.ts";
-export {
-  buildScript,
-  DEFAULT_PACING,
-  type Activity,
-  type FactoryScript,
-  type ForemanActivity,
-  type ForemanMove,
-  type InterventionCue,
-  type Mark,
-  type MessageCue,
-  type Pacing,
-  type PartMove,
-  type PartPlace,
-  type PartStatus,
-  type PromptCue,
-  type WorkerMove,
-} from "./script.ts";
-export {
-  sceneAt,
-  type ForemanFrame,
-  type InterventionFrame,
-  type MessageFrame,
-  type PartFrame,
-  type PromptFrame,
-  type Scene,
-  type WorkerFrame,
-} from "./scene.ts";

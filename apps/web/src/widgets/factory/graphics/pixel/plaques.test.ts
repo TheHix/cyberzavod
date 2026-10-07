@@ -1,10 +1,5 @@
-import {
-  FACTORY_LAYOUTS,
-  STAGES,
-  WIDE_LAYOUT,
-  type FactoryLayout,
-  type Stage,
-} from "@cyberzavod/core";
+import { STAGES, type Stage } from "@cyberzavod/core";
+import { FACTORY_LAYOUTS, WIDE_LAYOUT, type FactoryLayout } from "@cyberzavod/player";
 import { describe, expect, it } from "vitest";
 import { LOCALES, type Locale } from "@/shared/i18n/locale.ts";
 import { FOREMAN_LABEL, STAGE_LABELS } from "@/shared/config/stages.ts";

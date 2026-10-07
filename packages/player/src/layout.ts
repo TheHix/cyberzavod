@@ -2,7 +2,7 @@
 // в единице, поэтому план один для любой графики.
 
 import type { Aisle } from "./aisle.ts";
-import type { Stage } from "./stage.ts";
+import { type Stage } from "@cyberzavod/core";
 
 /** Точка на плане цеха; ось y направлена вниз, как на экране. */
 export interface Point {

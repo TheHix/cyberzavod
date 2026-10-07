@@ -1,7 +1,7 @@
 // Кабинет мастера: стол с монитором и бумагами. Рисуется один раз и дальше не меняется;
 // сам мастер — действующее лицо из actors.ts, а табличка — из plaques.ts.
 
-import type { ForemanPlan } from "@cyberzavod/core";
+import type { ForemanPlan } from "@cyberzavod/player";
 import { Container, Sprite } from "pixi.js";
 import { artSize, paintArt, paletteInks, type SpriteArt } from "./art.ts";
 import type { Palette } from "./palette.ts";

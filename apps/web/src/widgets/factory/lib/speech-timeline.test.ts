@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildScript, type FactoryScript, type SessionRecord } from "@cyberzavod/core";
+import { type SessionRecord } from "@cyberzavod/core";
+import { buildScript, type FactoryScript } from "@cyberzavod/player";
 import { speechAt, speechStart, speechTimeline } from "./speech-timeline.ts";
 
 // Промпты и реплики вперемешку: порядок в записи — реплика, промпт, реплика.

@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { aisleStop } from "./aisle.ts";
 import { FACTORY_LAYOUTS, distance, headingTo, type Point } from "./layout.ts";
-import type { SessionRecord } from "./record.ts";
-import { STAGES } from "./stage.ts";
+import { type SessionRecord, STAGES } from "@cyberzavod/core";
 import { sceneAt } from "./scene.ts";
 import type { FactoryScript, ForemanMove, WorkerMove } from "./script.ts";
 import {

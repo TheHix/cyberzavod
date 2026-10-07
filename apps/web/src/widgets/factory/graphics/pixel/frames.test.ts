@@ -1,4 +1,4 @@
-import type { ForemanFrame, WorkerFrame } from "@cyberzavod/core";
+import type { ForemanFrame, WorkerFrame } from "@cyberzavod/player";
 import { describe, expect, it } from "vitest";
 import {
   facingOf,

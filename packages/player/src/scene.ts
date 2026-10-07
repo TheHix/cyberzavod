@@ -4,8 +4,7 @@
 // а кадр стоит O(log n) от длины записи.
 
 import { pointBetween, type Point } from "./layout.ts";
-import type { Tally } from "./record.ts";
-import { STAGES, type Stage } from "./stage.ts";
+import { type Tally, STAGES, type Stage } from "@cyberzavod/core";
 import { progressOf, turned } from "./turn.ts";
 import type {
   Activity,

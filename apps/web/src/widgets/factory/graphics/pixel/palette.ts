@@ -1,7 +1,8 @@
 // Краски цеха. Единственный источник — токены оформления (shared/ui/tokens.css): цех читает
 // их при встраивании, поэтому пол совпадает с фоном страницы, а контур — с контуром панелей.
 
-import type { PartStatus, Stage } from "@cyberzavod/core";
+import type { Stage } from "@cyberzavod/core";
+import type { PartStatus } from "@cyberzavod/player";
 
 /** Краски цеха числами 0xRRGGBB — в таком виде их берёт PixiJS. */
 export interface Palette {

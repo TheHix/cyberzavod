@@ -1,7 +1,7 @@
 // Геометрия прохода: прямоугольники вдоль отрезков ломаной. Чистые расчёты без Pixi — рисует
 // их floor.ts. Диагонали пиксель-арт не умеет: ступеньки не складываются в плитку.
 
-import type { Aisle, Point } from "@cyberzavod/core";
+import type { Aisle, Point } from "@cyberzavod/player";
 import type { PlanBounds } from "./bounds.ts";
 
 function direction(from: Point, to: Point): Point {

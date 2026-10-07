@@ -2,7 +2,7 @@
 // журналу, до какой речи дошла сцена, и находит, куда перематывать. Чистые функции без Solid
 // и DOM.
 
-import type { FactoryScript } from "@cyberzavod/core";
+import type { FactoryScript } from "@cyberzavod/player";
 import { isSameSpeech, type Speech } from "@/features/journal-sync";
 
 /** Начало промпта, вмешательства или реплики на сцене. */

@@ -89,7 +89,8 @@ The record format is the whole contract between the tool and any viewer. [cyberz
 | Path | What it is |
 |---|---|
 | `harness/` | The process: principles, stages, workflows, conductor rules. Agent- and stack-neutral |
-| `packages/core` | The model: records, project config, stages, harness, and the factory-floor player |
+| `packages/core` | The model: records, project config, stages, harness |
+| `packages/player` | The factory-floor player: script and frame of a session record; used only by the site |
 | `packages/storage` | Disk: project config, the directory record store, harness loading |
 | `packages/cli` | The `cyberzavod` npm package: the CLI, bundled with everything below into one file |
 | `adapters/claude` | The Claude Code adapter: file generator, hooks, session capture |

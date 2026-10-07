@@ -3,7 +3,8 @@
 // накладки работы (показана одна, пока рабочий бьёт у станка), лампа погасшая всегда
 // на месте, горящая появляется, пока станок держит деталь. Остальное в кадре не меняется.
 
-import type { Stage, StationPlan } from "@cyberzavod/core";
+import type { Stage } from "@cyberzavod/core";
+import type { StationPlan } from "@cyberzavod/player";
 import { Container, Sprite } from "pixi.js";
 import {
   artSize,

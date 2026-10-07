@@ -489,39 +489,6 @@ function parseProjectConfig(raw) {
   return stack === void 0 ? config : { ...config, stack };
 }
 
-// ../core/src/layout.ts
-var FACING_UP = -Math.PI / 2;
-var FACING_DOWN = Math.PI / 2;
-var FOREMAN_SIDE_OFFSET = 1.5;
-function stationOf(machine, post, facing) {
-  return { machine, post, facing, foremanPost: { x: post.x + FOREMAN_SIDE_OFFSET, y: post.y } };
-}
-var WIDE_MIN_FIELD_ASPECT = 0.8;
-var WIDE_MIN_SCREEN_ASPECT = 1;
-var WIDE_LAYOUT = {
-  width: 16,
-  height: 9,
-  minFieldAspect: WIDE_MIN_FIELD_ASPECT,
-  minScreenAspect: WIDE_MIN_SCREEN_ASPECT,
-  aisle: [
-    { x: 0, y: 4.5 },
-    { x: 16, y: 4.5 }
-  ],
-  stations: {
-    planning: stationOf({ x: 3, y: 1.6 }, { x: 3, y: 2.9 }, FACING_UP),
-    implementation: stationOf({ x: 8, y: 1.6 }, { x: 8, y: 2.9 }, FACING_UP),
-    review: stationOf({ x: 13, y: 1.6 }, { x: 13, y: 2.9 }, FACING_UP),
-    verification: stationOf({ x: 13, y: 7.4 }, { x: 13, y: 6.1 }, FACING_DOWN),
-    record: stationOf({ x: 8, y: 7.4 }, { x: 8, y: 6.1 }, FACING_DOWN)
-  },
-  foreman: {
-    desk: { x: 3, y: 6.3 },
-    post: { x: 3, y: 7.4 },
-    facing: FACING_UP,
-    door: { x: 4.5, y: 7.4 }
-  }
-};
-
 // ../../adapters/claude/src/capture/leaks.ts
 var LEAK_PATTERNS = [
   // Локальные 127.x и 0.0.0.0 не выдают ничего о серверах — пропускаем.
