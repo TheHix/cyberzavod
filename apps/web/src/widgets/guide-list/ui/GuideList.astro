@@ -1,13 +1,13 @@
 ---
 // Список гайдов: название-ссылка и описание каждого.
 import { guideUrl, type PublishedGuide } from "@/entities/guide";
-import { CONTENT_LOCALE, type Locale } from "@/shared/i18n/locale.ts";
+import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { Card, Title } from "@/shared/ui";
 
 interface Props {
   guides: readonly PublishedGuide[];
-  /** Язык страницы: на нём интерфейс вокруг гайдов; сами гайды — в оригинале. */
+  /** Язык страницы: на нём список и сами гайды. */
   locale: Locale;
 }
 
@@ -18,16 +18,14 @@ const { guides, locale } = Astro.props;
   <p class="note">{UI_TEXT.lists.noGuides[locale]}</p>
 ) : (
   <ul class="list">
-    {guides.map(({ meta }) => (
+    {guides.map(({ id, translations }) => (
       <li>
         <Card>
           <div class="guide">
-            <a href={guideUrl(meta.id, locale)} lang={CONTENT_LOCALE}>
-              <Title as="span">{meta.title}</Title>
+            <a href={guideUrl(id, locale)}>
+              <Title as="span">{translations[locale].title}</Title>
             </a>
-            <p class="note" lang={CONTENT_LOCALE}>
-              {meta.description}
-            </p>
+            <p class="note">{translations[locale].description}</p>
           </div>
         </Card>
       </li>

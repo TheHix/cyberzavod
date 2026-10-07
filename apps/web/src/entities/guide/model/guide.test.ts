@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GuideError, guideIdOf, parseGuideMeta } from "./guide.ts";
+import { GuideError, guideFileOf, parseGuideMeta } from "./guide.ts";
 
 function validFrontmatter(): Record<string, unknown> {
   return {
@@ -64,30 +64,33 @@ describe("parseGuideMeta", () => {
   });
 });
 
-describe("guideIdOf", () => {
-  it("берёт имя файла без .md из абсолютного пути", () => {
-    const file = "/src/guides/connect-project.md";
+describe("guideFileOf", () => {
+  it("берёт id и язык из абсолютного пути", () => {
+    const file = "/src/guides/connect-project.ru.md";
 
-    const id = guideIdOf(file);
+    const name = guideFileOf(file);
 
-    expect(id).toBe("connect-project");
+    expect(name).toEqual({ id: "connect-project", locale: "ru" });
   });
 
-  it("принимает имя из цифр и одного слова", () => {
-    const id = guideIdOf("/src/guides/2fa.md");
+  it("принимает id из цифр и одного слова", () => {
+    const name = guideFileOf("/src/guides/2fa.en.md");
 
-    expect(id).toBe("2fa");
+    expect(name).toEqual({ id: "2fa", locale: "en" });
   });
 
   it.each([
-    ["с заглавными буквами", "/src/guides/Connect-Project.md"],
-    ["с пробелом", "/src/guides/two words.md"],
-    ["с подчёркиванием", "/src/guides/connect_project.md"],
-    ["с дефисом в конце", "/src/guides/connect-.md"],
-    ["без имени", "/src/guides/.md"],
-    ["не Markdown", "/src/guides/connect-project.txt"],
+    ["с заглавными буквами", "/src/guides/Connect-Project.en.md"],
+    ["с пробелом", "/src/guides/two words.en.md"],
+    ["с подчёркиванием", "/src/guides/connect_project.en.md"],
+    ["с дефисом в конце", "/src/guides/connect-.en.md"],
+    ["без id", "/src/guides/.en.md"],
+    ["с точкой в id", "/src/guides/connect.project.en.md"],
+    ["без языка", "/src/guides/connect-project.md"],
+    ["с чужим языком", "/src/guides/connect-project.de.md"],
+    ["не Markdown", "/src/guides/connect-project.en.txt"],
   ])("отклоняет имя %s", (_case, file) => {
-    const act = () => guideIdOf(file);
+    const act = () => guideFileOf(file);
 
     expect(act).toThrow(GuideError);
   });

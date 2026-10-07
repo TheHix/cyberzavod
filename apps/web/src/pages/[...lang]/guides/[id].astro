@@ -9,7 +9,7 @@ import { GuideArticle } from "@/widgets/guide-article";
 export const getStaticPaths = (() =>
   LOCALES.flatMap((locale) =>
     publishedGuides.map((guide) => ({
-      params: { lang: localeParam(locale), id: guide.meta.id },
+      params: { lang: localeParam(locale), id: guide.id },
       props: { locale, guide },
     })),
   )) satisfies GetStaticPaths;
@@ -20,8 +20,9 @@ interface Props {
 }
 
 const { locale, guide } = Astro.props;
+const { title, description } = guide.translations[locale];
 ---
 
-<GameLayout locale={locale} title={guide.meta.title} description={guide.meta.description}>
+<GameLayout locale={locale} title={title} description={description}>
   <GuideArticle guide={guide} locale={locale} />
 </GameLayout>
