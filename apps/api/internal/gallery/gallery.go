@@ -8,14 +8,21 @@ import (
 	"time"
 )
 
-// RecordingLimit — сколько записей может лежать в галерее одного автора.
-const RecordingLimit = 5
+const (
+	// RecordingLimit — сколько записей может лежать в галерее одного автора.
+	RecordingLimit = 5
+	// StorageLimitBytes — сколько байт тел записей могут занять все галереи вместе: потолок
+	// не даёт намеренно забить диск сервера множеством авторов.
+	StorageLimitBytes int64 = 2 << 30
+)
 
 var (
 	// ErrNotFound — записи, галереи или автора нет, или галерея закрыта для посторонних.
 	ErrNotFound = errors.New("не найдено")
 	// ErrLimitReached — в галерее уже RecordingLimit записей, новая не помещается.
 	ErrLimitReached = errors.New("достигнут предел записей в галерее")
+	// ErrStorageFull — новая запись не помещается под общий потолок StorageLimitBytes.
+	ErrStorageFull = errors.New("хранилище галерей заполнено")
 	// ErrTokenRejected — GitHub не принял токен автора.
 	ErrTokenRejected = errors.New("GitHub не принял токен")
 )

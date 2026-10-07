@@ -13,16 +13,24 @@ import (
 	"github.com/bysavelii/cyberzavod/apps/api/internal/gallery"
 )
 
-const queryTimeout = 5 * time.Second
+const (
+	queryTimeout = 5 * time.Second
+	// storageLockKey — ключ advisory-блокировки Postgres, под которой загрузки всех авторов
+	// по очереди сверяют общий объём с потолком. Число произвольное, лишь бы своё.
+	storageLockKey int64 = 0x637a_7374_6f72_6167
+)
 
 // Store — галереи в Postgres. Каждый метод ограничен queryTimeout.
 type Store struct {
 	pool *pgxpool.Pool
+	// storageLimitBytes — потолок суммы тел записей всех галерей.
+	storageLimitBytes int64
 }
 
-// New создаёт хранилище галерей поверх пула соединений.
-func New(pool *pgxpool.Pool) *Store {
-	return &Store{pool: pool}
+// New создаёт хранилище галерей поверх пула соединений с потолком storageLimitBytes на
+// сумму тел записей всех галерей (в работе — gallery.StorageLimitBytes).
+func New(pool *pgxpool.Pool, storageLimitBytes int64) *Store {
+	return &Store{pool: pool, storageLimitBytes: storageLimitBytes}
 }
 
 const summaryColumns = `record_id, slug, project_id, title, language, started_at, uploaded_at`
@@ -122,13 +130,14 @@ func (s *Store) recordings(ctx context.Context, ownerID int64) ([]gallery.Summar
 }
 
 // SaveRecording кладёт запись в галерею автора или заменяет её, если запись с тем же id уже
-// там. isNew — запись новая. Новая запись сверх gallery.RecordingLimit — gallery.ErrLimitReached.
+// там. isNew — запись новая. Новая запись сверх gallery.RecordingLimit — gallery.ErrLimitReached;
+// запись, которая выросла и не помещается под потолок хранилища, — gallery.ErrStorageFull.
 func (s *Store) SaveRecording(ctx context.Context, ownerID int64, recording gallery.Recording) (summary gallery.Summary, isNew bool, err error) {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		summary, isNew, err = saveRecording(ctx, tx, ownerID, recording)
+		summary, isNew, err = s.saveRecording(ctx, tx, ownerID, recording)
 		return err
 	})
 	if err != nil {
@@ -140,8 +149,13 @@ func (s *Store) SaveRecording(ctx context.Context, ownerID int64, recording gall
 
 // saveRecording сохраняет запись под блокировкой строки автора: параллельные загрузки
 // одного автора идут по очереди и не превышают предел вдвоём.
-func saveRecording(ctx context.Context, tx pgx.Tx, ownerID int64, recording gallery.Recording) (gallery.Summary, bool, error) {
+func (s *Store) saveRecording(ctx context.Context, tx pgx.Tx, ownerID int64, recording gallery.Recording) (gallery.Summary, bool, error) {
 	if err := lockOwner(ctx, tx, ownerID); err != nil {
+		return gallery.Summary{}, false, err
+	}
+
+	previousBytes, err := recordingBytes(ctx, tx, ownerID, recording.ID)
+	if err != nil {
 		return gallery.Summary{}, false, err
 	}
 
@@ -150,9 +164,16 @@ func saveRecording(ctx context.Context, tx pgx.Tx, ownerID int64, recording gall
 		return gallery.Summary{}, false, err
 	}
 
-	summary, err := upsertRecording(ctx, tx, ownerID, slug, recording)
+	summary, savedBytes, err := upsertRecording(ctx, tx, ownerID, slug, recording)
 	if err != nil {
 		return gallery.Summary{}, false, err
+	}
+
+	hasGrown := savedBytes > previousBytes
+	if hasGrown {
+		if err := s.ensureStorage(ctx, tx); err != nil {
+			return gallery.Summary{}, false, err
+		}
 	}
 
 	if err := touchOwner(ctx, tx, ownerID); err != nil {
@@ -215,32 +236,77 @@ func ensureRoom(ctx context.Context, tx pgx.Tx, ownerID int64) error {
 	return nil
 }
 
-// upsertRecording пишет запись; у заменённой записи ссылка остаётся прежней.
-func upsertRecording(ctx context.Context, tx pgx.Tx, ownerID int64, slug string, recording gallery.Recording) (gallery.Summary, error) {
+// recordingBytes возвращает размер тела уже лежащей записи; новой записи — 0.
+func recordingBytes(ctx context.Context, tx pgx.Tx, ownerID int64, recordID string) (int64, error) {
+	var size int64
+	err := tx.QueryRow(ctx,
+		`SELECT body_bytes FROM recordings WHERE owner_id = $1 AND record_id = $2`, ownerID, recordID,
+	).Scan(&size)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, nil
+	}
+
+	if err != nil {
+		return 0, fmt.Errorf("размер записи: %w", err)
+	}
+
+	return size, nil
+}
+
+// savedRecording — строка записи после сохранения: сводка и размер тела.
+type savedRecording struct {
+	gallery.Summary
+	BodyBytes int64
+}
+
+// upsertRecording пишет запись и возвращает её сводку и размер тела; у заменённой записи
+// ссылка остаётся прежней. Размер считает Postgres тем же выражением, что и миграция.
+func upsertRecording(ctx context.Context, tx pgx.Tx, ownerID int64, slug string, recording gallery.Recording) (gallery.Summary, int64, error) {
 	rows, err := tx.Query(ctx, `
 		INSERT INTO recordings
-			(owner_id, record_id, slug, project_id, title, language, started_at, body, uploaded_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
+			(owner_id, record_id, slug, project_id, title, language, started_at, body, body_bytes, uploaded_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, octet_length($8::jsonb::text), now())
 		ON CONFLICT (owner_id, record_id) DO UPDATE SET
 			project_id = EXCLUDED.project_id,
 			title = EXCLUDED.title,
 			language = EXCLUDED.language,
 			started_at = EXCLUDED.started_at,
 			body = EXCLUDED.body,
+			body_bytes = EXCLUDED.body_bytes,
 			uploaded_at = EXCLUDED.uploaded_at
-		RETURNING `+summaryColumns,
+		RETURNING `+summaryColumns+`, body_bytes`,
 		ownerID, recording.ID, slug, recording.ProjectID, recording.Title, recording.Language,
 		recording.StartedAt, recording.Body)
 	if err != nil {
-		return gallery.Summary{}, fmt.Errorf("запись в галерею: %w", err)
+		return gallery.Summary{}, 0, fmt.Errorf("запись в галерею: %w", err)
 	}
 
-	summary, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByPos[gallery.Summary])
+	saved, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByPos[savedRecording])
 	if err != nil {
-		return gallery.Summary{}, fmt.Errorf("запись в галерею: %w", err)
+		return gallery.Summary{}, 0, fmt.Errorf("запись в галерею: %w", err)
 	}
 
-	return summary, nil
+	return saved.Summary, saved.BodyBytes, nil
+}
+
+// ensureStorage проверяет, что тела записей всех галерей, уже со свежей записью, не выше
+// потолка. Advisory-блокировка до конца транзакции ставит загрузки разных авторов в очередь:
+// иначе две параллельные загрузки вместе перешагнули бы потолок.
+func (s *Store) ensureStorage(ctx context.Context, tx pgx.Tx) error {
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, storageLockKey); err != nil {
+		return fmt.Errorf("блокировка хранилища: %w", err)
+	}
+
+	var totalBytes int64
+	if err := tx.QueryRow(ctx, `SELECT coalesce(sum(body_bytes), 0) FROM recordings`).Scan(&totalBytes); err != nil {
+		return fmt.Errorf("подсчёт объёма хранилища: %w", err)
+	}
+
+	if totalBytes > s.storageLimitBytes {
+		return gallery.ErrStorageFull
+	}
+
+	return nil
 }
 
 // touchOwner отмечает, что галерея автора изменилась: по этому времени сортируется список

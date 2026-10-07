@@ -1,4 +1,4 @@
-// Package github проверяет токены авторов у GitHub: кто стоит за токеном.
+// Package github говорит с GitHub: проверяет токены авторов и меняет код входа на сайте на токен.
 package github
 
 import (

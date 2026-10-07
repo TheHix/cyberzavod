@@ -18,6 +18,7 @@ import (
 
 	"github.com/bysavelii/cyberzavod/apps/api/internal/config"
 	"github.com/bysavelii/cyberzavod/apps/api/internal/db"
+	"github.com/bysavelii/cyberzavod/apps/api/internal/gallery"
 	"github.com/bysavelii/cyberzavod/apps/api/internal/github"
 	"github.com/bysavelii/cyberzavod/apps/api/internal/httpapi"
 	"github.com/bysavelii/cyberzavod/apps/api/internal/store"
@@ -80,11 +81,15 @@ func serve(ctx context.Context, stop context.CancelFunc, logger *slog.Logger) er
 	}
 	defer pool.Close()
 
+	galleryStore := store.New(pool, gallery.StorageLimitBytes)
 	handler := httpapi.NewHandler(httpapi.Deps{
 		DB:             pool,
-		Galleries:      store.New(pool),
+		Galleries:      galleryStore,
+		Sessions:       galleryStore,
 		Tokens:         github.NewVerifier(cfg.GitHubAPIURL),
 		GitHubClientID: cfg.GitHubClientID,
+		OAuth:          siteLogin(cfg),
+		PublicURL:      cfg.PublicURL,
 		Logger:         logger,
 	})
 	srv := newServer(cfg.Addr, handler)
@@ -105,6 +110,16 @@ func serve(ctx context.Context, stop context.CancelFunc, logger *slog.Logger) er
 	logger.Info("останавливаюсь")
 
 	return shutdown(srv, errCh)
+}
+
+// siteLogin возвращает OAuth-приложение для входа на сайте или nil, если вход не настроен.
+// nil возвращается явно: *github.OAuthApp, равный nil, в интерфейсе nil не был бы.
+func siteLogin(cfg config.Config) httpapi.OAuthApp {
+	if !cfg.HasSiteLogin() {
+		return nil
+	}
+
+	return github.NewOAuthApp(cfg.GitHubOAuthURL, cfg.GitHubClientID, cfg.GitHubClientSecret)
 }
 
 func newServer(addr string, handler http.Handler) *http.Server {

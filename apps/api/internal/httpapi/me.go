@@ -84,6 +84,11 @@ func (a *api) putRecording(w http.ResponseWriter, r *http.Request, user gallery.
 		return
 	}
 
+	if errors.Is(err, gallery.ErrStorageFull) {
+		writeError(w, http.StatusInsufficientStorage, codeStorageFull, "Хранилище галерей заполнено, попробуйте позже")
+		return
+	}
+
 	if err != nil {
 		a.failInternal(w, r, err)
 		return

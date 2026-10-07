@@ -38,6 +38,7 @@ func TestGalleryRoutes(t *testing.T) {
 		{"решение вместо сессии", apiRequest{http.MethodPut, recordingPath, authorToken, strings.Replace(validBody, `"session"`, `"decision"`, 1)}, fakeGalleries{}, "", http.StatusBadRequest, codeInvalidRecord},
 		{"id не совпадает с адресом", apiRequest{http.MethodPut, "/api/me/recordings/other", authorToken, validBody}, fakeGalleries{}, "", http.StatusBadRequest, codeIDMismatch},
 		{"галерея полна", apiRequest{http.MethodPut, recordingPath, authorToken, validBody}, fakeGalleries{err: gallery.ErrLimitReached}, "", http.StatusConflict, codeLimitReached},
+		{"хранилище заполнено", apiRequest{http.MethodPut, recordingPath, authorToken, validBody}, fakeGalleries{err: gallery.ErrStorageFull}, "", http.StatusInsufficientStorage, codeStorageFull},
 
 		{"удаление записи", apiRequest{method: http.MethodDelete, path: recordingPath, token: authorToken}, fakeGalleries{}, "", http.StatusNoContent, ""},
 		{"удаление чужой или нет записи", apiRequest{method: http.MethodDelete, path: recordingPath, token: authorToken}, fakeGalleries{err: gallery.ErrNotFound}, "", http.StatusNotFound, codeNotFound},
