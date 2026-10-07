@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# Копия корневого LICENSE для npm-пакета, её делает prepack
+/packages/cli/LICENSE
 .DS_Store
 .env
 *.log
