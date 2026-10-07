@@ -106,4 +106,4 @@ A step-by-step guide (in Russian) to connecting a project is on the site: https:
 
 ## License
 
-[MIT](LICENSE).
+[MIT](LICENSE) © [bysavelii](https://bysavelii.com).
