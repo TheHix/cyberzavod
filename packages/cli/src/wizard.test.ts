@@ -1,8 +1,15 @@
 import path from "node:path";
+import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
 import { readInstallation } from "./installation/installation.ts";
 import type { DetectedProject } from "./detect.ts";
-import { askProjectConfig, defaultsPrompter, describeDetected, type Prompter } from "./wizard.ts";
+import {
+  askProjectConfig,
+  defaultsPrompter,
+  describeDetected,
+  terminalPrompter,
+  type Prompter,
+} from "./wizard.ts";
 
 function detected(): DetectedProject {
   return {
@@ -94,5 +101,35 @@ describe("describeDetected", () => {
       "Фреймворки: не найдены",
       "Git: нет",
     ]);
+  });
+});
+
+describe("terminalPrompter", () => {
+  it("на закрытом вводе отвечает по умолчанию", async () => {
+    const input = new PassThrough();
+    const prompter = terminalPrompter({ input, output: new PassThrough() });
+
+    input.end();
+
+    const answers = [
+      await prompter.ask("Проект", "shop"),
+      await prompter.ask("Процесс", "default"),
+    ];
+
+    expect(answers).toEqual(["shop", "default"]);
+  });
+
+  it("берёт ответы из ввода, а после его конца — по умолчанию", async () => {
+    const input = new PassThrough();
+    const prompter = terminalPrompter({ input, output: new PassThrough() });
+
+    input.end("lab\n");
+
+    const answers = [
+      await prompter.ask("Проект", "shop"),
+      await prompter.ask("Процесс", "default"),
+    ];
+
+    expect(answers).toEqual(["lab", "default"]);
   });
 });

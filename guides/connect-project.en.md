@@ -35,7 +35,7 @@ npm is needed only here. `init` puts the whole tool — a single file with no de
 - the check commands — the wizard suggests them from the project scripts, for example `make check` or `npm run test`;
 - where to keep the log — inside the project by default, `.cyberzavod/journal`. It can live outside the repository too, for example `../<project>.cyberzavod`.
 
-What was detected is a hint, not a limit: you can answer any question differently. `init --yes` takes all the default answers.
+What was detected is a hint, not a limit: you can answer any question differently. `init --yes` takes all the default answers; without a terminal (cloud, CI, `</dev/null`) the wizard does the same for every question the input has no answer to.
 
 What appears in the project:
 

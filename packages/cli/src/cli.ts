@@ -65,7 +65,10 @@ const COMMANDS: Readonly<Record<string, Command>> = {
     summary: "подключить проект в текущем каталоге: мастер, конфиг, AGENTS.md, файлы агента",
     run: async ({ args, directory }) => {
       const { values } = parseArgs({ args, options: { yes: { type: "boolean", short: "y" } } });
-      const prompter = values.yes === true ? defaultsPrompter() : terminalPrompter();
+      const prompter =
+        values.yes === true
+          ? defaultsPrompter()
+          : terminalPrompter({ input: process.stdin, output: process.stdout });
 
       try {
         await initProject(directory, prompter, await readInstallation());

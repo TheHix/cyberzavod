@@ -3729,7 +3729,7 @@ async function readAssets() {
 }
 
 // src/installation/installation.ts
-var HARNESS_VERSION = "0.7.0";
+var HARNESS_VERSION = "0.7.1";
 var RULES_TEMPLATE = "rules.md";
 function template(templates2, name) {
   const text = templates2[name];
@@ -3758,7 +3758,7 @@ function toolOf(installation) {
 }
 
 // src/wizard.ts
-import { createInterface } from "node:readline/promises";
+import { createInterface } from "node:readline";
 import path12 from "node:path";
 var DEFAULT_AGENT = {
   provider: "anthropic",
@@ -3768,13 +3768,19 @@ var LIST_SEPARATOR = ";";
 function defaultsPrompter() {
   return { ask: (_question, fallback) => Promise.resolve(fallback), close: () => void 0 };
 }
-function terminalPrompter() {
-  const terminal = createInterface({ input: process.stdin, output: process.stdout });
+function terminalPrompter(streams) {
+  const terminal = createInterface({ input: streams.input });
+  const lines = terminal[Symbol.asyncIterator]();
   return {
     ask: async (question, fallback) => {
-      const answer = await terminal.question(`${question} [${fallback}]: `);
-      const trimmed = answer.trim();
-      return trimmed === "" ? fallback : trimmed;
+      streams.output.write(`${question} [${fallback}]: `);
+      const line = await lines.next();
+      if (line.done === true) {
+        streams.output.write("\n");
+        return fallback;
+      }
+      const answer = line.value.trim();
+      return answer === "" ? fallback : answer;
     },
     close: () => {
       terminal.close();
@@ -4437,7 +4443,7 @@ var COMMANDS = {
     summary: "\u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u043F\u0440\u043E\u0435\u043A\u0442 \u0432 \u0442\u0435\u043A\u0443\u0449\u0435\u043C \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0435: \u043C\u0430\u0441\u0442\u0435\u0440, \u043A\u043E\u043D\u0444\u0438\u0433, AGENTS.md, \u0444\u0430\u0439\u043B\u044B \u0430\u0433\u0435\u043D\u0442\u0430",
     run: async ({ args, directory }) => {
       const { values } = parseArgs({ args, options: { yes: { type: "boolean", short: "y" } } });
-      const prompter = values.yes === true ? defaultsPrompter() : terminalPrompter();
+      const prompter = values.yes === true ? defaultsPrompter() : terminalPrompter({ input: process.stdin, output: process.stdout });
       try {
         await initProject(directory, prompter, await readInstallation());
       } finally {
