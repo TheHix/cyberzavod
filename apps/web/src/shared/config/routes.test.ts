@@ -8,6 +8,12 @@ describe("isUnindexedPath", () => {
     expect(unindexed).toBe(true);
   });
 
+  it("закрывает от поисковиков личный кабинет", () => {
+    const unindexed = isUnindexedPath(API_PAGES.cabinet);
+
+    expect(unindexed).toBe(true);
+  });
+
   it.each([API_PAGES.galleries, API_PAGES.stats, "/", "/recordings/a-1/"])(
     "оставляет открытой страницу %s",
     (path) => {

@@ -1,0 +1,30 @@
+---
+// Личный кабинет в поле: кто вошёл и его галерея приходят из API в браузере. При сборке никто не
+// вошёл и ничего не известно — в разметке заголовок, загрузка и подсказка про CLI.
+import type { Locale } from "@/shared/i18n/locale.ts";
+import { Panel } from "@/shared/ui";
+import { CabinetBoard } from "./CabinetBoard.tsx";
+
+interface Props {
+  /** Язык страницы. */
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+
+if (Astro.site === undefined) throw new Error("в astro.config.ts не задан site");
+
+const siteUrl = Astro.site.href;
+---
+
+<Panel scrollable>
+  <div class="article">
+    <CabinetBoard client:load locale={locale} siteUrl={siteUrl} />
+  </div>
+</Panel>
+
+<style>
+  .article {
+    max-width: 48rem;
+  }
+</style>

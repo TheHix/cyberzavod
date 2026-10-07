@@ -167,6 +167,8 @@ For an open gallery, `gallery` also prints a badge line for the README: the "cyb
 [![Built at Cyberzavod](https://cyberzavod.com/api/badges/<login>.svg)](https://cyberzavod.com/gallery/?user=<login>)
 ```
 
+The same can be done on the site, without a terminal: sign in with GitHub in the menu (on a phone, in the Builds panel) and open [your account](/me/). There you open or close the gallery, see your recordings with their links, delete the ones you no longer need and copy the badge line. Recordings are still uploaded only from the project, with `share`.
+
 ### A project on the factory's home page
 
 The home page and the project pages of the site are built from the factory repository: recordings from its `.cyberzavod/journal/sessions/` and project cards from `projects/`. To have your project there with a card, open a pull request to the [factory repository](https://github.com/bysavelii/cyberzavod) with two files:

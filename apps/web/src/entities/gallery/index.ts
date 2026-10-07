@@ -1,10 +1,16 @@
 export type {
   Gallery,
   GalleryListing,
+  OwnGallery,
   RecordingSummary,
   SharedRecording,
 } from "./model/gallery.ts";
-export { parseGalleries, parseGallery, parseSharedRecording } from "./model/parse.ts";
+export {
+  parseGalleries,
+  parseGallery,
+  parseOwnGallery,
+  parseSharedRecording,
+} from "./model/parse.ts";
 export {
   badgeImageUrl,
   badgeMarkdown,
@@ -13,4 +19,12 @@ export {
   queryParamOf,
   sharedRecordingUrl,
 } from "./model/url.ts";
-export { fetchGalleries, fetchGallery, fetchSharedRecording } from "./api/requests.ts";
+export {
+  deleteOwnRecording,
+  fetchGalleries,
+  fetchGallery,
+  fetchOwnGallery,
+  fetchSharedRecording,
+  setGalleryPublic,
+} from "./api/requests.ts";
+export { ReadmeBadge } from "./ui/ReadmeBadge.tsx";

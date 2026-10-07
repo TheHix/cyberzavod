@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SessionRecord } from "@cyberzavod/core";
 import { ApiResponseError } from "@/shared/api/errors.ts";
-import { parseGalleries, parseGallery, parseSharedRecording } from "./parse.ts";
+import { parseGalleries, parseGallery, parseOwnGallery, parseSharedRecording } from "./parse.ts";
 
 function validSession(): SessionRecord {
   return {
@@ -116,5 +116,28 @@ describe("parseSharedRecording", () => {
     const act = () => parseSharedRecording({ owner: "alice", galleryPublic: false, record: note });
 
     expect(act).toThrow("запись из галереи — note, а не сессия");
+  });
+});
+
+describe("parseOwnGallery", () => {
+  it("читает свою галерею с пределом и записями", () => {
+    const raw = { login: "alice", galleryPublic: false, limit: 5, recordings: [validSummary()] };
+
+    const gallery = parseOwnGallery(raw);
+
+    expect(gallery).toEqual({
+      login: "alice",
+      galleryPublic: false,
+      limit: 5,
+      recordings: [validSummary()],
+    });
+  });
+
+  it("отклоняет ответ без предела", () => {
+    const raw = { login: "alice", galleryPublic: true, recordings: [] };
+
+    const act = () => parseOwnGallery(raw);
+
+    expect(act).toThrow(ApiResponseError);
   });
 });

@@ -1,7 +1,7 @@
 import type { JSX } from "solid-js";
 
 /**
- * Знак GitHub: в наборе иконок lucide фирменных знаков нет.
+ * Знак GitHub ui-kit: в наборе иконок lucide фирменных знаков нет.
  * @returns {JSX.Element} SVG-знак размером с иконку.
  */
 export function GithubMark(): JSX.Element {

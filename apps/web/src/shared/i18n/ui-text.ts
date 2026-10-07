@@ -126,6 +126,11 @@ export const UI_TEXT = {
       ru: "Открытые галереи пользователей Киберзавода: записи сборок их проектов в цехе ИИ-агентов.",
     },
     statsTitle: { en: "Analytics", ru: "Аналитика" },
+    cabinetTitle: { en: "Your account", ru: "Личный кабинет" },
+    cabinetDescription: {
+      en: "Your Cyberzavod gallery: open or close it, see your build recordings and remove the ones you no longer need.",
+      ru: "Ваша галерея Киберзавода: открыть или закрыть её, посмотреть записи сборок и удалить лишние.",
+    },
     statsDescription: {
       en: "Where the process stalls: reworks by stage, human interventions, tokens and build outcomes across open galleries.",
       ru: "Где процесс буксует: возвраты по этапам, вмешательства человека, токены и исходы сборок по открытым галереям.",
@@ -228,6 +233,76 @@ export const UI_TEXT = {
     copyLabels: {
       en: { idle: "Copy Markdown", copied: "Copied", failed: "Could not copy" },
       ru: { idle: "Копировать Markdown", copied: "Скопировано", failed: "Не удалось скопировать" },
+    },
+  },
+  /** Вход через GitHub: кнопка в меню и в панели записей, сообщение о неудачном входе. */
+  account: {
+    signIn: { en: "Sign in with GitHub", ru: "Войти через GitHub" },
+    // Подпись плитки меню: полная в узкую плитку не помещается, она — в доступном имени и `title`.
+    signInShort: { en: "Sign in", ru: "Войти" },
+    // Видимая подпись — логин; он входит в доступное имя (WCAG 2.5.3).
+    cabinetLabel: {
+      en: (login: string) => `${login} — your account`,
+      ru: (login: string) => `${login} — личный кабинет`,
+    },
+    ownGallery: {
+      en: "Your own gallery is managed in your account on the site.",
+      ru: "Своей галереей управляют в личном кабинете на сайте.",
+    },
+    signInFailed: {
+      en: "Could not sign in with GitHub — please try again.",
+      ru: "Не удалось войти через GitHub, попробуйте ещё раз.",
+    },
+  },
+  /** Личный кабинет: своя галерея, записи и подсказка про CLI. */
+  cabinet: {
+    heading: { en: "Your account", ru: "Личный кабинет" },
+    guestIntro: {
+      en: "Sign in with GitHub to manage your gallery: open or close it, see your recordings and remove the ones you no longer need.",
+      ru: "Войдите через GitHub, чтобы управлять своей галереей: открыть или закрыть её, посмотреть записи и удалить лишние.",
+    },
+    signOut: { en: "Sign out", ru: "Выйти" },
+    galleryHeading: { en: "Gallery", ru: "Галерея" },
+    visibilityLabel: { en: "Gallery visibility", ru: "Видимость галереи" },
+    private: { en: "Private", ru: "Закрыта" },
+    public: { en: "Public", ru: "Открыта" },
+    privateHint: {
+      en: "Only those who have a link can see your recordings.",
+      ru: "Записи видят только те, у кого есть ссылка.",
+    },
+    publicHint: {
+      en: "The gallery is in the list of galleries on the site and counts towards the analytics.",
+      ru: "Галерея есть в списке галерей на сайте и входит в аналитику.",
+    },
+    galleryPage: { en: "Gallery page", ru: "Страница галереи" },
+    recordingsHeading: { en: "Recordings", ru: "Записи" },
+    usage: {
+      en: (count: number, limit: number) => `${count} of ${limit}`,
+      ru: (count: number, limit: number) => `${count} из ${limit}`,
+    },
+    noRecordings: { en: "No recordings in your gallery yet.", ru: "В галерее пока нет записей." },
+    delete: { en: "Delete", ru: "Удалить" },
+    deleteLabel: {
+      en: (title: string) => `Delete “${title}”`,
+      ru: (title: string) => `Удалить «${title}»`,
+    },
+    deleteQuestion: {
+      en: "Delete this recording? Its link will stop working.",
+      ru: "Удалить запись? Ссылка на неё перестанет работать.",
+    },
+    cancel: { en: "Cancel", ru: "Отмена" },
+    changeFailed: {
+      en: "Could not save the change — please try again.",
+      ru: "Не удалось сохранить изменение, попробуйте ещё раз.",
+    },
+    cliHeading: { en: "Recordings from your project", ru: "Записи из проекта" },
+    shareHint: {
+      en: "Recordings are uploaded from the project with this command; id is the file name in sessions/ of the journal:",
+      ru: "Записи загружаются из проекта командой; id — имя файла в sessions/ журнала:",
+    },
+    loginHint: {
+      en: "Before that, sign in to the CLI:",
+      ru: "Перед этим войдите в CLI:",
     },
   },
   /** Аналитика по записям открытых галерей. */

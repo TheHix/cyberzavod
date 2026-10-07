@@ -1,3 +1,4 @@
+export { Avatar } from "./avatar/Avatar.tsx";
 export { BarList, type BarItem } from "./bar-list/BarList.tsx";
 export { BulletList } from "./bullet-list/BulletList.tsx";
 export {
@@ -11,7 +12,9 @@ export {
 export { Card } from "./card/Card.tsx";
 export { Chip, type ChipTone } from "./chip/Chip.tsx";
 export { CopyButton, type CopyLabels } from "./copy-button/CopyButton.tsx";
+export { CopyableCode } from "./copyable-code/CopyableCode.tsx";
 export { Drawer } from "./drawer/Drawer.tsx";
+export { GithubMark } from "./github-mark/GithubMark.tsx";
 export { Panel } from "./panel/Panel.tsx";
 export { PixelPlaque } from "./pixel-plaque/PixelPlaque.tsx";
 export { codeBlockClass, Prose } from "./prose/Prose.tsx";
