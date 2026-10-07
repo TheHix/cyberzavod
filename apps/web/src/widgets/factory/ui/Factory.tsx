@@ -39,8 +39,12 @@ const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 
 // Встраивает графику в холст и запускает цех: кадр рисуется по подписке на сцену модели —
 // идёт она или её перематывают, — а часы двигают модель.
-async function launchFactory(model: FactoryModel, host: HTMLElement): Promise<LaunchedFactory> {
-  const graphics = await loadFactoryGraphics();
+async function launchFactory(
+  model: FactoryModel,
+  host: HTMLElement,
+  locale: Locale,
+): Promise<LaunchedFactory> {
+  const graphics = await loadFactoryGraphics(locale);
   try {
     const mounted = model.$layout.get();
     await graphics.mount(host, mounted);
@@ -136,7 +140,7 @@ export function Factory(props: Props): JSX.Element {
       stop?.();
     });
 
-    launchFactory(model, canvasHost).then(
+    launchFactory(model, canvasHost, locale).then(
       (launched) => {
         if (disposed) {
           launched.stop();

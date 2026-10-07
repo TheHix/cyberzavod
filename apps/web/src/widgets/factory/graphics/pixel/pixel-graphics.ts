@@ -5,6 +5,7 @@
 
 import { STAGES, type FactoryLayout, type Point, type Scene, type Stage } from "@cyberzavod/core";
 import { Container, isWebGLSupported } from "pixi.js";
+import type { Locale } from "@/shared/i18n/locale.ts";
 import type { FactoryGraphics, Frame, ScreenPoint } from "../factory-graphics.ts";
 import {
   bakeActorTextures,
@@ -29,7 +30,10 @@ import { drawPlaques } from "./plaques.ts";
 import { createRenderer, type FactoryRenderer } from "./renderer.ts";
 import { PIXELS_PER_UNIT } from "./units.ts";
 
-/** Графика цеха в пиксель-арте: рисунки строками, запечённые в текстуры. */
+/**
+ * Графика цеха в пиксель-арте: рисунки строками, запечённые в текстуры. Надписи табличек —
+ * на языке, который задан при создании.
+ */
 export class PixelGraphics implements FactoryGraphics {
   readonly #renderer: FactoryRenderer = createRenderer(isWebGLSupported());
   readonly #stage = new Container();
@@ -49,6 +53,17 @@ export class PixelGraphics implements FactoryGraphics {
   #scale = 1;
   #offset: ScreenPoint = { x: 0, y: 0 };
   #mounted = false;
+  // Язык страницы не меняется, пока открыт цех,
+  // поэтому графика хранит его, а не получает в `setLayout`.
+  readonly #locale: Locale;
+
+  /**
+   * Создаёт графику; надписи табличек будут на этом языке.
+   * @param {Locale} locale Язык страницы.
+   */
+  constructor(locale: Locale) {
+    this.#locale = locale;
+  }
 
   /**
    * Встраивает холст в контейнер и рисует неподвижный цех: пол, станки, кабинет мастера, таблички.
@@ -168,7 +183,7 @@ export class PixelGraphics implements FactoryGraphics {
   #drawPlan(layout: FactoryLayout): void {
     const palette = this.#palette;
     if (palette === undefined) return;
-    this.#bounds = planBounds(layout);
+    this.#bounds = planBounds(layout, this.#locale);
     const plan = new Container();
     plan.addChild(drawFloor(layout, palette));
     for (const stage of STAGES) {
@@ -177,7 +192,7 @@ export class PixelGraphics implements FactoryGraphics {
       this.#machines.set(stage, machine.sprites);
     }
     plan.addChild(drawOffice(layout.foreman, palette));
-    plan.addChild(drawPlaques(layout, palette));
+    plan.addChild(drawPlaques(layout, palette, this.#locale));
     this.#world.addChildAt(plan, 0);
     this.#plan = plan;
   }

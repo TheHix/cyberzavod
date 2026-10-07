@@ -6,8 +6,8 @@ import {
   type FactoryLayout,
 } from "@cyberzavod/core";
 import { describe, expect, it } from "vitest";
+import { LOCALES, type Locale } from "@/shared/i18n/locale.ts";
 import { FOREMAN_LABEL, STAGE_LABELS } from "@/shared/config/stages.ts";
-import { PLAQUE_LOCALE } from "@/shared/lib/pixel-plaque.ts";
 import { fitPixelPlan, planBounds, type PlanBounds } from "./bounds.ts";
 import { plaqueSize } from "./glyphs.ts";
 import { MACHINE_SIZE } from "./machines.ts";
@@ -66,38 +66,58 @@ function neededRects(layout: FactoryLayout): PlanBounds[] {
   ];
 }
 
-function widestPlaqueText(): string {
+function widestPlaqueText(locale: Locale): string {
   return [
-    ...Object.values(STAGE_LABELS).map((label) => label[PLAQUE_LOCALE]),
-    FOREMAN_LABEL[PLAQUE_LOCALE],
+    ...Object.values(STAGE_LABELS).map((label) => label[locale]),
+    FOREMAN_LABEL[locale],
   ].reduce((widest, text) => (plaqueSize(widest).width >= plaqueSize(text).width ? widest : text));
 }
 
+interface PlanCase {
+  readonly locale: Locale;
+  readonly layout: FactoryLayout;
+  readonly width: number;
+  readonly height: number;
+}
+
+// Каждый план цеха на каждом языке: от языка зависит ширина табличек.
+const PLAN_CASES: readonly PlanCase[] = LOCALES.flatMap((locale) =>
+  FACTORY_LAYOUTS.map((layout) => ({
+    locale,
+    layout,
+    width: layout.width,
+    height: layout.height,
+  })),
+);
+
 describe("planBounds", () => {
-  it.each(FACTORY_LAYOUTS)(
-    "включает станки, места, дверь и таблички (план $width×$height)",
-    (layout) => {
+  it.each(PLAN_CASES)(
+    "включает станки, места, дверь и таблички (план $width×$height, $locale)",
+    ({ locale, layout }) => {
       const needed = neededRects(layout);
 
-      const bounds = planBounds(layout);
+      const bounds = planBounds(layout, locale);
 
       expect(needed.filter((rect) => !contains(bounds, rect))).toEqual([]);
     },
   );
 
-  it.each(FACTORY_LAYOUTS)("включает самую широкую табличку (план $width×$height)", (layout) => {
-    const widest = widestPlaqueText();
-    const placement = plaquePlacements(layout).find(({ text }) => text === widest);
-    const rect = placement === undefined ? undefined : plaqueRect(placement);
+  it.each(PLAN_CASES)(
+    "включает самую широкую табличку (план $width×$height, $locale)",
+    ({ locale, layout }) => {
+      const widest = widestPlaqueText(locale);
+      const placement = plaquePlacements(layout, locale).find(({ text }) => text === widest);
+      const rect = placement === undefined ? undefined : plaqueRect(placement);
 
-    const bounds = planBounds(layout);
+      const bounds = planBounds(layout, locale);
 
-    expect(rect?.width).toBe(plaqueSize(widest).width);
-    expect(contains(bounds, unitsOf(rect))).toBe(true);
-  });
+      expect(rect?.width).toBe(plaqueSize(widest).width);
+      expect(contains(bounds, unitsOf(rect))).toBe(true);
+    },
+  );
 
   it("не оставляет пустых краёв: границы вплотную к нарисованному", () => {
-    const wide = planBounds(WIDE_LAYOUT);
+    const wide = planBounds(WIDE_LAYOUT, "ru");
 
     expect(wide.x).toBeGreaterThan(0);
     expect(wide.x + wide.width).toBeLessThan(WIDE_LAYOUT.width);
@@ -110,7 +130,7 @@ describe("planBounds", () => {
       stations: { ...WIDE_LAYOUT.stations, review: { ...review, foremanPost: { x: 30, y: 6.1 } } },
     };
 
-    const bounds = planBounds(layout);
+    const bounds = planBounds(layout, "ru");
 
     expect(bounds.x + bounds.width).toBeCloseTo(30.5);
   });
@@ -118,15 +138,15 @@ describe("planBounds", () => {
   it("расширяет границы, если дверь вынесена за кабинет", () => {
     const layout = { ...WIDE_LAYOUT, foreman: { ...WIDE_LAYOUT.foreman, door: { x: 20, y: 7.4 } } };
 
-    const bounds = planBounds(layout);
+    const bounds = planBounds(layout, "ru");
 
     expect(bounds.x + bounds.width).toBeCloseTo(20.5);
   });
 });
 
 describe("fitPixelPlan", () => {
-  const bounds = planBounds(WIDE_LAYOUT);
-  const portraitBounds = planBounds(PORTRAIT_LAYOUT);
+  const bounds = planBounds(WIDE_LAYOUT, "ru");
+  const portraitBounds = planBounds(PORTRAIT_LAYOUT, "ru");
 
   it.each(RESOLUTIONS)(
     "берёт целый множитель пикселей устройства при плотности %s",

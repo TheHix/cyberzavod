@@ -1,7 +1,33 @@
 import { describe, expect, it } from "vitest";
+import { LOGO_LINES, LOGO_SHORT_LINES } from "@/shared/config/logo.ts";
+import { FOREMAN_LABEL, STAGE_LABELS } from "@/shared/config/stages.ts";
+import { LOCALES } from "@/shared/i18n/locale.ts";
 import { PLAQUE_GLYPHS, PLAQUE_INKS, plaqueArt, plaqueRuns } from "./pixel-plaque.ts";
 
 const GLYPH_HEIGHT = 5;
+// Латинские буквы того же вида, что кириллические: пары (латиница, кириллица).
+const LATIN_TWINS: readonly (readonly [string, string])[] = [
+  ["A", "А"],
+  ["B", "В"],
+  ["C", "С"],
+  ["E", "Е"],
+  ["H", "Н"],
+  ["M", "М"],
+  ["O", "О"],
+  ["P", "Р"],
+  ["T", "Т"],
+];
+
+// Все надписи, которые рисуют таблички цеха и логотип, на каждом языке.
+const LABEL_CASES = LOCALES.flatMap((locale) =>
+  [
+    ...Object.values(STAGE_LABELS).map((label) => [label[locale]]),
+    [FOREMAN_LABEL[locale]],
+    LOGO_LINES[locale],
+    LOGO_SHORT_LINES[locale],
+  ].map((lines) => ({ locale, lines, text: lines.join(" ") })),
+);
+
 const INK_LETTERS = new Set<string>(Object.values(PLAQUE_INKS));
 
 function rowsOfOneWidth(art: readonly string[]): boolean {
@@ -12,6 +38,16 @@ describe("PLAQUE_GLYPHS", () => {
   it.each(Object.entries(PLAQUE_GLYPHS))("глиф «%s» — 5 строк одной ширины", (_letter, glyph) => {
     expect(glyph).toHaveLength(GLYPH_HEIGHT);
     expect(rowsOfOneWidth(glyph)).toBe(true);
+  });
+
+  it.each(LATIN_TWINS)("латинская «%s» рисуется как кириллическая «%s»", (latin, cyrillic) => {
+    expect(PLAQUE_GLYPHS[latin]).toEqual(PLAQUE_GLYPHS[cyrillic]);
+  });
+
+  it.each(LABEL_CASES)("есть все буквы надписи «$text» ($locale)", ({ lines }) => {
+    const act = () => plaqueArt(lines);
+
+    expect(act).not.toThrow();
   });
 });
 

@@ -1,4 +1,5 @@
 import type { FactoryLayout, Point, Scene } from "@cyberzavod/core";
+import type { Locale } from "@/shared/i18n/locale.ts";
 
 /** Точка в координатах контейнера цеха, CSS-пиксели от его левого верхнего угла. */
 export interface ScreenPoint {
@@ -41,9 +42,11 @@ export interface FactoryGraphics {
 /**
  * Загружает графику цеха, которую показывает сайт. Её код приходит отдельным файлом и только
  * в браузере; чтобы сменить графику, достаточно вернуть здесь другую реализацию FactoryGraphics.
+ * Надписи графики — на языке страницы.
+ * @param {Locale} locale Язык страницы.
  * @returns {Promise<FactoryGraphics>} Графика, ещё не встроенная в страницу.
  */
-export async function loadFactoryGraphics(): Promise<FactoryGraphics> {
+export async function loadFactoryGraphics(locale: Locale): Promise<FactoryGraphics> {
   const { PixelGraphics } = await import("./pixel/pixel-graphics.ts");
-  return new PixelGraphics();
+  return new PixelGraphics(locale);
 }

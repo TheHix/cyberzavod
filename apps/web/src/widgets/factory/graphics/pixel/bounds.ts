@@ -3,6 +3,7 @@
 // у плана целиком. Размеры берутся из рисунков, а не подгоняются.
 
 import { STAGES, type FactoryLayout, type Point } from "@cyberzavod/core";
+import type { Locale } from "@/shared/i18n/locale.ts";
 import type { Frame, ScreenPoint } from "../factory-graphics.ts";
 import { ACTOR_ART } from "./actor-art.ts";
 import { artSize } from "./art.ts";
@@ -47,12 +48,13 @@ function actorRect(point: Point): PlanBounds {
 /**
  * Считает, какую часть плана занимает нарисованный цех.
  * @param {FactoryLayout} layout План цеха.
+ * @param {Locale} locale Язык надписей: от него зависит ширина табличек.
  * @returns {PlanBounds} Прямоугольник в единицах плана, который надо вписать в поле.
  */
-export function planBounds(layout: FactoryLayout): PlanBounds {
+export function planBounds(layout: FactoryLayout, locale: Locale): PlanBounds {
   const rects = [
     ...padRects(layout),
-    ...plaquePlacements(layout).map(plaqueRect),
+    ...plaquePlacements(layout, locale).map(plaqueRect),
     ...STAGES.map((stage) => actorRect(layout.stations[stage].foremanPost)),
     actorRect(layout.foreman.door),
   ].map(unitsOf);

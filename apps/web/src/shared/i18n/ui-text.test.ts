@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { INTERVENTION_LABELS } from "@/shared/config/interventions.ts";
+import { LOGO_LINES, LOGO_SHORT_LINES } from "@/shared/config/logo.ts";
 import { site } from "@/shared/config/site.ts";
 import { FOREMAN_LABEL, STAGE_LABELS } from "@/shared/config/stages.ts";
 import { LOCALES } from "./locale.ts";
@@ -65,6 +66,8 @@ describe("UI_TEXT", () => {
 describe.each([
   ["STAGE_LABELS", STAGE_LABELS],
   ["FOREMAN_LABEL", FOREMAN_LABEL],
+  ["LOGO_LINES", LOGO_LINES],
+  ["LOGO_SHORT_LINES", LOGO_SHORT_LINES],
   ["INTERVENTION_LABELS", INTERVENTION_LABELS],
   ["site", { name: site.name, description: site.description }],
 ] as const)("%s", (name, labels) => {

@@ -6,8 +6,8 @@ import {
   type Stage,
 } from "@cyberzavod/core";
 import { describe, expect, it } from "vitest";
+import { LOCALES, type Locale } from "@/shared/i18n/locale.ts";
 import { FOREMAN_LABEL, STAGE_LABELS } from "@/shared/config/stages.ts";
-import { PLAQUE_LOCALE } from "@/shared/lib/pixel-plaque.ts";
 import { ACTOR_FIGURE } from "./actors.ts";
 import { artSize } from "./art.ts";
 import { MACHINE_SIZE } from "./machines.ts";
@@ -81,13 +81,30 @@ function figureRectsOf(layout: FactoryLayout): Rect[] {
   }));
 }
 
+interface PlanCase {
+  readonly locale: Locale;
+  readonly layout: FactoryLayout;
+  readonly width: number;
+  readonly height: number;
+}
+
+// Каждый план цеха на каждом языке: от языка зависит ширина табличек.
+const PLAN_CASES: readonly PlanCase[] = LOCALES.flatMap((locale) =>
+  FACTORY_LAYOUTS.map((layout) => ({
+    locale,
+    layout,
+    width: layout.width,
+    height: layout.height,
+  })),
+);
+
 // Просвет между фигурами в ряду — такая доля ширины таблички: она туда не влезает.
 const NARROWER_THAN_PLAQUE = 0.9;
 
 // Места мастера у всех станков — в ряд на табличке этапа, просветы чуть уже таблички: сдвиг
 // от одной фигуры упирает её в соседнюю, и она мечется между ними.
-function rowOfFiguresOnPlaque(layout: FactoryLayout, stage: Stage): FactoryLayout {
-  const plaque = plaquePlacements(layout)[STAGES.indexOf(stage)];
+function rowOfFiguresOnPlaque(layout: FactoryLayout, stage: Stage, locale: Locale): FactoryLayout {
+  const plaque = plaquePlacements(layout, locale)[STAGES.indexOf(stage)];
   if (plaque === undefined) throw new Error(`у этапа ${stage} нет таблички`);
   const figureWidth = (ACTOR_FIGURE.right - ACTOR_FIGURE.left) / PIXELS_PER_UNIT;
   const spacing = figureWidth + plaque.size.width * NARROWER_THAN_PLAQUE;
@@ -105,22 +122,22 @@ function rowOfFiguresOnPlaque(layout: FactoryLayout, stage: Stage): FactoryLayou
 }
 
 describe("plaquePlacements", () => {
-  it.each(FACTORY_LAYOUTS)(
-    "ставит табличку каждому станку и кабинету (план $width×$height)",
-    (layout) => {
-      const placements = plaquePlacements(layout);
+  it.each(PLAN_CASES)(
+    "ставит табличку каждому станку и кабинету (план $width×$height, $locale)",
+    ({ locale, layout }) => {
+      const placements = plaquePlacements(layout, locale);
 
       expect(placements.map(({ text }) => text)).toEqual([
-        ...STAGES.map((stage) => STAGE_LABELS[stage][PLAQUE_LOCALE]),
-        FOREMAN_LABEL[PLAQUE_LOCALE],
+        ...STAGES.map((stage) => STAGE_LABELS[stage][locale]),
+        FOREMAN_LABEL[locale],
       ]);
     },
   );
 
-  it.each(FACTORY_LAYOUTS)(
-    "не пересекает таблички друг с другом (план $width×$height)",
-    (layout) => {
-      const rects = plaquePlacements(layout).map(plaqueRectOf);
+  it.each(PLAN_CASES)(
+    "не пересекает таблички друг с другом (план $width×$height, $locale)",
+    ({ locale, layout }) => {
+      const rects = plaquePlacements(layout, locale).map(plaqueRectOf);
 
       const crossings = rects.flatMap((rect, index) =>
         rects.slice(index + 1).filter((other) => overlap(rect, other)),
@@ -130,12 +147,12 @@ describe("plaquePlacements", () => {
     },
   );
 
-  it.each(FACTORY_LAYOUTS)(
-    "не пересекает таблички со станками и столом (план $width×$height)",
-    (layout) => {
+  it.each(PLAN_CASES)(
+    "не пересекает таблички со станками и столом (план $width×$height, $locale)",
+    ({ locale, layout }) => {
       const furniture = furnitureOf(layout);
 
-      const crossings = plaquePlacements(layout)
+      const crossings = plaquePlacements(layout, locale)
         .map(plaqueRectOf)
         .flatMap((rect) => furniture.filter((piece) => overlap(rect, piece)));
 
@@ -143,10 +160,10 @@ describe("plaquePlacements", () => {
     },
   );
 
-  it.each(FACTORY_LAYOUTS)(
-    "ставит табличку по другую сторону станка от рабочего (план $width×$height)",
-    (layout) => {
-      const placements = plaquePlacements(layout);
+  it.each(PLAN_CASES)(
+    "ставит табличку по другую сторону станка от рабочего (план $width×$height, $locale)",
+    ({ locale, layout }) => {
+      const placements = plaquePlacements(layout, locale);
 
       for (const [index, stage] of STAGES.entries()) {
         const { machine, post } = layout.stations[stage];
@@ -156,23 +173,23 @@ describe("plaquePlacements", () => {
     },
   );
 
-  it.each(FACTORY_LAYOUTS)(
-    "ставит табличку кабинета за местом мастера (план $width×$height)",
-    (layout) => {
+  it.each(PLAN_CASES)(
+    "ставит табличку кабинета за местом мастера (план $width×$height, $locale)",
+    ({ locale, layout }) => {
       const { desk, post } = layout.foreman;
 
-      const placement = plaquePlacements(layout).at(-1);
+      const placement = plaquePlacements(layout, locale).at(-1);
 
       expect(Math.sign((placement?.center.y ?? NaN) - post.y)).toBe(Math.sign(post.y - desk.y));
     },
   );
 
-  it.each(FACTORY_LAYOUTS)(
-    "не пересекает таблички с мастером и рабочими во всех их точках (план $width×$height)",
-    (layout) => {
+  it.each(PLAN_CASES)(
+    "не пересекает таблички с мастером и рабочими во всех их точках (план $width×$height, $locale)",
+    ({ locale, layout }) => {
       const figures = figureRectsOf(layout);
 
-      const crossings = plaquePlacements(layout)
+      const crossings = plaquePlacements(layout, locale)
         .map(plaqueRectOf)
         .flatMap((rect) => figures.filter((figure) => overlap(rect, figure)));
 
@@ -191,22 +208,20 @@ describe("plaquePlacements", () => {
         [stage]: { ...station, foremanPost: { x: station.machine.x, y: station.machine.y - 1 } },
       },
     };
-    const [original] = plaquePlacements(layout);
+    const [original] = plaquePlacements(layout, "ru");
 
-    const [moved] = plaquePlacements(crowded);
+    const [moved] = plaquePlacements(crowded, "ru");
 
     expect(moved?.center.y).toBeCloseTo(original?.center.y ?? NaN);
     expect(moved?.center.x).not.toBeCloseTo(original?.center.x ?? NaN);
   });
 
   it("отказывает, если табличке негде встать между фигурами", () => {
-    const layout = rowOfFiguresOnPlaque(WIDE_LAYOUT, "spec");
+    const layout = rowOfFiguresOnPlaque(WIDE_LAYOUT, "spec", "ru");
 
-    const act = () => plaquePlacements(layout);
+    const act = () => plaquePlacements(layout, "ru");
 
-    expect(act).toThrow(
-      `табличка «${STAGE_LABELS.spec[PLAQUE_LOCALE]}» не помещается между фигурами`,
-    );
+    expect(act).toThrow(`табличка «${STAGE_LABELS.spec.ru}» не помещается между фигурами`);
   });
 });
 

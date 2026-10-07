@@ -7,6 +7,7 @@ import ListVideo from "lucide-solid/icons/list-video";
 import MessageSquareText from "lucide-solid/icons/message-square-text";
 import { For, Show, type JSX } from "solid-js";
 import { PANELS } from "@/shared/config/panels.ts";
+import { LOGO_LINES, LOGO_SHORT_LINES } from "@/shared/config/logo.ts";
 import { site } from "@/shared/config/site.ts";
 import { LOCALE_NAMES, otherLocales, type Locale } from "@/shared/i18n/locale.ts";
 import { localizedPath } from "@/shared/i18n/path.ts";
@@ -28,9 +29,6 @@ interface Props {
 }
 
 const ICON_STROKE = 2.5;
-// Логотип — табличка пиксельным шрифтом, как у станков в цехе; на тесном экране — сокращение.
-const LOGO_LINES = ["Кибер", "завод"];
-const LOGO_SHORT_LINES = ["КЗ"];
 
 /**
  * Меню сайта слева: логотип, цех, панели записей, журнала сборки, проекта, гайдов и «о заводе»,
@@ -51,8 +49,8 @@ export function Sidebar(props: Props): JSX.Element {
         href={localizedPath(props.locale, "/")}
         aria-label={UI_TEXT.menu.home[props.locale](site.name[props.locale])}
       >
-        <PixelPlaque class={styles.logoFull} lines={LOGO_LINES} />
-        <PixelPlaque class={styles.logoShort} lines={LOGO_SHORT_LINES} />
+        <PixelPlaque class={styles.logoFull} lines={LOGO_LINES[props.locale]} />
+        <PixelPlaque class={styles.logoShort} lines={LOGO_SHORT_LINES[props.locale]} />
       </a>
       <ul class={styles.menu}>
         <li>

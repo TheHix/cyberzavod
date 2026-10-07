@@ -10,8 +10,8 @@ import {
   type StationPlan,
 } from "@cyberzavod/core";
 import { Container, Sprite } from "pixi.js";
+import type { Locale } from "@/shared/i18n/locale.ts";
 import { FOREMAN_LABEL, STAGE_LABELS } from "@/shared/config/stages.ts";
-import { PLAQUE_LOCALE } from "@/shared/lib/pixel-plaque.ts";
 import { ACTOR_FIGURE } from "./actors.ts";
 import { plaqueImage, plaqueSize } from "./glyphs.ts";
 import type { PlanBounds } from "./bounds.ts";
@@ -47,8 +47,8 @@ function offsetOf(text: string): number {
 }
 
 // Табличка станка — со стороны, противоположной рабочему; если они на одной высоте — над станком.
-function stationPlacement(stage: Stage, plan: StationPlan): PlaquePlacement {
-  const text = STAGE_LABELS[stage][PLAQUE_LOCALE];
+function stationPlacement(stage: Stage, plan: StationPlan, locale: Locale): PlaquePlacement {
+  const text = STAGE_LABELS[stage][locale];
   const awayFromWorker = Math.sign(plan.machine.y - plan.post.y) || -1;
   return placementOf(text, {
     x: plan.machine.x,
@@ -58,11 +58,12 @@ function stationPlacement(stage: Stage, plan: StationPlan): PlaquePlacement {
 
 // Табличка кабинета — за местом мастера, по ту же сторону от стола, что и он, в одном ряду
 // с табличками станков.
-function foremanPlacement(plan: ForemanPlan): PlaquePlacement {
+function foremanPlacement(plan: ForemanPlan, locale: Locale): PlaquePlacement {
   const awayFromDesk = Math.sign(plan.post.y - plan.desk.y) || 1;
-  return placementOf(FOREMAN_LABEL[PLAQUE_LOCALE], {
+  const text = FOREMAN_LABEL[locale];
+  return placementOf(text, {
     x: plan.desk.x,
-    y: plan.post.y + awayFromDesk * offsetOf(FOREMAN_LABEL[PLAQUE_LOCALE]),
+    y: plan.post.y + awayFromDesk * offsetOf(text),
   });
 }
 
@@ -118,14 +119,15 @@ function clearOf(placement: PlaquePlacement, figures: readonly PlanBounds[]): Pl
  * Места всех табличек плана: по одной на станок и на кабинет мастера. Табличка не заходит
  * на человека ни в одной его точке плана.
  * @param {FactoryLayout} layout План цеха.
+ * @param {Locale} locale Язык надписей.
  * @returns {PlaquePlacement[]} Таблички в порядке этапов, кабинет — последний.
  * @throws {Error} Если табличку нельзя поставить, не задев фигур.
  */
-export function plaquePlacements(layout: FactoryLayout): PlaquePlacement[] {
+export function plaquePlacements(layout: FactoryLayout, locale: Locale): PlaquePlacement[] {
   const figures = figurePoints(layout).map(figureRect);
   return [
-    ...STAGES.map((stage) => stationPlacement(stage, layout.stations[stage])),
-    foremanPlacement(layout.foreman),
+    ...STAGES.map((stage) => stationPlacement(stage, layout.stations[stage], locale)),
+    foremanPlacement(layout.foreman, locale),
   ].map((placement) => clearOf(placement, figures));
 }
 
@@ -147,11 +149,12 @@ export function plaqueRect({ center, size }: PlaquePlacement): PlanBounds {
  * Рисует таблички плана; координаты — в пикселях рисунка.
  * @param {FactoryLayout} layout План цеха.
  * @param {Palette} palette Краски цеха.
+ * @param {Locale} locale Язык надписей.
  * @returns {Container} Все таблички: они лежат поверх станков и кабинета.
  */
-export function drawPlaques(layout: FactoryLayout, palette: Palette): Container {
+export function drawPlaques(layout: FactoryLayout, palette: Palette, locale: Locale): Container {
   const plaques = new Container();
-  for (const placement of plaquePlacements(layout)) {
+  for (const placement of plaquePlacements(layout, locale)) {
     const plaque = new Sprite(textureOf(plaqueImage(placement.text, palette)));
     const { x, y } = plaqueRect(placement);
     plaque.position.set(x, y);
