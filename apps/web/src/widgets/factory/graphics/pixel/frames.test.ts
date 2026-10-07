@@ -14,7 +14,7 @@ import {
 
 function workerFrame(overrides: Partial<WorkerFrame> = {}): WorkerFrame {
   return {
-    station: "code",
+    station: "implementation",
     position: { x: 1, y: 1 },
     heading: 0,
     activity: "walk",

@@ -50,7 +50,8 @@ RUN printf 'export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH:/usr/local/share/n
 RUN mkdir -p /usr/local/share/npm-global /commandhistory \
     /home/node/.claude /home/node/.config/gh /home/node/.local/share/pnpm /home/node/go \
     /workspace/node_modules /workspace/apps/web/node_modules \
-    /workspace/packages/core/node_modules /workspace/packages/recorder/node_modules \
+    /workspace/packages/core/node_modules /workspace/packages/storage/node_modules \
+    /workspace/packages/cli/node_modules /workspace/adapters/claude/node_modules \
   && chown -R node:node /usr/local/share/npm-global /commandhistory /home/node /workspace
 
 # Единственное, что node может сделать от root, — перезапустить файрвол. Скрипт принадлежит root.

@@ -2,7 +2,7 @@
 // в единице, поэтому план один для любой графики.
 
 import type { Aisle } from "./aisle.ts";
-import type { Stage } from "./recording.ts";
+import type { Stage } from "./stage.ts";
 
 /** Точка на плане цеха; ось y направлена вниз, как на экране. */
 export interface Point {
@@ -74,8 +74,8 @@ const WIDE_MIN_FIELD_ASPECT = 0.8;
 const WIDE_MIN_SCREEN_ASPECT = 1;
 
 /**
- * Широкий план: петля на полу 16×9. Сверху слева направо — постановка, код, проверки;
- * снизу справа налево — ревью и выпуск, так деталь идёт по кругу. Кабинет мастера — внизу слева,
+ * Широкий план: петля на полу 16×9. Сверху слева направо — постановка, код, ревью;
+ * снизу справа налево — проверки и фиксация, так деталь идёт по кругу. Кабинет мастера — внизу слева,
  * в стороне от маршрутов рабочих; мастер ходит к станкам и встаёт справа от рабочего.
  */
 export const WIDE_LAYOUT: FactoryLayout = {
@@ -88,11 +88,11 @@ export const WIDE_LAYOUT: FactoryLayout = {
     { x: 16, y: 4.5 },
   ],
   stations: {
-    spec: stationOf({ x: 3, y: 1.6 }, { x: 3, y: 2.9 }, FACING_UP),
-    code: stationOf({ x: 8, y: 1.6 }, { x: 8, y: 2.9 }, FACING_UP),
-    test: stationOf({ x: 13, y: 1.6 }, { x: 13, y: 2.9 }, FACING_UP),
-    review: stationOf({ x: 13, y: 7.4 }, { x: 13, y: 6.1 }, FACING_DOWN),
-    ship: stationOf({ x: 8, y: 7.4 }, { x: 8, y: 6.1 }, FACING_DOWN),
+    planning: stationOf({ x: 3, y: 1.6 }, { x: 3, y: 2.9 }, FACING_UP),
+    implementation: stationOf({ x: 8, y: 1.6 }, { x: 8, y: 2.9 }, FACING_UP),
+    review: stationOf({ x: 13, y: 1.6 }, { x: 13, y: 2.9 }, FACING_UP),
+    verification: stationOf({ x: 13, y: 7.4 }, { x: 13, y: 6.1 }, FACING_DOWN),
+    record: stationOf({ x: 8, y: 7.4 }, { x: 8, y: 6.1 }, FACING_DOWN),
   },
   foreman: {
     desk: { x: 3, y: 6.3 },
@@ -119,31 +119,31 @@ export const PORTRAIT_LAYOUT: FactoryLayout = {
     { x: 3.5, y: 10 },
   ],
   stations: {
-    spec: {
+    planning: {
       machine: { x: 1.5, y: 1.6 },
       post: { x: 1.5, y: 2.9 },
       facing: FACING_UP,
       foremanPost: { x: 2.6, y: 3.9 },
     },
-    code: {
+    implementation: {
       machine: { x: 1.5, y: 4.6 },
       post: { x: 1.5, y: 5.9 },
       facing: FACING_UP,
       foremanPost: { x: 2.6, y: 6.9 },
     },
-    test: {
+    review: {
       machine: { x: 1.5, y: 7.6 },
       post: { x: 1.5, y: 8.9 },
       facing: FACING_UP,
       foremanPost: { x: 2.6, y: 9.9 },
     },
-    review: {
+    verification: {
       machine: { x: 5.5, y: 4.6 },
       post: { x: 5.5, y: 5.9 },
       facing: FACING_UP,
       foremanPost: { x: 4.4, y: 6.9 },
     },
-    ship: {
+    record: {
       machine: { x: 5.5, y: 1.6 },
       post: { x: 5.5, y: 2.9 },
       facing: FACING_UP,

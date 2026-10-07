@@ -1,6 +1,6 @@
 ---
 // Список записей: заголовок, проект, день и главные счётчики каждой сборки.
-import { summarize, type Recording } from "@cyberzavod/core";
+import { summarize, type SessionRecord } from "@cyberzavod/core";
 import { projectOf, projectUrl, publishedProjects } from "@/entities/project";
 import { recordingUrl } from "@/entities/recording";
 import type { Locale } from "@/shared/i18n/locale.ts";
@@ -9,7 +9,7 @@ import { formatCount, formatDate, formatDuration } from "@/shared/lib/format.ts"
 import { ButtonLink, Card, Chip, Title } from "@/shared/ui";
 
 interface Props {
-  recordings: readonly Recording[];
+  recordings: readonly SessionRecord[];
   /** Язык страницы: на нём подписи и форматы чисел и дат. */
   locale: Locale;
 }
@@ -23,14 +23,14 @@ const { recordings, locale } = Astro.props;
   <ul class="list">
     {recordings.map((recording) => {
       const stats = summarize(recording);
-      const project = projectOf(publishedProjects, recording.project);
+      const project = projectOf(publishedProjects, recording.projectId);
       return (
         <li>
           <Card>
             <div class="record">
-              <Chip tone="sun">{formatDate(recording.startedAt, locale)}</Chip>
+              <Chip tone="sun">{formatDate(recording.timestamp, locale)}</Chip>
               <a href={recordingUrl(recording.id, locale)}>
-                <Title as="span">{recording.title}</Title>
+                <Title as="span">{recording.data.title}</Title>
               </a>
               <ButtonLink variant="link" href={projectUrl(project.id, locale)}>
                 {project.name}

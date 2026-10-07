@@ -1,20 +1,25 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Recording } from "@cyberzavod/core";
+import type { SessionRecord } from "@cyberzavod/core";
 import { createFactoryModel } from "../model/factory.ts";
 import { startFrameClock } from "./frame-clock.ts";
 
-function recording(): Recording {
+function recording(): SessionRecord {
   return {
-    version: 2,
+    version: 1,
+    type: "session",
     id: "test",
-    project: "test",
-    factory: "0.0.0",
-    startedAt: "2026-10-04T00:00:00.000Z",
-    title: "Тест",
-    events: [
-      { t: 0, type: "build_start" },
-      { t: 600_000, type: "build_end", ok: true },
-    ],
+    timestamp: "2026-10-04T00:00:00.000Z",
+    projectId: "test",
+    source: { type: "manual" },
+    data: {
+      title: "Тест",
+      workflow: "default",
+      harness: "0.0.0",
+      events: [
+        { t: 0, type: "build_start" },
+        { t: 600_000, type: "build_end", ok: true },
+      ],
+    },
   };
 }
 

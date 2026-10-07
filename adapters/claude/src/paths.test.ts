@@ -3,14 +3,14 @@ import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  claimHumanCallMarker,
-  findProjectId,
-  humanCallMarkerPath,
-  PROJECT_CONFIG_FILE,
-} from "./paths.ts";
+import { PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
+import { claimHumanCallMarker, findProjectId, humanCallMarkerPath } from "./paths.ts";
 
 let root: string;
+
+function configOf(projectId: string): string {
+  return JSON.stringify({ projectId, harness: "0.1.0", workflow: "default", journal: "journal" });
+}
 
 async function writeConfig(directory: string, content: string): Promise<void> {
   await mkdir(path.join(directory, path.dirname(PROJECT_CONFIG_FILE)), { recursive: true });
@@ -28,7 +28,7 @@ describe("findProjectId", () => {
   });
 
   it("находит id проекта в самом каталоге", async () => {
-    await writeConfig(root, JSON.stringify({ id: "lab", factory: "0.1.0" }));
+    await writeConfig(root, configOf("lab"));
 
     const id = await findProjectId(root);
 
@@ -36,7 +36,7 @@ describe("findProjectId", () => {
   });
 
   it("поднимается из подкаталога до конфига", async () => {
-    await writeConfig(root, JSON.stringify({ id: "lab", factory: "0.1.0" }));
+    await writeConfig(root, configOf("lab"));
     const nested = path.join(root, "src", "state");
     await mkdir(nested, { recursive: true });
 
@@ -46,9 +46,9 @@ describe("findProjectId", () => {
   });
 
   it("берёт ближайший конфиг", async () => {
-    await writeConfig(root, JSON.stringify({ id: "outer", factory: "0.1.0" }));
+    await writeConfig(root, configOf("outer"));
     const inner = path.join(root, "inner");
-    await writeConfig(inner, JSON.stringify({ id: "inner", factory: "0.1.0" }));
+    await writeConfig(inner, configOf("inner"));
 
     const id = await findProjectId(inner);
 
@@ -56,7 +56,7 @@ describe("findProjectId", () => {
   });
 
   it("находит конфиг, когда каталога уже нет", async () => {
-    await writeConfig(root, JSON.stringify({ id: "lab", factory: "0.1.0" }));
+    await writeConfig(root, configOf("lab"));
 
     const id = await findProjectId(path.join(root, "removed", "deeper"));
 
@@ -64,7 +64,7 @@ describe("findProjectId", () => {
   });
 
   it("поднимается выше, когда на пути лежит файл, а не каталог", async () => {
-    await writeConfig(root, JSON.stringify({ id: "lab", factory: "0.1.0" }));
+    await writeConfig(root, configOf("lab"));
     await writeFile(path.join(root, "file.txt"), "");
 
     const id = await findProjectId(path.join(root, "file.txt", "inside"));
@@ -89,7 +89,7 @@ describe("findProjectId", () => {
 });
 
 describe("humanCallMarkerPath", () => {
-  const HOOKS_LIB = path.resolve(import.meta.dirname, "../../../../.claude/hooks/lib.sh");
+  const HOOKS_LIB = path.resolve(import.meta.dirname, "../hooks/lib.sh");
 
   // Имя отметки считает human_call_marker из lib.sh — та же функция, что вызывает stop-gate.sh.
   function hookMarkerOf(sessionId: string, tmpDir: string): string {
@@ -124,7 +124,7 @@ describe("humanCallMarkerPath", () => {
 
     const markerPath = humanCallMarkerPath("", tmpDir);
 
-    expect(markerPath).toBe("/var/tmp/cz/factory-human-call-unknown");
+    expect(markerPath).toBe("/var/tmp/cz/cyberzavod-human-call-unknown");
   });
 });
 

@@ -24,9 +24,9 @@ export default defineConfig({
   },
   vite: {
     resolve: {
-      // Опубликованные записи, карточки проектов и гайды лежат в корне репозитория.
+      // Журнал проекта, карточки проектов и гайды лежат в корне репозитория.
       alias: {
-        "@recordings": fileURLToPath(new URL("../../recordings/published", import.meta.url)),
+        "@journal": fileURLToPath(new URL("../../journal", import.meta.url)),
         "@projects": fileURLToPath(new URL("../../projects", import.meta.url)),
         "@guides": fileURLToPath(new URL("../../guides", import.meta.url)),
       },

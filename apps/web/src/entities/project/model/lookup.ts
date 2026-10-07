@@ -6,7 +6,7 @@ export class UnknownProjectError extends Error {}
 /**
  * Находит карточку проекта по id.
  * @param {readonly Project[]} projects Карточки проектов.
- * @param {string} id Идентификатор проекта, например из `Recording.project`.
+ * @param {string} id Идентификатор проекта, например из `SessionRecord.projectId`.
  * @returns {Project} Карточка проекта.
  * @throws {UnknownProjectError} Если карточки с таким id нет.
  */

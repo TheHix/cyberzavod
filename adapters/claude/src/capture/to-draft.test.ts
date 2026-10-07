@@ -68,13 +68,13 @@ describe("toDraft", () => {
     const draft = toDraft(raw, { sessionId: "s1" });
 
     expect(stagesOf(draft.events)).toEqual([
-      "code",
-      "test",
-      "fail:test",
-      "code",
-      "test",
+      "implementation",
+      "verification",
+      "fail:verification",
+      "implementation",
+      "verification",
       "review",
-      "ship",
+      "record",
     ]);
   });
 
@@ -125,14 +125,20 @@ describe("toDraft", () => {
     });
   });
 
-  it("берёт проект и версию завода из начала сессии", () => {
+  it("берёт проект и версию harness из начала сессии", () => {
     const raw: RawEvent[] = [
-      { ts: START, kind: "session_start", project: "cyberzavod", factory: "0.1.0" },
+      {
+        ts: START,
+        kind: "session_start",
+        project: "cyberzavod",
+        harness: "0.1.0",
+        workflow: "default",
+      },
     ];
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(draft.builds[0]).toMatchObject({ project: "cyberzavod", factory: "0.1.0" });
+    expect(draft.builds[0]).toMatchObject({ project: "cyberzavod", harness: "0.1.0" });
   });
 
   it("собирает одну сборку с id черновика и без запусков", () => {
@@ -140,26 +146,34 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "744e7547-d312" });
 
-    expect(draft.builds).toEqual([{ id: draft.id, project: "", factory: "", title: "", runs: [] }]);
+    expect(draft.builds).toEqual([
+      { id: draft.id, project: "", harness: "", workflow: "", title: "", runs: [] },
+    ]);
   });
 
-  it("оставляет проект и версию завода пустыми, если в журнале их нет", () => {
+  it("оставляет проект и версию harness пустыми, если в журнале их нет", () => {
     const raw: RawEvent[] = [{ ts: START, kind: "session_start" }];
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(draft.builds[0]).toMatchObject({ project: "", factory: "" });
+    expect(draft.builds[0]).toMatchObject({ project: "", harness: "" });
   });
 
   it("берёт проект из первого начала сессии, где он есть", () => {
     const raw: RawEvent[] = [
       { ts: START, kind: "session_start" },
-      { ts: START + 1_000, kind: "session_start", project: "cyberzavod", factory: "0.1.0" },
+      {
+        ts: START + 1_000,
+        kind: "session_start",
+        project: "cyberzavod",
+        harness: "0.1.0",
+        workflow: "default",
+      },
     ];
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(draft.builds[0]).toMatchObject({ project: "cyberzavod", factory: "0.1.0" });
+    expect(draft.builds[0]).toMatchObject({ project: "cyberzavod", harness: "0.1.0" });
   });
 
   it("пишет исход каждого запуска проверок в основной сессии без запуска станции", () => {
@@ -193,7 +207,7 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(draft.events)).toEqual(["code", "review", "ship"]);
+    expect(stagesOf(draft.events)).toEqual(["implementation", "review", "record"]);
   });
 
   it("не закрывает окно ревьюера остановкой служебного сабагента без старта", () => {
@@ -207,7 +221,7 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(draft.events)).toEqual(["code", "review"]);
+    expect(stagesOf(draft.events)).toEqual(["implementation", "review"]);
   });
 
   it("возвращает деталь с этапа станции, которая вернула работу", () => {
@@ -237,10 +251,10 @@ describe("toDraft", () => {
     const draft = toDraft(raw, { sessionId: "s1" });
 
     expect(stagesOf(draft.events)).toEqual([
-      "code",
-      "test",
-      "fail:test",
-      "code",
+      "implementation",
+      "verification",
+      "fail:verification",
+      "implementation",
       "review",
       "fail:review",
     ]);
@@ -277,7 +291,7 @@ describe("toDraft", () => {
     const draft = toDraft(raw, { sessionId: "s1" });
 
     expect([stagesOf(draft.events), checksOf(draft.events).at(-1)]).toEqual([
-      ["test", "fail:test", "test"],
+      ["verification", "fail:verification", "verification"],
       { ok: true, run: "t1" },
     ]);
   });
@@ -330,7 +344,7 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(draft.events)).toEqual(["test", "fail:test"]);
+    expect(stagesOf(draft.events)).toEqual(["verification", "fail:verification"]);
   });
 
   it("не судит отчёт агента, запуск которого не попал в журнал", () => {
@@ -341,7 +355,7 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(draft.events)).toEqual(["code"]);
+    expect(stagesOf(draft.events)).toEqual(["implementation"]);
   });
 
   it("судит заново повторный запуск того же агента", () => {
@@ -369,7 +383,7 @@ describe("toDraft", () => {
       const draft = toDraft(raw, { sessionId: "s1" });
 
       expect([stagesOf(draft.events), checksOf(draft.events)]).toEqual([
-        ["test", "fail:test", "review"],
+        ["verification", "fail:verification", "review"],
         [{ ok: false }],
       ]);
     },
@@ -390,7 +404,7 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(draft.events)).toEqual(["code"]);
+    expect(stagesOf(draft.events)).toEqual(["implementation"]);
   });
 
   it("ведёт сборку как обычно по инструментам сабагента без своего этапа", () => {
@@ -402,7 +416,7 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(draft.events)).toEqual(["code"]);
+    expect(stagesOf(draft.events)).toEqual(["implementation"]);
   });
 
   it.each([
@@ -423,7 +437,7 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(draft.events)).toEqual(["test", "fail:test"]);
+    expect(stagesOf(draft.events)).toEqual(["verification", "fail:verification"]);
   });
 
   it.each([
@@ -448,7 +462,7 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(draft.events)).toEqual(["test", "ship"]);
+    expect(stagesOf(draft.events)).toEqual(["verification", "record"]);
   });
 
   it("относит упавшую цепочку проверок и коммита к неудаче проверок", () => {
@@ -464,7 +478,7 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(draft.events)).toEqual(["test", "fail:test"]);
+    expect(stagesOf(draft.events)).toEqual(["verification", "fail:verification"]);
   });
 
   it("относит выход из режима планирования к этапу spec", () => {
@@ -472,14 +486,14 @@ describe("toDraft", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(draft.events)).toEqual(["spec"]);
+    expect(stagesOf(draft.events)).toEqual(["planning"]);
   });
 
   it.each([
-    ["Plan", "spec"],
-    ["analyst", "spec"],
-    ["coder", "code"],
-    ["tester", "test"],
+    ["Plan", "planning"],
+    ["analyst", "planning"],
+    ["coder", "implementation"],
+    ["tester", "verification"],
     ["reviewer", "review"],
   ])("относит работу агента %s к этапу %s", (agent, stage) => {
     const raw: RawEvent[] = [{ ts: START, kind: "subagent_start", agent, agentId: "a1" }];
@@ -631,9 +645,9 @@ describe("toDraft: реплики", () => {
     const draft = toDraft(chatSession(), { sessionId: "s1", assignments });
 
     expect(routesOf(draft).map(([t, from]) => [t, from])).toEqual([
-      [1_500, "spec"],
-      [1_700, "spec"],
-      [15_000, "code"],
+      [1_500, "planning"],
+      [1_700, "planning"],
+      [15_000, "implementation"],
     ]);
   });
 
@@ -645,7 +659,7 @@ describe("toDraft: реплики", () => {
     expect(draft.events.find((event) => event.type === "draft_message")).toEqual({
       t: 1_500,
       type: "draft_message",
-      from: "spec",
+      from: "planning",
       to: "foreman",
       source: "assignment",
       said: "Задание analyst",
@@ -703,9 +717,9 @@ describe("toDraft: реплики", () => {
       "draft_message",
     ]);
     expect(routesOf(draft)).toEqual([
-      [5_000, "code", "foreman", "assignment"],
-      [5_000, "code", "foreman", "report"],
-      [5_000, "code", "foreman", "answer"],
+      [5_000, "implementation", "foreman", "assignment"],
+      [5_000, "implementation", "foreman", "report"],
+      [5_000, "implementation", "foreman", "answer"],
     ]);
   });
 });
@@ -716,7 +730,7 @@ describe("toDraft: маршруты реплик по правилу ремар�
 
     const draft = toDraft(chatSession(), { sessionId: "s1", assignments });
 
-    expect(routesOf(draft)).toEqual([[1_500, "spec", "foreman", "assignment"]]);
+    expect(routesOf(draft)).toEqual([[1_500, "planning", "foreman", "assignment"]]);
   });
 
   it("отдаёт отчёт перед ответом человеку мастеру", () => {
@@ -725,8 +739,8 @@ describe("toDraft: маршруты реплик по правилу ремар�
     const draft = toDraft(chatSession(), { sessionId: "s1", reports, answers: [answer(35_000)] });
 
     expect(routesOf(draft)).toEqual([
-      [9_000, "spec", "foreman", "report"],
-      [35_000, "code", "foreman", "answer"],
+      [9_000, "planning", "foreman", "report"],
+      [35_000, "implementation", "foreman", "answer"],
     ]);
   });
 
@@ -735,7 +749,7 @@ describe("toDraft: маршруты реплик по правилу ремар�
 
     const draft = toDraft(chatSession(), { sessionId: "s1", reports });
 
-    expect(routesOf(draft)).toEqual([[30_000, "code", "foreman", "report"]]);
+    expect(routesOf(draft)).toEqual([[30_000, "implementation", "foreman", "report"]]);
   });
 
   it("адресует отчёт следующему по заданию, а задание — тому, кто сдал работу", () => {
@@ -745,9 +759,9 @@ describe("toDraft: маршруты реплик по правилу ремар�
     const draft = toDraft(chatSession(), { sessionId: "s1", assignments, reports });
 
     expect(routesOf(draft)).toEqual([
-      [1_500, "code", "foreman", "assignment"],
-      [30_000, "code", "test", "report"],
-      [31_000, "test", "code", "assignment"],
+      [1_500, "implementation", "foreman", "assignment"],
+      [30_000, "implementation", "verification", "report"],
+      [31_000, "verification", "implementation", "assignment"],
     ]);
   });
 
@@ -758,9 +772,9 @@ describe("toDraft: маршруты реплик по правилу ремар�
     const draft = toDraft(chatSession(), { sessionId: "s1", assignments, reports });
 
     expect(routesOf(draft)).toEqual([
-      [30_000, "code", "test", "report"],
-      [30_500, "code", "foreman", "assignment"],
-      [31_000, "test", "code", "assignment"],
+      [30_000, "implementation", "verification", "report"],
+      [30_500, "implementation", "foreman", "assignment"],
+      [31_000, "verification", "implementation", "assignment"],
     ]);
   });
 
@@ -776,8 +790,8 @@ describe("toDraft: маршруты реплик по правилу ремар�
     });
 
     expect(routesOf(draft).slice(0, 2)).toEqual([
-      [30_000, "code", "foreman", "report"],
-      [32_000, "code", "foreman", "answer"],
+      [30_000, "implementation", "foreman", "report"],
+      [32_000, "implementation", "foreman", "answer"],
     ]);
   });
 
@@ -795,8 +809,8 @@ describe("toDraft: маршруты реплик по правилу ремар�
     const draft = toDraft(raw, { sessionId: "s1", assignments, reports });
 
     expect(routesOf(draft)).toEqual([
-      [9_000, "spec", "foreman", "report"],
-      [21_000, "code", "foreman", "assignment"],
+      [9_000, "planning", "foreman", "report"],
+      [21_000, "implementation", "foreman", "assignment"],
     ]);
   });
 
@@ -813,9 +827,9 @@ describe("toDraft: маршруты реплик по правилу ремар�
     const draft = toDraft(raw, { sessionId: "s1", assignments, reports });
 
     expect(routesOf(draft)).toEqual([
-      [500, "code", "foreman", "assignment"],
-      [800, "code", "foreman", "report"],
-      [2_000, "test", "foreman", "assignment"],
+      [500, "implementation", "foreman", "assignment"],
+      [800, "implementation", "foreman", "report"],
+      [2_000, "verification", "foreman", "assignment"],
     ]);
   });
 
@@ -839,7 +853,7 @@ describe("toDraft: маршруты реплик по правилу ремар�
 
     const draft = toDraft(chatSession(), { sessionId: "s1", answers });
 
-    expect(routesOf(draft)).toEqual([[35_000, "code", "foreman", "answer"]]);
+    expect(routesOf(draft)).toEqual([[35_000, "implementation", "foreman", "answer"]]);
   });
 
   it("отвечает от рабочего этапа в момент ответа, если станций в ходе не было", () => {
@@ -852,7 +866,7 @@ describe("toDraft: маршруты реплик по правилу ремар�
 
     const draft = toDraft(raw, { sessionId: "s1", answers });
 
-    expect(routesOf(draft)).toEqual([[5_000, "code", "foreman", "answer"]]);
+    expect(routesOf(draft)).toEqual([[5_000, "implementation", "foreman", "answer"]]);
   });
 
   it("берёт этап постановки, пока деталь ещё не вышла со своего первого станка", () => {
@@ -863,7 +877,7 @@ describe("toDraft: маршруты реплик по правилу ремар�
 
     const draft = toDraft(raw, { sessionId: "s1", answers: [answer(1_000)] });
 
-    expect(routesOf(draft)).toEqual([[1_000, "spec", "foreman", "answer"]]);
+    expect(routesOf(draft)).toEqual([[1_000, "planning", "foreman", "answer"]]);
   });
 
   it("не считает ходом служебное сообщение среды", () => {
@@ -875,7 +889,7 @@ describe("toDraft: маршруты реплик по правилу ремар�
 
     const draft = toDraft(raw, { sessionId: "s1", answers: [answer(1_000), answer(3_000)] });
 
-    expect(routesOf(draft)).toEqual([[3_000, "spec", "foreman", "answer"]]);
+    expect(routesOf(draft)).toEqual([[3_000, "planning", "foreman", "answer"]]);
   });
 
   // Прогон с возвратом на доработку: задача, постановка, код, проверки, ревью с возвратом,
@@ -919,22 +933,22 @@ describe("toDraft: маршруты реплик по правилу ремар�
     const draft = toDraft(raw, { sessionId: "s1", assignments, reports, answers });
 
     expect(routesOf(draft).map(([t, from, to]) => [t, from, to])).toEqual([
-      [2_000, "spec", "foreman"],
-      [9_000, "spec", "foreman"],
-      [10_000, "spec", "foreman"],
-      [31_000, "code", "foreman"],
-      [40_000, "code", "test"],
-      [41_000, "test", "code"],
-      [50_000, "test", "review"],
-      [51_000, "review", "test"],
-      [60_000, "review", "code"],
-      [61_000, "code", "review"],
-      [70_000, "code", "test"],
-      [71_000, "test", "code"],
-      [80_000, "test", "review"],
-      [81_000, "review", "test"],
+      [2_000, "planning", "foreman"],
+      [9_000, "planning", "foreman"],
+      [10_000, "planning", "foreman"],
+      [31_000, "implementation", "foreman"],
+      [40_000, "implementation", "verification"],
+      [41_000, "verification", "implementation"],
+      [50_000, "verification", "review"],
+      [51_000, "review", "verification"],
+      [60_000, "review", "implementation"],
+      [61_000, "implementation", "review"],
+      [70_000, "implementation", "verification"],
+      [71_000, "verification", "implementation"],
+      [80_000, "verification", "review"],
+      [81_000, "review", "verification"],
       [90_000, "review", "foreman"],
-      [100_000, "ship", "foreman"],
+      [100_000, "record", "foreman"],
     ]);
   });
 });
@@ -1036,7 +1050,7 @@ describe("toDraft: запуски станций", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(stagesOf(draft.events)).toEqual(["code"]);
+    expect(stagesOf(draft.events)).toEqual(["implementation"]);
   });
 
   it("ставит запуск на возврат по вердикту и на исход проверок", () => {
@@ -1054,7 +1068,13 @@ describe("toDraft: запуски станций", () => {
     const draft = toDraft(raw, { sessionId: "s1" });
 
     expect(draft.events.filter((event) => event.type === "stage_fail")).toEqual([
-      { t: 1_000, type: "stage_fail", stage: "test", reason: expect.any(String), run: "t1" },
+      {
+        t: 1_000,
+        type: "stage_fail",
+        stage: "verification",
+        reason: expect.any(String),
+        run: "t1",
+      },
     ]);
     expect(checksOf(draft.events)).toEqual([{ ok: false, run: "t1" }]);
   });
@@ -1273,7 +1293,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["test b", "check b"]);
+    expect(projectMarksOf(draft)).toEqual(["verification b", "check b"]);
   });
 
   it("берёт проект подкаталога, в который перешёл cd", () => {
@@ -1284,7 +1304,7 @@ describe("toDraft: проект команды", () => {
       projectsByDirectory: new Map([[`${PROJECT_B}/src/state`, "b-state"]]),
     });
 
-    expect(projectMarksOf(draft)).toEqual(["test b-state", "check b-state"]);
+    expect(projectMarksOf(draft)).toEqual(["verification b-state", "check b-state"]);
   });
 
   it("разрешает относительный cd от каталога вызова", () => {
@@ -1292,7 +1312,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["test b", "check b"]);
+    expect(projectMarksOf(draft)).toEqual(["verification b", "check b"]);
   });
 
   it("разрешает cd с двумя точками от каталога вызова", () => {
@@ -1300,7 +1320,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["test a", "check a"]);
+    expect(projectMarksOf(draft)).toEqual(["verification a", "check a"]);
   });
 
   it("снимает простые кавычки вокруг каталога", () => {
@@ -1308,7 +1328,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["test b", "check b"]);
+    expect(projectMarksOf(draft)).toEqual(["verification b", "check b"]);
   });
 
   it("даёт сегментам цепочки с двумя cd разные проекты", () => {
@@ -1318,7 +1338,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["test a", "check a", "ship b"]);
+    expect(projectMarksOf(draft)).toEqual(["verification a", "check a", "record b"]);
   });
 
   it("распознаёт git -C как выпуск проекта каталога", () => {
@@ -1326,7 +1346,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["ship b"]);
+    expect(projectMarksOf(draft)).toEqual(["record b"]);
   });
 
   it("не распространяет git -C на следующие команды цепочки", () => {
@@ -1334,7 +1354,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["ship b", "ship a"]);
+    expect(projectMarksOf(draft)).toEqual(["record b", "record a"]);
   });
 
   it("берёт проект каталога правимого файла", () => {
@@ -1342,7 +1362,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["code b"]);
+    expect(projectMarksOf(draft)).toEqual(["implementation b"]);
   });
 
   it("берёт проект каталога вызова, если cd в команде нет", () => {
@@ -1350,29 +1370,29 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["test a", "check a"]);
+    expect(projectMarksOf(draft)).toEqual(["verification a", "check a"]);
   });
 
   it("берёт проект из начала сессии для старого журнала без cwd", () => {
     const raw: RawEvent[] = [
-      { ts: START, kind: "session_start", project: "old", factory: "0.1.0" },
+      { ts: START, kind: "session_start", project: "old", harness: "0.1.0", workflow: "default" },
       bash(START + 1_000, "make check-web"),
     ];
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(projectMarksOf(draft)).toEqual(["test old", "check old"]);
+    expect(projectMarksOf(draft)).toEqual(["verification old", "check old"]);
   });
 
   it("не берёт проект сессии, когда относительный cd выходит из её каталога", () => {
     const raw: RawEvent[] = [
-      { ts: START, kind: "session_start", project: "old", factory: "0.1.0" },
+      { ts: START, kind: "session_start", project: "old", harness: "0.1.0", workflow: "default" },
       bash(START + 1_000, "cd ../other && make check-web"),
     ];
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(projectMarksOf(draft)).toEqual(["test —", "check —"]);
+    expect(projectMarksOf(draft)).toEqual(["verification —", "check —"]);
   });
 
   it.each([
@@ -1393,7 +1413,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["test —", "check —"]);
+    expect(projectMarksOf(draft)).toEqual(["verification —", "check —"]);
   });
 
   it("сохраняет проект после command без cd", () => {
@@ -1401,7 +1421,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["test a", "check a"]);
+    expect(projectMarksOf(draft)).toEqual(["verification a", "check a"]);
   });
 
   it("не даёт этапа вызову из каталога, которого нет в карте проектов", () => {
@@ -1425,7 +1445,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(projectMarksOf(draft)).toEqual(["test —", "check —"]);
+    expect(projectMarksOf(draft)).toEqual(["verification —", "check —"]);
   });
 
   it.each([
@@ -1441,7 +1461,7 @@ describe("toDraft: проект команды", () => {
 
       const draft = toDraft(raw, { sessionId: "s1", projectsByDirectory: projects });
 
-      expect(projectMarksOf(draft)).toEqual(["test —", "check —"]);
+      expect(projectMarksOf(draft)).toEqual(["verification —", "check —"]);
     },
   );
 
@@ -1450,7 +1470,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["test b", "check b"]);
+    expect(projectMarksOf(draft)).toEqual(["verification b", "check b"]);
   });
 
   it("берёт проект из cd в двойных кавычках с пробелом в пути", () => {
@@ -1461,7 +1481,7 @@ describe("toDraft: проект команды", () => {
       projectsByDirectory: new Map([["/work/c d", "c"]]),
     });
 
-    expect(projectMarksOf(draft)).toEqual(["test c", "check c"]);
+    expect(projectMarksOf(draft)).toEqual(["verification c", "check c"]);
   });
 
   it("распознаёт git -C с кавычками и пробелом в пути как выпуск проекта", () => {
@@ -1472,7 +1492,7 @@ describe("toDraft: проект команды", () => {
       projectsByDirectory: new Map([["/work/c d", "c"]]),
     });
 
-    expect(projectMarksOf(draft)).toEqual(["ship c"]);
+    expect(projectMarksOf(draft)).toEqual(["record c"]);
   });
 
   it("оставляет без проекта git -C с кавычками внутри пути", () => {
@@ -1480,7 +1500,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["ship —"]);
+    expect(projectMarksOf(draft)).toEqual(["record —"]);
   });
 
   it("возвращает место после подоболочки в неизвестное, а не в начальное", () => {
@@ -1488,7 +1508,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["test —", "check —"]);
+    expect(projectMarksOf(draft)).toEqual(["verification —", "check —"]);
   });
 
   it.each(["cat > notes.md <<'EOF'", "cat > notes.md <<EOF", "cat > notes.md <<-EOF"])(
@@ -1509,7 +1529,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["test a", "check a"]);
+    expect(projectMarksOf(draft)).toEqual(["verification a", "check a"]);
   });
 
   it("узнаёт коммит с heredoc в сообщении и не берёт этапы из его текста", () => {
@@ -1518,7 +1538,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["ship a"]);
+    expect(projectMarksOf(draft)).toEqual(["record a"]);
   });
 
   it("узнаёт heredoc после подстановки в кавычках и перед перенаправлением в кавычках", () => {
@@ -1535,7 +1555,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["test a", "check a"]);
+    expect(projectMarksOf(draft)).toEqual(["verification a", "check a"]);
   });
 
   it.each([
@@ -1548,7 +1568,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["test a", "check a"]);
+    expect(projectMarksOf(draft)).toEqual(["verification a", "check a"]);
   });
 
   it("пропускает тела двух heredoc подряд", () => {
@@ -1557,7 +1577,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["test a", "check a"]);
+    expect(projectMarksOf(draft)).toEqual(["verification a", "check a"]);
   });
 
   it("ставит проект и на провал проверок", () => {
@@ -1565,7 +1585,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["test b", "check b", "fail:test b"]);
+    expect(projectMarksOf(draft)).toEqual(["verification b", "check b", "fail:verification b"]);
   });
 
   it("записывает команду основной сессии, пока работает станция", () => {
@@ -1576,7 +1596,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["review —", "test a", "check a"]);
+    expect(projectMarksOf(draft)).toEqual(["review —", "verification a", "check a"]);
   });
 
   it("пропускает команду сабагента, чья станция работает", () => {
@@ -1598,7 +1618,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["review —", "test a", "check a"]);
+    expect(projectMarksOf(draft)).toEqual(["review —", "verification a", "check a"]);
   });
 
   it("входит на этап проекта b после станции code проекта a", () => {
@@ -1611,7 +1631,11 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["code a", "code —", "code b"]);
+    expect(projectMarksOf(draft)).toEqual([
+      "implementation a",
+      "implementation —",
+      "implementation b",
+    ]);
   });
 
   it("входит на этап снова после работы станции того же проекта", () => {
@@ -1624,7 +1648,11 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["code a", "code —", "code a"]);
+    expect(projectMarksOf(draft)).toEqual([
+      "implementation a",
+      "implementation —",
+      "implementation a",
+    ]);
   });
 
   it("не повторяет этап при повторных правках одного проекта", () => {
@@ -1636,7 +1664,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["code b"]);
+    expect(projectMarksOf(draft)).toEqual(["implementation b"]);
   });
 
   it("ведёт этап каждого проекта отдельно", () => {
@@ -1648,7 +1676,7 @@ describe("toDraft: проект команды", () => {
 
     const draft = toDraft(raw, meta);
 
-    expect(projectMarksOf(draft)).toEqual(["code a", "code b"]);
+    expect(projectMarksOf(draft)).toEqual(["implementation a", "implementation b"]);
   });
 });
 
@@ -1747,8 +1775,22 @@ function routedDraft(events: DraftEvent[], secondRuns: string[]): Draft {
     id: "first",
     startedAt: "2026-10-04T09:52:13.000Z",
     builds: [
-      { id: "first", project: "p", factory: "0.1.0", title: "", runs: ["a1", "a2"] },
-      { id: "second", project: "p", factory: "0.1.0", title: "", runs: secondRuns },
+      {
+        id: "first",
+        project: "p",
+        harness: "0.1.0",
+        workflow: "default",
+        title: "",
+        runs: ["a1", "a2"],
+      },
+      {
+        id: "second",
+        project: "p",
+        harness: "0.1.0",
+        workflow: "default",
+        title: "",
+        runs: secondRuns,
+      },
     ],
     events,
   };
@@ -1756,7 +1798,7 @@ function routedDraft(events: DraftEvent[], secondRuns: string[]): Draft {
 
 function say(
   t: number,
-  from: "spec" | "code" | "test" | "review",
+  from: "planning" | "implementation" | "verification" | "review",
   source: "assignment" | "report" | "answer",
   run?: string,
 ): DraftMessage {
@@ -1783,10 +1825,10 @@ describe("routeMessages", () => {
   it("не адресует отчёт станции одной задачи станции другой", () => {
     const draft = routedDraft(
       [
-        { t: 0, type: "stage_enter", stage: "spec", run: "a1" },
-        say(1_000, "spec", "report", "a1"),
-        { t: 2_000, type: "stage_enter", stage: "code", run: "b1" },
-        say(3_000, "code", "assignment", "b1"),
+        { t: 0, type: "stage_enter", stage: "planning", run: "a1" },
+        say(1_000, "planning", "report", "a1"),
+        { t: 2_000, type: "stage_enter", stage: "implementation", run: "b1" },
+        say(3_000, "implementation", "assignment", "b1"),
       ],
       ["b1"],
     );
@@ -1794,17 +1836,17 @@ describe("routeMessages", () => {
     const routed = routeMessages(draft);
 
     expect(routes(routed)).toEqual([
-      [1_000, "spec", "foreman"],
-      [3_000, "code", "foreman"],
+      [1_000, "planning", "foreman"],
+      [3_000, "implementation", "foreman"],
     ]);
   });
 
   it("не берёт отчёт другой задачи в отправители задания", () => {
     const draft = routedDraft(
       [
-        say(1_000, "spec", "report", "a1"),
-        say(2_000, "code", "assignment", "b1"),
-        say(3_000, "test", "assignment", "a2"),
+        say(1_000, "planning", "report", "a1"),
+        say(2_000, "implementation", "assignment", "b1"),
+        say(3_000, "verification", "assignment", "a2"),
       ],
       ["b1"],
     );
@@ -1812,9 +1854,9 @@ describe("routeMessages", () => {
     const routed = routeMessages(draft);
 
     expect(routes(routed)).toEqual([
-      [1_000, "spec", "test"],
-      [2_000, "code", "foreman"],
-      [3_000, "test", "spec"],
+      [1_000, "planning", "verification"],
+      [2_000, "implementation", "foreman"],
+      [3_000, "verification", "planning"],
     ]);
   });
 
@@ -1829,10 +1871,10 @@ describe("routeMessages", () => {
     };
     const draft = routedDraft(
       [
-        say(1_000, "spec", "report", "a1"),
+        say(1_000, "planning", "report", "a1"),
         prompt,
-        say(2_000, "code", "assignment", "b1"),
-        say(3_000, "test", "assignment", "a2"),
+        say(2_000, "implementation", "assignment", "b1"),
+        say(3_000, "verification", "assignment", "a2"),
       ],
       ["b1"],
     );
@@ -1840,9 +1882,9 @@ describe("routeMessages", () => {
     const routed = routeMessages(draft);
 
     expect(routes(routed)).toEqual([
-      [1_000, "spec", "test"],
-      [2_000, "code", "foreman"],
-      [3_000, "test", "spec"],
+      [1_000, "planning", "verification"],
+      [2_000, "implementation", "foreman"],
+      [3_000, "verification", "planning"],
     ]);
   });
 
@@ -1856,15 +1898,19 @@ describe("routeMessages", () => {
       text: "",
     };
     const draft = routedDraft(
-      [say(1_000, "spec", "report", "a1"), question, say(2_000, "test", "assignment", "a2")],
+      [
+        say(1_000, "planning", "report", "a1"),
+        question,
+        say(2_000, "verification", "assignment", "a2"),
+      ],
       ["b1"],
     );
 
     const routed = routeMessages(draft);
 
     expect(routes(routed)).toEqual([
-      [1_000, "spec", "test"],
-      [2_000, "test", "spec"],
+      [1_000, "planning", "verification"],
+      [2_000, "verification", "planning"],
     ]);
   });
 
@@ -1872,21 +1918,25 @@ describe("routeMessages", () => {
     const intervention: DraftEvent = {
       t: 1_500,
       type: "draft_intervention",
-      reason: "spec_review",
+      reason: "plan_review",
       said: "одобряю",
       line: "",
       text: "",
     };
     const draft = routedDraft(
-      [say(1_000, "spec", "report", "a1"), intervention, say(2_000, "test", "assignment", "a2")],
+      [
+        say(1_000, "planning", "report", "a1"),
+        intervention,
+        say(2_000, "verification", "assignment", "a2"),
+      ],
       ["b1"],
     );
 
     const routed = routeMessages(draft);
 
     expect(routes(routed)).toEqual([
-      [1_000, "spec", "foreman"],
-      [2_000, "test", "foreman"],
+      [1_000, "planning", "foreman"],
+      [2_000, "verification", "foreman"],
     ]);
   });
 
@@ -1894,21 +1944,21 @@ describe("routeMessages", () => {
     const draft = routedDraft(
       [
         { t: 0, type: "stage_enter", stage: "review", run: "a1" },
-        { t: 1_000, type: "stage_enter", stage: "code", run: "b1" },
-        say(2_000, "spec", "answer"),
+        { t: 1_000, type: "stage_enter", stage: "implementation", run: "b1" },
+        say(2_000, "planning", "answer"),
       ],
       ["b1"],
     );
 
     const routed = routeMessages(draft);
 
-    expect(routes(routed)).toEqual([[2_000, "code", "foreman"]]);
+    expect(routes(routed)).toEqual([[2_000, "implementation", "foreman"]]);
   });
 
   it("сохраняет строку, текст, запуск и сборку реплики", () => {
     const draft = routedDraft([], ["b1"]);
     draft.events.push({
-      ...say(1_000, "spec", "report", "a1"),
+      ...say(1_000, "planning", "report", "a1"),
       line: "Держи",
       text: "Текст",
       build: "second",
@@ -2005,7 +2055,7 @@ describe("toDraft: вмешательства", () => {
     const draft = toDraft(raw, { sessionId: "s1" });
 
     expect({ interventions: interventionsOf(draft), prompts: promptsOf(draft) }).toEqual({
-      interventions: [[20_000, "spec_review", "Одобряю"]],
+      interventions: [[20_000, "plan_review", "Одобряю"]],
       prompts: ["/feature 16"],
     });
   });
@@ -2110,7 +2160,7 @@ describe("toDraft: вмешательства", () => {
 
     const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect(interventionsOf(draft)).toEqual([[20_000, "spec_review", "Одобряю"]]);
+    expect(interventionsOf(draft)).toEqual([[20_000, "plan_review", "Одобряю"]]);
   });
 
   it("не считает вмешательством второй промпт после ответа на вызов", () => {
@@ -2125,7 +2175,7 @@ describe("toDraft: вмешательства", () => {
     const draft = toDraft(raw, { sessionId: "s1" });
 
     expect({ interventions: interventionsOf(draft), prompts: promptsOf(draft) }).toEqual({
-      interventions: [[20_000, "spec_review", "Одобряю"]],
+      interventions: [[20_000, "plan_review", "Одобряю"]],
       prompts: ["Ещё"],
     });
   });
@@ -2141,7 +2191,7 @@ describe("toDraft: вмешательства", () => {
     const draft = toDraft(raw, { sessionId: "s1" });
 
     expect({ interventions: interventionsOf(draft), prompts: promptsOf(draft) }).toEqual({
-      interventions: [[20_000, "spec_review", "Одобряю"]],
+      interventions: [[20_000, "plan_review", "Одобряю"]],
       prompts: [],
     });
   });

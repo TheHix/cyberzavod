@@ -1,7 +1,7 @@
 // Общие данные для тестов сценария и кадра.
 
 import { FACTORY_LAYOUTS, type FactoryLayout, type StationPlan } from "./layout.ts";
-import type { FactoryEvent, MessageEvent, Recording, Speaker } from "./recording.ts";
+import type { SessionEvent, MessageEvent, SessionRecord, Speaker } from "./record.ts";
 import { DEFAULT_PACING, type Pacing } from "./script.ts";
 
 // Станки в ряд через 10 единиц, проход в двух единицах от рабочих мест, бег — единица
@@ -39,11 +39,11 @@ export const LINE_LAYOUT: FactoryLayout = {
     { x: 60, y: AISLE },
   ],
   stations: {
-    spec: stationAt(0),
-    code: stationAt(10),
-    test: stationAt(20),
+    planning: stationAt(0),
+    implementation: stationAt(10),
+    verification: stationAt(20),
     review: stationAt(30),
-    ship: stationAt(40),
+    record: stationAt(40),
   },
   foreman: {
     desk: { x: 20, y: 5 },
@@ -73,27 +73,37 @@ export const PLAIN_PACING: Pacing = {
 /**
  * Запись для тестов без разговоров: постановка → код → проверки с провалом → снова код.
  * @param {boolean} ok Итог сборки.
- * @returns {Recording} Запись сборки.
+ * @returns {SessionRecord} Запись сборки.
  */
-export function reworkRecording(ok = true): Recording {
-  const events: FactoryEvent[] = [
+export function reworkRecording(ok = true): SessionRecord {
+  const events: SessionEvent[] = [
     { t: 0, type: "build_start" },
-    { t: 2_000, type: "stage_enter", stage: "code" },
-    { t: 5_000, type: "stage_enter", stage: "test" },
-    { t: 6_000, type: "stage_fail", stage: "test", reason: "проверки не прошли" },
-    { t: 6_000, type: "stage_enter", stage: "code" },
+    { t: 2_000, type: "stage_enter", stage: "implementation" },
+    { t: 5_000, type: "stage_enter", stage: "verification" },
+    { t: 6_000, type: "stage_fail", stage: "verification", reason: "проверки не прошли" },
+    { t: 6_000, type: "stage_enter", stage: "implementation" },
     { t: 7_000, type: "usage", tokens: 1_200 },
     { t: 8_000, type: "build_end", ok },
   ];
   return {
-    version: 2,
+    version: 1,
+    type: "session",
     id: "test",
-    project: "test",
-    factory: "0.0.0",
-    startedAt: "2026-10-04T00:00:00.000Z",
-    title: "Тест",
-    events,
+    timestamp: "2026-10-04T00:00:00.000Z",
+    projectId: "test",
+    source: { type: "manual" },
+    data: { title: "Тест", workflow: "default", harness: "0.0.0", events },
   };
+}
+
+/**
+ * Та же сессия с другими событиями.
+ * @param {SessionRecord} session Сессия, у которой берётся всё, кроме событий.
+ * @param {SessionEvent[]} events Новые события.
+ * @returns {SessionRecord} Новая сессия.
+ */
+export function withEvents(session: SessionRecord, events: SessionEvent[]): SessionRecord {
+  return { ...session, data: { ...session.data, events } };
 }
 
 /**
@@ -110,71 +120,71 @@ export function messageAt(t: number, from: Speaker, to: Speaker): MessageEvent {
 /**
  * Запись для тестов с репликами: промпт и «принял» рабочего у станка постановки, у станка кода
  * мастер-слушатель и обмен кода с проверками при передаче, у станка проверок отчёт мастеру.
- * @returns {Recording} Запись сборки.
+ * @returns {SessionRecord} Запись сборки.
  */
-export function chatRecording(): Recording {
-  const events: FactoryEvent[] = [
+export function chatRecording(): SessionRecord {
+  const events: SessionEvent[] = [
     { t: 0, type: "build_start" },
     { t: 500, type: "prompt", goal: "Добавь счётчик", requirements: [] },
-    messageAt(600, "spec", "foreman"),
-    { t: 1_000, type: "stage_enter", stage: "code" },
-    messageAt(1_500, "code", "foreman"),
-    messageAt(3_000, "code", "test"),
-    messageAt(3_500, "test", "code"),
-    { t: 4_000, type: "stage_enter", stage: "test" },
-    messageAt(5_000, "test", "foreman"),
+    messageAt(600, "planning", "foreman"),
+    { t: 1_000, type: "stage_enter", stage: "implementation" },
+    messageAt(1_500, "implementation", "foreman"),
+    messageAt(3_000, "implementation", "verification"),
+    messageAt(3_500, "verification", "implementation"),
+    { t: 4_000, type: "stage_enter", stage: "verification" },
+    messageAt(5_000, "verification", "foreman"),
     { t: 8_000, type: "build_end", ok: true },
   ];
-  return { ...reworkRecording(), events };
+  return withEvents(reworkRecording(), events);
 }
 
 /**
  * Запись для тестов с обменом при возврате с браком: проверки и код говорят между собой
  * до и после провала, и деталь идёт на доработку с этим разговором.
- * @returns {Recording} Запись сборки.
+ * @returns {SessionRecord} Запись сборки.
  */
-export function defectExchangeRecording(): Recording {
-  const events: FactoryEvent[] = [
+export function defectExchangeRecording(): SessionRecord {
+  const events: SessionEvent[] = [
     { t: 0, type: "build_start" },
-    { t: 100, type: "stage_enter", stage: "test" },
-    messageAt(1_500, "test", "code"),
-    { t: 1_600, type: "stage_fail", stage: "test", reason: "проверки не прошли" },
-    messageAt(1_700, "code", "test"),
-    { t: 2_000, type: "stage_enter", stage: "code" },
+    { t: 100, type: "stage_enter", stage: "verification" },
+    messageAt(1_500, "verification", "implementation"),
+    { t: 1_600, type: "stage_fail", stage: "verification", reason: "проверки не прошли" },
+    messageAt(1_700, "implementation", "verification"),
+    { t: 2_000, type: "stage_enter", stage: "implementation" },
     { t: 3_000, type: "build_end", ok: true },
   ];
-  return { ...reworkRecording(), events };
+  return withEvents(reworkRecording(), events);
 }
 
 /**
  * Запись для тестов с репликой кода проверкам перед другой речью визита: она звучит у станка,
  * а не у места встречи, и обмен остаётся только у реплики после промпта и слов мастера.
- * @returns {Recording} Запись сборки.
+ * @returns {SessionRecord} Запись сборки.
  */
-export function earlyExchangeRecording(): Recording {
-  const events: FactoryEvent[] = [
+export function earlyExchangeRecording(): SessionRecord {
+  const events: SessionEvent[] = [
     { t: 0, type: "build_start" },
-    { t: 100, type: "stage_enter", stage: "code" },
-    messageAt(500, "code", "test"),
+    { t: 100, type: "stage_enter", stage: "implementation" },
+    messageAt(500, "implementation", "verification"),
     { t: 600, type: "prompt", goal: "Добавь счётчик", requirements: ["Над цехом"] },
-    messageAt(700, "foreman", "code"),
-    messageAt(900, "test", "code"),
-    { t: 1_000, type: "stage_enter", stage: "test" },
+    messageAt(700, "foreman", "implementation"),
+    messageAt(900, "verification", "implementation"),
+    { t: 1_000, type: "stage_enter", stage: "verification" },
     { t: 2_000, type: "build_end", ok: true },
   ];
-  return { ...reworkRecording(), events };
+  return withEvents(reworkRecording(), events);
 }
 
 /**
  * Запись для тестов с вмешательством человека: проверки провалились, ревью остановилось, и
  * мастер решает, что делать дальше, а потом ревью продолжает.
- * @returns {Recording} Запись сборки.
+ * @returns {SessionRecord} Запись сборки.
  */
-export function interventionRecording(): Recording {
-  const events: FactoryEvent[] = [
+export function interventionRecording(): SessionRecord {
+  const events: SessionEvent[] = [
     { t: 0, type: "build_start" },
-    { t: 1_000, type: "stage_enter", stage: "test" },
-    { t: 2_000, type: "stage_fail", stage: "test", reason: "проверки не прошли" },
+    { t: 1_000, type: "stage_enter", stage: "verification" },
+    { t: 2_000, type: "stage_fail", stage: "verification", reason: "проверки не прошли" },
     { t: 2_000, type: "stage_enter", stage: "review" },
     {
       t: 4_000,
@@ -186,13 +196,13 @@ export function interventionRecording(): Recording {
     messageAt(6_000, "review", "foreman"),
     { t: 10_000, type: "build_end", ok: true },
   ];
-  return { ...reworkRecording(), events };
+  return withEvents(reworkRecording(), events);
 }
 
 /** Записи с речью для тестов времени: с обменом при передаче и без. */
 export const SPEECH_RECORDINGS: readonly {
   readonly name: string;
-  readonly recording: Recording;
+  readonly recording: SessionRecord;
 }[] = [
   { name: "с мастером и обменом", recording: chatRecording() },
   { name: "с обменом при возврате с браком", recording: defectExchangeRecording() },

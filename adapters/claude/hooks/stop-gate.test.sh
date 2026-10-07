@@ -9,7 +9,7 @@ readonly HOOKS_DIR
 readonly SESSION=test-session
 readonly BLOCKED=2
 readonly RELEASED=0
-readonly DEFAULT_CONFIG='{"id": "test", "checks": {"command": "make check", "paths": ["apps"]}}'
+readonly DEFAULT_CONFIG='{"verification": {"commands": ["make check"], "paths": ["apps"]}}'
 passed=0
 failed=0
 
@@ -28,7 +28,7 @@ make_repo() {
     if [[ -n "$config" ]]; then
       echo "$config" > .cyberzavod/project.json
     fi
-    printf 'out\nfactory-*\n' > .git/info/exclude
+    printf 'out\ncyberzavod-*\n' > .git/info/exclude
     git add -A
     git -c user.email=t@t -c user.name=t commit -qm init
   )
@@ -107,7 +107,7 @@ test_agent_released_after_three_blocks_leaves_human_call_marker() {
 
   run_hook "$repo" stop-gate.sh
 
-  check "оставляет отметку вызова человека после трёх отказов" "[[ -f '$repo/factory-human-call-$SESSION' ]]"
+  check "оставляет отметку вызова человека после трёх отказов" "[[ -f '$repo/cyberzavod-human-call-$SESSION' ]]"
   rm -rf "$repo"
 }
 
@@ -117,7 +117,7 @@ test_unwritable_human_call_marker_is_named_in_message() {
   repo=$(make_repo)
   run_hook "$repo" turn-start.sh
   touch "$repo/apps/broken"
-  mkdir "$repo/factory-human-call-$SESSION"
+  mkdir "$repo/cyberzavod-human-call-$SESSION"
   for _ in 1 2 3; do run_hook "$repo" stop-gate.sh; done
 
   run_hook "$repo" stop-gate.sh
@@ -135,7 +135,7 @@ test_green_checks_leave_no_human_call_marker() {
 
   run_hook "$repo" stop-gate.sh
 
-  check "не оставляет отметку при зелёных проверках" "[[ ! -e '$repo/factory-human-call-$SESSION' ]]"
+  check "не оставляет отметку при зелёных проверках" "[[ ! -e '$repo/cyberzavod-human-call-$SESSION' ]]"
   rm -rf "$repo"
 }
 
@@ -146,7 +146,7 @@ test_release_without_code_changes_leaves_no_human_call_marker() {
 
   run_hook "$repo" stop-gate.sh
 
-  check "не оставляет отметку при отпуске без изменений кода" "[[ ! -e '$repo/factory-human-call-$SESSION' ]]"
+  check "не оставляет отметку при отпуске без изменений кода" "[[ ! -e '$repo/cyberzavod-human-call-$SESSION' ]]"
   rm -rf "$repo"
 }
 
@@ -158,7 +158,7 @@ test_block_does_not_leave_human_call_marker() {
 
   run_hook "$repo" stop-gate.sh
 
-  check "не оставляет отметку, пока агента ещё возвращают к работе" "[[ ! -e '$repo/factory-human-call-$SESSION' ]]"
+  check "не оставляет отметку, пока агента ещё возвращают к работе" "[[ ! -e '$repo/cyberzavod-human-call-$SESSION' ]]"
   rm -rf "$repo"
 }
 
@@ -232,7 +232,7 @@ test_green_checks_release_and_end_turn() {
   code=$?
 
   check "зелёные проверки отпускают и завершают ход" \
-    "[[ $code -eq $RELEASED && ! -e '$repo/factory-turn-start-$SESSION' ]]"
+    "[[ $code -eq $RELEASED && ! -e '$repo/cyberzavod-turn-start-$SESSION' ]]"
   rm -rf "$repo"
 }
 
@@ -255,7 +255,7 @@ test_unwritable_counter_releases_instead_of_looping() {
   repo=$(make_repo)
   run_hook "$repo" turn-start.sh
   touch "$repo/apps/broken"
-  mkdir "$repo/factory-stop-blocks-$SESSION"
+  mkdir "$repo/cyberzavod-stop-blocks-$SESSION"
 
   run_hook "$repo" stop-gate.sh
   code=$?
@@ -266,7 +266,7 @@ test_unwritable_counter_releases_instead_of_looping() {
 
 test_checks_command_from_config_runs_and_is_named() {
   local repo code
-  repo=$(make_repo '{"checks": {"command": "touch checks-ran; exit 1", "paths": ["apps"]}}')
+  repo=$(make_repo '{"verification": {"commands": ["touch checks-ran; exit 1"], "paths": ["apps"]}}')
   run_hook "$repo" turn-start.sh
   echo changed > "$repo/apps/main.ts"
 
@@ -278,9 +278,23 @@ test_checks_command_from_config_runs_and_is_named() {
   rm -rf "$repo"
 }
 
+test_all_verification_commands_run_in_order() {
+  local repo code
+  repo=$(make_repo '{"verification": {"commands": ["touch first-ran", "touch second-ran; exit 1"]}}')
+  run_hook "$repo" turn-start.sh
+  echo changed > "$repo/apps/main.ts"
+
+  run_hook "$repo" stop-gate.sh
+  code=$?
+
+  check "проверки — все команды по порядку, красная последняя держит агента" \
+    "[[ $code -eq $BLOCKED && -e '$repo/first-ran' && -e '$repo/second-ran' ]]"
+  rm -rf "$repo"
+}
+
 test_edits_outside_paths_do_not_block() {
   local repo code
-  repo=$(make_repo '{"checks": {"command": "false", "paths": ["apps"]}}')
+  repo=$(make_repo '{"verification": {"commands": ["false"], "paths": ["apps"]}}')
   run_hook "$repo" turn-start.sh
   mkdir "$repo/docs"
   echo changed > "$repo/docs/note.md"
@@ -294,7 +308,7 @@ test_edits_outside_paths_do_not_block() {
 
 test_missing_paths_watch_whole_repository() {
   local repo code
-  repo=$(make_repo '{"checks": {"command": "test ! -f broken"}}')
+  repo=$(make_repo '{"verification": {"commands": ["test ! -f broken"]}}')
   run_hook "$repo" turn-start.sh
   touch "$repo/broken"
 
@@ -327,13 +341,13 @@ test_without_checks_agent_is_released() {
   run_hook "$repo" stop-gate.sh
   code=$?
 
-  check "без checks агент отпускается молча" "[[ $code -eq $RELEASED && ! -s '$repo/out' ]]"
+  check "без команд проверок агент отпускается молча" "[[ $code -eq $RELEASED && ! -s '$repo/out' ]]"
   rm -rf "$repo"
 }
 
 test_broken_config_releases_with_message() {
   local repo code
-  repo=$(make_repo '{"checks": ')
+  repo=$(make_repo '{"verification": ')
   touch "$repo/apps/broken"
 
   run_hook "$repo" stop-gate.sh
@@ -346,13 +360,13 @@ test_broken_config_releases_with_message() {
 
 test_turn_start_with_broken_config_remembers_nothing() {
   local repo code
-  repo=$(make_repo '{"checks": ')
+  repo=$(make_repo '{"verification": ')
 
   run_hook "$repo" turn-start.sh
   code=$?
 
   check "turn-start с битым конфигом выходит без ошибки и без отпечатка" \
-    "[[ $code -eq $RELEASED && ! -e '$repo/factory-turn-start-$SESSION' ]]"
+    "[[ $code -eq $RELEASED && ! -e '$repo/cyberzavod-turn-start-$SESSION' ]]"
   rm -rf "$repo"
 }
 
@@ -364,7 +378,7 @@ test_turn_start_without_config_remembers_nothing() {
   code=$?
 
   check "turn-start без конфига выходит без ошибки и без отпечатка" \
-    "[[ $code -eq $RELEASED && ! -e '$repo/factory-turn-start-$SESSION' ]]"
+    "[[ $code -eq $RELEASED && ! -e '$repo/cyberzavod-turn-start-$SESSION' ]]"
   rm -rf "$repo"
 }
 
@@ -375,8 +389,8 @@ test_turn_start_without_checks_remembers_nothing() {
   run_hook "$repo" turn-start.sh
   code=$?
 
-  check "turn-start без checks выходит без ошибки и без отпечатка" \
-    "[[ $code -eq $RELEASED && ! -e '$repo/factory-turn-start-$SESSION' ]]"
+  check "turn-start без команд проверок выходит без ошибки и без отпечатка" \
+    "[[ $code -eq $RELEASED && ! -e '$repo/cyberzavod-turn-start-$SESSION' ]]"
   rm -rf "$repo"
 }
 
@@ -401,7 +415,7 @@ test_turn_start_without_jq_remembers_nothing() {
   code=$?
 
   check "без jq turn-start выходит без ошибки и без отпечатка" \
-    "[[ $code -eq $RELEASED && ! -e '$repo/factory-turn-start-$SESSION' ]]"
+    "[[ $code -eq $RELEASED && ! -e '$repo/cyberzavod-turn-start-$SESSION' ]]"
   rm -rf "$repo"
 }
 
@@ -420,6 +434,7 @@ test_green_checks_release_and_end_turn
 test_without_turn_start_dirty_red_code_blocks
 test_unwritable_counter_releases_instead_of_looping
 test_checks_command_from_config_runs_and_is_named
+test_all_verification_commands_run_in_order
 test_edits_outside_paths_do_not_block
 test_missing_paths_watch_whole_repository
 test_without_config_agent_is_released

@@ -62,7 +62,7 @@ describe("readPalette", () => {
 
     const palette = readPalette(source);
 
-    expect([palette.stations.spec, palette.stations.ship]).toEqual([0x3fc1ff, 0xff5ca8]);
+    expect([palette.stations.planning, palette.stations.record]).toEqual([0x3fc1ff, 0xff5ca8]);
   });
 
   it("берёт пол из того же токена, что и фон страницы", () => {

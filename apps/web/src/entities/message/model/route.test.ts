@@ -8,14 +8,14 @@ function messageBetween(from: Speaker, to: Speaker): BriefMessageEvent {
 
 describe("routeOf", () => {
   it.each([
-    ["code", "test", "ru", "Код → Проверки"],
-    ["spec", "foreman", "ru", "Постановка → мастер"],
-    ["foreman", "code", "ru", "Мастер → Код"],
-    ["review", "code", "ru", "Ревью → Код"],
-    ["code", "test", "en", "Code → Tests"],
-    ["spec", "foreman", "en", "Spec → foreman"],
-    ["foreman", "code", "en", "Foreman → Code"],
-    ["review", "code", "en", "Review → Code"],
+    ["implementation", "verification", "ru", "Код → Проверки"],
+    ["planning", "foreman", "ru", "Постановка → мастер"],
+    ["foreman", "implementation", "ru", "Мастер → Код"],
+    ["review", "implementation", "ru", "Ревью → Код"],
+    ["implementation", "verification", "en", "Code → Verify"],
+    ["planning", "foreman", "en", "Plan → foreman"],
+    ["foreman", "implementation", "en", "Foreman → Code"],
+    ["review", "implementation", "en", "Review → Code"],
   ] as const)("называет маршрут %s → %s на языке %s: «%s»", (from, to, locale, expected) => {
     const message = messageBetween(from, to);
 

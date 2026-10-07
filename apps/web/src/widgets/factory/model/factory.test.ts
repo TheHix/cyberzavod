@@ -5,7 +5,7 @@ import {
   PORTRAIT_LAYOUT,
   WIDE_LAYOUT,
   type FactoryLayout,
-  type Recording,
+  type SessionRecord,
 } from "@cyberzavod/core";
 import { publishedRecordings } from "@/entities/recording";
 import { createFactoryModel, type FactoryModel } from "./factory.ts";
@@ -14,21 +14,26 @@ import type { Speech } from "@/features/journal-sync";
 // Темп по умолчанию сжимает минуту записи в секунду сцены: постановка работает 0–2 000 мс.
 // Первый промпт мастер говорит, дойдя до станка постановки; второй приходит, когда деталь
 // уже у станка кода.
-function recordingWithPrompt(): Recording {
+function recordingWithPrompt(): SessionRecord {
   return {
-    version: 2,
+    version: 1,
+    type: "session",
     id: "test",
-    project: "test",
-    factory: "0.0.0",
-    startedAt: "2026-10-04T00:00:00.000Z",
-    title: "Тест",
-    events: [
-      { t: 0, type: "build_start" },
-      { t: 60_000, type: "prompt", goal: "Добавь счётчик", requirements: ["Над цехом"] },
-      { t: 120_000, type: "stage_enter", stage: "code" },
-      { t: 180_000, type: "prompt", goal: "Покажи токены", requirements: [] },
-      { t: 240_000, type: "build_end", ok: true },
-    ],
+    timestamp: "2026-10-04T00:00:00.000Z",
+    projectId: "test",
+    source: { type: "manual" },
+    data: {
+      title: "Тест",
+      workflow: "default",
+      harness: "0.0.0",
+      events: [
+        { t: 0, type: "build_start" },
+        { t: 60_000, type: "prompt", goal: "Добавь счётчик", requirements: ["Над цехом"] },
+        { t: 120_000, type: "stage_enter", stage: "implementation" },
+        { t: 180_000, type: "prompt", goal: "Покажи токены", requirements: [] },
+        { t: 240_000, type: "build_end", ok: true },
+      ],
+    },
   };
 }
 
@@ -86,7 +91,7 @@ describe("createFactoryModel", () => {
     model.seek(duringPrompt(model, 1));
 
     expect(model.$promptPosition.get()).toEqual(
-      model.$script.get().layout.stations.code.foremanPost,
+      model.$script.get().layout.stations.implementation.foremanPost,
     );
   });
 
@@ -153,39 +158,43 @@ describe("createFactoryModel", () => {
 // Реплики на тех же минутах: мастер даёт задание постановке, постановка говорит на месте
 // (адресат не следующий по передаче), а рабочий кода обменивается репликой с проверками
 // у места передачи.
-function recordingWithMessages(): Recording {
+function recordingWithMessages(): SessionRecord {
+  const base = recordingWithPrompt();
   return {
-    ...recordingWithPrompt(),
-    events: [
-      { t: 0, type: "build_start" },
-      {
-        t: 60_000,
-        type: "message",
-        from: "foreman",
-        to: "spec",
-        line: "Сделай счётчик",
-        text: "Сделай счётчик токенов.",
-      },
-      {
-        t: 90_000,
-        type: "message",
-        from: "spec",
-        to: "test",
-        line: "Критерии на тебе",
-        text: "Критерии проверок на тебе.",
-      },
-      { t: 120_000, type: "stage_enter", stage: "code" },
-      {
-        t: 180_000,
-        type: "message",
-        from: "code",
-        to: "test",
-        line: "Держи, счётчик готов",
-        text: "Держи, счётчик токенов готов.",
-      },
-      { t: 240_000, type: "stage_enter", stage: "test" },
-      { t: 300_000, type: "build_end", ok: true },
-    ],
+    ...base,
+    data: {
+      ...base.data,
+      events: [
+        { t: 0, type: "build_start" },
+        {
+          t: 60_000,
+          type: "message",
+          from: "foreman",
+          to: "planning",
+          line: "Сделай счётчик",
+          text: "Сделай счётчик токенов.",
+        },
+        {
+          t: 90_000,
+          type: "message",
+          from: "planning",
+          to: "verification",
+          line: "Критерии на тебе",
+          text: "Критерии проверок на тебе.",
+        },
+        { t: 120_000, type: "stage_enter", stage: "implementation" },
+        {
+          t: 180_000,
+          type: "message",
+          from: "implementation",
+          to: "verification",
+          line: "Держи, счётчик готов",
+          text: "Держи, счётчик токенов готов.",
+        },
+        { t: 240_000, type: "stage_enter", stage: "verification" },
+        { t: 300_000, type: "build_end", ok: true },
+      ],
+    },
   };
 }
 
@@ -217,7 +226,7 @@ describe("createFactoryModel: реплики", () => {
     model.seek(duringMessage(model, 0));
 
     expect(model.$messagePosition.get()).toEqual(
-      model.$script.get().layout.stations.spec.foremanPost,
+      model.$script.get().layout.stations.planning.foremanPost,
     );
   });
 
@@ -226,7 +235,7 @@ describe("createFactoryModel: реплики", () => {
 
     model.seek(duringMessage(model, 1));
 
-    expect(model.$messagePosition.get()).toEqual(model.$script.get().layout.stations.spec.post);
+    expect(model.$messagePosition.get()).toEqual(model.$script.get().layout.stations.planning.post);
   });
 
   it("ставит пузырь над рабочим у места встречи, когда он говорит при передаче", () => {
@@ -234,9 +243,11 @@ describe("createFactoryModel: реплики", () => {
 
     model.seek(duringMessage(model, 2));
 
-    const giver = model.$scene.get().workers.find((worker) => worker.station === "code");
+    const giver = model.$scene.get().workers.find((worker) => worker.station === "implementation");
     expect(model.$messagePosition.get()).toEqual(giver?.position);
-    expect(model.$messagePosition.get()).not.toEqual(model.$script.get().layout.stations.code.post);
+    expect(model.$messagePosition.get()).not.toEqual(
+      model.$script.get().layout.stations.implementation.post,
+    );
   });
 
   it("не ищет место, когда никто не говорит", () => {
@@ -249,28 +260,32 @@ describe("createFactoryModel: реплики", () => {
 });
 
 // Вмешательства на тех же минутах: решение у станка постановки, потом у станка кода.
-function recordingWithInterventions(): Recording {
+function recordingWithInterventions(): SessionRecord {
+  const base = recordingWithPrompt();
   return {
-    ...recordingWithPrompt(),
-    events: [
-      { t: 0, type: "build_start" },
-      {
-        t: 60_000,
-        type: "intervention",
-        reason: "spec_review",
-        line: "Одобряю, делай по плану",
-        text: "Одобряю, делай по плану.",
-      },
-      { t: 120_000, type: "stage_enter", stage: "code" },
-      {
-        t: 180_000,
-        type: "intervention",
-        reason: "question",
-        line: "Возьми вариант с таблицей",
-        text: "Возьми вариант с таблицей.",
-      },
-      { t: 240_000, type: "build_end", ok: true },
-    ],
+    ...base,
+    data: {
+      ...base.data,
+      events: [
+        { t: 0, type: "build_start" },
+        {
+          t: 60_000,
+          type: "intervention",
+          reason: "plan_review",
+          line: "Одобряю, делай по плану",
+          text: "Одобряю, делай по плану.",
+        },
+        { t: 120_000, type: "stage_enter", stage: "implementation" },
+        {
+          t: 180_000,
+          type: "intervention",
+          reason: "question",
+          line: "Возьми вариант с таблицей",
+          text: "Возьми вариант с таблицей.",
+        },
+        { t: 240_000, type: "build_end", ok: true },
+      ],
+    },
   };
 }
 
@@ -302,7 +317,7 @@ describe("createFactoryModel: вмешательства", () => {
     model.seek(duringIntervention(model, 0));
 
     expect(model.$interventionPosition.get()).toEqual(
-      model.$script.get().layout.stations.spec.foremanPost,
+      model.$script.get().layout.stations.planning.foremanPost,
     );
     expect(model.$interventionPosition.get()).toEqual(model.$scene.get().foreman.position);
   });
@@ -423,10 +438,10 @@ describe("createFactoryModel: журнал", () => {
 
 // Время события в журнале и то, куда перематывает «показать в цехе»: по промптам, репликам
 // и вмешательствам.
-function speechTimes(recording: Recording): { speech: Speech; t: number }[] {
-  const prompts = recording.events.filter((event) => event.type === "prompt");
-  const messages = recording.events.filter((event) => event.type === "message");
-  const interventions = recording.events.filter((event) => event.type === "intervention");
+function speechTimes(recording: SessionRecord): { speech: Speech; t: number }[] {
+  const prompts = recording.data.events.filter((event) => event.type === "prompt");
+  const messages = recording.data.events.filter((event) => event.type === "message");
+  const interventions = recording.data.events.filter((event) => event.type === "intervention");
   return [
     ...prompts.map((event, index) => ({ speech: { kind: "prompt", index } as const, t: event.t })),
     ...messages.map((event, index) => ({
@@ -441,7 +456,7 @@ function speechTimes(recording: Recording): { speech: Speech; t: number }[] {
 }
 
 // Речи, у которых после перемотки время записи не равно времени события.
-function mismatchedSpeech(recording: Recording, layout: FactoryLayout): unknown[] {
+function mismatchedSpeech(recording: SessionRecord, layout: FactoryLayout): unknown[] {
   const model = createFactoryModel(briefOf(recording), layout);
   return speechTimes(recording).flatMap(({ speech, t }) => {
     model.seekToSpeech(speech);

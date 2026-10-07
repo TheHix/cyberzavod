@@ -18,7 +18,7 @@ function capitalized(text: string): string {
  * Маршрут реплики для подписи: кто кому говорит.
  * @param {BriefMessageEvent} message Реплика из записи.
  * @param {Locale} locale Язык подписей.
- * @returns {string} Например «Код → Проверки» или «Постановка → мастер»; по-английски «Spec → foreman».
+ * @returns {string} Например «Код → Проверки» или «Постановка → мастер»; по-английски «Plan → foreman».
  */
 export function routeOf(message: BriefMessageEvent, locale: Locale): string {
   return `${capitalized(speakerLabel(message.from, locale))} → ${speakerLabel(message.to, locale)}`;

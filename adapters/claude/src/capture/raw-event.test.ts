@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { ProjectConfig } from "@cyberzavod/core";
 import {
   fromHookPayload,
   isSafeSessionId,
@@ -353,24 +354,36 @@ describe("isSafeSessionId", () => {
   });
 });
 
+function projectConfig(): ProjectConfig {
+  return {
+    projectId: "cyberzavod",
+    harness: "0.1.0",
+    workflow: "default",
+    journal: "journal",
+    agents: {},
+    verification: { commands: [], paths: [] },
+  };
+}
+
 describe("stampProject", () => {
-  it("добавляет к началу сессии проект и версию завода", () => {
+  it("добавляет к началу сессии проект, версию harness и процесс", () => {
     const event = { ts: TS, kind: "session_start" } as const;
 
-    const stamped = stampProject(event, { id: "cyberzavod", factory: "0.1.0" });
+    const stamped = stampProject(event, projectConfig());
 
     expect(stamped).toEqual({
       ts: TS,
       kind: "session_start",
       project: "cyberzavod",
-      factory: "0.1.0",
+      harness: "0.1.0",
+      workflow: "default",
     });
   });
 
   it("не меняет исходное событие", () => {
     const event = { ts: TS, kind: "session_start" } as const;
 
-    stampProject(event, { id: "cyberzavod", factory: "0.1.0" });
+    stampProject(event, projectConfig());
 
     expect(event).toEqual({ ts: TS, kind: "session_start" });
   });
@@ -406,20 +419,27 @@ describe("parseRawLog", () => {
 
   it("принимает начало сессии с проектом и без него", () => {
     const log =
-      '{"ts":1,"kind":"session_start","project":"cyberzavod","factory":"0.1.0"}\n{"ts":2,"kind":"session_start"}\n';
+      '{"ts":1,"kind":"session_start","project":"cyberzavod","harness":"0.1.0","workflow":"default"}\n{"ts":2,"kind":"session_start"}\n';
 
     const events = parseRawLog(log);
 
     expect(events).toEqual([
-      { ts: 1, kind: "session_start", project: "cyberzavod", factory: "0.1.0" },
+      {
+        ts: 1,
+        kind: "session_start",
+        project: "cyberzavod",
+        harness: "0.1.0",
+        workflow: "default",
+      },
       { ts: 2, kind: "session_start" },
     ]);
   });
 
   it.each([
     '{"ts":1,"kind":"session_start","project":"cyberzavod"}\n',
-    '{"ts":1,"kind":"session_start","factory":"0.1.0"}\n',
-    '{"ts":1,"kind":"session_start","project":"cyberzavod","factory":1}\n',
+    '{"ts":1,"kind":"session_start","harness":"0.1.0"}\n',
+    '{"ts":1,"kind":"session_start","project":"cyberzavod","harness":"0.1.0"}\n',
+    '{"ts":1,"kind":"session_start","project":"cyberzavod","harness":1,"workflow":"default"}\n',
   ])("отклоняет начало сессии с одним полем проекта или не строкой: %s", (log) => {
     const act = () => parseRawLog(log);
 

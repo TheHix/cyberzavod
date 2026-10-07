@@ -32,9 +32,12 @@ export const PLAQUE_GLYPHS: Readonly<Record<string, PlaqueArt>> = {
   С: ["kkk", "k..", "k..", "k..", "kkk"],
   Т: ["kkk", ".k.", ".k.", ".k.", ".k."],
   У: ["k.k", "k.k", "kkk", "..k", "kk."],
+  Ф: [".kkk.", "k.k.k", "k.k.k", ".kkk.", "..k.."],
+  Ц: ["k.k.", "k.k.", "k.k.", "kkkk", "...k"],
   Ы: ["k....k", "k....k", "kkkk.k", "k...kk", "kkkk.k"],
   Ь: ["k..", "k..", "kk.", "k.k", "kk."],
   Ю: ["k.kk.", "k.k.k", "kkk.k", "k.k.k", "k.kk."],
+  Я: [".kk", "k.k", ".kk", "k.k", "k.k"],
   // Латинские буквы того же вида, что кириллические, рисуются так же: на одной табличке и на
   // одной странице не должно быть двух разных «А» шрифта.
   A: [".k.", "k.k", "kkk", "k.k", "k.k"],
@@ -45,6 +48,7 @@ export const PLAQUE_GLYPHS: Readonly<Record<string, PlaqueArt>> = {
   F: ["kkk", "k..", "kk.", "k..", "k.."],
   H: ["k.k", "k.k", "kkk", "k.k", "k.k"],
   I: ["kkk", ".k.", ".k.", ".k.", "kkk"],
+  L: ["k..", "k..", "k..", "k..", "kkk"],
   M: ["k...k", "kk.kk", "k.k.k", "k...k", "k...k"],
   N: ["k...k", "kk..k", "k.k.k", "k..kk", "k...k"],
   O: ["kkk", "k.k", "k.k", "k.k", "kkk"],

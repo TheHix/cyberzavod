@@ -1,23 +1,48 @@
-// Ядро завода: чистый TypeScript без зависимостей от фреймворков и браузера.
-// Интерфейс и рендер цеха только читают то, что экспортируется отсюда.
+// Ядро Cyberzavod: доменная модель (этапы, процесс, агенты, конфиг проекта, записи журнала)
+// и проигрыватель цеха. Чистый TypeScript без зависимостей от фреймворков, браузера и Node.
 
 export {
+  HarnessError,
+  parseStageGuide,
+  STAGE_ACCESS,
+  type Harness,
+  type Principle,
+  type StageAccess,
+  type StageGuide,
+  type StageRole,
+} from "./harness.ts";
+export {
   STAGES,
+  WorkflowError,
+  isStage,
+  parseWorkflow,
+  type Stage,
+  type Workflow,
+} from "./stage.ts";
+export { AgentConfigError, DEFAULT_MODEL, parseAgentConfig, type AgentConfig } from "./agent.ts";
+export {
+  ProjectConfigError,
+  parseProjectConfig,
+  type ProjectConfig,
+  type StackInfo,
+  type VerificationConfig,
+} from "./project-config.ts";
+export {
+  RECORD_VERSION,
   INTERVENTION_REASONS,
-  RecordingError,
-  parseFactoryEvent,
-  parseRecording,
+  RecordError,
+  parseSessionEvent,
+  parseRecord,
   succeeded,
   summarize,
   tally,
   briefOf,
   isSpeaker,
-  isRecordingId,
-  isFactoryVersion,
+  isRecordId,
+  isHarnessVersion,
   FOREMAN,
   NO_TALLY,
   type Tally,
-  type Stage,
   type Speaker,
   type PromptEvent,
   type MessageEvent,
@@ -25,12 +50,20 @@ export {
   type InterventionReason,
   type BriefMessageEvent,
   type BriefInterventionEvent,
-  type BriefFactoryEvent,
-  type BriefRecording,
-  type FactoryEvent,
-  type Recording,
+  type BriefSessionEvent,
+  type BriefSessionRecord,
+  type SessionEvent,
+  type SessionData,
+  type SessionRecord,
+  type DecisionRecord,
+  type NoteRecord,
+  type JournalRecord,
+  type RecordHeader,
+  type RecordSource,
+  type RecordType,
   type BuildStats,
-} from "./recording.ts";
+} from "./record.ts";
+export type { RecordStore } from "./store.ts";
 export { ProjectError, parseProject, type Project } from "./project.ts";
 export type { Aisle } from "./aisle.ts";
 export { carryTime, ScriptMismatchError } from "./carry-time.ts";

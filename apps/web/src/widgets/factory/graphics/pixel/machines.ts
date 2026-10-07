@@ -25,7 +25,7 @@ import { PIXELS_PER_UNIT } from "./units.ts";
  * корпус, его тень и блик в цвете этапа.
  */
 export const MACHINE_ART: Readonly<Record<Stage, SpriteArt>> = {
-  spec: [
+  planning: [
     ".kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.",
     "klllllllllllllllllllllllllllllllllllllbk",
     "klbkkkkkkkkkkkkkkkkkkkkbbbbbbbbbbbbbbbBk",
@@ -47,7 +47,7 @@ export const MACHINE_ART: Readonly<Record<Stage, SpriteArt>> = {
     "kBBBkBBkBBkBBkBBBBBBBBBBBBBBBBBBBBBBBBBk",
     ".kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.",
   ],
-  code: [
+  implementation: [
     ".kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.",
     "klllllllllllllllllllllllllllllllllllllbk",
     "klbkkkkkkkkkkkkkkkkkkkkkkkkkkbbbbbbbbbBk",
@@ -69,7 +69,7 @@ export const MACHINE_ART: Readonly<Record<Stage, SpriteArt>> = {
     "kBBBkBBkBBkBBkBBBBBBBBBBBBBBBBBBBBBBBBBk",
     ".kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.",
   ],
-  test: [
+  verification: [
     ".kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.",
     "klllllllllllllllllllllllllllllllllllllbk",
     "klbkkkkkkkkkkkkkkbbkkkkkkkkkkkkkkbbbbbBk",
@@ -113,7 +113,7 @@ export const MACHINE_ART: Readonly<Record<Stage, SpriteArt>> = {
     "kBBBkBBkBBkBBkBBBBBBBBBBBBBBBBBBBBBBBBBk",
     ".kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.",
   ],
-  ship: [
+  record: [
     ".kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.",
     "klllllllllllllllllllllllllllllllllllllbk",
     "klbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbBk",
@@ -160,17 +160,17 @@ export interface MachineWorkArt {
 /**
  * Накладки работы станков по этапам. Новый этап — новая строка. Постановка — перо ведёт линию
  * по чертежу, код — строки в терминале то растут, то сжимаются, мигает курсор, проверки — пузырьки в колбах,
- * ревью — блик ходит по линзе лупы, выпуск — полосы ленты сдвигаются.
+ * ревью — блик ходит по линзе лупы, фиксация — полосы ленты сдвигаются.
  */
 export const MACHINE_WORK_ART: Readonly<Record<Stage, MachineWorkArt>> = {
-  spec: {
+  planning: {
     at: { x: 9, y: 5 },
     frames: {
       workA: ["......", "11k...", "......"],
       workB: ["......", "1111k.", "......"],
     },
   },
-  code: {
+  implementation: {
     at: { x: 5, y: 4 },
     frames: {
       workA: [
@@ -191,7 +191,7 @@ export const MACHINE_WORK_ART: Readonly<Record<Stage, MachineWorkArt>> = {
       ],
     },
   },
-  test: {
+  verification: {
     at: { x: 21, y: 3 },
     frames: {
       workA: [
@@ -247,7 +247,7 @@ export const MACHINE_WORK_ART: Readonly<Record<Stage, MachineWorkArt>> = {
       ],
     },
   },
-  ship: {
+  record: {
     at: { x: 3, y: 7 },
     frames: {
       workA: [

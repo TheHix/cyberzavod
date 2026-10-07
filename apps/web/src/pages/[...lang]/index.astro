@@ -37,7 +37,7 @@ const [latest] = publishedRecordings;
       client:load
       locale={locale}
       recording={briefOf(latest)}
-      project={projectLinkOf(projectOf(publishedProjects, latest.project), locale)}
+      project={projectLinkOf(projectOf(publishedProjects, latest.projectId), locale)}
       titleLevel="h2"
     />
   ) : (

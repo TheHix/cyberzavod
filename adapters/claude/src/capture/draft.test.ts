@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RecordingError } from "@cyberzavod/core";
+import { RecordError } from "@cyberzavod/core";
 import {
   carryOverEdits,
   DraftError,
@@ -32,7 +32,7 @@ function messageDraft(patch: Partial<DraftMessage> = {}): DraftMessage {
   return {
     t: 1_500,
     type: "draft_message",
-    from: "code",
+    from: "implementation",
     to: "foreman",
     source: "assignment",
     said: "Сделай счётчик токенов, показывай над цехом",
@@ -56,7 +56,8 @@ function editedDraft(): Draft {
       {
         id: BUILD_ID,
         project: "cyberzavod",
-        factory: "0.1.0",
+        harness: "0.1.0",
+        workflow: "default",
         title: "Счётчик токенов",
         runs: [],
       },
@@ -70,7 +71,7 @@ function editedDraft(): Draft {
         requirements: ["Показывай его над цехом"],
         model: "claude-opus-5-5",
       },
-      { t: 2_000, type: "stage_enter", stage: "code" },
+      { t: 2_000, type: "stage_enter", stage: "implementation" },
     ],
   };
 }
@@ -83,19 +84,6 @@ function uneditedDraft(): Draft {
     events: draft.events.map((event) =>
       event.type === "draft_prompt" ? { ...event, goal: "", requirements: [] } : event,
     ),
-  };
-}
-
-// Черновик прошлого формата: шапка одной сборки лежит прямо в корне.
-function legacyDraft(): Record<string, unknown> {
-  const { id, startedAt, events } = editedDraft();
-  return {
-    id,
-    startedAt,
-    project: "cyberzavod",
-    factory: "0.1.0",
-    title: "Счётчик токенов",
-    events: [{ t: 0, type: "build_start" }, ...events, { t: 3_000, type: "build_end", ok: true }],
   };
 }
 
@@ -118,58 +106,19 @@ describe("parseDraft", () => {
     expect(draft).toEqual(uneditedDraft());
   });
 
-  it("читает старый черновик без builds как одну сборку с id черновика", () => {
-    const old = legacyDraft();
+  it.each(["project", "harness", "workflow"] as const)(
+    "отклоняет %s сборки не строкой",
+    (field) => {
+      const raw = { ...uneditedDraft(), builds: [{ ...uneditedDraft().builds[0], [field]: 5 }] };
 
-    const draft = parseDraft(old);
+      const act = () => parseDraft(raw);
 
-    expect(draft.builds).toEqual([
-      {
-        id: BUILD_ID,
-        project: "cyberzavod",
-        factory: "0.1.0",
-        title: "Счётчик токенов",
-        runs: [],
-      },
-    ]);
-  });
-
-  it("читает старый черновик без project и factory с пустыми строками", () => {
-    const old = legacyDraft();
-    delete old.project;
-    delete old.factory;
-
-    const draft = parseDraft(old);
-
-    expect(draft.builds[0]).toMatchObject({ project: "", factory: "" });
-  });
-
-  it("публикует старый черновик одной записью с id черновика", () => {
-    const draft = parseDraft(legacyDraft());
-
-    const recordings = publishDraft(draft);
-
-    expect(recordings.map((recording) => recording.id)).toEqual([BUILD_ID]);
-  });
-
-  it.each(["project", "factory"] as const)("отклоняет %s сборки не строкой", (field) => {
-    const raw = { ...uneditedDraft(), builds: [{ ...uneditedDraft().builds[0], [field]: 5 }] };
-
-    const act = () => parseDraft(raw);
-
-    expect(act).toThrow(new RegExp(field));
-  });
-
-  it.each(["project", "factory"] as const)("отклоняет %s старого черновика не строкой", (field) => {
-    const raw = { ...legacyDraft(), [field]: 5 };
-
-    const act = () => parseDraft(raw);
-
-    expect(act).toThrow(new RegExp(field));
-  });
+      expect(act).toThrow(new RegExp(field));
+    },
+  );
 
   it.each([
-    ["событие цеха", { t: 2_000, type: "stage_enter", stage: "test", project: "b" }],
+    ["событие цеха", { t: 2_000, type: "stage_enter", stage: "verification", project: "b" }],
     ["исход проверок", { t: 2_000, type: "draft_check", ok: true, project: "b" }],
   ])("принимает пометку project у события: %s", (_name, event) => {
     const raw = { ...uneditedDraft(), events: [event] };
@@ -180,7 +129,7 @@ describe("parseDraft", () => {
   });
 
   it.each([
-    ["событие цеха", { t: 2_000, type: "stage_enter", stage: "test", project: 5 }],
+    ["событие цеха", { t: 2_000, type: "stage_enter", stage: "verification", project: 5 }],
     ["исход проверок", { t: 2_000, type: "draft_check", ok: true, project: 5 }],
   ])("отклоняет нестроковую пометку project у события: %s", (_name, event) => {
     const raw = { ...uneditedDraft(), events: [event] };
@@ -196,14 +145,6 @@ describe("parseDraft", () => {
     const act = () => parseDraft(raw);
 
     expect(act).toThrow("у черновика должны быть id и startedAt");
-  });
-
-  it("называет title, когда его нет у старого черновика", () => {
-    const raw = { ...legacyDraft(), title: undefined };
-
-    const act = () => parseDraft(raw);
-
-    expect(act).toThrow("у черновика без builds должен быть title");
   });
 
   it("отклоняет черновик без сборок", () => {
@@ -290,7 +231,7 @@ describe("parseDraft", () => {
       { t: 1, type: "draft_run", run: "a1", agent: "coder", until: 9 },
       { t: 2, type: "draft_check", ok: false, run: "a1" },
       { t: 3, type: "draft_check", ok: true },
-      { t: 4, type: "stage_enter", stage: "code", run: "a1" },
+      { t: 4, type: "stage_enter", stage: "implementation", run: "a1" },
     ];
 
     const draft = parseDraft({ ...uneditedDraft(), events });
@@ -303,7 +244,10 @@ describe("parseDraft", () => {
     ["окно запуска без agent", { t: 1, type: "draft_run", run: "a1", until: 2 }],
     ["проверка без ok", { t: 1, type: "draft_check" }],
     ["проверка с run не строкой", { t: 1, type: "draft_check", ok: true, run: 5 }],
-    ["событие цеха с run не строкой", { t: 1, type: "stage_enter", stage: "code", run: 5 }],
+    [
+      "событие цеха с run не строкой",
+      { t: 1, type: "stage_enter", stage: "implementation", run: 5 },
+    ],
     ["реплика с run не строкой", { ...messageDraft(), run: 5 }],
   ])("отклоняет %s", (_name, event) => {
     const act = () => parseDraft({ ...uneditedDraft(), events: [event] });
@@ -383,7 +327,7 @@ describe("parseDraft", () => {
     expect(act).toThrow(/joined/);
   });
 
-  it.each(["question", "spec_review", "rework_limit", "stop_gate"] as const)(
+  it.each(["question", "plan_review", "rework_limit", "stop_gate"] as const)(
     "принимает вмешательство с причиной %s",
     (reason) => {
       const event = intervention({ t: 2_000, reason, line: "", text: "" });
@@ -421,7 +365,7 @@ describe("parseDraft", () => {
 
     const act = () => parseDraft(raw);
 
-    expect(act).toThrow(RecordingError);
+    expect(act).toThrow(RecordError);
   });
 
   it("читает черновик из нескольких сборок без потерь", () => {
@@ -452,34 +396,34 @@ describe("carryOverEdits", () => {
     expect(draft.builds).toEqual(interleavedDraft().builds);
   });
 
-  it("переносит заполненные редактором проект и версию завода первой сборки", () => {
+  it("переносит заполненные редактором проект и версию harness первой сборки", () => {
     const previous = editedDraft();
-    previous.builds = [{ ...buildOf(previous, 0), project: "demo", factory: "0.2.0" }];
+    previous.builds = [{ ...buildOf(previous, 0), project: "demo", harness: "0.2.0" }];
     const next = uneditedDraft();
-    next.builds = [{ ...buildOf(next, 0), project: "cyberzavod", factory: "0.1.0" }];
+    next.builds = [{ ...buildOf(next, 0), project: "cyberzavod", harness: "0.1.0" }];
 
     const draft = carryOverEdits(previous, next);
 
-    expect(draft.builds[0]).toMatchObject({ project: "demo", factory: "0.2.0" });
+    expect(draft.builds[0]).toMatchObject({ project: "demo", harness: "0.2.0" });
   });
 
-  it("берёт проект и версию завода первой сборки из журнала, если редактор их не заполнил", () => {
+  it("берёт проект и версию harness первой сборки из журнала, если редактор их не заполнил", () => {
     const previous = editedDraft();
-    previous.builds = [{ ...buildOf(previous, 0), project: "", factory: "" }];
+    previous.builds = [{ ...buildOf(previous, 0), project: "", harness: "" }];
     const next = uneditedDraft();
-    next.builds = [{ ...buildOf(next, 0), project: "cyberzavod", factory: "0.1.0" }];
+    next.builds = [{ ...buildOf(next, 0), project: "cyberzavod", harness: "0.1.0" }];
 
     const draft = carryOverEdits(previous, next);
 
-    expect(draft.builds[0]).toMatchObject({ project: "cyberzavod", factory: "0.1.0" });
+    expect(draft.builds[0]).toMatchObject({ project: "cyberzavod", harness: "0.1.0" });
   });
 
   it("не подставляет проект журнала в сборку, которую завёл редактор", () => {
     const previous = interleavedDraft();
-    previous.builds = previous.builds.map((build) => ({ ...build, project: "", factory: "" }));
+    previous.builds = previous.builds.map((build) => ({ ...build, project: "", harness: "" }));
     const next = uneditedDraft();
     next.builds = [
-      { ...buildOf(next, 0), id: FIRST_BUILD_ID, project: "cyberzavod", factory: "0.1.0" },
+      { ...buildOf(next, 0), id: FIRST_BUILD_ID, project: "cyberzavod", harness: "0.1.0" },
     ];
 
     const draft = carryOverEdits(previous, next);
@@ -553,14 +497,16 @@ describe("carryOverEdits: реплики и склейка", () => {
 
   it("берёт маршрут, source и запуск из пересобранного черновика, а редактуру из прошлого", () => {
     const previous = draftWith(edited);
-    const next = draftWith(messageDraft({ from: "test", to: "code", source: "report", run: "a1" }));
+    const next = draftWith(
+      messageDraft({ from: "verification", to: "implementation", source: "report", run: "a1" }),
+    );
 
     const draft = carryOverEdits(previous, next);
 
     expect(draft.events[0]).toEqual({
       ...edited,
-      from: "test",
-      to: "code",
+      from: "verification",
+      to: "implementation",
       source: "report",
       run: "a1",
     });
@@ -627,7 +573,7 @@ describe("carryOverEdits: вмешательства", () => {
   });
 
   it("берёт причину из пересобранного черновика", () => {
-    const previous = draftWith(intervention({ t: 2_000, reason: "spec_review" }));
+    const previous = draftWith(intervention({ t: 2_000, reason: "plan_review" }));
     const next = draftWith(intervention({ t: 2_000, reason: "stop_gate", line: "", text: "" }));
 
     const draft = carryOverEdits(previous, next);
@@ -734,7 +680,7 @@ describe("orphanedRuns", () => {
 
 describe("reroutedMessages", () => {
   it("находит заполненную реплику, у которой поменялся маршрут", () => {
-    const previous = draftWith(messageDraft({ to: "test", line: "Держи" }));
+    const previous = draftWith(messageDraft({ to: "verification", line: "Держи" }));
     const next = draftWith(messageDraft({ to: "foreman", line: "Держи" }));
 
     const rerouted = reroutedMessages(previous, next);
@@ -744,7 +690,7 @@ describe("reroutedMessages", () => {
 
   it.each([
     ["у реплики не поменялся маршрут", messageDraft({ line: "Держи" })],
-    ["реплика ещё не заполнена", messageDraft({ to: "test" })],
+    ["реплика ещё не заполнена", messageDraft({ to: "verification" })],
   ])("не находит ничего, если %s", (_name, now) => {
     const previous = draftWith(messageDraft({ line: "Держи" }));
 
@@ -769,7 +715,7 @@ describe("publishBuild", () => {
 
     const recording = publishOnly(draft);
 
-    expect(recording.events[1]).toEqual({
+    expect(recording.data.events[1]).toEqual({
       t: 0,
       type: "prompt",
       goal: "Добавь счётчик токенов",
@@ -784,7 +730,7 @@ describe("publishBuild", () => {
 
     const recording = publishOnly(draft);
 
-    expect(recording.events.filter((event) => event.type === "intervention")).toEqual([
+    expect(recording.data.events.filter((event) => event.type === "intervention")).toEqual([
       {
         t: 1_500,
         type: "intervention",
@@ -801,7 +747,7 @@ describe("publishBuild", () => {
 
     const act = () => publishOnly(draft);
 
-    expect(act).toThrow(RecordingError);
+    expect(act).toThrow(RecordError);
     expect(act).toThrow(/line/);
   });
 
@@ -823,27 +769,33 @@ describe("publishBuild", () => {
     expect(act).toThrow(/goal/);
   });
 
-  it("переносит проект и версию завода в запись", () => {
+  it("собирает запись сессии с проектом, версией harness, процессом и источником Claude", () => {
     const draft = editedDraft();
 
     const recording = publishOnly(draft);
 
-    expect(recording).toMatchObject({ version: 2, project: "cyberzavod", factory: "0.1.0" });
+    expect(recording).toMatchObject({
+      version: 1,
+      type: "session",
+      projectId: "cyberzavod",
+      source: { type: "agent", provider: "anthropic", agent: "claude" },
+      data: { harness: "0.1.0", workflow: "default" },
+    });
   });
 
-  it.each(["project", "factory"] as const)("не публикует сборку с пустым полем %s", (field) => {
+  it.each(["project", "harness"] as const)("не публикует сборку с пустым полем %s", (field) => {
     const draft = editedDraft();
     buildOf(draft, 0)[field] = "";
 
     const act = () => publishOnly(draft);
 
-    expect(act).toThrow(RecordingError);
+    expect(act).toThrow(RecordError);
     expect(act).toThrow(new RegExp(field));
   });
 
-  it("проверяет на утечки версию завода", () => {
+  it("проверяет на утечки версию harness", () => {
     const draft = editedDraft();
-    buildOf(draft, 0).factory = "сервер 203.0.113.7";
+    buildOf(draft, 0).harness = "сервер 203.0.113.7";
 
     const act = () => publishOnly(draft);
 
@@ -864,7 +816,7 @@ describe("publishBuild", () => {
     draft.events[1] = {
       t: 2_000,
       type: "stage_fail",
-      stage: "test",
+      stage: "verification",
       reason: "нет доступа к 203.0.113.7",
     };
 
@@ -919,10 +871,10 @@ describe("publishBuild", () => {
 
     const recording = publishOnly(draft);
 
-    expect(recording.events[2]).toEqual({
+    expect(recording.data.events[2]).toEqual({
       t: 500,
       type: "message",
-      from: "code",
+      from: "implementation",
       to: "foreman",
       line: "Сделай счётчик",
       text: "Сделай счётчик токенов.",
@@ -951,7 +903,7 @@ describe("publishBuild", () => {
 
     const recording = publishOnly(draft);
 
-    expect(recording.events.filter((event) => event.type === "prompt")).toHaveLength(1);
+    expect(recording.data.events.filter((event) => event.type === "prompt")).toHaveLength(1);
   });
 
   it("не публикует склеенный первый промпт", () => {
@@ -998,17 +950,17 @@ describe("publishBuild", () => {
   it("не повторяет этап, на котором сборка уже стоит", () => {
     const draft = editedDraft();
     draft.events.push(
-      { t: 2_500, type: "stage_enter", stage: "code", run: "a2" },
-      { t: 3_000, type: "stage_enter", stage: "test" },
-      { t: 3_500, type: "stage_enter", stage: "code" },
+      { t: 2_500, type: "stage_enter", stage: "implementation", run: "a2" },
+      { t: 3_000, type: "stage_enter", stage: "verification" },
+      { t: 3_500, type: "stage_enter", stage: "implementation" },
     );
 
     const recording = publishOnly(draft);
 
-    const stages = recording.events.flatMap((event) =>
+    const stages = recording.data.events.flatMap((event) =>
       event.type === "stage_enter" ? [event.stage] : [],
     );
-    expect(stages).toEqual(["code", "test", "code"]);
+    expect(stages).toEqual(["implementation", "verification", "implementation"]);
   });
 
   it("ставит build_start в нуль и отбрасывает старые начало и конец черновика", () => {
@@ -1021,7 +973,7 @@ describe("publishBuild", () => {
 
     const recording = publishOnly(draft);
 
-    expect(recording.events.map((event) => [event.t, event.type])).toEqual([
+    expect(recording.data.events.map((event) => [event.t, event.type])).toEqual([
       [0, "build_start"],
       [0, "prompt"],
       [1_000, "stage_enter"],
@@ -1032,12 +984,12 @@ describe("publishBuild", () => {
   it("не оставляет в записи пометок project у событий", () => {
     const draft = editedDraft();
     draft.events.push(
-      { t: 3_000, type: "stage_enter", stage: "test", project: "cyberzavod" },
+      { t: 3_000, type: "stage_enter", stage: "verification", project: "cyberzavod" },
       { t: 3_000, type: "draft_check", ok: false, project: "cyberzavod" },
       {
         t: 3_000,
         type: "stage_fail",
-        stage: "test",
+        stage: "verification",
         reason: "проверки не прошли",
         project: "cyberzavod",
       },
@@ -1045,28 +997,7 @@ describe("publishBuild", () => {
 
     const recording = publishOnly(draft);
 
-    expect(JSON.stringify(recording.events)).not.toContain("project");
-  });
-
-  it("берёт исход сборки из build_end старого черновика, если проверок нет", () => {
-    const draft = editedDraft();
-    draft.events.push({ t: 3_000, type: "build_end", ok: false });
-
-    const recording = publishOnly(draft);
-
-    expect(recording.events.at(-1)).toMatchObject({ type: "build_end", ok: false });
-  });
-
-  it("предпочитает проверки старому build_end", () => {
-    const draft = editedDraft();
-    draft.events.push(
-      { t: 3_000, type: "draft_check", ok: true },
-      { t: 3_500, type: "build_end", ok: false },
-    );
-
-    const recording = publishOnly(draft);
-
-    expect(recording.events.at(-1)).toMatchObject({ type: "build_end", ok: true });
+    expect(JSON.stringify(recording.data.events)).not.toContain("project");
   });
 
   it("считает сборку без проверок удачной", () => {
@@ -1074,7 +1005,7 @@ describe("publishBuild", () => {
 
     const recording = publishOnly(draft);
 
-    expect(recording.events.at(-1)).toMatchObject({ type: "build_end", ok: true });
+    expect(recording.data.events.at(-1)).toMatchObject({ type: "build_end", ok: true });
   });
 
   it("не оставляет в записи служебных событий и пометок черновика", () => {
@@ -1083,12 +1014,21 @@ describe("publishBuild", () => {
     const recording = publishBuild(draft, FIRST_BUILD_ID);
 
     const marks = ["draft_", "run", "said", "source", 'build":'];
-    expect(marks.filter((mark) => JSON.stringify(recording).includes(`"${mark}`))).toEqual([]);
+    expect(
+      marks.filter((mark) => JSON.stringify(recording.data.events).includes(`"${mark}`)),
+    ).toEqual([]);
   });
 
   it("не публикует сборку из неизвестной сборки и сборку без событий", () => {
     const draft = editedDraft();
-    draft.builds.push({ id: "empty", project: "p", factory: "0.1.0", title: "Пустая", runs: [] });
+    draft.builds.push({
+      id: "empty",
+      project: "p",
+      harness: "0.1.0",
+      workflow: "default",
+      title: "Пустая",
+      runs: [],
+    });
 
     const unknown = () => publishBuild(draft, "no-such-build");
     const empty = () => publishBuild(draft, "empty");
@@ -1105,27 +1045,27 @@ describe("publishDraft: несколько сборок", () => {
     const recordings = publishDraft(draft);
 
     expect(
-      recordings.map(({ id, project, factory, title, startedAt }) => ({
+      recordings.map(({ id, projectId, timestamp, data }) => ({
         id,
-        project,
-        factory,
-        title,
-        startedAt,
+        projectId,
+        harness: data.harness,
+        title: data.title,
+        timestamp,
       })),
     ).toEqual([
       {
         id: FIRST_BUILD_ID,
-        project: "cyberzavod",
-        factory: "0.1.0",
+        projectId: "cyberzavod",
+        harness: "0.1.0",
         title: "Счётчик токенов",
-        startedAt: "2026-10-04T09:52:13.000Z",
+        timestamp: "2026-10-04T09:52:13.000Z",
       },
       {
         id: SECOND_BUILD_ID,
-        project: "personal-finance-lab",
-        factory: "0.1.0",
+        projectId: "personal-finance-lab",
+        harness: "0.1.0",
         title: "Движок финансов",
-        startedAt: "2026-10-04T09:52:15.000Z",
+        timestamp: "2026-10-04T09:52:15.000Z",
       },
     ]);
   });
@@ -1136,7 +1076,7 @@ describe("publishDraft: несколько сборок", () => {
     const recordings = publishDraft(draft);
 
     const summary = recordings.map((recording) =>
-      recording.events.flatMap((event) => {
+      recording.data.events.flatMap((event) => {
         if (event.type === "prompt") return [event.goal];
         if (event.type === "stage_enter") return [event.stage];
         if (event.type === "stage_fail") return [`fail:${event.stage}`];
@@ -1144,8 +1084,8 @@ describe("publishDraft: несколько сборок", () => {
       }),
     );
     expect(summary).toEqual([
-      ["Добавь счётчик токенов", "spec", "code", "test", "fail:test"],
-      ["Сделай движок финансов", "code", "test"],
+      ["Добавь счётчик токенов", "planning", "implementation", "verification", "fail:verification"],
+      ["Сделай движок финансов", "implementation", "verification"],
     ]);
   });
 
@@ -1156,7 +1096,7 @@ describe("publishDraft: несколько сборок", () => {
 
     const lastEventBeforeWaiting = 31_000;
     const waiting = 200_000 - lastEventBeforeWaiting;
-    const ends = recordings.map((recording) => recording.events.at(-1)?.t);
+    const ends = recordings.map((recording) => recording.data.events.at(-1)?.t);
     expect(ends).toEqual([250_000 - (waiting - IDLE_GAP_MS), 58_000]);
   });
 
@@ -1166,7 +1106,7 @@ describe("publishDraft: несколько сборок", () => {
     const recordings = publishDraft(draft);
 
     const tokens = recordings.map((recording) =>
-      recording.events.flatMap((event) => (event.type === "usage" ? [event.tokens] : [])),
+      recording.data.events.flatMap((event) => (event.type === "usage" ? [event.tokens] : [])),
     );
     expect(tokens).toEqual([[822], [370]]);
   });
@@ -1178,7 +1118,7 @@ describe("publishDraft: несколько сборок", () => {
     const recordings = publishDraft(draft);
 
     const inRecordings = recordings
-      .flatMap((recording) => recording.events)
+      .flatMap((recording) => recording.data.events)
       .reduce((sum, event) => sum + (event.type === "usage" ? event.tokens : 0), 0);
     expect(inRecordings).toBe(inDraft);
   });
@@ -1188,7 +1128,10 @@ describe("publishDraft: несколько сборок", () => {
 
     const [recording] = publishDraft(draft);
 
-    expect(recording?.events.slice(-2).map((event) => event.type)).toEqual(["usage", "build_end"]);
+    expect(recording?.data.events.slice(-2).map((event) => event.type)).toEqual([
+      "usage",
+      "build_end",
+    ]);
   });
 
   it("берёт итог сборки из её последней проверки: провал соседней сборки не мешает", () => {
@@ -1196,7 +1139,7 @@ describe("publishDraft: несколько сборок", () => {
 
     const recordings = publishDraft(draft);
 
-    const outcomes = recordings.map((recording) => recording.events.at(-1));
+    const outcomes = recordings.map((recording) => recording.data.events.at(-1));
     expect(outcomes).toEqual([
       { t: expect.any(Number), type: "build_end", ok: false },
       { t: expect.any(Number), type: "build_end", ok: true },
@@ -1256,11 +1199,11 @@ describe("unfilledHeader", () => {
 
   it("называет все пустые поля сборки по порядку шапки", () => {
     const draft = editedDraft();
-    draft.builds = [{ ...buildOf(draft, 0), title: "", project: "", factory: "" }];
+    draft.builds = [{ ...buildOf(draft, 0), title: "", project: "", harness: "" }];
 
     const names = unfilledHeader(draft);
 
-    expect(names).toEqual([`сборка ${BUILD_ID}: заголовок, проект, версия завода`]);
+    expect(names).toEqual([`сборка ${BUILD_ID}: заголовок, проект, версия harness`]);
   });
 
   it("называет пустые поля по каждой сборке и пропускает заполненные", () => {

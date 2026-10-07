@@ -4,7 +4,7 @@
 **/dist
 **/.astro
 pnpm-lock.yaml
-recordings
+journal
 apps/api
 deploy
 .devcontainer

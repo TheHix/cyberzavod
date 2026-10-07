@@ -30,11 +30,11 @@ import type {
 
 // Инструменты, по которым видно этап.
 const TOOL_STAGES: Readonly<Record<string, Stage>> = {
-  Edit: "code",
-  Write: "code",
-  MultiEdit: "code",
-  NotebookEdit: "code",
-  ExitPlanMode: "spec",
+  Edit: "implementation",
+  Write: "implementation",
+  MultiEdit: "implementation",
+  NotebookEdit: "implementation",
+  ExitPlanMode: "planning",
 };
 
 // Путь одним аргументом оболочки: в двойных кавычках, в простых или без них. Общая часть `cd X`
@@ -45,13 +45,16 @@ const PATH_ARGUMENT = String.raw`"[^"]*"|'[^']*'|\S+`;
 // (`cd apps/api && go test ./...`), а не любая подстрока: `cat eslint.config.js`
 // или `grep vitest` — не проверки.
 const COMMAND_STAGES: readonly { pattern: RegExp; stage: Stage }[] = [
-  { pattern: /^make check\b/, stage: "test" },
-  { pattern: /^pnpm (?:-r |--filter \S+ )?(?:run )?(?:check|test|lint)\b/, stage: "test" },
-  { pattern: /^(?:pnpm exec |npx )?(?:vitest|eslint|prettier --check)(?:\s|$)/, stage: "test" },
-  { pattern: /^go test\b/, stage: "test" },
-  { pattern: /^golangci-lint run\b/, stage: "test" },
-  { pattern: /^node --test\b/, stage: "test" },
-  { pattern: new RegExp(`^git (?:-C (?:${PATH_ARGUMENT}) )?(?:commit|push)\\b`), stage: "ship" },
+  { pattern: /^make check\b/, stage: "verification" },
+  { pattern: /^pnpm (?:-r |--filter \S+ )?(?:run )?(?:check|test|lint)\b/, stage: "verification" },
+  {
+    pattern: /^(?:pnpm exec |npx )?(?:vitest|eslint|prettier --check)(?:\s|$)/,
+    stage: "verification",
+  },
+  { pattern: /^go test\b/, stage: "verification" },
+  { pattern: /^golangci-lint run\b/, stage: "verification" },
+  { pattern: /^node --test\b/, stage: "verification" },
+  { pattern: new RegExp(`^git (?:-C (?:${PATH_ARGUMENT}) )?(?:commit|push)\\b`), stage: "record" },
 ];
 
 // Разделители команд в одном вызове Bash, включая перевод строки в многострочной команде.
@@ -95,10 +98,10 @@ const SURROUNDING_QUOTES = /^(["'])(.*)\1$/;
 // Сабагенты, по которым видно этап: встроенный Plan и станции пайплайна /feature
 // из .claude/agents/.
 const AGENT_STAGES: Readonly<Record<string, Stage>> = {
-  Plan: "spec",
-  analyst: "spec",
-  coder: "code",
-  tester: "test",
+  Plan: "planning",
+  analyst: "planning",
+  coder: "implementation",
+  tester: "verification",
   reviewer: "review",
 };
 
@@ -123,7 +126,7 @@ const VERDICTS: Readonly<Record<string, Readonly<Record<string, Verdict>>>> = {
 // на одобрение. Возврат станции (вердикт-отказ) тоже ждёт человека, но он берётся из `VERDICTS`.
 // По таблице видно причину вызова, текст промпта для этого не разбирается.
 const AGENT_HUMAN_CALLS: Readonly<Record<string, InterventionReason>> = {
-  analyst: "spec_review",
+  analyst: "plan_review",
 };
 const REWORK_CALL: InterventionReason = "rework_limit";
 const ANSWER_CALL: InterventionReason = "question";
@@ -638,19 +641,22 @@ export function routeMessages(draft: Draft): Draft {
   return { ...draft, events };
 }
 
-// Проект и версия завода — из первого начала сессии, где есть оба: сессию могли подключить
-// к хукам посреди работы, и тогда первое начало без проекта.
-function projectOf(events: readonly RawEvent[]): Pick<DraftBuild, "project" | "factory"> {
+// Проект, версия harness и процесс — из первого начала сессии, где они есть: сессию могли
+// подключить к хукам посреди работы, и тогда первое начало без проекта.
+function projectOf(
+  events: readonly RawEvent[],
+): Pick<DraftBuild, "project" | "harness" | "workflow"> {
   for (const event of events) {
     if (
       event.kind === "session_start" &&
       event.project !== undefined &&
-      event.factory !== undefined
+      event.harness !== undefined &&
+      event.workflow !== undefined
     ) {
-      return { project: event.project, factory: event.factory };
+      return { project: event.project, harness: event.harness, workflow: event.workflow };
     }
   }
-  return { project: "", factory: "" };
+  return { project: "", harness: "", workflow: "" };
 }
 
 // Проект места: у каталога — по карте, у сессии — проект из `session_start`, а где место
@@ -727,7 +733,7 @@ function withSessionUsages(
  * Собирает черновик записи из сырого журнала: промпты человека, реплики (задания, отчёты и
  * итоговые ответы, если переданы их тексты), этапы, окна запусков станций, исходы проверок
  * и токены. Заголовок, чистовые версии промптов и `line` с `text` у реплик остаются пустыми —
- * их заполняет редактор. В черновике одна сборка с `id` черновика; проект и версия завода
+ * их заполняет редактор. В черновике одна сборка с `id` черновика; проект и версия harness
  * берутся из первого начала сессии, где они есть, без них остаются пустыми. Другие сборки
  * добавляет редактор. События основной сессии из инструментов получают пометку `project`
  * по каталогу команды, если он есть в `meta.projectsByDirectory`. Этап вызова из известного
@@ -867,7 +873,7 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
           if (directoryOutsideProjects(place, meta.projectsByDirectory) !== undefined) continue;
           const mark = projectMark(projectOfPlace(place, sessionProject, meta.projectsByDirectory));
           enterStageByTool(stage, mark.project, event.ts);
-          if (stage !== "test") continue;
+          if (stage !== "verification") continue;
           draftEvents.push({ t: at(event.ts), type: "draft_check", ok: event.ok, ...mark });
           if (!event.ok) {
             draftEvents.push({

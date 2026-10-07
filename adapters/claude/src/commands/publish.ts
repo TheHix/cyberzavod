@@ -1,51 +1,72 @@
-// Публикация записей: `make recording-publish [DRAFT=recordings/drafts/<id>.json] [BUILD=<id>]`.
-// Без черновика берётся самый свежий. Без сборки публикуются все сборки черновика, и если
-// хоть одна не готова, не пишется ничего; с BUILD — только она, остальные могут быть не готовы.
-// Запись без исходных текстов промптов ложится в recordings/published/ — оттуда её берёт сайт
-// при сборке.
+// Публикация записей из черновика. Без черновика берётся самый свежий. Без сборки публикуются
+// все сборки черновика, и если хоть одна не готова, не пишется ничего; со сборкой — только она,
+// остальные могут быть не готовы. Запись без исходных текстов промптов ложится в журнал
+// проекта — оттуда её берёт сайт при сборке.
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { RecordingError, type Recording } from "@cyberzavod/core";
-import { DraftError, parseDraft, publishBuild } from "../draft.ts";
-import { fromFactoryHome, newestFile, RECORDINGS_DIRS } from "./paths.ts";
+import { RecordError, type SessionRecord } from "@cyberzavod/core";
+import { DirectoryRecordStore } from "@cyberzavod/storage";
+import { DraftError, parseDraft, publishBuild, type Draft } from "../capture/draft.ts";
+import { captureDirectories, newestFile, requireProject } from "../paths.ts";
 
-// Makefile всегда передаёт DRAFT (пустой, если не задан) и добавляет BUILD, только если он указан
-// в командной строке: пустая строка значит «не задано», а отсутствие аргумента — тоже.
-const draftPath = process.argv[2] || (await newestFile(RECORDINGS_DIRS.drafts, ".json"));
-const buildId = process.argv[3] || undefined;
-if (draftPath === undefined) {
-  throw new Error("черновиков ещё нет: сначала make recording-draft");
+/** Что опубликовать: проект и, если нужно, конкретные черновик и сборку. */
+export interface PublishSessionsOptions {
+  /** Каталог внутри проекта. */
+  projectDirectory: string;
+  /** Черновик; без него берётся самый свежий. */
+  draftPath?: string;
+  /** Сборка черновика; без неё публикуются все. */
+  buildId?: string;
 }
 
-try {
-  const draft = parseDraft(JSON.parse(await readFile(draftPath, "utf8")));
+function isPublishProblem(err: unknown): err is DraftError | RecordError {
+  return err instanceof DraftError || err instanceof RecordError;
+}
+
+// Сначала проверяются все выбранные сборки, чтобы не опубликовать часть записей.
+function publishSelected(draft: Draft, buildId: string | undefined): SessionRecord[] {
   const selected = draft.builds.filter(({ id }) => buildId === undefined || id === buildId);
   if (selected.length === 0) throw new DraftError(`в черновике нет сборки ${buildId}`);
-
-  // Сначала проверяются все выбранные сборки, чтобы не опубликовать часть записей.
-  const recordings: Recording[] = [];
+  const records: SessionRecord[] = [];
   const problems: string[] = [];
   for (const build of selected) {
     try {
-      recordings.push(publishBuild(draft, build.id));
+      records.push(publishBuild(draft, build.id));
     } catch (err) {
-      if (!(err instanceof DraftError || err instanceof RecordingError)) throw err;
+      if (!isPublishProblem(err)) throw err;
       problems.push(`сборка ${build.id}: ${err.message}`);
     }
   }
   if (problems.length > 0) throw new DraftError(problems.join("\n"));
+  return records;
+}
 
-  await mkdir(RECORDINGS_DIRS.published, { recursive: true });
-  for (const recording of recordings) {
-    const publishedPath = path.join(RECORDINGS_DIRS.published, `${recording.id}.json`);
-    await writeFile(publishedPath, `${JSON.stringify(recording, null, 2)}\n`);
-    console.log(
-      `опубликовано: ${fromFactoryHome(publishedPath)} — сайт покажет запись после выкатки`,
-    );
+/**
+ * Публикует сборки черновика записями в журнал проекта. Неготовый черновик — сообщение об
+ * ошибке, а не исключение: его исправляет человек.
+ * @param {PublishSessionsOptions} options Проект, черновик и сборка.
+ * @returns {Promise<boolean>} true, если записи опубликованы.
+ * @throws {Error} Если проекта или черновиков нет.
+ */
+export async function publishSessions(options: PublishSessionsOptions): Promise<boolean> {
+  const project = await requireProject(options.projectDirectory);
+  const shown = (file: string) => path.relative(project.root, file) || ".";
+  const draftPath =
+    options.draftPath ?? (await newestFile(captureDirectories(project.journal).drafts, ".json"));
+  if (draftPath === undefined) throw new Error("черновиков ещё нет: сначала cyberzavod draft");
+
+  const store = new DirectoryRecordStore(project.journal);
+  try {
+    const draft = parseDraft(JSON.parse(await readFile(draftPath, "utf8")));
+    for (const record of publishSelected(draft, options.buildId)) {
+      await store.write(record);
+      console.log(`опубликовано: ${shown(store.pathOf(record))}`);
+    }
+    return true;
+  } catch (err) {
+    if (!isPublishProblem(err)) throw err;
+    console.error(`${shown(draftPath)} не готов к публикации:\n${err.message}`);
+    return false;
   }
-} catch (err) {
-  if (!(err instanceof DraftError || err instanceof RecordingError)) throw err;
-  console.error(`${fromFactoryHome(draftPath)} не готов к публикации:\n${err.message}`);
-  process.exitCode = 1;
 }

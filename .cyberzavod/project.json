@@ -1,5 +1,37 @@
 {
-  "id": "cyberzavod",
-  "factory": "0.2.0",
-  "checks": { "command": "make check-web check-api", "paths": ["apps", "packages"] }
+  "projectId": "cyberzavod",
+  "harness": "0.3.0",
+  "workflow": "default",
+  "journal": "journal",
+  "agents": {
+    "planning": {
+      "provider": "anthropic",
+      "agent": "claude",
+      "model": "default"
+    },
+    "implementation": {
+      "provider": "anthropic",
+      "agent": "claude",
+      "model": "default"
+    },
+    "review": {
+      "provider": "anthropic",
+      "agent": "claude",
+      "model": "default"
+    },
+    "verification": {
+      "provider": "anthropic",
+      "agent": "claude",
+      "model": "default"
+    }
+  },
+  "verification": {
+    "commands": ["make check-web check-api"],
+    "paths": ["apps", "packages", "adapters", "harness"]
+  },
+  "stack": {
+    "languages": ["javascript"],
+    "frameworks": [],
+    "packageManager": "pnpm"
+  }
 }

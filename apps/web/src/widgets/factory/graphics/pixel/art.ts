@@ -28,11 +28,11 @@ export type Ink =
   | "belt"
   | "lampOff"
   | "lampOn"
-  | "spec"
-  | "code"
-  | "test"
+  | "planning"
+  | "implementation"
+  | "verification"
   | "review"
-  | "ship";
+  | "record";
 
 /** Краски рисунка числами 0xRRGGBB. */
 export type Inks = Readonly<Record<Ink, number>>;
@@ -66,11 +66,11 @@ export const ART_LEGEND: Readonly<Record<string, Ink | null>> = {
   t: "belt",
   o: "lampOff",
   O: "lampOn",
-  "1": "spec",
-  "2": "code",
-  "3": "test",
+  "1": "planning",
+  "2": "implementation",
+  "3": "verification",
   "4": "review",
-  "5": "ship",
+  "5": "record",
 };
 
 /** Готовая картинка: пиксели RGBA подряд, строка за строкой. */

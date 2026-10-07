@@ -1,0 +1,14 @@
+{
+  "name": "@cyberzavod/storage",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "tsc -p . && vitest run"
+  },
+  "dependencies": {
+    "@cyberzavod/core": "workspace:*"
+  }
+}

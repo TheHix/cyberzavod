@@ -199,7 +199,7 @@ describe("plaquePlacements", () => {
 
   it("сдвигает табличку вдоль ряда, а не по вертикали, когда на ней стоит мастер", () => {
     const [layout] = FACTORY_LAYOUTS;
-    const stage = STAGES[0] ?? "spec";
+    const stage = STAGES[0] ?? "planning";
     const station = layout.stations[stage];
     const crowded = {
       ...layout,
@@ -217,11 +217,11 @@ describe("plaquePlacements", () => {
   });
 
   it("отказывает, если табличке негде встать между фигурами", () => {
-    const layout = rowOfFiguresOnPlaque(WIDE_LAYOUT, "spec", "ru");
+    const layout = rowOfFiguresOnPlaque(WIDE_LAYOUT, "planning", "ru");
 
     const act = () => plaquePlacements(layout, "ru");
 
-    expect(act).toThrow(`табличка «${STAGE_LABELS.spec.ru}» не помещается между фигурами`);
+    expect(act).toThrow(`табличка «${STAGE_LABELS.planning.ru}» не помещается между фигурами`);
   });
 });
 

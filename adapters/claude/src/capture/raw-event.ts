@@ -2,17 +2,19 @@
 // Из полезной нагрузки хука берётся только то, что нужно для записи, — без содержимого
 // файлов и ответов инструментов, чтобы в журнал не попадало лишнее.
 
-import type { ProjectConfig } from "./project.ts";
+import type { ProjectConfig } from "@cyberzavod/core";
 
 /** Событие сырого журнала сборки; `ts` — время по часам машины в миллисекундах. */
 export type RawEvent =
   | {
       ts: number;
       kind: "session_start";
-      /** Идентификатор проекта из `.cyberzavod/project.json`; приходит вместе с `factory`. */
+      /** Идентификатор проекта из `.cyberzavod/project.json`; приходит вместе с `harness` и `workflow`. */
       project?: string;
-      /** Версия завода из `.cyberzavod/project.json`; приходит вместе с `project`. */
-      factory?: string;
+      /** Версия harness из `.cyberzavod/project.json`; приходит вместе с `project`. */
+      harness?: string;
+      /** Процесс разработки из `.cyberzavod/project.json`; приходит вместе с `project`. */
+      workflow?: string;
     }
   | {
       ts: number;
@@ -227,13 +229,18 @@ export function fromHookPayload(payload: unknown, ts: number): RawEvent | null {
 }
 
 /**
- * Помечает начало сессии проектом и версией завода из конфига проекта.
+ * Помечает начало сессии проектом, версией harness и процессом из конфига проекта.
  * @param {SessionStartEvent} event Начало сессии.
- * @param {ProjectConfig} project Конфиг проекта, в котором идёт сессия.
- * @returns {SessionStartEvent} Новое событие с `project` и `factory`.
+ * @param {ProjectConfig} config Конфиг проекта, в котором идёт сессия.
+ * @returns {SessionStartEvent} Новое событие с `project`, `harness` и `workflow`.
  */
-export function stampProject(event: SessionStartEvent, project: ProjectConfig): SessionStartEvent {
-  return { ...event, project: project.id, factory: project.factory };
+export function stampProject(event: SessionStartEvent, config: ProjectConfig): SessionStartEvent {
+  return {
+    ...event,
+    project: config.projectId,
+    harness: config.harness,
+    workflow: config.workflow,
+  };
 }
 
 /**
@@ -258,8 +265,10 @@ export function isSafeSessionId(value: unknown): value is string {
 // новый вид в RawEvent не скомпилируется, пока здесь не опишут его проверку.
 const RAW_EVENT_SHAPES: Record<RawEvent["kind"], (value: HookPayload) => boolean> = {
   session_start: (value) =>
-    (value.project === undefined && value.factory === undefined) ||
-    (typeof value.project === "string" && typeof value.factory === "string"),
+    (value.project === undefined && value.harness === undefined && value.workflow === undefined) ||
+    (typeof value.project === "string" &&
+      typeof value.harness === "string" &&
+      typeof value.workflow === "string"),
   prompt: (value) =>
     typeof value.text === "string" &&
     (value.afterStopGate === undefined || value.afterStopGate === true),

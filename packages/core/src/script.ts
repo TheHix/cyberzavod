@@ -21,18 +21,17 @@ import {
   briefMessage,
   FOREMAN,
   NO_TALLY,
-  STAGES,
   succeeded,
   tally,
-  type BriefFactoryEvent,
+  type BriefSessionEvent,
   type BriefInterventionEvent,
   type BriefMessageEvent,
-  type BriefRecording,
+  type BriefSessionRecord,
   type PromptEvent,
   type Speaker,
-  type Stage,
   type Tally,
-} from "./recording.ts";
+} from "./record.ts";
+import { STAGES, type Stage } from "./stage.ts";
 
 /** Темп сцены: как сжимается работа и как быстро двигаются рабочие. */
 export interface Pacing {
@@ -208,21 +207,21 @@ interface Visit {
   readonly from: number;
   readonly to: number;
   /** События визита, которые идут в работу у станка: обмен звучит позже. */
-  readonly events: readonly BriefFactoryEvent[];
+  readonly events: readonly BriefSessionEvent[];
   /** Все события визита в порядке записи, обмен тоже. */
-  readonly recorded: readonly BriefFactoryEvent[];
+  readonly recorded: readonly BriefSessionEvent[];
   /** Реплики с рабочим следующего визита: они звучат у места передачи детали. */
   readonly exchange: readonly BriefMessageEvent[];
 }
 
 // Деталь начинает путь у станка постановки: с него берут заказ.
-const FIRST_STATION: Stage = "spec";
+const FIRST_STATION: Stage = "planning";
 
-function splitIntoVisits(events: readonly BriefFactoryEvent[]): Visit[] {
+function splitIntoVisits(events: readonly BriefSessionEvent[]): Visit[] {
   const visits: Visit[] = [];
   let station = FIRST_STATION;
   let from = events[0]?.t ?? 0;
-  let visitEvents: BriefFactoryEvent[] = [];
+  let visitEvents: BriefSessionEvent[] = [];
   for (const event of events) {
     if (event.type === "stage_enter" && event.stage !== station) {
       visits.push({
@@ -256,7 +255,7 @@ function isBetween(message: BriefMessageEvent, a: Stage, b: Stage): boolean {
 
 // Речь визита, кроме разговора отдающего с получателем: промпт, вмешательство или реплика
 // не между станциями.
-function isOtherSpeech(event: BriefFactoryEvent, a: Stage, b: Stage): boolean {
+function isOtherSpeech(event: BriefSessionEvent, a: Stage, b: Stage): boolean {
   return (
     event.type === "prompt" ||
     event.type === "intervention" ||
@@ -281,7 +280,7 @@ function withExchanges(visits: readonly Visit[]): Visit[] {
         ? [event]
         : [],
     );
-    const spoken = new Set<BriefFactoryEvent>(exchange);
+    const spoken = new Set<BriefSessionEvent>(exchange);
     const events = visit.events.filter((event) => !spoken.has(event));
     return { ...visit, events, exchange };
   });
@@ -375,7 +374,7 @@ class Director {
   // Паузы станции текущего визита: от доли работы, на которую пришлось вмешательство, до конца пузыря.
   #pauses: Span[] = [];
   // Когда событие видно на сцене: для речи — начало пузыря, для остальных — доля работы.
-  readonly #shownAt = new Map<BriefFactoryEvent, number>();
+  readonly #shownAt = new Map<BriefSessionEvent, number>();
   // Визиты и когда у них кончилась работа: из них в конце собираются отметки.
   readonly #worked: { readonly visit: Visit; readonly workEnd: number }[] = [];
   #partStatus: PartStatus = "ok";
@@ -390,7 +389,7 @@ class Director {
   // Когда мастер договорил последний раз: от этого момента он ждёт, не позовут ли снова.
   #foremanFreeAt = 0;
 
-  constructor(layout: FactoryLayout, pacing: Pacing, events: readonly BriefFactoryEvent[]) {
+  constructor(layout: FactoryLayout, pacing: Pacing, events: readonly BriefSessionEvent[]) {
     // Своя копия плана: сценарий замораживается, а план вызывающего кода остаётся его.
     this.#layout = structuredClone(layout);
     this.#pacing = pacing;
@@ -440,7 +439,7 @@ class Director {
   }
 
   // Что событие записи меняет на сцене, кроме счётчиков.
-  #cue(event: BriefFactoryEvent, at: number, station: Stage): void {
+  #cue(event: BriefSessionEvent, at: number, station: Stage): void {
     switch (event.type) {
       case "prompt":
         this.#sayPrompt(event, at, station);
@@ -657,7 +656,7 @@ class Director {
     return alignMarks(marks);
   }
 
-  #shownAtOf(event: BriefFactoryEvent): number {
+  #shownAtOf(event: BriefSessionEvent): number {
     const at = this.#shownAt.get(event);
     if (at === undefined) {
       throw new Error(`у события ${event.type} (t=${event.t}) нет момента на сцене`);
@@ -744,18 +743,18 @@ function stand(
 /**
  * Раскладывает запись сборки на действия рабочих и мастера: кто когда работает, бежит,
  * передаёт деталь, говорит и слушает.
- * @param {BriefRecording} recording Проверенная запись сборки.
+ * @param {BriefSessionRecord} recording Проверенная запись сборки.
  * @param {FactoryLayout} layout План цеха.
  * @param {Pacing} pacing Темп сцены.
  * @returns {FactoryScript} Сценарий, по которому считается кадр в любой момент.
  */
 export function buildScript(
-  recording: BriefRecording,
+  recording: BriefSessionRecord,
   layout: FactoryLayout = WIDE_LAYOUT,
   pacing: Pacing = DEFAULT_PACING,
 ): FactoryScript {
-  const director = new Director(layout, pacing, recording.events);
-  const visits = withExchanges(splitIntoVisits(recording.events));
+  const director = new Director(layout, pacing, recording.data.events);
+  const visits = withExchanges(splitIntoVisits(recording.data.events));
   let workEnd = 0;
   let station = FIRST_STATION;
   for (const [index, visit] of visits.entries()) {

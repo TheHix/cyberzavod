@@ -1,38 +1,43 @@
 import { describe, expect, it } from "vitest";
-import { buildScript, type FactoryScript, type Recording } from "@cyberzavod/core";
+import { buildScript, type FactoryScript, type SessionRecord } from "@cyberzavod/core";
 import { speechAt, speechStart, speechTimeline } from "./speech-timeline.ts";
 
 // Промпты и реплики вперемешку: порядок в записи — реплика, промпт, реплика.
 function validScript(): FactoryScript {
-  const recording: Recording = {
-    version: 2,
+  const recording: SessionRecord = {
+    version: 1,
+    type: "session",
     id: "test",
-    project: "test",
-    factory: "0.0.0",
-    startedAt: "2026-10-04T00:00:00.000Z",
-    title: "Тест",
-    events: [
-      { t: 0, type: "build_start" },
-      {
-        t: 60_000,
-        type: "message",
-        from: "foreman",
-        to: "spec",
-        line: "Сделай счётчик",
-        text: "Сделай счётчик токенов.",
-      },
-      { t: 90_000, type: "prompt", goal: "Добавь счётчик", requirements: [] },
-      { t: 120_000, type: "stage_enter", stage: "code" },
-      {
-        t: 180_000,
-        type: "message",
-        from: "code",
-        to: "test",
-        line: "Держи, счётчик готов",
-        text: "Держи, счётчик токенов готов.",
-      },
-      { t: 240_000, type: "build_end", ok: true },
-    ],
+    timestamp: "2026-10-04T00:00:00.000Z",
+    projectId: "test",
+    source: { type: "manual" },
+    data: {
+      title: "Тест",
+      workflow: "default",
+      harness: "0.0.0",
+      events: [
+        { t: 0, type: "build_start" },
+        {
+          t: 60_000,
+          type: "message",
+          from: "foreman",
+          to: "planning",
+          line: "Сделай счётчик",
+          text: "Сделай счётчик токенов.",
+        },
+        { t: 90_000, type: "prompt", goal: "Добавь счётчик", requirements: [] },
+        { t: 120_000, type: "stage_enter", stage: "implementation" },
+        {
+          t: 180_000,
+          type: "message",
+          from: "implementation",
+          to: "verification",
+          line: "Держи, счётчик готов",
+          text: "Держи, счётчик токенов готов.",
+        },
+        { t: 240_000, type: "build_end", ok: true },
+      ],
+    },
   };
   return buildScript(recording);
 }
@@ -134,34 +139,39 @@ describe("speechStart", () => {
 
 // Вмешательство между промптом и репликой: все три вида речи в одном списке.
 function scriptWithIntervention(): FactoryScript {
-  const recording: Recording = {
-    version: 2,
+  const recording: SessionRecord = {
+    version: 1,
+    type: "session",
     id: "test",
-    project: "test",
-    factory: "0.0.0",
-    startedAt: "2026-10-04T00:00:00.000Z",
-    title: "Тест",
-    events: [
-      { t: 0, type: "build_start" },
-      { t: 60_000, type: "prompt", goal: "Добавь счётчик", requirements: [] },
-      { t: 120_000, type: "stage_enter", stage: "code" },
-      {
-        t: 150_000,
-        type: "intervention",
-        reason: "question",
-        line: "Возьми вариант с таблицей",
-        text: "Возьми вариант с таблицей.",
-      },
-      {
-        t: 180_000,
-        type: "message",
-        from: "code",
-        to: "test",
-        line: "Держи, счётчик готов",
-        text: "Держи, счётчик токенов готов.",
-      },
-      { t: 240_000, type: "build_end", ok: true },
-    ],
+    timestamp: "2026-10-04T00:00:00.000Z",
+    projectId: "test",
+    source: { type: "manual" },
+    data: {
+      title: "Тест",
+      workflow: "default",
+      harness: "0.0.0",
+      events: [
+        { t: 0, type: "build_start" },
+        { t: 60_000, type: "prompt", goal: "Добавь счётчик", requirements: [] },
+        { t: 120_000, type: "stage_enter", stage: "implementation" },
+        {
+          t: 150_000,
+          type: "intervention",
+          reason: "question",
+          line: "Возьми вариант с таблицей",
+          text: "Возьми вариант с таблицей.",
+        },
+        {
+          t: 180_000,
+          type: "message",
+          from: "implementation",
+          to: "verification",
+          line: "Держи, счётчик готов",
+          text: "Держи, счётчик токенов готов.",
+        },
+        { t: 240_000, type: "build_end", ok: true },
+      ],
+    },
   };
   return buildScript(recording);
 }
