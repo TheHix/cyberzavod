@@ -1,11 +1,10 @@
 import { For, Show, type JSX } from "solid-js";
-import { sharedRecordingUrl, type Gallery } from "@/entities/gallery";
+import { ReadmeBadge, sharedRecordingUrl, type Gallery } from "@/entities/gallery";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { formatDate } from "@/shared/lib/format.ts";
 import { languageNoteOf } from "@/shared/lib/language-note.ts";
 import { Card, Chip, Title } from "@/shared/ui";
-import { ReadmeBadge } from "./ReadmeBadge.tsx";
 import styles from "./GalleryBoard.module.css";
 
 interface Props {

@@ -1,11 +1,13 @@
 ---
 // Игровой экран: цех на всё окно, меню слева, панели записей, гайдов и «о заводе» поверх. Вход
-// в галереи и аналитику — в панели записей: плитка в меню на 360px уже не помещается.
+// в галереи и аналитику — в панели записей: плитка в меню на 360px уже не помещается. Вход через
+// GitHub — плитка в меню на широком экране и кнопка в панели записей на любом.
 // Содержимое страницы — цех со своим HUD — встаёт в поле справа от меню.
 import BaseLayout from "./BaseLayout.astro";
 import { GuideList } from "@/widgets/guide-list";
 import { RecordingList } from "@/widgets/recording-list";
 import { Sidebar } from "@/widgets/sidebar";
+import { AccountLink, SignInFailedNotice } from "@/features/sign-in";
 import { galleriesUrl } from "@/entities/gallery";
 import { publishedGuides } from "@/entities/guide";
 import { statsUrl } from "@/entities/stats";
@@ -51,12 +53,15 @@ const closeLabel = UI_TEXT.panels.close[locale];
 
 <BaseLayout locale={locale} path={path} title={title} description={description} notFound={notFound}>
   <div class="game">
-    <Sidebar journal={journal} project={project} locale={locale} path={path} />
+    <Sidebar journal={journal} project={project} locale={locale} path={path}>
+      <AccountLink slot="account" client:load locale={locale} layout="tile" />
+    </Sidebar>
     <main class="field">
       {heading && <h1 class="visually-hidden">{heading}</h1>}
       <slot />
     </main>
   </div>
+  <SignInFailedNotice client:idle locale={locale} />
 
   <Drawer id={PANELS.records} title={UI_TEXT.panels.records[locale]} closeLabel={closeLabel}>
     <div class="records">
@@ -67,6 +72,10 @@ const closeLabel = UI_TEXT.panels.close[locale];
             {UI_TEXT.pages.galleriesTitle[locale]}
           </ButtonLink>
           <ButtonLink href={statsUrl(locale)}>{UI_TEXT.pages.statsTitle[locale]}</ButtonLink>
+        </div>
+        <p>{UI_TEXT.account.ownGallery[locale]}</p>
+        <div class="links">
+          <AccountLink client:load locale={locale} layout="text" />
         </div>
       </div>
       <RecordingList recordings={publishedRecordings} locale={locale} />

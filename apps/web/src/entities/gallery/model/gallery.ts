@@ -33,3 +33,15 @@ export interface SharedRecording {
   readonly galleryPublic: boolean;
   readonly record: SessionRecord;
 }
+
+/**
+ * Своя галерея вошедшего автора — ответ `GET /api/me`: открыта ли она, сколько записей можно
+ * держать и сами записи, в том числе в закрытой галерее.
+ */
+export interface OwnGallery {
+  readonly login: string;
+  readonly galleryPublic: boolean;
+  /** Сколько записей помещается в галерею. */
+  readonly limit: number;
+  readonly recordings: readonly RecordingSummary[];
+}

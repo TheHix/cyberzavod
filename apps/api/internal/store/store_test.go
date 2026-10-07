@@ -16,10 +16,18 @@ import (
 	"github.com/bysavelii/cyberzavod/apps/api/internal/gallery"
 )
 
-// newTestStore подключается к Postgres из TEST_DATABASE_URL, применяет миграции и очищает
-// таблицы галерей. Без переменной тест пропускается: хранилище проверяется только на
-// настоящем Postgres, подделка не поймала бы ни SQL, ни гонку за предел.
+// newTestStore — newLimitedTestStore с рабочим потолком хранилища.
 func newTestStore(t *testing.T) *Store {
+	t.Helper()
+
+	return newLimitedTestStore(t, gallery.StorageLimitBytes)
+}
+
+// newLimitedTestStore подключается к Postgres из TEST_DATABASE_URL, применяет миграции,
+// очищает таблицы галерей и сессий и возвращает хранилище с потолком storageLimitBytes.
+// Без переменной тест пропускается: хранилище проверяется только на настоящем Postgres,
+// подделка не поймала бы ни SQL, ни гонку за предел.
+func newLimitedTestStore(t *testing.T, storageLimitBytes int64) *Store {
 	t.Helper()
 
 	url := os.Getenv("TEST_DATABASE_URL")
@@ -37,11 +45,11 @@ func newTestStore(t *testing.T) *Store {
 	}
 	t.Cleanup(pool.Close)
 
-	if _, err := pool.Exec(t.Context(), `TRUNCATE users, recordings`); err != nil {
+	if _, err := pool.Exec(t.Context(), `TRUNCATE users, recordings, sessions`); err != nil {
 		t.Fatalf("очистка таблиц: %v", err)
 	}
 
-	return New(pool)
+	return New(pool, storageLimitBytes)
 }
 
 // sessionStart — начало первой тестовой сессии; следующие начинаются на час позже.
@@ -397,5 +405,94 @@ func TestEmptyListsAreNotNil(t *testing.T) {
 	isEmptyList := account.Recordings != nil && stats.Returns != nil && stats.Interventions != nil
 	if !isEmptyList {
 		t.Fatalf("пустые списки должны уходить в JSON как [], а не null: %+v %+v", account, stats)
+	}
+}
+
+// storedBytes возвращает, сколько байт тело записи займёт в хранилище.
+func storedBytes(t *testing.T, store *Store, recording gallery.Recording) int64 {
+	t.Helper()
+
+	var size int64
+	err := store.pool.QueryRow(t.Context(), `SELECT octet_length($1::jsonb::text)`, recording.Body).Scan(&size)
+	if err != nil {
+		t.Fatalf("размер записи %s: %v", recording.ID, err)
+	}
+
+	return size
+}
+
+func TestSaveRecordingStorageLimit(t *testing.T) {
+	const bigEvents = `[{"t":0,"type":"build_start"},{"t":1,"type":"build_end"}]`
+	tests := []struct {
+		name      string
+		upload    func(t *testing.T) gallery.Recording
+		limit     func(stored, uploaded int64) int64
+		wantErr   error
+		wantBytes func(stored, uploaded int64) int64
+	}{
+		{
+			"новая запись помещается ровно",
+			func(t *testing.T) gallery.Recording { return testRecording(t, "other", 1, `[]`) },
+			func(stored, uploaded int64) int64 { return stored + uploaded },
+			nil,
+			func(stored, uploaded int64) int64 { return stored + uploaded },
+		},
+		{
+			"новая запись не помещается",
+			func(t *testing.T) gallery.Recording { return testRecording(t, "other", 1, `[]`) },
+			func(stored, uploaded int64) int64 { return stored + uploaded - 1 },
+			gallery.ErrStorageFull,
+			func(stored, _ int64) int64 { return stored },
+		},
+		{
+			"замена такой же при переполнении",
+			func(t *testing.T) gallery.Recording { return testRecording(t, "stored", 0, bigEvents) },
+			func(stored, _ int64) int64 { return stored - 1 },
+			nil,
+			func(stored, _ int64) int64 { return stored },
+		},
+		{
+			"замена меньшей при переполнении",
+			func(t *testing.T) gallery.Recording { return testRecording(t, "stored", 0, `[]`) },
+			func(int64, int64) int64 { return 1 },
+			nil,
+			func(_, uploaded int64) int64 { return uploaded },
+		},
+		{
+			"замена большей сверх потолка",
+			func(t *testing.T) gallery.Recording {
+				return testRecording(t, "stored", 0, `[{"t":0,"type":"build_start"},{"t":1,"type":"build_end"},{"t":2,"type":"build_end"}]`)
+			},
+			func(stored, _ int64) int64 { return stored },
+			gallery.ErrStorageFull,
+			func(stored, _ int64) int64 { return stored },
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			seeded := newTestStore(t)
+			saveAuthor(t, seeded, octocat, false, 0)
+			stored := testRecording(t, "stored", 0, bigEvents)
+			if _, _, err := seeded.SaveRecording(t.Context(), octocat.GitHubID, stored); err != nil {
+				t.Fatalf("первая запись: %v", err)
+			}
+			uploaded := tt.upload(t)
+			storedSize := storedBytes(t, seeded, stored)
+			uploadedSize := storedBytes(t, seeded, uploaded)
+			limited := New(seeded.pool, tt.limit(storedSize, uploadedSize))
+
+			_, _, err := limited.SaveRecording(t.Context(), octocat.GitHubID, uploaded)
+
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("ошибка %v, ожидалась %v", err, tt.wantErr)
+			}
+			var totalBytes int64
+			if err := seeded.pool.QueryRow(t.Context(), `SELECT sum(body_bytes) FROM recordings`).Scan(&totalBytes); err != nil {
+				t.Fatalf("объём хранилища: %v", err)
+			}
+			if want := tt.wantBytes(storedSize, uploadedSize); totalBytes != want {
+				t.Fatalf("в хранилище %d байт, ожидалось %d", totalBytes, want)
+			}
+		})
 	}
 }

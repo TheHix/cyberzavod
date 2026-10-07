@@ -116,8 +116,10 @@ func serve(t *testing.T, galleries *fakeGalleries, clientID string, request apiR
 	handler := NewHandler(Deps{
 		DB:             fakeDB{},
 		Galleries:      galleries,
+		Sessions:       newFakeSessions(),
 		Tokens:         fakeVerifier{},
 		GitHubClientID: clientID,
+		PublicURL:      testPublicURL,
 		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	recorder := httptest.NewRecorder()

@@ -1,12 +1,25 @@
 import { ApiRequestError, ApiResponseError } from "./errors.ts";
 
-/** Запрос GET к API: в браузере — `fetch`, в тестах — подмена без сети. */
-export type ApiRequest = (path: string) => Promise<Response>;
+/** Запрос к API: в браузере — `fetch`, в тестах — подмена без сети. */
+export type ApiRequest = (path: string, init?: RequestInit) => Promise<Response>;
+
+/** Запрос к API, который меняет данные: метод, путь и тело, если оно есть. */
+export interface ApiCommand {
+  readonly method: "PUT" | "POST" | "DELETE";
+  /** Путь от корня сайта: `/api/me/gallery`. */
+  readonly path: string;
+  /** Тело запроса: уходит в JSON. */
+  readonly body?: unknown;
+}
 
 /** Код ошибки, когда тело ответа с ошибкой не JSON, например страница прокси. */
 const UNKNOWN_ERROR_CODE = "unknown";
 
-const browserRequest: ApiRequest = (path) => fetch(path);
+// Кука входа уходит только на свой сайт: API и сайт — один адрес.
+const browserRequest: ApiRequest = (path, init) =>
+  fetch(path, { ...init, credentials: "same-origin" });
+
+const JSON_HEADERS = { "Content-Type": "application/json" };
 
 function errorCodeOf(body: unknown): string {
   const code =
@@ -48,4 +61,27 @@ export async function getJson(
   } catch (err) {
     throw new ApiResponseError(`ответ ${path} — не JSON`, { cause: err });
   }
+}
+
+function requestInitOf(command: ApiCommand): RequestInit {
+  if (command.body === undefined) return { method: command.method };
+
+  return { method: command.method, headers: JSON_HEADERS, body: JSON.stringify(command.body) };
+}
+
+/**
+ * Шлёт API запрос, который меняет данные. Ответ не читается: страница после изменения заново
+ * спрашивает API, что получилось.
+ * @param {ApiCommand} command Метод, путь и тело запроса.
+ * @param {ApiRequest} [request] Запрос; по умолчанию `fetch` браузера.
+ * @returns {Promise<void>} Когда API ответил успехом.
+ * @throws {ApiRequestError} Если API ответил ошибкой.
+ */
+export async function sendCommand(
+  command: ApiCommand,
+  request: ApiRequest = browserRequest,
+): Promise<void> {
+  const response = await request(command.path, requestInitOf(command));
+
+  if (!response.ok) throw await requestErrorOf(response, command.path);
 }

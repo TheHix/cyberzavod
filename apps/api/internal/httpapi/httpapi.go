@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/bysavelii/cyberzavod/apps/api/internal/gallery"
+	"github.com/bysavelii/cyberzavod/apps/api/internal/session"
 )
 
 const (
@@ -45,33 +46,69 @@ type Galleries interface {
 	Stats(ctx context.Context) (gallery.Stats, error)
 }
 
+// Sessions — хранилище сессий входа на сайте. Сессия ищется по sha256 её идентификатора;
+// нет сессии или она просрочена — session.ErrNotFound.
+type Sessions interface {
+	CreateSession(ctx context.Context, created session.Session) error
+	SessionUser(ctx context.Context, tokenHash []byte) (gallery.User, error)
+	DeleteSession(ctx context.Context, tokenHash []byte) error
+}
+
+// OAuthApp — OAuth-приложение GitHub для входа на сайте.
+type OAuthApp interface {
+	AuthorizeURL(state, redirectURI string) string
+	ExchangeCode(ctx context.Context, code, redirectURI string) (token string, err error)
+}
+
 // Deps — зависимости обработчиков API.
 type Deps struct {
 	DB        Pinger
 	Galleries Galleries
+	Sessions  Sessions
 	Tokens    TokenVerifier
 	// GitHubClientID — client_id OAuth-приложения для входа из CLI; пусто — вход недоступен.
 	GitHubClientID string
-	Logger         *slog.Logger
+	// OAuth — приложение для входа на сайте; nil — вход на сайте недоступен.
+	OAuth OAuthApp
+	// PublicURL — адрес сайта без завершающего "/": origin для проверки запросов по куке
+	// и основа адреса возврата с GitHub.
+	PublicURL string
+	// Now — часы для сроков сессий и окон частоты изменений; nil — time.Now. Тесты подменяют.
+	Now    func() time.Time
+	Logger *slog.Logger
 }
 
 // api — обработчики маршрутов поверх общих зависимостей.
 type api struct {
-	deps Deps
+	deps    Deps
+	now     func() time.Time
+	changes *changeLimiter
 }
 
 // NewHandler собирает маршруты API.
 func NewHandler(deps Deps) http.Handler {
-	routes := &api{deps: deps}
+	now := deps.Now
+	if now == nil {
+		now = time.Now
+	}
+
+	routes := &api{
+		deps:    deps,
+		now:     now,
+		changes: newChangeLimiter(galleryChangeLimit, galleryChangeWindow, now),
+	}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET "+HealthPath, health)
 	mux.HandleFunc("GET "+readyPath, routes.ready)
 
 	mux.HandleFunc("GET /api/auth/github", routes.githubAuth)
+	mux.HandleFunc("GET "+loginPath, routes.githubLogin)
+	mux.HandleFunc("GET "+callbackPath, routes.githubCallback)
+	mux.HandleFunc("POST /api/auth/logout", routes.logout)
 	mux.HandleFunc("GET /api/me", routes.authorized(routes.me))
-	mux.HandleFunc("PUT /api/me/recordings/{id}", routes.authorized(routes.putRecording))
-	mux.HandleFunc("DELETE /api/me/recordings/{id}", routes.authorized(routes.deleteRecording))
+	mux.HandleFunc("PUT /api/me/recordings/{id}", routes.authorized(routes.limitedChanges(routes.putRecording)))
+	mux.HandleFunc("DELETE /api/me/recordings/{id}", routes.authorized(routes.limitedChanges(routes.deleteRecording)))
 	mux.HandleFunc("PUT /api/me/gallery", routes.authorized(routes.putGallery))
 
 	mux.HandleFunc("GET /api/galleries", routes.galleries)

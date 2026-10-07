@@ -1,7 +1,13 @@
 import { parseRecord, type JournalRecord, type SessionRecord } from "@cyberzavod/core";
 import { ApiResponseError } from "@/shared/api/errors.ts";
 import { arrayAt, booleanAt, countAt, objectAt, stringAt } from "@/shared/api/fields.ts";
-import type { Gallery, GalleryListing, RecordingSummary, SharedRecording } from "./gallery.ts";
+import type {
+  Gallery,
+  GalleryListing,
+  OwnGallery,
+  RecordingSummary,
+  SharedRecording,
+} from "./gallery.ts";
 
 function summaryOf(raw: unknown): RecordingSummary {
   const place = "запись галереи";
@@ -92,5 +98,23 @@ export function parseSharedRecording(raw: unknown): SharedRecording {
     owner: stringAt(response, "owner", place),
     galleryPublic: booleanAt(response, "galleryPublic", place),
     record: sessionOf(response["record"]),
+  };
+}
+
+/**
+ * Разбирает ответ `GET /api/me`: своя галерея вошедшего автора.
+ * @param {unknown} raw Тело ответа.
+ * @returns {OwnGallery} Галерея с записями в порядке API — свежие сверху.
+ * @throws {ApiResponseError} Если ответ не того вида.
+ */
+export function parseOwnGallery(raw: unknown): OwnGallery {
+  const place = "ответ /api/me";
+  const gallery = objectAt(raw, place);
+
+  return {
+    login: stringAt(gallery, "login", place),
+    galleryPublic: booleanAt(gallery, "galleryPublic", place),
+    limit: countAt(gallery, "limit", place),
+    recordings: arrayAt(gallery, "recordings", place).map(summaryOf),
   };
 }

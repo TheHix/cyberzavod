@@ -1,0 +1,21 @@
+/* Портрет автора: круг в контуре kit, фон — бумага, пока картинка не пришла. */
+.avatar {
+  --avatar-small-size: 1.5rem;
+  --avatar-large-size: 3.5rem;
+
+  flex: none;
+  object-fit: cover;
+  background: var(--paper-deep);
+  border: var(--outline);
+  border-radius: var(--radius-round);
+}
+
+.small {
+  width: var(--avatar-small-size);
+  height: var(--avatar-small-size);
+}
+
+.large {
+  width: var(--avatar-large-size);
+  height: var(--avatar-large-size);
+}

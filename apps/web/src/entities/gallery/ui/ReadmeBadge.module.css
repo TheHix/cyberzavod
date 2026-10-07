@@ -1,0 +1,14 @@
+/* minmax(0, …): иначе колонка не уже строки Markdown, и панель прокручивается вбок. */
+.badge {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-s);
+}
+
+.badge img {
+  justify-self: start;
+}
+
+.badge p {
+  margin: 0;
+}

@@ -88,3 +88,49 @@ func TestLocalURL(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadSiteLogin(t *testing.T) {
+	tests := []struct {
+		name          string
+		clientID      string
+		clientSecret  string
+		oauthURL      string
+		publicURL     string
+		wantOAuthURL  string
+		wantPublicURL string
+		wantLogin     bool
+		wantErr       bool
+	}{
+		{"по умолчанию", "", "", "", "", "https://github.com", "https://cyberzavod.com", false, false},
+		{"client_id без секрета", "Iv1.test", "", "", "", "https://github.com", "https://cyberzavod.com", false, false},
+		{"секрет без client_id", "", "secret", "", "", "https://github.com", "https://cyberzavod.com", false, false},
+		{"вход настроен", "Iv1.test", "secret", "", "", "https://github.com", "https://cyberzavod.com", true, false},
+		{"адреса из окружения", "", "", "http://127.0.0.1:9999/", "http://localhost:4321/", "http://127.0.0.1:9999", "http://localhost:4321", false, false},
+		{"адрес сайта с путём", "", "", "", "https://cyberzavod.com/ru", "", "", false, true},
+		{"адрес сайта без схемы", "", "", "", "cyberzavod.com", "", "", false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("DATABASE_URL", "postgres://x")
+			t.Setenv("GITHUB_CLIENT_ID", tt.clientID)
+			t.Setenv("GITHUB_CLIENT_SECRET", tt.clientSecret)
+			t.Setenv("GITHUB_OAUTH_URL", tt.oauthURL)
+			t.Setenv("PUBLIC_URL", tt.publicURL)
+
+			cfg, err := Load()
+
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ошибка %v, ожидалась ошибка: %v", err, tt.wantErr)
+			}
+			if cfg.GitHubOAuthURL != tt.wantOAuthURL {
+				t.Fatalf("GitHubOAuthURL %q, ожидался %q", cfg.GitHubOAuthURL, tt.wantOAuthURL)
+			}
+			if cfg.PublicURL != tt.wantPublicURL {
+				t.Fatalf("PublicURL %q, ожидался %q", cfg.PublicURL, tt.wantPublicURL)
+			}
+			if cfg.HasSiteLogin() != tt.wantLogin {
+				t.Fatalf("HasSiteLogin %v, ожидалось %v", cfg.HasSiteLogin(), tt.wantLogin)
+			}
+		})
+	}
+}

@@ -8,24 +8,42 @@ Go, Postgres через pgx, миграции goose. Один бинарник �
 - `internal/<пакет>` — пакет по ответственности, а не по типу файла:
   - `config` — настройки из окружения;
   - `db` — подключение к Postgres и миграции;
-  - `gallery` — предметная область галерей без базы и HTTP: автор, запись, сводка, предел `RecordingLimit`, проверка конверта записи (`ParseRecording`) и случайная ссылка (`NewSlug`). Полную проверку формата записи делает TypeScript-ядро в CLI и в браузере, второго описания формата на Go нет;
-  - `github` — проверка токена у GitHub (`GET /user`) с кэшем в памяти по sha256 токена на 10 минут;
-  - `store` — галереи в Postgres на pgx: авторы, записи, предел записей (загрузки автора идут по очереди под `SELECT … FOR UPDATE` его строки), сводка SQL по `jsonb`;
+  - `gallery` — предметная область галерей без базы и HTTP: автор, запись, сводка, пределы `RecordingLimit` и `StorageLimitBytes`, проверка конверта записи (`ParseRecording`) и случайная ссылка (`NewSlug`). Полную проверку формата записи делает TypeScript-ядро в CLI и в браузере, второго описания формата на Go нет;
+  - `github` — проверка токена у GitHub (`GET /user`) с кэшем в памяти по sha256 токена на 10 минут; OAuth-приложение для входа на сайте: адрес страницы согласия и обмен кода на токен;
+  - `session` — сессии входа на сайте без базы и HTTP: случайный идентификатор, его sha256, срок `Lifetime` (30 дней);
+  - `store` — галереи и сессии в Postgres на pgx: авторы, записи, предел записей (загрузки автора идут по очереди под `SELECT … FOR UPDATE` его строки), общий потолок хранилища, сводка SQL по `jsonb`;
   - `badge` — SVG-бейдж галереи для README;
-  - `httpapi` — маршруты `/api` поверх интерфейсов `Galleries` и `TokenVerifier`.
+  - `httpapi` — маршруты `/api` поверх интерфейсов `Galleries`, `Sessions`, `TokenVerifier` и `OAuthApp`.
 - `migrations/` — SQL-миграции, вшиты в бинарник.
 
 ## Окружение
 
 - `DATABASE_URL` — строка подключения к Postgres, обязательна для `serve` и `migrate`.
 - `API_ADDR` — адрес сервера, по умолчанию `:8080`.
-- `GITHUB_CLIENT_ID` — client_id OAuth-приложения GitHub с device flow для входа из CLI. Необязательна: без неё `GET /api/auth/github` отвечает `503 auth_unavailable`, остальное работает. Не секрет, но настоящее значение живёт только в окружении сервера.
+- `GITHUB_CLIENT_ID` — client_id OAuth-приложения GitHub с device flow для входа из CLI и на сайте. Необязательна: без неё `GET /api/auth/github` и `GET /api/auth/github/login` отвечают `503 auth_unavailable`, остальное работает. Не секрет, но настоящее значение живёт только в окружении сервера.
+- `GITHUB_CLIENT_SECRET` — секрет того же приложения для входа на сайте. Необязательна: без неё вход на сайте отвечает `503 auth_unavailable`, CLI работает. Не логируется и в репозиторий не попадает.
+- `PUBLIC_URL` — адрес сайта, только схема и хост, по умолчанию `https://cyberzavod.com`: из него строится `redirect_uri` (`{PUBLIC_URL}/api/auth/github/callback` — он же Authorization callback URL приложения на GitHub), с ним сверяется `Origin`. Локально — `http://localhost:4321`.
 - `GITHUB_API_URL` — адрес API GitHub, по умолчанию `https://api.github.com`; нужен для тестов.
+- `GITHUB_OAUTH_URL` — адрес страницы согласия и обмена кода, по умолчанию `https://github.com`; нужен для тестов.
+
+## Вход и сессии
+
+- CLI ходит с `Authorization: Bearer <токен GitHub>`; токен проверяет `GET /user`, в базе он не хранится. Если заголовок есть, кука не смотрится.
+- Сайт входит по OAuth authorization code: `GET /api/auth/github/login?return=<путь>` → GitHub → `GET /api/auth/github/callback`. State (32 случайных байта) и путь возврата лежат в куке `cz_oauth_state` на 10 минут, state сравнивается за постоянное время. Путь возврата — только относительный путь сайта (без `//`, `\` и управляющих символов, до 512 байт), иначе `/`. Любой сбой — редирект на путь возврата с отметкой `?login=failed` (без куки state — на главную); код, токен и идентификатор сессии в журнал не пишутся.
+- Сессия — кука `cz_session` (HttpOnly, Secure, SameSite=Lax) на 30 дней; в таблице `sessions` — только sha256 идентификатора. Просроченные удаляются при создании новой; просроченная кука даёт `401` и стирается. `POST /api/auth/logout` удаляет сессию.
+- Защита от CSRF: запрос по куке с методом не GET/HEAD проходит, только если `Origin` равен `PUBLIC_URL`, иначе `403 forbidden_origin`. Запросы с Bearer проверку Origin не проходят: у CLI его нет.
+- Ответы `/api/me*` — с `Cache-Control: no-store`.
+
+## Пределы
+
+- В галерее автора — не больше `gallery.RecordingLimit` (5) записей: `409 limit_reached`.
+- Все тела записей вместе — не больше `gallery.StorageLimitBytes` (2 ГиБ, размер — `octet_length(body::text)` в столбце `body_bytes`). Загрузка, после которой сумма выше потолка, — `507 storage_full`; проверка идёт под глобальной `pg_advisory_xact_lock`, чтобы параллельные загрузки не перешагнули потолок вдвоём. Замена записи на такую же или меньшую проходит всегда. Потолок — параметр `store.New`, тесты подставляют свой.
+- Загрузок и удалений записей — не больше 20 в час на автора (фиксированное окно, считаются попытки, не только успешные): `429 too_many_requests` с `Retry-After` в секундах. Счётчики в памяти процесса: API работает одним экземпляром; закончившиеся окна чистятся при каждой попытке.
 
 ## Тесты
 
-- Обработчики и проверка токена тестируются без сети и базы: фейковое хранилище, фейковая проверка токена, `httptest`-сервер вместо GitHub.
-- Тесты `internal/store` идут на настоящем Postgres из `TEST_DATABASE_URL` и без неё пропускаются. Тест сам применяет миграции и очищает таблицы галерей, поэтому база нужна отдельная, не рабочая: `TEST_DATABASE_URL=postgres://cyberzavod:cyberzavod@localhost:5432/cyberzavod_test?sslmode=disable go test ./internal/store/` (базу `cyberzavod_test` создать один раз: `createdb`).
+- Обработчики и проверка токена тестируются без сети и базы: фейковые хранилища галерей и сессий, фейковая проверка токена, `httptest`-сервер вместо GitHub, подменённые часы (`Deps.Now`).
+- Тесты `internal/store` идут на настоящем Postgres из `TEST_DATABASE_URL` и без неё пропускаются. Тест сам применяет миграции и очищает таблицы галерей и сессий, поэтому база нужна отдельная, не рабочая: `TEST_DATABASE_URL=postgres://cyberzavod:cyberzavod@localhost:5432/cyberzavod_test?sslmode=disable go test ./internal/store/` (базу `cyberzavod_test` создать один раз: `createdb`).
 
 ## Правила
 

@@ -13,8 +13,7 @@ import { LOCALE_NAMES, otherLocales, type Locale } from "@/shared/i18n/locale.ts
 import { localizedPath } from "@/shared/i18n/path.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { cx } from "@/shared/lib/cx.ts";
-import { Button, ButtonLink, PixelPlaque } from "@/shared/ui";
-import { GithubMark } from "./GithubMark.tsx";
+import { Button, ButtonLink, GithubMark, PixelPlaque } from "@/shared/ui";
 import styles from "./Sidebar.module.css";
 
 interface Props {
@@ -26,19 +25,25 @@ interface Props {
   locale: Locale;
   /** Путь страницы без языка: по нему переключатель ведёт на ту же страницу на другом языке. */
   path: string;
+  /**
+   * Вход через GitHub — остров, который ставит страница: меню рисуется без JS. На узком и низком
+   * экране его нет — он в панели записей.
+   */
+  account?: JSX.Element;
 }
 
 const ICON_STROKE = 2.5;
 
 /**
  * Меню сайта слева: логотип, цех, панели записей, журнала сборки, проекта, гайдов и «о заводе»,
- * ссылка на код и переключатель языка.
+ * вход через GitHub, ссылка на код и переключатель языка.
  * Работает без JavaScript: панели открываются нативным popover.
  * @param {Props} props Свойства компонента.
  * @param {boolean} props.journal Показывать ли кнопку журнала сборки.
  * @param {boolean} props.project Показывать ли кнопку проекта.
  * @param {Locale} props.locale Язык страницы.
  * @param {string} props.path Путь страницы без языка.
+ * @param {JSX.Element} [props.account] Вход через GitHub.
  * @returns {JSX.Element} Боковое меню.
  */
 export function Sidebar(props: Props): JSX.Element {
@@ -94,31 +99,39 @@ export function Sidebar(props: Props): JSX.Element {
           </Button>
         </li>
       </ul>
-      <div class={styles.bottom}>
-        <ButtonLink class={styles.bottomTile} href={site.repoUrl} layout="halfTile" variant="ghost">
-          <GithubMark />
-          {UI_TEXT.menu.code[props.locale]}
-        </ButtonLink>
-        <For each={otherLocales(props.locale)}>
-          {(other) => (
-            <ButtonLink
-              class={cx(styles.bottomTile, styles.language)}
-              href={localizedPath(other, props.path)}
-              hreflang={other}
-              lang={other}
-              aria-label={UI_TEXT.menu.language[props.locale](
-                other.toUpperCase(),
-                LOCALE_NAMES[other],
-              )}
-              title={LOCALE_NAMES[other]}
-              layout="halfTile"
-              variant="ghost"
-            >
-              <Languages stroke-width={ICON_STROKE} />
-              {other.toUpperCase()}
-            </ButtonLink>
-          )}
-        </For>
+      <div class={styles.footer}>
+        <div class={styles.account}>{props.account}</div>
+        <div class={styles.bottom}>
+          <ButtonLink
+            class={styles.bottomTile}
+            href={site.repoUrl}
+            layout="halfTile"
+            variant="ghost"
+          >
+            <GithubMark />
+            {UI_TEXT.menu.code[props.locale]}
+          </ButtonLink>
+          <For each={otherLocales(props.locale)}>
+            {(other) => (
+              <ButtonLink
+                class={cx(styles.bottomTile, styles.language)}
+                href={localizedPath(other, props.path)}
+                hreflang={other}
+                lang={other}
+                aria-label={UI_TEXT.menu.language[props.locale](
+                  other.toUpperCase(),
+                  LOCALE_NAMES[other],
+                )}
+                title={LOCALE_NAMES[other]}
+                layout="halfTile"
+                variant="ghost"
+              >
+                <Languages stroke-width={ICON_STROKE} />
+                {other.toUpperCase()}
+              </ButtonLink>
+            )}
+          </For>
+        </div>
       </div>
     </nav>
   );
