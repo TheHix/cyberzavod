@@ -13,7 +13,7 @@ Cyberzavod — локальный, независимый от модели harn
 - `make dev` — Postgres и API в Docker, фронт с горячей перезагрузкой на http://localhost:4321.
 - `make up` / `make down` — поднять или остановить Docker-окружение.
 - `make format` — привести код к стилю (Prettier, ESLint --fix, gofumpt, goimports).
-- `pnpm cyberzavod <команда>` — собрать CLI из рабочей копии и запустить: `init`, `sync`, `status`, `decision`, `note`, `draft`, `publish`, `hook`; `pnpm cyberzavod --help` — подробности.
+- `pnpm cyberzavod <команда>` — собрать CLI из рабочей копии и запустить: `init`, `sync`, `status`, `decision`, `note`, `draft`, `publish`, `hook`, `login`, `logout`, `share`, `unshare`, `gallery`; `pnpm cyberzavod --help` — подробности.
 - `pnpm cyberzavod sync` — после правки `harness/`, шаблонов, CLI, адаптера или конфига: перегенерировать `CLAUDE.md`, `.claude/` и `.cyberzavod/bin/cyberzavod.mjs`. `make check-web` ловит, если забыли.
 - `/feature <номер issue>` — провести задачу через процесс: постановка (ждёт одобрения человека), код, ревью, проверки, фиксация.
 - `/publish-recording` — опубликовать сессию: черновик из сырого журнала, чистовая редактура промптов и реплик, проверка человеком, запись в `.cyberzavod/journal/sessions/`.
@@ -28,7 +28,7 @@ Cyberzavod — локальный, независимый от модели harn
 - `packages/core` — модель на чистом TypeScript: записи журнала (конверт `{version, type, timestamp, projectId, sessionId, source, data}`, типы `session`, `decision`, `note`), конфиг проекта, этапы и процесс, harness, счётчики.
 - `packages/player` — проигрыватель цеха: сценарий из записи и кадр в любой момент. Только для сайта; в npm-пакет инструмента не входит.
 - `packages/storage` — диск: чтение конфига проекта, `DirectoryRecordStore` (журнал как каталог файлов), загрузка harness. Одно хранилище для CLI, адаптера и сайта.
-- `packages/cli` — npm-пакет `cyberzavod`: мастер `init` с распознаванием проекта, `sync`, `status`, записи решений и заметок; `draft`, `publish` и `hook` передаёт адаптеру. `scripts/build.ts` собирает всё в `dist/cyberzavod.mjs` без зависимостей.
+- `packages/cli` — npm-пакет `cyberzavod`: мастер `init` с распознаванием проекта, `sync`, `status`, записи решений и заметок; `draft`, `publish` и `hook` передаёт адаптеру; `login`, `share`, `unshare` и `gallery` — вход через GitHub и личная галерея записей на сайте (не больше 5 записей, по умолчанию закрыта). `scripts/build.ts` собирает всё в `dist/cyberzavod.mjs` без зависимостей.
 - `adapters/claude` — адаптер Claude Code: генератор `CLAUDE.md`, агентов, скиллов и `.claude/settings.json`; хуки записи сессии и остановки; черновик и публикация записи сессии; шаблоны того, что не выводится из harness.
 - `harness/` — процесс, который Cyberzavod даёт каждому проекту: принципы, этапы, процессы (`workflows/default.json`), правила ведущего. Тексты не называют проект, язык, модель и хостинг.
 - `.cyberzavod/project.json` — маркер и конфиг проекта: `projectId`, версия harness, процесс, путь журнала, агент на каждый этап (`provider`, `agent`, `model`), команды проверок и каталоги кода для хука остановки.
@@ -37,7 +37,7 @@ Cyberzavod — локальный, независимый от модели harn
 - `projects/` — карточки проектов для сайта (название, описание, ссылки), в git; сайт берёт их при сборке.
 - `guides/` — гайды для сайта в Markdown, в git: `<id>.<язык>.md`, по файлу на каждый язык сайта; сайт берёт их при сборке; новый гайд — новые файлы.
 - `apps/web` — сайт: Astro + SolidJS + Nano Stores, слои FSD, свой ui-kit на Kobalte, цех на весь экран на canvas через PixiJS.
-- `apps/api` — API на Go с Postgres.
+- `apps/api` — API на Go с Postgres: галереи записей, бейдж для README, аналитика по открытым галереям.
 - `compose.yaml` — локальное окружение: db → migrate → api.
 
 Деплой автоматический: push в `main` → проверки → образы `ghcr.io/bysavelii/cyberzavod-{api,web}:<sha>` → CI вызывает по SSH выкатку этого sha и передаёт на stdin временный токен job'а для скачивания приватных образов. Сервер в этом репозитории не описан: проект знает только адрес, свой ключ и sha. На сервере перед переключением версии применяются миграции, поэтому миграции совместимы с предыдущей версией API: сначала добавляем, удаляем только следующим релизом.

@@ -55,6 +55,30 @@ describe("runCli", () => {
     expect(code).toBe(1);
   });
 
+  it("справка называет команды публикации", async () => {
+    await runCli([], root);
+
+    const help = vi.mocked(console.log).mock.calls.join("\n");
+
+    expect(
+      ["login", "logout", "share", "unshare", "gallery"].map((name) =>
+        help.includes(`cyberzavod ${name}`),
+      ),
+    ).toEqual([true, true, true, true, true]);
+  });
+
+  it("share и unshare без id выходят с ошибкой до обращения в сеть", async () => {
+    const codes = await Promise.all([runCli(["share"], root), runCli(["unshare"], root)]);
+
+    expect(codes).toEqual([1, 1]);
+  });
+
+  it("gallery с --public и --private вместе выходит с ошибкой", async () => {
+    const code = await runCli(["gallery", "--public", "--private"], root);
+
+    expect(code).toBe(1);
+  });
+
   it("init --yes пишет конфиг, AGENTS.md и тонкий CLAUDE.md", async () => {
     const code = await runCli(["init", "--yes"], root);
 

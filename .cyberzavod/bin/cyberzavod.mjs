@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { parseArgs } from "node:util";
 
 // ../../adapters/claude/src/commands/draft.ts
@@ -151,9 +151,9 @@ function frontmatterOf(text, stage) {
   if (match === null) throw new HarnessError(`\u044D\u0442\u0430\u043F ${stage}: \u043D\u0435\u0442 \u0448\u0430\u043F\u043A\u0438 \u043C\u0435\u0436\u0434\u0443 \u0441\u0442\u0440\u043E\u043A\u0430\u043C\u0438 ---`);
   const fields = /* @__PURE__ */ new Map();
   for (const line of (match[1] ?? "").split("\n")) {
-    const field = FRONTMATTER_LINE.exec(line);
-    if (field === null) throw new HarnessError(`\u044D\u0442\u0430\u043F ${stage}: \u0441\u0442\u0440\u043E\u043A\u0430 \u0448\u0430\u043F\u043A\u0438 \xAB${line}\xBB \u043D\u0435 \u043F\u043E\u043B\u0435`);
-    fields.set(field[1] ?? "", (field[2] ?? "").trim());
+    const field2 = FRONTMATTER_LINE.exec(line);
+    if (field2 === null) throw new HarnessError(`\u044D\u0442\u0430\u043F ${stage}: \u0441\u0442\u0440\u043E\u043A\u0430 \u0448\u0430\u043F\u043A\u0438 \xAB${line}\xBB \u043D\u0435 \u043F\u043E\u043B\u0435`);
+    fields.set(field2[1] ?? "", (field2[2] ?? "").trim());
   }
   return { fields, body: text.slice(match[0].length).trim() };
 }
@@ -200,10 +200,10 @@ function compareNames(left, right) {
 }
 function filesIn(files, directory, extension) {
   const matching = Object.entries(files).filter(
-    ([path18]) => path18.startsWith(directory) && path18.endsWith(extension)
+    ([path20]) => path20.startsWith(directory) && path20.endsWith(extension)
   );
-  const named = matching.map(([path18, text]) => [
-    path18.slice(directory.length, -extension.length),
+  const named = matching.map(([path20, text]) => [
+    path20.slice(directory.length, -extension.length),
     text
   ]);
   const direct = named.filter(([name]) => !name.includes("/"));
@@ -247,11 +247,11 @@ var AGENT_FIELDS = ["provider", "agent", "model"];
 function parseAgentConfig(raw) {
   if (!isObject(raw)) throw new AgentConfigError("\u0430\u0433\u0435\u043D\u0442 \u0434\u043E\u043B\u0436\u0435\u043D \u0431\u044B\u0442\u044C \u043E\u0431\u044A\u0435\u043A\u0442\u043E\u043C");
   const config = {};
-  for (const field of AGENT_FIELDS) {
-    const value = raw[field];
+  for (const field2 of AGENT_FIELDS) {
+    const value = raw[field2];
     if (value === void 0) continue;
-    if (!isLine(value)) throw new AgentConfigError(`${field} \u0434\u043E\u043B\u0436\u0435\u043D \u0431\u044B\u0442\u044C \u043D\u0435\u043F\u0443\u0441\u0442\u043E\u0439 \u0441\u0442\u0440\u043E\u043A\u043E\u0439`);
-    config[field] = value;
+    if (!isLine(value)) throw new AgentConfigError(`${field2} \u0434\u043E\u043B\u0436\u0435\u043D \u0431\u044B\u0442\u044C \u043D\u0435\u043F\u0443\u0441\u0442\u043E\u0439 \u0441\u0442\u0440\u043E\u043A\u043E\u0439`);
+    config[field2] = value;
   }
   return config;
 }
@@ -854,7 +854,7 @@ function carryOverEdits(previous, next) {
 function unfilledHeader(draft) {
   const fields = Object.keys(HEADER_FIELD_NAMES);
   return draft.builds.flatMap((build) => {
-    const names = fields.filter((field) => build[field] === "").map((f) => HEADER_FIELD_NAMES[f]);
+    const names = fields.filter((field2) => build[field2] === "").map((f) => HEADER_FIELD_NAMES[f]);
     return names.length === 0 ? [] : [`\u0441\u0431\u043E\u0440\u043A\u0430 ${build.id}: ${names.join(", ")}`];
   });
 }
@@ -2412,9 +2412,9 @@ var MS_PER_SECOND = 1e3;
 var SECONDS_PER_MINUTE = 60;
 var MAX_ASSIGNMENT_LINE = 100;
 function clockOf(t) {
-  const seconds = Math.floor(t / MS_PER_SECOND);
-  const minutes = Math.floor(seconds / SECONDS_PER_MINUTE);
-  return `${minutes}:${String(seconds % SECONDS_PER_MINUTE).padStart(2, "0")}`;
+  const seconds2 = Math.floor(t / MS_PER_SECOND);
+  const minutes = Math.floor(seconds2 / SECONDS_PER_MINUTE);
+  return `${minutes}:${String(seconds2 % SECONDS_PER_MINUTE).padStart(2, "0")}`;
 }
 function assignmentLineOf(draft, run) {
   const assignment = draft.events.find(
@@ -3327,6 +3327,245 @@ async function runHook(name, context) {
   return HOOKS[name](context);
 }
 
+// src/errors.ts
+var CommandError = class extends Error {
+};
+
+// src/sharing/http.ts
+async function sendRequest(fetchImplementation, url, init) {
+  try {
+    return await fetchImplementation(url, init);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new CommandError(`\u043D\u0435\u0442 \u0441\u0432\u044F\u0437\u0438 \u0441 ${new URL(url).origin}: ${reason}`, { cause: err });
+  }
+}
+async function readJsonBody(response) {
+  const text = await response.text();
+  if (text.trim() === "") return void 0;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return void 0;
+  }
+}
+function isObject5(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// src/sharing/api.ts
+var ApiError = class extends Error {
+  code;
+  status;
+  /**
+   * Ошибка, о которой сообщил сервер.
+   * @param {string} message Текст ошибки по-русски из ответа сервера.
+   * @param {string} code Код ошибки из ответа сервера, например `limit_reached`.
+   * @param {number} status HTTP-статус ответа.
+   */
+  constructor(message, code, status) {
+    super(message);
+    this.code = code;
+    this.status = status;
+  }
+};
+var UNAUTHORIZED_CODE = "unauthorized";
+var LIMIT_REACHED_CODE = "limit_reached";
+var INVALID_RESPONSE_CODE = "invalid_response";
+var HTTP_ERROR_CODE = "http_error";
+var NEW_RECORDING_STATUS = 201;
+function isString(value) {
+  return typeof value === "string";
+}
+function invalidResponse(what, status) {
+  return new ApiError(`\u0441\u0435\u0440\u0432\u0435\u0440 \u0432\u0435\u0440\u043D\u0443\u043B \u043D\u0435\u043E\u0436\u0438\u0434\u0430\u043D\u043D\u044B\u0439 \u043E\u0442\u0432\u0435\u0442: ${what}`, INVALID_RESPONSE_CODE, status);
+}
+function parseSummary(raw, status) {
+  if (!isObject5(raw)) throw invalidResponse("\u0437\u0430\u043F\u0438\u0441\u044C \u043D\u0435 \u043E\u0431\u044A\u0435\u043A\u0442", status);
+  const { id, slug, projectId, title, language, startedAt, uploadedAt } = raw;
+  if (!isString(id) || !isString(slug) || !isString(projectId) || !isString(title) || !isString(language) || !isString(startedAt) || !isString(uploadedAt)) {
+    throw invalidResponse("\u0432 \u0437\u0430\u043F\u0438\u0441\u0438 \u043D\u0435 \u0445\u0432\u0430\u0442\u0430\u0435\u0442 \u043F\u043E\u043B\u0435\u0439", status);
+  }
+  return { id, slug, projectId, title, language, startedAt, uploadedAt };
+}
+function parseMe(raw, status) {
+  if (!isObject5(raw)) throw invalidResponse("\u0430\u0432\u0442\u043E\u0440 \u043D\u0435 \u043E\u0431\u044A\u0435\u043A\u0442", status);
+  const { login: login2, galleryPublic, limit, recordings } = raw;
+  if (!isString(login2) || typeof galleryPublic !== "boolean" || typeof limit !== "number" || !Array.isArray(recordings)) {
+    throw invalidResponse("\u0443 \u0430\u0432\u0442\u043E\u0440\u0430 \u043D\u0435 \u0445\u0432\u0430\u0442\u0430\u0435\u0442 \u043F\u043E\u043B\u0435\u0439", status);
+  }
+  const summaries = recordings.map((summary) => parseSummary(summary, status));
+  return { login: login2, galleryPublic, limit, recordings: summaries };
+}
+function errorOf(body, status) {
+  if (isObject5(body) && isString(body.error) && isString(body.message)) {
+    return new ApiError(body.message, body.error, status);
+  }
+  return new ApiError(`\u0441\u0435\u0440\u0432\u0435\u0440 \u043E\u0442\u0432\u0435\u0442\u0438\u043B ${status}`, HTTP_ERROR_CODE, status);
+}
+var HttpCyberzavodApi = class {
+  #baseUrl;
+  #fetch;
+  /**
+   * Клиент сервера.
+   * @param {string} baseUrl Адрес сервера без завершающего «/».
+   * @param {FetchFunction} fetchImplementation Функция запроса; по умолчанию встроенный `fetch`.
+   */
+  constructor(baseUrl, fetchImplementation = fetch) {
+    this.#baseUrl = baseUrl;
+    this.#fetch = fetchImplementation;
+  }
+  /**
+   * Спрашивает у сервера идентификатор приложения GitHub.
+   * @returns {Promise<string>} `clientId` для device flow.
+   * @throws {ApiError} Если вход на сервере недоступен или ответ неожиданный.
+   */
+  async githubClientId() {
+    const { status, body } = await this.#call({ method: "GET", path: "/api/auth/github" });
+    if (!isObject5(body) || !isString(body.clientId)) throw invalidResponse("\u043D\u0435\u0442 clientId", status);
+    return body.clientId;
+  }
+  /**
+   * Возвращает автора, которому принадлежит токен.
+   * @param {string} token Токен GitHub.
+   * @returns {Promise<Me>} Автор с галереей и записями.
+   * @throws {ApiError} Если сервер не принял токен или ответ неожиданный.
+   */
+  async me(token) {
+    const { status, body } = await this.#call({ method: "GET", path: "/api/me", token });
+    return parseMe(body, status);
+  }
+  /**
+   * Отправляет запись в галерею автора.
+   * @param {string} token Токен GitHub.
+   * @param {string} id Идентификатор записи.
+   * @param {unknown} record Запись, прошедшая проверку ядра.
+   * @returns {Promise<UploadedRecording>} Сведения о записи на сервере.
+   * @throws {ApiError} Если сервер отклонил запись или ответ неожиданный.
+   */
+  async uploadRecording(token, id, record) {
+    const { status, body } = await this.#call({
+      method: "PUT",
+      path: `/api/me/recordings/${encodeURIComponent(id)}`,
+      token,
+      body: record
+    });
+    if (!isObject5(body)) throw invalidResponse("\u043D\u0435\u0442 \u0441\u0432\u0435\u0434\u0435\u043D\u0438\u0439 \u043E \u0437\u0430\u043F\u0438\u0441\u0438", status);
+    return {
+      recording: parseSummary(body.recording, status),
+      isNew: status === NEW_RECORDING_STATUS
+    };
+  }
+  /**
+   * Удаляет запись из галереи автора.
+   * @param {string} token Токен GitHub.
+   * @param {string} id Идентификатор записи.
+   * @returns {Promise<void>} Готово, когда сервер удалил запись.
+   * @throws {ApiError} Если записи нет или сервер отказал.
+   */
+  async deleteRecording(token, id) {
+    await this.#call({
+      method: "DELETE",
+      path: `/api/me/recordings/${encodeURIComponent(id)}`,
+      token
+    });
+  }
+  /**
+   * Открывает или закрывает галерею автора.
+   * @param {string} token Токен GitHub.
+   * @param {boolean} isPublic Показывать галерею в общем списке.
+   * @returns {Promise<void>} Готово, когда сервер применил выбор.
+   * @throws {ApiError} Если сервер отказал.
+   */
+  async setGalleryPublic(token, isPublic) {
+    await this.#call({ method: "PUT", path: "/api/me/gallery", token, body: { public: isPublic } });
+  }
+  async #call({ method, path: path20, token, body }) {
+    const headers = { Accept: "application/json" };
+    if (token !== void 0) headers.Authorization = `Bearer ${token}`;
+    if (body !== void 0) headers["Content-Type"] = "application/json";
+    const response = await sendRequest(this.#fetch, `${this.#baseUrl}${path20}`, {
+      method,
+      headers,
+      ...body === void 0 ? {} : { body: JSON.stringify(body) }
+    });
+    const answer = await readJsonBody(response);
+    if (!response.ok) throw errorOf(answer, response.status);
+    return { status: response.status, body: answer };
+  }
+};
+function isApiError(err, code) {
+  return err instanceof ApiError && err.code === code;
+}
+
+// src/sharing/authorization.ts
+var LOGIN_HINT = "\u0432\u043E\u0439\u0434\u0438\u0442\u0435 \u043A\u043E\u043C\u0430\u043D\u0434\u043E\u0439 cyberzavod login";
+async function withToken(sharing, action) {
+  const token = await sharing.credentials.read();
+  if (token === void 0) throw new CommandError(`\u043D\u0435\u0442 \u0432\u0445\u043E\u0434\u0430: ${LOGIN_HINT}`);
+  try {
+    return await action(token);
+  } catch (err) {
+    if (!isApiError(err, UNAUTHORIZED_CODE)) throw err;
+    throw new CommandError(`${err.message}: ${LOGIN_HINT}`, { cause: err });
+  }
+}
+
+// src/sharing/links.ts
+var BADGE_ALT = "Built at Cyberzavod";
+function recordingLink(siteUrl, slug) {
+  return `${siteUrl}/r/?id=${encodeURIComponent(slug)}`;
+}
+function galleryLink(siteUrl, login2) {
+  return `${siteUrl}/gallery/?user=${encodeURIComponent(login2)}`;
+}
+function badgeMarkdown(siteUrl, login2) {
+  const badge = `${siteUrl}/api/badges/${encodeURIComponent(login2)}.svg`;
+  return `[![${BADGE_ALT}](${badge})](${galleryLink(siteUrl, login2)})`;
+}
+
+// src/commands/gallery.ts
+function galleryAccessOf(isPublicRequested, isPrivateRequested) {
+  if (isPublicRequested && isPrivateRequested) {
+    throw new CommandError("--public \u0438 --private \u0432\u043C\u0435\u0441\u0442\u0435 \u043D\u0435 \u0440\u0430\u0431\u043E\u0442\u0430\u044E\u0442: \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043E\u0434\u043D\u043E");
+  }
+  if (isPublicRequested) return "public";
+  if (isPrivateRequested) return "private";
+  return "keep";
+}
+async function changeAccess(sharing, token, access2) {
+  if (access2 !== "keep") await sharing.api.setGalleryPublic(token, access2 === "public");
+  return sharing.api.me(token);
+}
+function describeGallery(sharing, me) {
+  const recordingLines2 = me.recordings.map((recording) => {
+    const link = recordingLink(sharing.siteUrl, recording.slug);
+    return `  ${recording.id}  ${recording.title}
+    ${link}`;
+  });
+  const recordingsTitle = `\u0417\u0430\u043F\u0438\u0441\u0438: ${me.recordings.length} \u0438\u0437 ${me.limit}`;
+  if (!me.galleryPublic) {
+    return [
+      `\u0413\u0430\u043B\u0435\u0440\u0435\u044F ${me.login}: \u0437\u0430\u043A\u0440\u044B\u0442\u0430, \u0437\u0430\u043F\u0438\u0441\u0438 \u0432\u0438\u0434\u043D\u044B \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u043E \u0441\u0441\u044B\u043B\u043A\u0430\u043C`,
+      recordingsTitle,
+      ...recordingLines2,
+      "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0433\u0430\u043B\u0435\u0440\u0435\u044E: cyberzavod gallery --public"
+    ];
+  }
+  return [
+    `\u0413\u0430\u043B\u0435\u0440\u0435\u044F ${me.login}: \u043E\u0442\u043A\u0440\u044B\u0442\u0430`,
+    recordingsTitle,
+    ...recordingLines2,
+    `\u0421\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \u0433\u0430\u043B\u0435\u0440\u0435\u0438: ${galleryLink(sharing.siteUrl, me.login)}`,
+    `\u0411\u0435\u0439\u0434\u0436 \u0434\u043B\u044F README: ${badgeMarkdown(sharing.siteUrl, me.login)}`,
+    "\u0417\u0430\u043A\u0440\u044B\u0442\u044C \u0433\u0430\u043B\u0435\u0440\u0435\u044E: cyberzavod gallery --private"
+  ];
+}
+async function showGallery(sharing, access2) {
+  const me = await withToken(sharing, (token) => changeAccess(sharing, token, access2));
+  for (const line of describeGallery(sharing, me)) console.log(line);
+}
+
 // src/commands/init.ts
 import { rename, writeFile as writeFile8 } from "node:fs/promises";
 import path15 from "node:path";
@@ -3480,10 +3719,6 @@ function projectIdOf(name) {
   return id === "" ? "project" : id;
 }
 
-// src/errors.ts
-var CommandError = class extends Error {
-};
-
 // cyberzavod-assets:assets
 import { readFileSync as readFileSync3 } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -3494,7 +3729,7 @@ async function readAssets() {
 }
 
 // src/installation/installation.ts
-var HARNESS_VERSION = "0.6.0";
+var HARNESS_VERSION = "0.7.0";
 var RULES_TEMPLATE = "rules.md";
 function template(templates2, name) {
   const text = templates2[name];
@@ -3748,8 +3983,131 @@ async function recordNote(directory, text) {
   }));
 }
 
-// src/commands/status.ts
+// src/sharing/device-flow.ts
+var SLOW_DOWN_STEP_SECONDS = 5;
+var MILLISECONDS_IN_SECOND = 1e3;
+async function waitForAccessToken(options) {
+  const { auth, clientId, code, sleep } = options;
+  let intervalSeconds = code.intervalSeconds;
+  let waitedSeconds = 0;
+  while (waitedSeconds < code.expiresInSeconds) {
+    await sleep(intervalSeconds * MILLISECONDS_IN_SECOND);
+    waitedSeconds += intervalSeconds;
+    const poll = await auth.pollAccessToken(clientId, code.deviceCode);
+    switch (poll.status) {
+      case "granted":
+        return poll.token;
+      case "pending":
+        break;
+      case "slow_down":
+        intervalSeconds += SLOW_DOWN_STEP_SECONDS;
+        break;
+      case "expired":
+        throw new CommandError("\u043A\u043E\u0434 \u0432\u0445\u043E\u0434\u0430 \u0438\u0441\u0442\u0451\u043A: \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 cyberzavod login \u0437\u0430\u043D\u043E\u0432\u043E");
+      case "denied":
+        throw new CommandError("\u0432\u0445\u043E\u0434 \u043E\u0442\u043A\u043B\u043E\u043D\u0451\u043D \u043D\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435 GitHub");
+    }
+  }
+  throw new CommandError("\u043A\u043E\u0434 \u0432\u0445\u043E\u0434\u0430 \u0438\u0441\u0442\u0451\u043A: \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 cyberzavod login \u0437\u0430\u043D\u043E\u0432\u043E");
+}
+
+// src/commands/login.ts
+async function login(sharing) {
+  const clientId = await sharing.api.githubClientId();
+  const code = await sharing.github.requestDeviceCode(clientId);
+  console.log(`\u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 ${code.verificationUri} \u0438 \u0432\u0432\u0435\u0434\u0438\u0442\u0435 \u043A\u043E\u0434 ${code.userCode}`);
+  console.log("\u0416\u0434\u0443 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u044F\u2026");
+  const token = await waitForAccessToken({
+    auth: sharing.github,
+    clientId,
+    code,
+    sleep: (milliseconds) => sharing.sleep(milliseconds)
+  });
+  const me = await sharing.api.me(token);
+  await sharing.credentials.save(token);
+  console.log(`\u0432\u0445\u043E\u0434 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D: ${me.login}`);
+}
+async function logout(sharing) {
+  const hadToken = await sharing.credentials.remove();
+  console.log(hadToken ? "\u0432\u044B \u0432\u044B\u0448\u043B\u0438: \u0442\u043E\u043A\u0435\u043D \u0443\u0434\u0430\u043B\u0451\u043D" : "\u0432\u0445\u043E\u0434\u0430 \u0438 \u043D\u0435 \u0431\u044B\u043B\u043E");
+}
+
+// src/commands/share.ts
+import { readFile as readFile8 } from "node:fs/promises";
 import path17 from "node:path";
+function requireRecordId(id) {
+  if (!isRecordId(id)) {
+    throw new CommandError(`${id} \u043D\u0435 \u043F\u043E\u0445\u043E\u0436 \u043D\u0430 id \u0437\u0430\u043F\u0438\u0441\u0438: \u0442\u043E\u043B\u044C\u043A\u043E \u0431\u0443\u043A\u0432\u044B, \u0446\u0438\u0444\u0440\u044B, \xAB_\xBB \u0438 \xAB-\xBB`);
+  }
+}
+async function readRecordText(project, id) {
+  const file = path17.join(project.journal, RECORD_COLLECTIONS.session, `${id}.json`);
+  try {
+    return await readFile8(file, "utf8");
+  } catch (err) {
+    if (!isNotFound(err)) throw err;
+    const shown = path17.relative(project.root, file);
+    throw new CommandError(`\u0432 \u0436\u0443\u0440\u043D\u0430\u043B\u0435 \u043D\u0435\u0442 \u0437\u0430\u043F\u0438\u0441\u0438 ${id}: \u0444\u0430\u0439\u043B\u0430 ${shown} \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442`, {
+      cause: err
+    });
+  }
+}
+function parseSession(text, id) {
+  try {
+    const record = parseRecord(JSON.parse(text));
+    if (record.type !== "session") throw new RecordError(`\u0442\u0438\u043F ${record.type}, \u043D\u0443\u0436\u043D\u0430 \u0441\u0435\u0441\u0441\u0438\u044F`);
+    return record;
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new CommandError(`\u0437\u0430\u043F\u0438\u0441\u044C ${id} \u043D\u0435 \u043F\u0440\u043E\u0448\u043B\u0430 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0443: ${reason}`, { cause: err });
+  }
+}
+function recordingLines(recordings) {
+  return recordings.map((recording) => `  ${recording.id}  ${recording.title}`);
+}
+async function limitReachedError(sharing, token, serverMessage) {
+  const me = await sharing.api.me(token);
+  const lines = [
+    serverMessage,
+    `\u0417\u0430\u043F\u0438\u0441\u0438 \u0432 \u0433\u0430\u043B\u0435\u0440\u0435\u0435 (${me.recordings.length} \u0438\u0437 ${me.limit}):`,
+    ...recordingLines(me.recordings),
+    "\u041E\u0441\u0432\u043E\u0431\u043E\u0434\u0438\u0442\u0435 \u043C\u0435\u0441\u0442\u043E \u043A\u043E\u043C\u0430\u043D\u0434\u043E\u0439 cyberzavod unshare <id>"
+  ];
+  return new CommandError(lines.join("\n"));
+}
+async function upload(sharing, token, id, record) {
+  try {
+    return await sharing.api.uploadRecording(token, id, record);
+  } catch (err) {
+    if (!isApiError(err, LIMIT_REACHED_CODE)) throw err;
+    throw await limitReachedError(sharing, token, err.message);
+  }
+}
+async function shareRecording(sharing, directory, id) {
+  requireRecordId(id);
+  const project = await requireProjectAt(directory);
+  const text = await readRecordText(project, id);
+  const record = parseSession(text, id);
+  const { uploaded, me } = await withToken(sharing, async (token) => ({
+    uploaded: await upload(sharing, token, id, record),
+    me: await sharing.api.me(token)
+  }));
+  const verb = uploaded.isNew ? "\u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430" : "\u0437\u0430\u043C\u0435\u043D\u0435\u043D\u0430";
+  console.log(`\u0437\u0430\u043F\u0438\u0441\u044C ${id} ${verb}`);
+  console.log(`\u0441\u0441\u044B\u043B\u043A\u0430: ${recordingLink(sharing.siteUrl, uploaded.recording.slug)}`);
+  if (!me.galleryPublic) {
+    console.log("\u0433\u0430\u043B\u0435\u0440\u0435\u044F \u0437\u0430\u043A\u0440\u044B\u0442\u0430: \u0437\u0430\u043F\u0438\u0441\u044C \u0432\u0438\u0434\u043D\u0430 \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u043E \u044D\u0442\u043E\u0439 \u0441\u0441\u044B\u043B\u043A\u0435");
+    console.log("\u043E\u0442\u043A\u0440\u044B\u0442\u044C \u0433\u0430\u043B\u0435\u0440\u0435\u044E: cyberzavod gallery --public");
+  }
+}
+async function unshareRecording(sharing, id) {
+  requireRecordId(id);
+  await withToken(sharing, (token) => sharing.api.deleteRecording(token, id));
+  console.log(`\u0437\u0430\u043F\u0438\u0441\u044C ${id} \u0443\u0434\u0430\u043B\u0435\u043D\u0430 \u0438\u0437 \u0433\u0430\u043B\u0435\u0440\u0435\u0438`);
+}
+
+// src/commands/status.ts
+import path18 from "node:path";
 var RECORD_TITLES = {
   session: "\u0441\u0435\u0441\u0441\u0438\u0438",
   decision: "\u0440\u0435\u0448\u0435\u043D\u0438\u044F",
@@ -3779,7 +4137,7 @@ function journalLines(project, records) {
   const types = Object.keys(RECORD_COLLECTIONS);
   const counts = types.map((type) => countLine(records, type));
   const latest = records.reduce(newerOf, void 0);
-  const journalPath = path17.relative(project.root, project.journal) || ".";
+  const journalPath = path18.relative(project.root, project.journal) || ".";
   const latestLines = latest === void 0 ? [] : [`\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u044F\u044F \u0437\u0430\u043F\u0438\u0441\u044C: ${latest.timestamp} (${latest.type})`];
   return [`\u0416\u0443\u0440\u043D\u0430\u043B: ${journalPath} \u2014 ${counts.join(", ")}`, ...latestLines];
 }
@@ -3868,6 +4226,196 @@ async function syncProject(directory, options, installation) {
   printWrittenReport(withTool(report, isToolChanged));
 }
 
+// src/sharing/services.ts
+import { setTimeout as delay } from "node:timers/promises";
+
+// src/sharing/github.ts
+var GITHUB_DEVICE_CODE_URL = "https://github.com/login/device/code";
+var GITHUB_ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token";
+var DEVICE_CODE_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code";
+function field(body, name) {
+  const value = body[name];
+  if (typeof value !== "string" || value === "") {
+    throw new CommandError(`GitHub \u0432\u0435\u0440\u043D\u0443\u043B \u043D\u0435\u043E\u0436\u0438\u0434\u0430\u043D\u043D\u044B\u0439 \u043E\u0442\u0432\u0435\u0442: \u043D\u0435\u0442 \u043F\u043E\u043B\u044F ${name}`);
+  }
+  return value;
+}
+function seconds(body, name) {
+  const value = body[name];
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    throw new CommandError(`GitHub \u0432\u0435\u0440\u043D\u0443\u043B \u043D\u0435\u043E\u0436\u0438\u0434\u0430\u043D\u043D\u044B\u0439 \u043E\u0442\u0432\u0435\u0442: \u043D\u0435\u0442 \u043F\u043E\u043B\u044F ${name}`);
+  }
+  return value;
+}
+function parseDeviceCode(body) {
+  if (!isObject5(body)) throw new CommandError("GitHub \u043D\u0435 \u0432\u044B\u0434\u0430\u043B \u043A\u043E\u0434 \u0443\u0441\u0442\u0440\u043E\u0439\u0441\u0442\u0432\u0430");
+  return {
+    deviceCode: field(body, "device_code"),
+    userCode: field(body, "user_code"),
+    verificationUri: field(body, "verification_uri"),
+    expiresInSeconds: seconds(body, "expires_in"),
+    intervalSeconds: seconds(body, "interval")
+  };
+}
+function parseTokenPoll(body) {
+  if (!isObject5(body)) throw new CommandError("GitHub \u043D\u0435 \u0432\u044B\u0434\u0430\u043B \u0442\u043E\u043A\u0435\u043D");
+  if (typeof body.access_token === "string" && body.access_token !== "") {
+    return { status: "granted", token: body.access_token };
+  }
+  switch (body.error) {
+    case "authorization_pending":
+      return { status: "pending" };
+    case "slow_down":
+      return { status: "slow_down" };
+    case "expired_token":
+      return { status: "expired" };
+    case "access_denied":
+      return { status: "denied" };
+    default: {
+      const reason = typeof body.error_description === "string" ? body.error_description : "";
+      throw new CommandError(`GitHub \u043E\u0442\u043A\u043B\u043E\u043D\u0438\u043B \u0432\u0445\u043E\u0434: ${reason || String(body.error)}`);
+    }
+  }
+}
+var HttpGithubAuth = class {
+  #fetch;
+  /**
+   * Клиент device flow GitHub.
+   * @param {FetchFunction} fetchImplementation Функция запроса; по умолчанию встроенный `fetch`.
+   */
+  constructor(fetchImplementation = fetch) {
+    this.#fetch = fetchImplementation;
+  }
+  /**
+   * Просит у GitHub код устройства. Права (scope) не запрашиваются: хватает логина и id.
+   * @param {string} clientId Идентификатор приложения GitHub.
+   * @returns {Promise<DeviceCode>} Код для человека и параметры опроса.
+   * @throws {CommandError} Если GitHub недоступен или ответил неожиданно.
+   */
+  async requestDeviceCode(clientId) {
+    const body = await this.#post(GITHUB_DEVICE_CODE_URL, { client_id: clientId });
+    return parseDeviceCode(body);
+  }
+  /**
+   * Спрашивает у GitHub, подтвердил ли человек код.
+   * @param {string} clientId Идентификатор приложения GitHub.
+   * @param {string} deviceCode Код устройства из `requestDeviceCode`.
+   * @returns {Promise<TokenPoll>} Токен или причина подождать либо отказаться.
+   * @throws {CommandError} Если GitHub недоступен или отклонил вход по другой причине.
+   */
+  async pollAccessToken(clientId, deviceCode) {
+    const body = await this.#post(GITHUB_ACCESS_TOKEN_URL, {
+      client_id: clientId,
+      device_code: deviceCode,
+      grant_type: DEVICE_CODE_GRANT_TYPE
+    });
+    return parseTokenPoll(body);
+  }
+  async #post(url, form) {
+    const response = await sendRequest(this.#fetch, url, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(form).toString()
+    });
+    return readJsonBody(response);
+  }
+};
+
+// src/sharing/settings.ts
+import { chmod, mkdir as mkdir7, rm as rm4, writeFile as writeFile9 } from "node:fs/promises";
+import path19 from "node:path";
+var SETTINGS_DIRECTORY_NAME = "cyberzavod";
+var CREDENTIALS_FILE_NAME = "credentials.json";
+var OWNER_ONLY_FILE_MODE = 384;
+var OWNER_ONLY_DIRECTORY_MODE = 448;
+function settingsDirectory(environment) {
+  const { env, platform, homeDirectory } = environment;
+  const isWindows = platform === "win32";
+  const pathFor = isWindows ? path19.win32 : path19.posix;
+  const windowsBase = env.APPDATA || pathFor.join(homeDirectory, "AppData", "Roaming");
+  const posixBase = env.XDG_CONFIG_HOME || pathFor.join(homeDirectory, ".config");
+  const base = isWindows ? windowsBase : posixBase;
+  return pathFor.join(base, SETTINGS_DIRECTORY_NAME);
+}
+function credentialsFile(environment) {
+  const pathFor = environment.platform === "win32" ? path19.win32 : path19.posix;
+  return pathFor.join(settingsDirectory(environment), CREDENTIALS_FILE_NAME);
+}
+function tokenIn(text) {
+  try {
+    const parsed = JSON.parse(text);
+    return isObject5(parsed) && typeof parsed.token === "string" && parsed.token !== "" ? parsed.token : void 0;
+  } catch {
+    return void 0;
+  }
+}
+var FileCredentialsStore = class {
+  #file;
+  /**
+   * Хранилище токена в файле.
+   * @param {string} file Абсолютный путь `credentials.json`.
+   */
+  constructor(file) {
+    this.#file = file;
+  }
+  /**
+   * Читает сохранённый токен.
+   * @returns {Promise<string | undefined>} Токен или undefined, если файла нет.
+   * @throws {CommandError} Если файл повреждён.
+   */
+  async read() {
+    const text = await readOptionalText(this.#file);
+    if (text === void 0) return void 0;
+    const token = tokenIn(text);
+    if (token === void 0) {
+      throw new CommandError(
+        `\u0444\u0430\u0439\u043B ${CREDENTIALS_FILE_NAME} \u043F\u043E\u0432\u0440\u0435\u0436\u0434\u0451\u043D: \u0432\u043E\u0439\u0434\u0438\u0442\u0435 \u0437\u0430\u043D\u043E\u0432\u043E \u043A\u043E\u043C\u0430\u043D\u0434\u043E\u0439 cyberzavod login`
+      );
+    }
+    return token;
+  }
+  /**
+   * Сохраняет токен в файл, доступный только владельцу.
+   * @param {string} token Токен GitHub.
+   * @returns {Promise<void>} Готово, когда файл записан.
+   */
+  async save(token) {
+    await mkdir7(path19.dirname(this.#file), { recursive: true, mode: OWNER_ONLY_DIRECTORY_MODE });
+    await writeFile9(this.#file, `${JSON.stringify({ token }, null, 2)}
+`, {
+      mode: OWNER_ONLY_FILE_MODE
+    });
+    await chmod(this.#file, OWNER_ONLY_FILE_MODE);
+  }
+  /**
+   * Удаляет файл с токеном.
+   * @returns {Promise<boolean>} true, если токен был сохранён.
+   */
+  async remove() {
+    const hadToken = await readOptionalText(this.#file) !== void 0;
+    await rm4(this.#file, { force: true });
+    return hadToken;
+  }
+};
+
+// src/sharing/services.ts
+var DEFAULT_API_URL = "https://cyberzavod.com";
+var API_URL_VARIABLE = "CYBERZAVOD_API_URL";
+var TRAILING_SLASHES = /\/+$/;
+function createSharing(environment) {
+  const siteUrl = (environment.env[API_URL_VARIABLE] || DEFAULT_API_URL).replace(
+    TRAILING_SLASHES,
+    ""
+  );
+  return {
+    siteUrl,
+    api: new HttpCyberzavodApi(siteUrl),
+    github: new HttpGithubAuth(),
+    credentials: new FileCredentialsStore(credentialsFile(environment)),
+    sleep: (milliseconds) => delay(milliseconds)
+  };
+}
+
 // src/cli.ts
 var SUCCESS = 0;
 var FAILURE = 1;
@@ -3879,6 +4427,9 @@ async function readStdin() {
 function requiredText(value, what) {
   if (value === void 0 || value.trim() === "") throw new CommandError(`\u043D\u0443\u0436\u0435\u043D ${what}`);
   return value;
+}
+function defaultSharing() {
+  return createSharing({ env: process.env, platform: process.platform, homeDirectory: homedir() });
 }
 var COMMANDS = {
   init: {
@@ -3973,6 +4524,55 @@ var COMMANDS = {
       return published ? SUCCESS : FAILURE;
     }
   },
+  login: {
+    usage: "login",
+    summary: "\u0432\u043E\u0439\u0442\u0438 \u0447\u0435\u0440\u0435\u0437 GitHub, \u0447\u0442\u043E\u0431\u044B \u043F\u0443\u0431\u043B\u0438\u043A\u043E\u0432\u0430\u0442\u044C \u0437\u0430\u043F\u0438\u0441\u0438 \u0432 \u0433\u0430\u043B\u0435\u0440\u0435\u044E (\u0430\u0434\u0440\u0435\u0441 \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u2014 CYBERZAVOD_API_URL)",
+    run: async () => {
+      await login(defaultSharing());
+      return SUCCESS;
+    }
+  },
+  logout: {
+    usage: "logout",
+    summary: "\u0437\u0430\u0431\u044B\u0442\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D\u043D\u044B\u0439 \u0442\u043E\u043A\u0435\u043D GitHub",
+    run: async () => {
+      await logout(defaultSharing());
+      return SUCCESS;
+    }
+  },
+  share: {
+    usage: "share <id \u0437\u0430\u043F\u0438\u0441\u0438>",
+    summary: "\u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0437\u0430\u043F\u0438\u0441\u044C \u0441\u0435\u0441\u0441\u0438\u0438 \u0438\u0437 \u0436\u0443\u0440\u043D\u0430\u043B\u0430 \u0432 \u0432\u0430\u0448\u0443 \u0433\u0430\u043B\u0435\u0440\u0435\u044E \u0438 \u043F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0443 \u043D\u0430 \u043D\u0435\u0451",
+    run: async ({ args, directory }) => {
+      const { positionals } = parseArgs({ args, allowPositionals: true });
+      const [id] = positionals;
+      await shareRecording(defaultSharing(), directory, requiredText(id, "id \u0437\u0430\u043F\u0438\u0441\u0438"));
+      return SUCCESS;
+    }
+  },
+  unshare: {
+    usage: "unshare <id \u0437\u0430\u043F\u0438\u0441\u0438>",
+    summary: "\u0443\u0431\u0440\u0430\u0442\u044C \u0437\u0430\u043F\u0438\u0441\u044C \u0438\u0437 \u0432\u0430\u0448\u0435\u0439 \u0433\u0430\u043B\u0435\u0440\u0435\u0438",
+    run: async ({ args }) => {
+      const { positionals } = parseArgs({ args, allowPositionals: true });
+      const [id] = positionals;
+      await unshareRecording(defaultSharing(), requiredText(id, "id \u0437\u0430\u043F\u0438\u0441\u0438"));
+      return SUCCESS;
+    }
+  },
+  gallery: {
+    usage: "gallery [--public | --private]",
+    summary: "\u0432\u0430\u0448\u0438 \u0437\u0430\u043F\u0438\u0441\u0438 \u0432 \u0433\u0430\u043B\u0435\u0440\u0435\u0435, \u043B\u0438\u043C\u0438\u0442 \u0438 \u0441\u0441\u044B\u043B\u043A\u0438; --public \u043E\u0442\u043A\u0440\u044B\u0432\u0430\u0435\u0442 \u0433\u0430\u043B\u0435\u0440\u0435\u044E, --private \u0437\u0430\u043A\u0440\u044B\u0432\u0430\u0435\u0442",
+    run: async ({ args }) => {
+      const { values } = parseArgs({
+        args,
+        options: { public: { type: "boolean" }, private: { type: "boolean" } }
+      });
+      const access2 = galleryAccessOf(values.public === true, values.private === true);
+      await showGallery(defaultSharing(), access2);
+      return SUCCESS;
+    }
+  },
   hook: {
     usage: `hook <${HOOK_NAMES.join("|")}>`,
     summary: "\u0445\u0443\u043A Claude Code: \u0441\u043E\u0431\u044B\u0442\u0438\u0435 \u043D\u0430 stdin; \u0435\u0433\u043E \u0432\u044B\u0437\u044B\u0432\u0430\u044E\u0442 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043F\u0440\u043E\u0435\u043A\u0442\u0430, \u0430 \u043D\u0435 \u0447\u0435\u043B\u043E\u0432\u0435\u043A",
@@ -4001,7 +4601,14 @@ function usage() {
 
 ${lines.join("\n")}`;
 }
-var EXPECTED_ERRORS = [CommandError, GenerateError, ProjectFileError, JournalError, RecordError];
+var EXPECTED_ERRORS = [
+  CommandError,
+  ApiError,
+  GenerateError,
+  ProjectFileError,
+  JournalError,
+  RecordError
+];
 var ARGUMENT_ERROR_PREFIX = "ERR_PARSE_ARGS";
 function isExpected(err) {
   if (EXPECTED_ERRORS.some((kind) => err instanceof kind)) return true;
