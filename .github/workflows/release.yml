@@ -33,6 +33,12 @@ jobs:
             exit 1
           fi
       - run: make check-web
+      # Пакеты монорепозитория уже собраны внутрь dist/cyberzavod.mjs, а версий у них нет:
+      # pnpm не может подставить их вместо workspace:* и отказывается упаковывать пакет.
+      # Пользователю пакета devDependencies не нужны, поэтому из публикуемого манифеста они убраны.
+      - name: Манифест пакета без зависимостей сборки
+        working-directory: packages/cli
+        run: npm pkg delete devDependencies
       - run: pnpm --filter cyberzavod publish --access public --provenance --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
