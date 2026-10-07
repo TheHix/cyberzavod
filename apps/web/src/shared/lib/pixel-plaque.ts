@@ -62,6 +62,9 @@ export const PLAQUE_GLYPHS: Readonly<Record<string, PlaqueArt>> = {
   Z: ["kkk", "..k", ".k.", "k..", "kkk"],
 };
 
+/** Насколько тень бумаги темнее самой бумаги — для `shade`: у табличек цеха, в меню и в иконках одна. */
+export const PLAQUE_PAPER_SHADE = -0.12;
+
 const GLYPH_HEIGHT = 5;
 const LETTER_GAP = 1;
 const LINE_GAP = 1;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseColor, readPalette, shade, type TokenSource } from "./palette.ts";
+import type { TokenSource } from "@/shared/lib/css-tokens.ts";
+import { readPalette } from "./palette.ts";
 
 // Все токены, которые читает цех, — каждый своим цветом, чтобы было видно, что откуда взято.
 function tokens(overrides: Record<string, string> = {}): TokenSource {
@@ -35,26 +36,6 @@ function tokens(overrides: Record<string, string> = {}): TokenSource {
   );
   return { getPropertyValue: (name) => overrides[name] ?? values[name] ?? "" };
 }
-
-describe("parseColor", () => {
-  it("переводит цвет токена в число, не глядя на пробелы вокруг", () => {
-    const color = parseColor(" #1d1B33 ");
-
-    expect(color).toBe(0x1d1b33);
-  });
-
-  it("разворачивает короткую запись, до которой сборка сжимает белый", () => {
-    const color = parseColor("#fA0");
-
-    expect(color).toBe(0xffaa00);
-  });
-
-  it.each(["", "red", "#ffff", "#ffffff0", "rgb(0 0 0)"])("отклоняет «%s»", (value) => {
-    const act = () => parseColor(value);
-
-    expect(act).toThrow(/#rrggbb/);
-  });
-});
 
 describe("readPalette", () => {
   it("берёт краски станков из токенов этапов", () => {
@@ -96,18 +77,5 @@ describe("readPalette", () => {
     const act = () => readPalette(source);
 
     expect(act).toThrow(/#rrggbb/);
-  });
-});
-
-describe("shade", () => {
-  it.each([
-    [0x808080, 0, 0x808080],
-    [0x808080, -1, 0x000000],
-    [0x808080, 1, 0xffffff],
-    [0x204060, -0.5, 0x102030],
-  ])("цвет %s со сдвигом %s становится %s", (color, amount, expected) => {
-    const result = shade(color, amount);
-
-    expect(result).toBe(expected);
   });
 });

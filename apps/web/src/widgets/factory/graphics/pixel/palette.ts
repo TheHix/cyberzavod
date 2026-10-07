@@ -3,6 +3,8 @@
 
 import type { Stage } from "@cyberzavod/core";
 import type { PartStatus } from "@cyberzavod/player";
+import { parseColor } from "@/shared/lib/color.ts";
+import type { TokenSource } from "@/shared/lib/css-tokens.ts";
 
 /** Краски цеха числами 0xRRGGBB — в таком виде их берёт PixiJS. */
 export interface Palette {
@@ -35,36 +37,6 @@ export interface Palette {
   readonly lamp: { readonly off: number; readonly on: number };
   /** Свечение под деталью по состоянию; у детали в работе свечения нет. */
   readonly status: Readonly<Record<PartStatus, number | null>>;
-}
-
-/** Откуда читаются токены — достаточно `getPropertyValue`, как у `CSSStyleDeclaration`. */
-export interface TokenSource {
-  getPropertyValue(name: string): string;
-}
-
-const HEX_COLOR = /^#([\da-f]{6})$/i;
-// Сборка сжимает CSS: `#ffffff` в токенах доходит до браузера как `#fff`.
-const SHORT_HEX_COLOR = /^#([\da-f]{3})$/i;
-const HEX_BASE = 16;
-
-/**
- * Переводит цвет CSS вида `#rrggbb` или `#rgb` в число для PixiJS.
- * @param {string} value Цвет из токена.
- * @returns {number} Цвет 0xRRGGBB.
- * @throws {Error} Если это не цвет вида `#rrggbb` или `#rgb`.
- */
-export function parseColor(value: string): number {
-  const color = value.trim();
-  const short = SHORT_HEX_COLOR.exec(color)?.[1];
-  const hex = short === undefined ? HEX_COLOR.exec(color)?.[1] : doubledDigits(short);
-  if (hex === undefined) {
-    throw new Error(`краска цеха должна быть вида #rrggbb или #rgb, а не «${value}»`);
-  }
-  return Number.parseInt(hex, HEX_BASE);
-}
-
-function doubledDigits(hex: string): string {
-  return [...hex].map((digit) => digit + digit).join("");
 }
 
 /**
@@ -108,22 +80,4 @@ export function readPalette(tokens: TokenSource): Palette {
     lamp: { off: inkSoft, on: color("--lamp-on") },
     status: { ok: null, defect: color("--danger"), done: mint, scrap: inkSoft },
   };
-}
-
-const CHANNEL = 0xff;
-
-/**
- * Делает цвет темнее или светлее — для объёма: тёмная грань станка, светлый блик.
- * @param {number} color Цвет 0xRRGGBB.
- * @param {number} amount От −1 (чёрный) через 0 (без изменений) до 1 (белый).
- * @returns {number} Новый цвет 0xRRGGBB.
- */
-export function shade(color: number, amount: number): number {
-  const target = amount < 0 ? 0 : CHANNEL;
-  const weight = Math.min(1, Math.abs(amount));
-  const mix = (shift: number) => {
-    const channel = (color >> shift) & CHANNEL;
-    return Math.round(channel + (target - channel) * weight) << shift;
-  };
-  return mix(16) | mix(8) | mix(0);
 }
