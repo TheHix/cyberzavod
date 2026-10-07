@@ -146,5 +146,6 @@ export const UI_TEXT = {
       ru: "Адаптер агента (первый — Claude Code) пишет журнал сессии, из него собирается запись: этапы, промпты, реплики, время и токены. Цех проигрывает её — каждый станок это этап, рабочие передают деталь из рук в руки, а мастер в своём кабинете раздаёт задания и принимает отчёты.",
     },
     code: { en: "Project code on GitHub", ru: "Код проекта на GitHub" },
+    madeBy: { en: "Made by", ru: "Сделал" },
   },
 } as const satisfies Readonly<Record<string, Readonly<Record<string, Translated<unknown>>>>>;
