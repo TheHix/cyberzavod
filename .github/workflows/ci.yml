@@ -52,6 +52,8 @@ jobs:
   # Образы помечаются полным sha коммита: по нему версия деплоится и откатывается.
   # Сторонние actions с правом записи в реестр закреплены по sha коммита, а не по тегу.
   images:
+    # Без имени GitHub перечисляет в нём все значения матрицы, вместе с «.» контекста сайта.
+    name: images (${{ matrix.image }})
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [web, api, scripts]
     runs-on: ubuntu-latest
