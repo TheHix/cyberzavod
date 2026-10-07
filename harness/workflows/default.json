@@ -1,0 +1,4 @@
+{
+  "name": "default",
+  "stages": ["planning", "implementation", "review", "verification", "record"]
+}
