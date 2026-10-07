@@ -1,12 +1,20 @@
+import { isLocale, LOCALES, type Locale } from "@/shared/i18n/locale.ts";
+
 /** Заголовочные данные гайда: то, что сайт показывает в списке и в шапке страницы. */
 export interface GuideMeta {
-  /** Имя файла гайда без `.md`: часть адреса страницы. */
+  /** Общий для всех языков id из имени файла: часть адреса страницы. */
   id: string;
   title: string;
   /** Описание одной строкой: для списка гайдов и мета-тега страницы. */
   description: string;
   /** Место в списке: меньшие числа идут раньше. */
   order: number;
+}
+
+/** Что говорит о гайде имя его файла `<id>.<язык>.md`. */
+export interface GuideFileName {
+  id: string;
+  locale: Locale;
 }
 
 /** Ошибка гайда: файл пришёл извне и не прошёл проверку. */
@@ -21,29 +29,37 @@ function isLine(value: unknown): value is string {
 }
 
 /**
- * Берёт id гайда из пути его файла: имя без `.md`. Id становится частью адреса страницы,
- * поэтому имя из строчных латинских букв и цифр через дефис.
+ * Разбирает путь файла гайда: имя `<id>.<язык>.md`. Id становится частью адреса страницы,
+ * поэтому он из строчных латинских букв и цифр через дефис.
  * @param {string} file Путь файла гайда, как его отдаёт `import.meta.glob`.
- * @returns {string} Id гайда.
- * @throws {GuideError} Если это не `.md` или имя не подходит для адреса.
+ * @returns {GuideFileName} Id гайда и язык файла.
+ * @throws {GuideError} Если это не `.md`, нет языка сайта или имя не подходит для адреса.
  */
-export function guideIdOf(file: string): string {
+export function guideFileOf(file: string): GuideFileName {
   const name = file.slice(file.lastIndexOf("/") + 1);
   if (!name.endsWith(GUIDE_FILE_EXTENSION)) {
     throw new GuideError(`гайд должен быть файлом ${GUIDE_FILE_EXTENSION}`);
   }
-  const id = name.slice(0, -GUIDE_FILE_EXTENSION.length);
-  if (!GUIDE_ID_PATTERN.test(id)) {
+  const stem = name.slice(0, -GUIDE_FILE_EXTENSION.length);
+  const localeStart = stem.lastIndexOf(".");
+  const id = stem.slice(0, Math.max(localeStart, 0));
+  const locale = stem.slice(localeStart + 1);
+  if (localeStart === -1 || !isLocale(locale)) {
     throw new GuideError(
-      `имя файла «${id}» должно состоять из строчных латинских букв и цифр через «-»`,
+      `имя файла «${name}» должно заканчиваться языком сайта: .${LOCALES.join(".md, .")}.md`,
     );
   }
-  return id;
+  if (!GUIDE_ID_PATTERN.test(id)) {
+    throw new GuideError(
+      `id гайда «${id}» должен состоять из строчных латинских букв и цифр через «-»`,
+    );
+  }
+  return { id, locale };
 }
 
 /**
  * Проверяет frontmatter гайда, пришедший извне, и возвращает заголовочные данные.
- * @param {string} id Id гайда из `guideIdOf`.
+ * @param {string} id Id гайда из `guideFileOf`.
  * @param {unknown} frontmatter Разобранный YAML из начала файла.
  * @returns {GuideMeta} Проверенные данные; неизвестные поля отброшены.
  * @throws {GuideError} Если frontmatter не соответствует формату.

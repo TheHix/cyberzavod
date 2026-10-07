@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { Project } from "@cyberzavod/core";
 import { projectOf, UnknownProjectError } from "./lookup.ts";
+import type { PublishedProject } from "./published.ts";
 
-function projectWith(id: string): Project {
-  return { id, name: `Проект ${id}`, description: "Описание" };
+function projectWith(id: string): PublishedProject {
+  return {
+    id,
+    name: { en: `Project ${id}`, ru: `Проект ${id}` },
+    description: { en: "Description", ru: "Описание" },
+  };
 }
 
 describe("projectOf", () => {

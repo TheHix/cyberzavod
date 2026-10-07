@@ -147,7 +147,7 @@ describe("toDraft", () => {
     const draft = toDraft(raw, { sessionId: "744e7547-d312" });
 
     expect(draft.builds).toEqual([
-      { id: draft.id, project: "", harness: "", workflow: "", title: "", runs: [] },
+      { id: draft.id, project: "", harness: "", workflow: "", title: "", language: "", runs: [] },
     ]);
   });
 
@@ -1781,6 +1781,7 @@ function routedDraft(events: DraftEvent[], secondRuns: string[]): Draft {
         harness: "0.1.0",
         workflow: "default",
         title: "",
+        language: "ru",
         runs: ["a1", "a2"],
       },
       {
@@ -1789,6 +1790,7 @@ function routedDraft(events: DraftEvent[], secondRuns: string[]): Draft {
         harness: "0.1.0",
         workflow: "default",
         title: "",
+        language: "ru",
         runs: secondRuns,
       },
     ],

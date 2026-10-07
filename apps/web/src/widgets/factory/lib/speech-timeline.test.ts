@@ -14,6 +14,7 @@ function validScript(): FactoryScript {
     source: { type: "manual" },
     data: {
       title: "Тест",
+      language: "ru",
       workflow: "default",
       harness: "0.0.0",
       events: [
@@ -149,6 +150,7 @@ function scriptWithIntervention(): FactoryScript {
     source: { type: "manual" },
     data: {
       title: "Тест",
+      language: "ru",
       workflow: "default",
       harness: "0.0.0",
       events: [

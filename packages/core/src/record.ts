@@ -101,6 +101,11 @@ export interface RecordHeader {
 /** Данные сессии: задача прошла по этапам процесса, события — то, что проигрывает цех. */
 export interface SessionData {
   title: string;
+  /**
+   * Язык оригинала промптов и реплик — код ISO 639 (`ru`, `en`). Запись не переводится,
+   * зритель на другом языке видит её в оригинале с этой пометкой.
+   */
+  language: string;
   /** Имя процесса из `harness/workflows/`. */
   workflow: string;
   /** Версия harness одной строкой, например `0.3.0`: по ней видно, какие правила работали. */
@@ -212,6 +217,21 @@ export function isRecordId(value: unknown): value is string {
  */
 export function isHarnessVersion(value: unknown): value is string {
   return isLine(value);
+}
+
+/** Язык записей, опубликованных до поля `language`: тогда все записи были русскими. */
+export const LEGACY_SESSION_LANGUAGE = "ru";
+
+// Основной подтег языка BCP 47: двух- или трёхбуквенный код ISO 639 строчными буквами.
+const LANGUAGE_CODE_PATTERN = /^[a-z]{2,3}$/;
+
+/**
+ * Проверяет, что значение — код языка записи: `ru`, `en`, `deu`.
+ * @param {unknown} value Проверяемое значение.
+ * @returns {value is string} true, если это код ISO 639 из двух-трёх строчных латинских букв.
+ */
+export function isLanguageCode(value: unknown): value is string {
+  return typeof value === "string" && LANGUAGE_CODE_PATTERN.test(value);
 }
 
 // Строгое сравнение с toISOString отсекает и другие форматы, и несуществующие дни вроде
@@ -351,15 +371,18 @@ function parseEvents(raw: unknown): SessionEvent[] {
 
 function parseSessionData(raw: unknown): SessionData {
   if (!isObject(raw)) throw new RecordError("data должна быть объектом");
-  const { title, workflow, harness } = raw;
+  const { title, workflow, harness, language = LEGACY_SESSION_LANGUAGE } = raw;
   if (!isLine(title)) {
     throw new RecordError("title должен быть непустой строкой без переводов строки");
+  }
+  if (!isLanguageCode(language)) {
+    throw new RecordError("language должен быть кодом языка ISO 639: ru, en");
   }
   if (!isLine(workflow)) throw new RecordError("workflow должен быть непустой строкой");
   if (!isHarnessVersion(harness)) {
     throw new RecordError("harness должна быть непустой строкой без переводов строки");
   }
-  return { title, workflow, harness, events: parseEvents(raw.events) };
+  return { title, language, workflow, harness, events: parseEvents(raw.events) };
 }
 
 function parseDecisionData(raw: unknown): DecisionRecord["data"] {

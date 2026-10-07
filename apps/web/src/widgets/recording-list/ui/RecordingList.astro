@@ -2,7 +2,7 @@
 // Список записей: заголовок, проект, день и главные счётчики каждой сборки.
 import { summarize, type SessionRecord } from "@cyberzavod/core";
 import { projectOf, projectUrl, publishedProjects } from "@/entities/project";
-import { recordingUrl } from "@/entities/recording";
+import { languageNoteOf, recordingUrl } from "@/entities/recording";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { formatCount, formatDate, formatDuration } from "@/shared/lib/format.ts";
@@ -24,21 +24,25 @@ const { recordings, locale } = Astro.props;
     {recordings.map((recording) => {
       const stats = summarize(recording);
       const project = projectOf(publishedProjects, recording.projectId);
+      const languageNote = languageNoteOf(recording.data.language, locale);
       return (
         <li>
           <Card>
             <div class="record">
               <Chip tone="sun">{formatDate(recording.timestamp, locale)}</Chip>
               <a href={recordingUrl(recording.id, locale)}>
-                <Title as="span">{recording.data.title}</Title>
+                <Title as="span" lang={recording.data.language}>
+                  {recording.data.title}
+                </Title>
               </a>
               <ButtonLink variant="link" href={projectUrl(project.id, locale)}>
-                {project.name}
+                {project.name[locale]}
               </ButtonLink>
               <p class="note">
                 {formatDuration(stats.durationMs, locale)} ·{" "}
                 {formatCount(stats.tokens, UI_TEXT.lists.tokens, locale)} ·{" "}
                 {formatCount(stats.prompts, UI_TEXT.lists.prompts, locale)}
+                {languageNote !== undefined && ` · ${languageNote}`}
               </p>
             </div>
           </Card>

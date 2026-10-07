@@ -4,6 +4,7 @@ import {
   formatCount,
   formatDate,
   formatDuration,
+  formatLanguage,
   formatModel,
   formatTokens,
   type PluralWords,
@@ -124,5 +125,23 @@ describe("formatCount", () => {
     const result = formatCount(count, prompts, "en");
 
     expect(result).toBe(expected);
+  });
+});
+
+describe("formatLanguage", () => {
+  it.each([
+    ["ru", "en", "Russian"],
+    ["en", "ru", "английский"],
+    ["ru", "ru", "русский"],
+  ] as const)("называет язык %s на языке страницы %s", (code, locale, expected) => {
+    const name = formatLanguage(code, locale);
+
+    expect(name).toBe(expected);
+  });
+
+  it("показывает незнакомый код как есть", () => {
+    const name = formatLanguage("qaa", "en");
+
+    expect(name).toMatch(/qaa/i);
   });
 });

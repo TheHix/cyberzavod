@@ -21,9 +21,20 @@ interface Props {
   path: string;
   title?: string | undefined;
   description?: string | undefined;
+  /**
+   * Страница «не найдено»: у неё нет своего адреса — nginx отдаёт её на любой неизвестный, —
+   * поэтому нет `canonical`, `hreflang` и `og:url`, и поисковики её не индексируют.
+   */
+  notFound?: boolean | undefined;
 }
 
-const { locale, path, title, description = site.description[locale] } = Astro.props;
+const {
+  locale,
+  path,
+  title,
+  description = site.description[locale],
+  notFound = false,
+} = Astro.props;
 const siteName = site.name[locale];
 const fullTitle = title ? `${title} — ${siteName}` : siteName;
 const canonical = new URL(localizedPath(locale, path), Astro.site);
@@ -59,16 +70,22 @@ const structuredData = JSON.stringify({
     <meta name="theme-color" content={siteThemeColor()} />
     <link rel="icon" type="image/svg+xml" href={localizedPath(locale, site.images.favicon)} />
     <link rel="apple-touch-icon" href={localizedPath(locale, site.images.touchIcon)} />
-    <link rel="canonical" href={canonical} />
-    {alternates.map(({ hreflang, href }) => (
-      <link rel="alternate" hreflang={hreflang} href={href} />
-    ))}
-    <link rel="alternate" hreflang="x-default" href={defaultAlternate} />
+    {notFound ? (
+      <meta name="robots" content="noindex" />
+    ) : (
+      <>
+        <link rel="canonical" href={canonical} />
+        {alternates.map(({ hreflang, href }) => (
+          <link rel="alternate" hreflang={hreflang} href={href} />
+        ))}
+        <link rel="alternate" hreflang="x-default" href={defaultAlternate} />
+      </>
+    )}
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={siteName} />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
-    <meta property="og:url" content={canonical} />
+    {!notFound && <meta property="og:url" content={canonical} />}
     <meta property="og:locale" content={openGraphLocale(locale)} />
     {otherLocales(locale).map((other) => (
       <meta property="og:locale:alternate" content={openGraphLocale(other)} />

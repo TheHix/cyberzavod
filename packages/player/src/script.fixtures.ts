@@ -97,7 +97,7 @@ export function reworkRecording(ok = true): SessionRecord {
     timestamp: "2026-10-04T00:00:00.000Z",
     projectId: "test",
     source: { type: "manual" },
-    data: { title: "Тест", workflow: "default", harness: "0.0.0", events },
+    data: { title: "Тест", language: "ru", workflow: "default", harness: "0.0.0", events },
   };
 }
 

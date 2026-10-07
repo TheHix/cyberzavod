@@ -1,32 +1,32 @@
 import type { MarkdownInstance } from "astro";
-import { guideIdOf, parseGuideMeta, type GuideMeta } from "./guide.ts";
+import { guideFileOf, parseGuideMeta } from "./guide.ts";
 import { byGuideOrder } from "./order.ts";
+import { pairTranslations, type Guide, type GuideFile } from "./translations.ts";
 
-type GuideFile = MarkdownInstance<Record<string, unknown>>;
+type MarkdownFile = MarkdownInstance<Record<string, unknown>>;
 
-/** Опубликованный гайд: проверенные данные и тело, которое рисует `<Content />`. */
-export interface PublishedGuide {
-  meta: GuideMeta;
-  Content: GuideFile["Content"];
-}
+/** Тело гайда: его рисует `<Content />` на странице. */
+type GuideContent = MarkdownFile["Content"];
 
-// Гайды читаются при сборке сайта: битый гайд роняет сборку, а не страницу у читателя.
-const files = import.meta.glob<GuideFile>("@guides/*.md", {
+/** Опубликованный гайд: id, место в списке и проверенные переводы на все языки сайта. */
+export type PublishedGuide = Guide<GuideContent>;
+
+// Гайды читаются при сборке сайта: битый или непереведённый гайд роняет сборку, а не страницу
+// у читателя.
+const files = import.meta.glob<MarkdownFile>("@guides/*.md", {
   eager: true,
 });
 
-function parsePublished([file, guide]: [string, GuideFile]): PublishedGuide {
+function parseFile([file, markdown]: [string, MarkdownFile]): GuideFile<GuideContent> {
   try {
-    return {
-      meta: parseGuideMeta(guideIdOf(file), guide.frontmatter),
-      Content: guide.Content,
-    };
+    const { id, locale } = guideFileOf(file);
+    return { meta: parseGuideMeta(id, markdown.frontmatter), locale, body: markdown.Content };
   } catch (err) {
     throw new Error(`гайд ${file} не прошёл проверку`, { cause: err });
   }
 }
 
 /** Гайды сайта в порядке `order`. */
-export const publishedGuides: readonly PublishedGuide[] = Object.entries(files)
-  .map(parsePublished)
-  .sort((a, b) => byGuideOrder(a.meta, b.meta));
+export const publishedGuides: readonly PublishedGuide[] = pairTranslations(
+  Object.entries(files).map(parseFile),
+).sort(byGuideOrder);

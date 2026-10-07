@@ -35,7 +35,7 @@ Cyberzavod — локальный, независимый от модели harn
 - `.cyberzavod/journal/` — журнал этого проекта, в git: `sessions/`, `decisions/`, `notes/`. `capture/` в нём — сырые журналы и черновики адаптера, вне git. Сайт берёт сессии из `.cyberzavod/journal/sessions/` при сборке.
 - `.cyberzavod/bin/cyberzavod.mjs` — собранный CLI, в git: его запускают хуки. Руками не правится, его пишет `sync`.
 - `projects/` — карточки проектов для сайта (название, описание, ссылки), в git; сайт берёт их при сборке.
-- `guides/` — гайды для сайта в Markdown, в git; сайт берёт их при сборке; новый гайд — новый файл.
+- `guides/` — гайды для сайта в Markdown, в git: `<id>.<язык>.md`, по файлу на каждый язык сайта; сайт берёт их при сборке; новый гайд — новые файлы.
 - `apps/web` — сайт: Astro + SolidJS + Nano Stores, слои FSD, свой ui-kit на Kobalte, цех на весь экран на canvas через PixiJS.
 - `apps/api` — API на Go с Postgres.
 - `compose.yaml` — локальное окружение: db → migrate → api.

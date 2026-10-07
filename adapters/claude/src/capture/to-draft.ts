@@ -919,7 +919,7 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
   return routeMessages({
     id,
     startedAt,
-    builds: [{ id, ...projectOf(events), title: "", runs: [] }],
+    builds: [{ id, ...projectOf(events), title: "", language: "", runs: [] }],
     events: withSessionUsages(mergeMessages(draftEvents, messages), sessionUsages),
   });
 }

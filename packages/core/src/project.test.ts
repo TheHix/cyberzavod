@@ -5,16 +5,21 @@ import { parseProject, ProjectError } from "./project.ts";
 function validProject(): Record<string, unknown> {
   return {
     id: "cyberzavod",
-    name: "Киберзавод",
-    description: "Цех, в котором ИИ-агенты собирают продукты.",
+    name: { en: "Cyberzavod", ru: "Киберзавод" },
+    description: {
+      en: "A factory floor where AI agents build products.",
+      ru: "Цех, в котором ИИ-агенты собирают продукты.",
+    },
   };
 }
+
+const LANGUAGES = ["en", "ru"] as const;
 
 describe("parseProject", () => {
   it("принимает карточку без ссылок", () => {
     const raw = validProject();
 
-    const project = parseProject(raw);
+    const project = parseProject(raw, LANGUAGES);
 
     expect(project).toEqual(raw);
   });
@@ -26,7 +31,7 @@ describe("parseProject", () => {
       website: "https://cyberzavod.com",
     };
 
-    const project = parseProject(raw);
+    const project = parseProject(raw, LANGUAGES);
 
     expect(project.repo).toBe("https://github.com/bysavelii/cyberzavod");
     expect(project.website).toBe("https://cyberzavod.com");
@@ -35,13 +40,13 @@ describe("parseProject", () => {
   it("не добавляет отсутствующие ссылки и отбрасывает неизвестные поля", () => {
     const raw = { ...validProject(), license: "MIT" };
 
-    const project = parseProject(raw);
+    const project = parseProject(raw, LANGUAGES);
 
     expect(Object.keys(project).sort()).toEqual(["description", "id", "name"]);
   });
 
   it("отклоняет не объект", () => {
-    const act = () => parseProject("cyberzavod");
+    const act = () => parseProject("cyberzavod", LANGUAGES);
 
     expect(act).toThrow(ProjectError);
   });
@@ -49,31 +54,41 @@ describe("parseProject", () => {
   it("отклоняет id с недопустимыми символами", () => {
     const raw = { ...validProject(), id: "../etc" };
 
-    const act = () => parseProject(raw);
+    const act = () => parseProject(raw, LANGUAGES);
 
     expect(act).toThrow(/id/);
   });
 
-  it("отклоняет пустое name", () => {
-    const raw = { ...validProject(), name: "  " };
+  it("отбрасывает переводы на языки, которых нет у витрины", () => {
+    const raw = {
+      ...validProject(),
+      name: { en: "Cyberzavod", ru: "Киберзавод", de: "Cyberwerk" },
+    };
 
-    const act = () => parseProject(raw);
+    const project = parseProject(raw, LANGUAGES);
 
-    expect(act).toThrow(/name/);
+    expect(project.name).toEqual({ en: "Cyberzavod", ru: "Киберзавод" });
   });
 
-  it("отклоняет description с переводом строки", () => {
-    const raw = { ...validProject(), description: "Первая\nвторая" };
+  it.each([
+    ["name строкой, а не переводами", { name: "Киберзавод" }, /name/],
+    ["name без английского", { name: { ru: "Киберзавод" } }, /name на en/],
+    ["description без русского", { description: { en: "Factory." } }, /description на ru/],
+    ["пустое name", { name: { en: "  ", ru: "Киберзавод" } }, /name на en/],
+    ["description с переводом строки", { description: { en: "a\nb", ru: "б" } }, /description/],
+  ])("отклоняет карточку: %s", (_case, override, message) => {
+    const raw = { ...validProject(), ...override };
 
-    const act = () => parseProject(raw);
+    const act = () => parseProject(raw, LANGUAGES);
 
-    expect(act).toThrow(/description/);
+    expect(act).toThrow(ProjectError);
+    expect(act).toThrow(message);
   });
 
   it("отклоняет ссылку http://", () => {
     const raw = { ...validProject(), repo: "http://github.com/bysavelii/cyberzavod" };
 
-    const act = () => parseProject(raw);
+    const act = () => parseProject(raw, LANGUAGES);
 
     expect(act).toThrow(/repo/);
   });
@@ -81,7 +96,7 @@ describe("parseProject", () => {
   it("отклоняет не-адрес в website", () => {
     const raw = { ...validProject(), website: "не адрес" };
 
-    const act = () => parseProject(raw);
+    const act = () => parseProject(raw, LANGUAGES);
 
     expect(act).toThrow(ProjectError);
     expect(act).toThrow(/website/);

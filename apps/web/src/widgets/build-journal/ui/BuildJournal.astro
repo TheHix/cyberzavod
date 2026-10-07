@@ -8,6 +8,7 @@
 import type { InterventionEvent, MessageEvent, PromptEvent, SessionRecord } from "@cyberzavod/core";
 import { interventionAnchor, labelOf } from "@/entities/intervention";
 import { recipientOf } from "@/entities/prompt";
+import { languageNoteOf } from "@/entities/recording";
 import { messageAnchor, paragraphsOf, routeOf } from "@/entities/message";
 import type { Speech } from "@/features/journal-sync";
 import type { Locale } from "@/shared/i18n/locale.ts";
@@ -72,7 +73,11 @@ function entriesOf(events: SessionRecord["data"]["events"]): Entry[] {
 }
 
 const entries = entriesOf(recording.data.events);
+const { language } = recording.data;
+const languageNote = languageNoteOf(language, locale);
 ---
+
+{languageNote !== undefined && <p class="language">{languageNote}</p>}
 
 {entries.length === 0 ? (
   <p class="empty">{UI_TEXT.journal.empty[locale]}</p>
@@ -91,16 +96,18 @@ const entries = entriesOf(recording.data.events);
                 route={UI_TEXT.speech.humanTo[locale](recipientOf(entry.prompt, locale))}
               >
                 {entry.prompt.requirements.length === 0 ? (
-                  <Title>{entry.prompt.goal}</Title>
+                  <Title lang={language}>{entry.prompt.goal}</Title>
                 ) : (
                   <details class="details">
                     <summary>
-                      <Title as="span">{entry.prompt.goal}</Title>
+                      <Title as="span" lang={language}>
+                        {entry.prompt.goal}
+                      </Title>
                       <span class={`more ${buttonClass({ variant: "link" })}`}>
                         {UI_TEXT.speech.more[locale]}
                       </span>
                     </summary>
-                    <BulletList items={entry.prompt.requirements} />
+                    <BulletList items={entry.prompt.requirements} lang={language} />
                   </details>
                 )}
               </JournalEntry>
@@ -116,8 +123,8 @@ const entries = entriesOf(recording.data.events);
                 clock={formatClock(entry.intervention.t)}
                 route={labelOf(entry.intervention, locale)}
               >
-                <Title>{entry.intervention.line}</Title>
-                <div class="text">
+                <Title lang={language}>{entry.intervention.line}</Title>
+                <div class="text" lang={language}>
                   {paragraphsOf(entry.intervention.text).map((paragraph) => (
                     <p>{paragraph}</p>
                   ))}
@@ -135,8 +142,8 @@ const entries = entriesOf(recording.data.events);
                 clock={formatClock(entry.message.t)}
                 route={routeOf(entry.message, locale)}
               >
-                <Title>{entry.message.line}</Title>
-                <div class="text">
+                <Title lang={language}>{entry.message.line}</Title>
+                <div class="text" lang={language}>
                   {paragraphsOf(entry.message.text).map((paragraph) => (
                     <p>{paragraph}</p>
                   ))}
@@ -197,5 +204,11 @@ const entries = entriesOf(recording.data.events);
   .empty {
     margin: 0;
     color: var(--ink-soft);
+  }
+
+  .language {
+    margin: 0 0 var(--space-m);
+    color: var(--ink-soft);
+    font-weight: 700;
   }
 </style>

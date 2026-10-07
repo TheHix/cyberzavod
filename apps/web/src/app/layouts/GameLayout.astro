@@ -28,14 +28,25 @@ interface Props {
    * заголовком второго уровня, а первый — сайт. Виден только программам чтения и поисковикам.
    */
   heading?: string | undefined;
+  /** Страница «не найдено»: nginx отдаёт её на любой неизвестный адрес, поисковикам она не нужна. */
+  notFound?: boolean;
 }
 
-const { locale, title, description, journal = false, project = false, heading } = Astro.props;
-const path = pathWithoutLocale(Astro.url.pathname);
+const {
+  locale,
+  title,
+  description,
+  journal = false,
+  project = false,
+  heading,
+  notFound = false,
+} = Astro.props;
+// У страницы «не найдено» нет пары на другом языке по адресу: переключатель ведёт в цех.
+const path = notFound ? "/" : pathWithoutLocale(Astro.url.pathname);
 const closeLabel = UI_TEXT.panels.close[locale];
 ---
 
-<BaseLayout locale={locale} path={path} title={title} description={description}>
+<BaseLayout locale={locale} path={path} title={title} description={description} notFound={notFound}>
   <div class="game">
     <Sidebar journal={journal} project={project} locale={locale} path={path} />
     <main class="field">

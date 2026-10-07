@@ -5,6 +5,8 @@ import styles from "./BulletList.module.css";
 interface Props {
   items: readonly string[];
   class?: string | undefined;
+  /** Язык пунктов, если он не совпадает с языком страницы. */
+  lang?: string | undefined;
 }
 
 /**
@@ -12,11 +14,12 @@ interface Props {
  * @param {Props} props Свойства компонента.
  * @param {readonly string[]} props.items Пункты по порядку.
  * @param {string} [props.class] Дополнительный класс для раскладки снаружи.
+ * @param {string} [props.lang] Язык пунктов, если он не совпадает с языком страницы.
  * @returns {JSX.Element} Маркированный список.
  */
 export function BulletList(props: Props): JSX.Element {
   return (
-    <ul class={cx(styles.list, props.class)}>
+    <ul class={cx(styles.list, props.class)} lang={props.lang}>
       <For each={props.items}>{(item) => <li>{item}</li>}</For>
     </ul>
   );

@@ -136,7 +136,7 @@ node .cyberzavod/bin/cyberzavod.mjs sync
 Сайт берёт записи из `.cyberzavod/journal/sessions/` завода и карточки проектов из `projects/` при сборке. Это единственный случай, когда нужен клон завода. Чтобы показать свою работу, предложите pull request в [репозиторий завода](https://github.com/bysavelii/cyberzavod) с двумя файлами:
 
 - запись `.cyberzavod/journal/sessions/<id>.json` из журнала вашего проекта;
-- карточка `projects/<id>.json`: `id`, `name`, `description` одной строкой и необязательные `repo` и `website`, только с `https`.
+- карточка `projects/<id>.json`: `id`, `name` и `description` одной строкой на каждом языке сайта (`{ "en": …, "ru": … }`) и необязательные `repo` и `website`, только с `https`.
 
 Перед этим запустите в клоне `pnpm install` и `make check-web`: он собирает сайт и ловит битую карточку или запись. Посмотреть запись локально можно через `pnpm dev` в клоне: сайт откроется на `http://localhost:4321`, запись будет по адресу `/recordings/<id>/`.
 

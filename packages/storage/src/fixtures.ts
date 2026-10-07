@@ -48,6 +48,7 @@ export function validSession(id = "2026-10-07-demo"): SessionRecord {
     source: { type: "agent", provider: "anthropic", agent: "claude" },
     data: {
       title: "Демо",
+      language: "ru",
       workflow: "default",
       harness: "0.3.0",
       events: [

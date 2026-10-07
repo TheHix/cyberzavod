@@ -1,0 +1,38 @@
+---
+// Страница не найдена: короткое объяснение и дорога обратно в цех.
+import type { Locale } from "@/shared/i18n/locale.ts";
+import { localizedPath } from "@/shared/i18n/path.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
+import { ButtonLink, Panel, Title } from "@/shared/ui";
+
+interface Props {
+  /** Язык страницы. */
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<Panel label={UI_TEXT.notFound.label[locale]}>
+  <div class="not-found">
+    <Title as="h1" size="xl">
+      {UI_TEXT.notFound.heading[locale]}
+    </Title>
+    <p>{UI_TEXT.notFound.text[locale]}</p>
+    <ButtonLink variant="primary" href={localizedPath(locale, "/")}>
+      {UI_TEXT.notFound.toFloor[locale]}
+    </ButtonLink>
+  </div>
+</Panel>
+
+<style>
+  .not-found {
+    display: grid;
+    gap: var(--space-m);
+    justify-items: start;
+  }
+
+  p {
+    margin: 0;
+  }
+</style>

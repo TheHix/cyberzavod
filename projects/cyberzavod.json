@@ -1,7 +1,13 @@
 {
   "id": "cyberzavod",
-  "name": "Киберзавод",
-  "description": "Цех, в котором ИИ-агенты собирают продукты, и сайт, который показывает эту работу. Первый продукт завода — он сам.",
+  "name": {
+    "en": "Cyberzavod",
+    "ru": "Киберзавод"
+  },
+  "description": {
+    "en": "A floor where AI agents build products, and a site that shows that work. The factory's first product is the factory itself.",
+    "ru": "Цех, в котором ИИ-агенты собирают продукты, и сайт, который показывает эту работу. Первый продукт завода — он сам."
+  },
   "repo": "https://github.com/bysavelii/cyberzavod",
   "website": "https://cyberzavod.com"
 }

@@ -2,27 +2,27 @@
 // Статья гайда: заголовок, описание и текст в одной панели, которая прокручивается внутри поля.
 import type { PublishedGuide } from "@/entities/guide";
 import { CopyCode } from "@/features/copy-code";
-import { CONTENT_LOCALE, type Locale } from "@/shared/i18n/locale.ts";
+import type { Locale } from "@/shared/i18n/locale.ts";
 import { Panel, Prose, Title } from "@/shared/ui";
 import GuideBody from "./GuideBody.astro";
 
 interface Props {
   guide: PublishedGuide;
-  /** Язык страницы: на нём подписи кнопок; сама статья — в оригинале. */
+  /** Язык страницы: на нём статья и подписи кнопок. */
   locale: Locale;
 }
 
 const { guide, locale } = Astro.props;
-const { meta, Content } = guide;
-const proseId = `guide-${meta.id}`;
+const { title, description, body: Content } = guide.translations[locale];
+const proseId = `guide-${guide.id}`;
 ---
 
 <Panel scrollable>
-  <article class="article" lang={CONTENT_LOCALE}>
+  <article class="article">
     <Title as="h1" size="xl">
-      {meta.title}
+      {title}
     </Title>
-    <p class="description">{meta.description}</p>
+    <p class="description">{description}</p>
     <Prose id={proseId}>
       <GuideBody locale={locale}>
         <Content />
