@@ -10,6 +10,14 @@ import (
 	"time"
 )
 
+const (
+	// HealthPath — путь проверки жизни процесса; по нему же ходит подкоманда healthcheck.
+	HealthPath = "/api/health"
+	readyPath  = "/api/ready"
+
+	databasePingTimeout = 2 * time.Second
+)
+
 // Pinger — всё, что нужно от базы для проверки готовности.
 type Pinger interface {
 	Ping(ctx context.Context) error
@@ -24,8 +32,8 @@ type Deps struct {
 // NewHandler собирает маршруты API.
 func NewHandler(deps Deps) http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/health", health)
-	mux.HandleFunc("GET /api/ready", ready(deps))
+	mux.HandleFunc(http.MethodGet+" "+HealthPath, health)
+	mux.HandleFunc(http.MethodGet+" "+readyPath, ready(deps))
 	return mux
 }
 
@@ -37,8 +45,9 @@ func health(w http.ResponseWriter, _ *http.Request) {
 // ready отвечает, может ли API обслуживать запросы, то есть доступна ли база.
 func ready(deps Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), databasePingTimeout)
 		defer cancel()
+
 		if err := deps.DB.Ping(ctx); err != nil {
 			deps.Logger.WarnContext(ctx, "база недоступна", "err", err)
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "db unavailable"})
@@ -48,6 +57,7 @@ func ready(deps Deps) http.HandlerFunc {
 	}
 }
 
+// writeJSON отвечает телом body в JSON с кодом status.
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

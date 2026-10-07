@@ -29,6 +29,7 @@ func Migrate(ctx context.Context, url string) (err error) {
 	if err != nil {
 		return fmt.Errorf("разбор DATABASE_URL: %w", err)
 	}
+
 	conn := stdlib.OpenDB(*cfg.ConnConfig)
 	defer func() {
 		if closeErr := conn.Close(); closeErr != nil {
@@ -41,10 +42,12 @@ func Migrate(ctx context.Context, url string) (err error) {
 	if err != nil {
 		return fmt.Errorf("блокировка миграций: %w", err)
 	}
+
 	provider, err := goose.NewProvider(goose.DialectPostgres, conn, migrations.FS, goose.WithSessionLocker(locker))
 	if err != nil {
 		return fmt.Errorf("загрузка миграций: %w", err)
 	}
+
 	if _, err := provider.Up(ctx); err != nil {
 		return fmt.Errorf("применение миграций: %w", err)
 	}
