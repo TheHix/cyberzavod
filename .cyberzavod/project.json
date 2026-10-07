@@ -1,6 +1,6 @@
 {
   "projectId": "cyberzavod",
-  "harness": "0.4.0",
+  "harness": "0.4.1",
   "workflow": "default",
   "journal": ".cyberzavod/journal",
   "agents": {

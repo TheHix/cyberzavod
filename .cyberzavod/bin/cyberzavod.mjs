@@ -3300,7 +3300,7 @@ async function readAssets() {
 }
 
 // src/installation/installation.ts
-var HARNESS_VERSION = "0.4.0";
+var HARNESS_VERSION = "0.4.1";
 var RULES_TEMPLATE = "rules.md";
 function template(templates2, name) {
   const text = templates2[name];

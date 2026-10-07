@@ -14,7 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # Подпись происхождения пакета (npm provenance).
+      # Trusted Publishing: npm принимает публикацию по OIDC-токену job'а вместо секрета
+      # и сам подписывает происхождение пакета (provenance).
       id-token: write
     steps:
       - uses: actions/checkout@v7
@@ -34,11 +35,11 @@ jobs:
           fi
       - run: make check-web
       # Пакеты монорепозитория уже собраны внутрь dist/cyberzavod.mjs, а версий у них нет:
-      # pnpm не может подставить их вместо workspace:* и отказывается упаковывать пакет.
+      # подставить их вместо workspace:* нельзя.
       # Пользователю пакета devDependencies не нужны, поэтому из публикуемого манифеста они убраны.
       - name: Манифест пакета без зависимостей сборки
         working-directory: packages/cli
         run: npm pkg delete devDependencies
-      - run: pnpm --filter cyberzavod publish --access public --provenance --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Публикация
+        working-directory: packages/cli
+        run: npm publish --access public
