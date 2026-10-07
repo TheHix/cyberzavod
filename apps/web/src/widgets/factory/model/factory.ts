@@ -1,15 +1,12 @@
 // Модель цеха на Nano Stores: состояние проигрывания и всё, что из него следует. Без Solid
 // и DOM — компоненты только читают сторы и вызывают действия, кадр сцены считает ядро.
 
+import { FOREMAN, summarize, type BriefSessionRecord, type BuildStats } from "@cyberzavod/core";
 import {
   buildScript,
   carryTime,
-  FOREMAN,
   sceneAt,
-  summarize,
   WIDE_LAYOUT,
-  type BriefSessionRecord,
-  type BuildStats,
   type FactoryLayout,
   type FactoryScript,
   type InterventionCue,
@@ -17,7 +14,7 @@ import {
   type Point,
   type PromptCue,
   type Scene,
-} from "@cyberzavod/core";
+} from "@cyberzavod/player";
 import { atom, computed, type ReadableAtom } from "nanostores";
 import type { JournalScene, Speech } from "@/features/journal-sync";
 import { speechAt, speechStart, speechTimeline } from "../lib/speech-timeline.ts";

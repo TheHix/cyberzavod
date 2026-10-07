@@ -30,8 +30,9 @@ import {
   type PromptEvent,
   type Speaker,
   type Tally,
-} from "./record.ts";
-import { STAGES, type Stage } from "./stage.ts";
+  STAGES,
+  type Stage,
+} from "@cyberzavod/core";
 
 /** Темп сцены: как сжимается работа и как быстро двигаются рабочие. */
 export interface Pacing {

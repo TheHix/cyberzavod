@@ -1,4 +1,5 @@
-import { STAGES, type PartFrame, type WorkerFrame } from "@cyberzavod/core";
+import { STAGES } from "@cyberzavod/core";
+import { type PartFrame, type WorkerFrame } from "@cyberzavod/player";
 import { Texture, TextureSource } from "pixi.js";
 import { describe, expect, it } from "vitest";
 import { ACTOR_ART } from "./actor-art.ts";

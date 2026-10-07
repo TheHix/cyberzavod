@@ -1,5 +1,5 @@
 import { createMemo, Show, type JSX } from "solid-js";
-import type { Point } from "@cyberzavod/core";
+import type { Point } from "@cyberzavod/player";
 import type { FactoryGraphics, Frame } from "../graphics/factory-graphics.ts";
 import { placeBubble } from "../lib/bubble-placement.ts";
 import styles from "./SpeechBubble.module.css";

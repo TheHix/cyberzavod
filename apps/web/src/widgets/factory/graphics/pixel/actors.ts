@@ -2,16 +2,15 @@
 // у готовых спрайтов меняются только текстура кадра, место, зеркало, видимость, `tint`
 // и порядок по `y`. Новые объекты в кадре не создаются.
 
+import { STAGES, type Stage } from "@cyberzavod/core";
 import {
-  STAGES,
   type ForemanFrame,
   type PartFrame,
   type PartStatus,
   type Point,
   type Scene,
-  type Stage,
   type WorkerFrame,
-} from "@cyberzavod/core";
+} from "@cyberzavod/player";
 import { Container, Sprite, type Texture } from "pixi.js";
 import {
   ART_LEGEND,

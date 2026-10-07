@@ -1,7 +1,12 @@
 // Общие данные для тестов сценария и кадра.
 
 import { FACTORY_LAYOUTS, type FactoryLayout, type StationPlan } from "./layout.ts";
-import type { SessionEvent, MessageEvent, SessionRecord, Speaker } from "./record.ts";
+import {
+  type SessionEvent,
+  type MessageEvent,
+  type SessionRecord,
+  type Speaker,
+} from "@cyberzavod/core";
 import { DEFAULT_PACING, type Pacing } from "./script.ts";
 
 // Станки в ряд через 10 единиц, проход в двух единицах от рабочих мест, бег — единица

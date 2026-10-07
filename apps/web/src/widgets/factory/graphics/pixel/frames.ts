@@ -1,7 +1,7 @@
 // Выбор кадра рисунка из кадра сцены. Чистые функции: кадр сцены определяет всё, поэтому
 // перемотка рисует то же, что проигрывание до этого момента.
 
-import type { ForemanFrame, WorkerFrame } from "@cyberzavod/core";
+import type { ForemanFrame, WorkerFrame } from "@cyberzavod/player";
 
 /** С какой стороны виден персонаж: лицом к зрителю, спиной или боком (вправо). */
 export type Facing = "down" | "up" | "side";

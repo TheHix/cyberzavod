@@ -1,4 +1,4 @@
-import { FACTORY_LAYOUTS, type Aisle } from "@cyberzavod/core";
+import { FACTORY_LAYOUTS, type Aisle } from "@cyberzavod/player";
 import { describe, expect, it } from "vitest";
 import { extendedAisle, laneRects } from "./lane.ts";
 import { PIXELS_PER_UNIT } from "./units.ts";

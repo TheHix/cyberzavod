@@ -2,7 +2,8 @@
 // и под кабинетом мастера. Всё считается в пикселях рисунка и рисуется один раз. Картинки плиток
 // собираются кодом, а не строками: они повторяются, и их размер зависит от краски и плана.
 
-import { STAGES, type Aisle, type FactoryLayout, type Point } from "@cyberzavod/core";
+import { STAGES } from "@cyberzavod/core";
+import { type Aisle, type FactoryLayout, type Point } from "@cyberzavod/player";
 import { Container, Sprite, TilingSprite, type Texture } from "pixi.js";
 import { blankImage, clearPixel, fillRect, type PixelImage } from "./art.ts";
 import type { PlanBounds } from "./bounds.ts";

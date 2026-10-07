@@ -1,5 +1,6 @@
 import { createSignal, onCleanup, onMount, Show, untrack, type JSX } from "solid-js";
-import { layoutFor, type BriefSessionRecord } from "@cyberzavod/core";
+import { type BriefSessionRecord } from "@cyberzavod/core";
+import { layoutFor } from "@cyberzavod/player";
 import type { ProjectLink } from "@/entities/project";
 import { connectScene } from "@/features/journal-sync";
 import { LocaleProvider } from "@/shared/i18n/locale-context.ts";

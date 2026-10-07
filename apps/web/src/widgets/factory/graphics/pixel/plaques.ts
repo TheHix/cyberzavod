@@ -1,14 +1,13 @@
 // Таблички с названиями станков и кабинета: где они стоят и как рисуются. Место считают
 // и рисование, и границы цеха (`planBounds`), поэтому табличка не может оказаться вне кадра.
 
+import { STAGES, type Stage } from "@cyberzavod/core";
 import {
-  STAGES,
   type FactoryLayout,
   type ForemanPlan,
   type Point,
-  type Stage,
   type StationPlan,
-} from "@cyberzavod/core";
+} from "@cyberzavod/player";
 import { Container, Sprite } from "pixi.js";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { FOREMAN_LABEL, STAGE_LABELS } from "@/shared/config/stages.ts";

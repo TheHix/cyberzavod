@@ -1,12 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
+import { briefOf, type SessionRecord } from "@cyberzavod/core";
 import {
-  briefOf,
   FACTORY_LAYOUTS,
   PORTRAIT_LAYOUT,
   WIDE_LAYOUT,
   type FactoryLayout,
-  type SessionRecord,
-} from "@cyberzavod/core";
+} from "@cyberzavod/player";
 import { publishedRecordings } from "@/entities/recording";
 import { createFactoryModel, type FactoryModel } from "./factory.ts";
 import type { Speech } from "@/features/journal-sync";

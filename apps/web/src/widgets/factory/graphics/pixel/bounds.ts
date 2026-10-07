@@ -2,7 +2,8 @@
 // и мастера, дверь и таблички. По ним план вписывается в поле — без пустых краёв, которые есть
 // у плана целиком. Размеры берутся из рисунков, а не подгоняются.
 
-import { STAGES, type FactoryLayout, type Point } from "@cyberzavod/core";
+import { STAGES } from "@cyberzavod/core";
+import { type FactoryLayout, type Point } from "@cyberzavod/player";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import type { Frame, ScreenPoint } from "../factory-graphics.ts";
 import { ACTOR_ART } from "./actor-art.ts";
