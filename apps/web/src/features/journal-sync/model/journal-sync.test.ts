@@ -18,6 +18,7 @@ function stubScene(speech: Speech | null = null) {
   const $speech = atom<Speech | null>(speech);
   const seekToSpeech = vi.fn<(speech: Speech) => void>();
   const scene: JournalScene = { $speech, seekToSpeech };
+
   return { scene, $speech, seekToSpeech };
 }
 
@@ -26,7 +27,9 @@ const disconnects: (() => void)[] = [];
 // Подключает сцену и запоминает отключение: стор модульный, тесты не должны делить сцену.
 function connect(scene: JournalScene): () => void {
   const disconnect = connectScene(scene);
+
   disconnects.push(disconnect);
+
   return disconnect;
 }
 
@@ -47,6 +50,7 @@ describe("connectScene", () => {
 
   it("следит за речью сцены", () => {
     const { scene, $speech } = stubScene();
+
     connect(scene);
 
     $speech.set(FIRST_PROMPT);
@@ -66,6 +70,7 @@ describe("connectScene", () => {
   it("перестаёт следить за сценой после отключения", () => {
     const { scene, $speech } = stubScene();
     const disconnect = connect(scene);
+
     disconnect();
 
     $speech.set(FIRST_PROMPT);
@@ -76,6 +81,7 @@ describe("connectScene", () => {
   it("заменяет прежнюю сцену новой", () => {
     const older = stubScene(FIRST_PROMPT);
     const newer = stubScene(FIRST_MESSAGE);
+
     connect(older.scene);
 
     connect(newer.scene);
@@ -88,6 +94,7 @@ describe("connectScene", () => {
     const older = stubScene(FIRST_PROMPT);
     const newer = stubScene(FIRST_MESSAGE);
     const disconnectOlder = connect(older.scene);
+
     connect(newer.scene);
 
     disconnectOlder();
@@ -99,6 +106,7 @@ describe("connectScene", () => {
     const older = stubScene();
     const newer = stubScene();
     const disconnectOlder = connect(older.scene);
+
     connect(newer.scene);
     disconnectOlder();
 
@@ -113,6 +121,7 @@ describe("seekScene", () => {
 
   it("передаёт речь подключённой сцене", () => {
     const { scene, seekToSpeech } = stubScene();
+
     connect(scene);
 
     seekScene(FIRST_MESSAGE);
@@ -129,6 +138,7 @@ describe("seekScene", () => {
   it("не трогает отключённую сцену", () => {
     const { scene, seekToSpeech } = stubScene();
     const disconnect = connect(scene);
+
     disconnect();
 
     seekScene(FIRST_MESSAGE);

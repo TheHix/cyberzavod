@@ -23,10 +23,16 @@ export function localizeHref(href: string, locale: Locale, origin: string): stri
   const path = isOwnSite ? href.slice(host.length) || "/" : href;
   const pathname = path.split(QUERY_OR_FRAGMENT, 1)[0] ?? path;
   const isSitePath = pathname.startsWith("/") && !pathname.startsWith("//");
-  if (!isSitePath || FILE_EXTENSION.test(pathname)) return href;
-  if (pathWithoutLocale(pathname) !== pathname) return href;
+
+  const isFile = FILE_EXTENSION.test(pathname);
+  const hasLocale = pathWithoutLocale(pathname) !== pathname;
+
+  if (!isSitePath || isFile || hasLocale) return href;
+
   const localized = localizedPath(locale, path);
+
   if (localized === path) return href;
+
   return isOwnSite ? `${host}${localized}` : localized;
 }
 

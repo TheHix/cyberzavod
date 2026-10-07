@@ -32,8 +32,10 @@ export function SegmentedControl<T extends string>(props: Props<T>): JSX.Element
   // Повторное нажатие на выбранный вариант снимает выбор — у переключателя он всегда есть.
   const choose = (value: string | null) => {
     const option = props.options.find((candidate) => candidate.value === value);
+
     if (option !== undefined) props.onChange(option.value);
   };
+
   return (
     <ToggleGroup.Root
       class={styles.group}

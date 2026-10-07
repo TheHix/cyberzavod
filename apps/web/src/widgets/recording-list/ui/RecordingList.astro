@@ -25,6 +25,7 @@ const { recordings, locale } = Astro.props;
       const stats = summarize(recording);
       const project = projectOf(publishedProjects, recording.projectId);
       const languageNote = languageNoteOf(recording.data.language, locale);
+
       return (
         <li>
           <Card>

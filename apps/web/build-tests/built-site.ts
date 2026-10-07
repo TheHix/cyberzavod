@@ -39,6 +39,7 @@ function urlOfFile(relativePath: string): string {
  */
 export function pageUrlOf(fileUrl: string): string | undefined {
   if (fileUrl.endsWith(`/${PAGE_FILE}`)) return fileUrl.slice(0, -PAGE_FILE.length);
+
   return fileUrl.endsWith(HTML_EXTENSION) ? fileUrl : undefined;
 }
 
@@ -53,28 +54,41 @@ export function readBuiltSite(distDir: string, origin: string): BuiltSite {
     .filter((relativePath) => statSync(join(distDir, relativePath)).isFile())
     .map(urlOfFile);
   const pages = new Map<string, string>();
+
   for (const fileUrl of fileUrls) {
     const pageUrl = pageUrlOf(fileUrl);
+
     if (pageUrl !== undefined) pages.set(pageUrl, readFileSync(join(distDir, fileUrl), "utf8"));
   }
+
   const sitemap = fileUrls
     .filter((fileUrl) => SITEMAP_FILE.test(fileUrl.slice(1)))
     .map((fileUrl) => readFileSync(join(distDir, fileUrl), "utf8"))
     .join("\n");
+
   return { origin: origin.replace(/\/$/, ""), pages, files: new Set(fileUrls), sitemap };
+}
+
+function attributesOf(attributes: string): Tag {
+  const entries = [...attributes.matchAll(ATTRIBUTE)].map(([, key = "", quoted, single, bare]) => [
+    key.toLowerCase(),
+    quoted ?? single ?? bare ?? "",
+  ]);
+
+  return Object.fromEntries(entries);
 }
 
 // Теги с таким именем со всеми их атрибутами; значение без `=` — пустая строка.
 function tagsOf(html: string, name: string): Tag[] {
   const opening = new RegExp(`<${name}(?=[\\s/>])([^>]*)>`, "gi");
-  return [...html.matchAll(opening)].map(([, attributes = ""]) =>
-    Object.fromEntries(
-      [...attributes.matchAll(ATTRIBUTE)].map(([, key = "", quoted, single, bare]) => [
-        key.toLowerCase(),
-        quoted ?? single ?? bare ?? "",
-      ]),
-    ),
-  );
+
+  return [...html.matchAll(opening)].map(([, attributes = ""]) => attributesOf(attributes));
+}
+
+function isNoindexTag(tag: Tag): boolean {
+  const directives = (tag["content"] ?? "").split(",").map((directive) => directive.trim());
+
+  return tag["name"] === "robots" && directives.includes("noindex");
 }
 
 /**
@@ -84,11 +98,7 @@ function tagsOf(html: string, name: string): Tag[] {
  * @returns {boolean} `true`, если у страницы нет `noindex`.
  */
 export function isIndexed(html: string): boolean {
-  return !tagsOf(html, "meta").some(
-    (tag) =>
-      tag["name"] === "robots" &&
-      (tag["content"] ?? "").split(",").some((directive) => directive.trim() === "noindex"),
-  );
+  return !tagsOf(html, "meta").some(isNoindexTag);
 }
 
 /**
@@ -98,6 +108,7 @@ export function isIndexed(html: string): boolean {
  */
 export function localeOfPage(pageUrl: string): Locale | undefined {
   const bare = pathWithoutLocale(pageUrl);
+
   return LOCALES.find((locale) => localizedPath(locale, bare) === pageUrl);
 }
 
@@ -105,6 +116,7 @@ export function localeOfPage(pageUrl: string): Locale | undefined {
 // `mailto:`). Ссылка-якорь ведёт на саму страницу.
 function internalTarget(site: BuiltSite, pageUrl: string, href: string): string | undefined {
   const url = new URL(href, `${site.origin}${pageUrl}`);
+
   return url.origin === site.origin ? decodeURIComponent(url.pathname) : undefined;
 }
 
@@ -114,14 +126,20 @@ interface PageLink {
   readonly tag: Tag;
 }
 
+function internalLinksOfPage(site: BuiltSite, pageUrl: string, html: string): PageLink[] {
+  const tags = [...tagsOf(html, "a"), ...tagsOf(html, "link")];
+
+  return tags.flatMap((tag) => {
+    if (tag["href"] === undefined) return [];
+
+    const target = internalTarget(site, pageUrl, tag["href"]);
+
+    return target === undefined ? [] : [{ pageUrl, target, tag }];
+  });
+}
+
 function internalLinks(site: BuiltSite): PageLink[] {
-  return [...site.pages].flatMap(([pageUrl, html]) =>
-    [...tagsOf(html, "a"), ...tagsOf(html, "link")].flatMap((tag) => {
-      const target =
-        tag["href"] === undefined ? undefined : internalTarget(site, pageUrl, tag["href"]);
-      return target === undefined ? [] : [{ pageUrl, target, tag }];
-    }),
-  );
+  return [...site.pages].flatMap(([pageUrl, html]) => internalLinksOfPage(site, pageUrl, html));
 }
 
 function exists(site: BuiltSite, target: string): boolean {
@@ -139,42 +157,69 @@ export function brokenLinks(site: BuiltSite): string[] {
     .map(({ pageUrl, target }) => `${pageUrl}: ссылка на ${target}, которой нет`);
 }
 
-function missingAlternatesOf(site: BuiltSite, pageUrl: string, html: string): string[] {
-  const locale = localeOfPage(pageUrl);
-  if (locale === undefined) return [`${pageUrl}: язык страницы не определить по адресу`];
-  const problems: string[] = [];
+function langProblems(pageUrl: string, html: string, locale: Locale): string[] {
   const [root] = tagsOf(html, "html");
-  if (root?.["lang"] !== locale) {
-    problems.push(`${pageUrl}: <html lang="${root?.["lang"] ?? ""}"> вместо «${locale}»`);
-  }
-  if (!isIndexed(html)) return problems;
-  const links = tagsOf(html, "link");
+
+  if (root?.["lang"] === locale) return [];
+
+  return [`${pageUrl}: <html lang="${root?.["lang"] ?? ""}"> вместо «${locale}»`];
+}
+
+function canonicalProblems(site: BuiltSite, pageUrl: string, links: readonly Tag[]): string[] {
   const canonical = links.find((tag) => tag["rel"] === "canonical");
-  if (canonical?.["href"] !== `${site.origin}${pageUrl}`) {
-    problems.push(
-      `${pageUrl}: canonical ${canonical?.["href"] ?? "отсутствует"}, а не сама страница`,
-    );
+
+  if (canonical?.["href"] === `${site.origin}${pageUrl}`) return [];
+
+  return [`${pageUrl}: canonical ${canonical?.["href"] ?? "отсутствует"}, а не сама страница`];
+}
+
+function alternateProblem(
+  site: BuiltSite,
+  pageUrl: string,
+  links: readonly Tag[],
+  [hreflang, target]: readonly [string, string],
+): string | undefined {
+  const alternate = links.find((tag) => tag["rel"] === "alternate" && tag["hreflang"] === hreflang);
+
+  if (alternate === undefined) return `${pageUrl}: нет hreflang="${hreflang}"`;
+  if (alternate["href"] !== `${site.origin}${target}`) {
+    return `${pageUrl}: hreflang="${hreflang}" ведёт на ${alternate["href"] ?? ""}, а не на ${target}`;
   }
+  if (!site.pages.has(target)) {
+    return `${pageUrl}: hreflang="${hreflang}" ведёт на ${target}, которой нет`;
+  }
+
+  return undefined;
+}
+
+function alternatesProblems(site: BuiltSite, pageUrl: string, links: readonly Tag[]): string[] {
   const bare = pathWithoutLocale(pageUrl);
   const expected = [
     ...LOCALES.map((alternate) => [alternate, localizedPath(alternate, bare)] as const),
     ["x-default", localizedPath(DEFAULT_LOCALE, bare)] as const,
   ];
-  for (const [hreflang, target] of expected) {
-    const alternate = links.find(
-      (tag) => tag["rel"] === "alternate" && tag["hreflang"] === hreflang,
-    );
-    if (alternate === undefined) {
-      problems.push(`${pageUrl}: нет hreflang="${hreflang}"`);
-    } else if (alternate["href"] !== `${site.origin}${target}`) {
-      problems.push(
-        `${pageUrl}: hreflang="${hreflang}" ведёт на ${alternate["href"] ?? ""}, а не на ${target}`,
-      );
-    } else if (!site.pages.has(target)) {
-      problems.push(`${pageUrl}: hreflang="${hreflang}" ведёт на ${target}, которой нет`);
-    }
-  }
-  return problems;
+
+  return expected
+    .map((entry) => alternateProblem(site, pageUrl, links, entry))
+    .filter((problem) => problem !== undefined);
+}
+
+function missingAlternatesOf(site: BuiltSite, pageUrl: string, html: string): string[] {
+  const locale = localeOfPage(pageUrl);
+
+  if (locale === undefined) return [`${pageUrl}: язык страницы не определить по адресу`];
+
+  const problems = langProblems(pageUrl, html, locale);
+
+  if (!isIndexed(html)) return problems;
+
+  const links = tagsOf(html, "link");
+
+  return [
+    ...problems,
+    ...canonicalProblems(site, pageUrl, links),
+    ...alternatesProblems(site, pageUrl, links),
+  ];
 }
 
 /**
@@ -200,18 +245,18 @@ export function foreignLocaleLinks(site: BuiltSite): string[] {
     .filter(({ tag }) => tag["hreflang"] === undefined)
     .flatMap(({ pageUrl, target }) => {
       const targetLocale = site.pages.has(target) ? localeOfPage(target) : undefined;
-      return targetLocale === undefined || targetLocale === localeOfPage(pageUrl)
-        ? []
-        : [`${pageUrl}: ссылка на ${target} уводит на язык «${targetLocale}»`];
+      const isForeign = targetLocale !== undefined && targetLocale !== localeOfPage(pageUrl);
+
+      return isForeign ? [`${pageUrl}: ссылка на ${target} уводит на язык «${targetLocale}»`] : [];
     });
 }
 
 function sitemapPaths(site: BuiltSite): Set<string> {
-  return new Set(
-    [...site.sitemap.matchAll(SITEMAP_LOCATION)].map(
-      ([, location = ""]) => new URL(location).pathname,
-    ),
+  const locations = [...site.sitemap.matchAll(SITEMAP_LOCATION)].map(
+    ([, location = ""]) => location,
   );
+
+  return new Set(locations.map((location) => new URL(location).pathname));
 }
 
 /**
@@ -221,6 +266,7 @@ function sitemapPaths(site: BuiltSite): Set<string> {
  */
 export function pagesMissingFromSitemap(site: BuiltSite): string[] {
   const listed = sitemapPaths(site);
+
   return [...site.pages]
     .filter(([pageUrl, html]) => isIndexed(html) && !listed.has(pageUrl))
     .map(([pageUrl]) => pageUrl);
@@ -233,6 +279,7 @@ export function pagesMissingFromSitemap(site: BuiltSite): string[] {
  */
 export function unindexedPagesInSitemap(site: BuiltSite): string[] {
   const listed = sitemapPaths(site);
+
   return [...site.pages]
     .filter(([pageUrl, html]) => !isIndexed(html) && listed.has(pageUrl))
     .map(([pageUrl]) => pageUrl);

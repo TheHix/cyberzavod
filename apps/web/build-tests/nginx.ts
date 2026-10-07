@@ -12,6 +12,8 @@ const MAP_ENTRY = /^\s*\S+\s+(\S+);/gm;
  */
 export function notFoundFilesOf(config: string): string[] {
   const [, entries] = NOT_FOUND_MAP.exec(config) ?? [];
+
   if (entries === undefined) throw new Error("в nginx.conf нет map для $not_found_page");
+
   return [...entries.matchAll(MAP_ENTRY)].map(([, file = ""]) => file);
 }

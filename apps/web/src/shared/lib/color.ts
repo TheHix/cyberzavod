@@ -16,9 +16,11 @@ export function parseColor(value: string): number {
   const color = value.trim();
   const short = SHORT_HEX_COLOR.exec(color)?.[1];
   const hex = short === undefined ? HEX_COLOR.exec(color)?.[1] : doubledDigits(short);
+
   if (hex === undefined) {
     throw new Error(`цвет токена должен быть вида #rrggbb или #rgb, а не «${value}»`);
   }
+
   return Number.parseInt(hex, HEX_BASE);
 }
 
@@ -50,7 +52,9 @@ export function shade(color: number, amount: number): number {
   const weight = Math.min(1, Math.abs(amount));
   const mix = (shift: number) => {
     const channel = (color >> shift) & CHANNEL;
+
     return Math.round(channel + (target - channel) * weight) << shift;
   };
+
   return mix(16) | mix(8) | mix(0);
 }

@@ -51,8 +51,10 @@ export function CopyButton(props: Props): JSX.Element {
     } catch (err) {
       console.error("копирование в буфер обмена не удалось", err);
       showResult("failed");
+
       return;
     }
+
     showResult("copied");
   };
 

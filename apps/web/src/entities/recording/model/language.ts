@@ -12,5 +12,6 @@ import { formatLanguage } from "@/shared/lib/format.ts";
  */
 export function languageNoteOf(language: string, locale: Locale): string | undefined {
   if (language === locale) return undefined;
+
   return UI_TEXT.recording.language[locale](formatLanguage(language, locale));
 }

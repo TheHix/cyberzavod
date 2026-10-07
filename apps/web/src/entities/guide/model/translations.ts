@@ -32,13 +32,17 @@ type FilesByLocale<Body> = Partial<Record<Locale, GuideFile<Body>>>;
 
 function groupById<Body>(files: readonly GuideFile<Body>[]): Map<string, FilesByLocale<Body>> {
   const groups = new Map<string, FilesByLocale<Body>>();
+
   for (const file of files) {
     const group = groups.get(file.meta.id) ?? {};
+
     if (group[file.locale] !== undefined) {
       throw new GuideError(`у гайда «${file.meta.id}» два файла на языке ${file.locale}`);
     }
+
     groups.set(file.meta.id, { ...group, [file.locale]: file });
   }
+
   return groups;
 }
 
@@ -50,19 +54,24 @@ function requireTranslation<Body>(
   if (file === undefined) {
     throw new GuideError(`у гайда «${id}» нет перевода на язык ${locale}`);
   }
+
   return file;
 }
 
 function guideOf<Body>(id: string, group: FilesByLocale<Body>): Guide<Body> {
   const files = byLocale((locale) => requireTranslation(id, locale, group[locale]));
   const { order } = files[DEFAULT_LOCALE].meta;
+
   if (LOCALES.some((locale) => files[locale].meta.order !== order)) {
     throw new GuideError(`у переводов гайда «${id}» разный order`);
   }
+
   const translations = byLocale((locale) => {
     const { meta, body } = files[locale];
+
     return { title: meta.title, description: meta.description, body };
   });
+
   return { id, order, translations };
 }
 

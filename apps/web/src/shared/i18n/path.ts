@@ -22,9 +22,11 @@ export function localizedPath(locale: Locale, path: string): string {
 export function pathWithoutLocale(pathname: string): string {
   for (const locale of PREFIXED_LOCALES) {
     const prefix = `/${locale}`;
+
     if (pathname === prefix) return "/";
     if (pathname.startsWith(`${prefix}/`)) return pathname.slice(prefix.length);
   }
+
   return pathname;
 }
 

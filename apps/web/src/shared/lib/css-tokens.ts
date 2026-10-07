@@ -16,8 +16,10 @@ const DECLARATION = /(--[\w-]+)\s*:\s*([^;]+);/g;
  */
 export function readCssTokens(css: string): TokenSource {
   const values = new Map<string, string>();
+
   for (const [, name = "", value = ""] of css.matchAll(DECLARATION)) {
     if (!values.has(name)) values.set(name, value.trim());
   }
+
   return { getPropertyValue: (name) => values.get(name) ?? "" };
 }

@@ -37,23 +37,29 @@ function isLine(value: unknown): value is string {
  */
 export function guideFileOf(file: string): GuideFileName {
   const name = file.slice(file.lastIndexOf("/") + 1);
+
   if (!name.endsWith(GUIDE_FILE_EXTENSION)) {
     throw new GuideError(`гайд должен быть файлом ${GUIDE_FILE_EXTENSION}`);
   }
+
   const stem = name.slice(0, -GUIDE_FILE_EXTENSION.length);
   const localeStart = stem.lastIndexOf(".");
-  const id = stem.slice(0, Math.max(localeStart, 0));
   const locale = stem.slice(localeStart + 1);
+
   if (localeStart === -1 || !isLocale(locale)) {
     throw new GuideError(
       `имя файла «${name}» должно заканчиваться языком сайта: .${LOCALES.join(".md, .")}.md`,
     );
   }
+
+  const id = stem.slice(0, localeStart);
+
   if (!GUIDE_ID_PATTERN.test(id)) {
     throw new GuideError(
       `id гайда «${id}» должен состоять из строчных латинских букв и цифр через «-»`,
     );
   }
+
   return { id, locale };
 }
 
@@ -68,7 +74,9 @@ export function parseGuideMeta(id: string, frontmatter: unknown): GuideMeta {
   if (typeof frontmatter !== "object" || frontmatter === null) {
     throw new GuideError("frontmatter гайда должен быть объектом");
   }
+
   const { title, description, order } = frontmatter as Record<string, unknown>;
+
   if (!isLine(title)) {
     throw new GuideError("title должен быть непустой строкой без переводов строки");
   }
@@ -78,5 +86,6 @@ export function parseGuideMeta(id: string, frontmatter: unknown): GuideMeta {
   if (typeof order !== "number" || !Number.isInteger(order)) {
     throw new GuideError("order должен быть целым числом");
   }
+
   return { id, title, description, order };
 }

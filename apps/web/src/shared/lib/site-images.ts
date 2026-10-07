@@ -34,6 +34,7 @@ function tokenColor(name: string): number {
 
 function logoPaints(): PlaquePaints {
   const face = tokenColor(LOGO_FACE_TOKEN);
+
   return {
     ink: formatColor(tokenColor(INK_TOKEN)),
     paper: formatColor(face),
@@ -95,5 +96,7 @@ async function pngOf(
   canvas: PlaqueCanvas,
 ): Promise<Uint8Array<ArrayBuffer>> {
   const svg = plaqueSvg(lines, logoPaints(), canvas);
-  return new Uint8Array(await sharp(Buffer.from(svg)).png().toBuffer());
+  const png = await sharp(Buffer.from(svg)).png().toBuffer();
+
+  return new Uint8Array(png);
 }

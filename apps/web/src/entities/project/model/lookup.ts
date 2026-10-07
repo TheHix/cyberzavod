@@ -12,8 +12,10 @@ export class UnknownProjectError extends Error {}
  */
 export function projectOf(projects: readonly PublishedProject[], id: string): PublishedProject {
   const project = projects.find((candidate) => candidate.id === id);
+
   if (project === undefined) {
     throw new UnknownProjectError(`у проекта ${id} нет карточки в projects/`);
   }
+
   return project;
 }

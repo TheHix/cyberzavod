@@ -12,7 +12,9 @@ const SITEMAP_INDEX = "sitemap-index.xml";
  */
 export const GET: APIRoute = ({ site }) => {
   if (site === undefined) throw new Error("для robots.txt в astro.config.ts нужен site");
+
   const sitemap = new URL(SITEMAP_INDEX, site).href;
+
   return new Response(`User-agent: *\nAllow: /\n\nSitemap: ${sitemap}\n`, {
     headers: { "Content-Type": "text/plain; charset=utf-8" },
   });
