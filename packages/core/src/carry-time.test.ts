@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { carryTime, ScriptMismatchError } from "./carry-time.ts";
 import { PORTRAIT_LAYOUT, WIDE_LAYOUT } from "./layout.ts";
 import { sceneAt } from "./scene.ts";
-import { chatRecording, reworkRecording } from "./script.fixtures.ts";
+import { chatRecording, reworkRecording, withEvents } from "./script.fixtures.ts";
 import { buildScript, DEFAULT_PACING } from "./script.ts";
 
 // Смещение после последней отметки, мс: внутри финала, который длится `finaleMs`.
@@ -82,10 +82,10 @@ describe("carryTime", () => {
 
   it("отклоняет сценарии с тем же числом отметок, но другим временем записи", () => {
     const original = reworkRecording();
-    const shifted = {
-      ...original,
-      events: original.events.map((event) => ({ ...event, t: event.t + 1 })),
-    };
+    const shifted = withEvents(
+      original,
+      original.data.events.map((event) => ({ ...event, t: event.t + 1 })),
+    );
     const source = buildScript(original, WIDE_LAYOUT, DEFAULT_PACING);
     const target = buildScript(shifted, PORTRAIT_LAYOUT, DEFAULT_PACING);
 

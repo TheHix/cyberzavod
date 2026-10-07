@@ -1,26 +1,27 @@
 # shellcheck shell=bash
 # Общее для хуков turn-start.sh и stop-gate.sh. Подключается через source.
 
-# Конфиг проекта относительно его корня; проверки перед остановкой описаны в его `checks`.
+# Конфиг проекта относительно его корня; проверки перед остановкой описаны в его `verification`.
 readonly PROJECT_CONFIG=".cyberzavod/project.json"
 
-# Проверять весь репозиторий, если в `checks` не заданы пути.
+# Проверять весь репозиторий, если в `verification` не заданы пути.
 readonly WHOLE_REPOSITORY=.
 
 # Заполняются read_checks: команда проверок и пути, изменения в которых её запускают.
 CHECKS_COMMAND=""
 CHECKS_PATHS=()
 
-# Читает `checks` из конфига проекта в CHECKS_COMMAND и CHECKS_PATHS. Нет файла или команды —
+# Читает `verification` из конфига проекта в CHECKS_COMMAND и CHECKS_PATHS: команды проверок
+# склеиваются через `&&`, чтобы первая красная останавливала остальные. Нет файла или команд —
 # команда пустая, и вызывающий хук ничего не проверяет. Битый конфиг — код 1.
 read_checks() {
   local paths path
   CHECKS_COMMAND=""
   CHECKS_PATHS=()
   [[ -f "$PROJECT_CONFIG" ]] || return 0
-  CHECKS_COMMAND=$(jq -r '.checks.command // empty' "$PROJECT_CONFIG") || return 1
+  CHECKS_COMMAND=$(jq -r '.verification.commands // [] | join(" && ")' "$PROJECT_CONFIG") || return 1
   [[ -n "$CHECKS_COMMAND" ]] || return 0
-  paths=$(jq -r '.checks.paths // [] | .[]' "$PROJECT_CONFIG") || return 1
+  paths=$(jq -r '.verification.paths // [] | .[]' "$PROJECT_CONFIG") || return 1
   while IFS= read -r path; do
     [[ -z "$path" ]] || CHECKS_PATHS+=("$path")
   done <<< "$paths"
@@ -44,11 +45,11 @@ state_file() {
   local session="$1" name="$2"
   local safe_session
   safe_session=$(tr -cd 'A-Za-z0-9_-' <<< "$session")
-  echo "${TMPDIR:-/tmp}/factory-${name}-${safe_session:-unknown}"
+  echo "${TMPDIR:-/tmp}/cyberzavod-${name}-${safe_session:-unknown}"
 }
 
-# Отметка «хук остановки сдался и позвал человека»: её читает рекордер завода, поэтому имя
-# `human-call` общее для хука и рекордера.
+# Отметка «хук остановки сдался и позвал человека»: её забирает хук записи сессии, поэтому имя
+# `human-call` общее для обоих хуков.
 human_call_marker() {
   state_file "$1" human-call
 }

@@ -8,7 +8,7 @@ import {
   sceneAt,
   summarize,
   WIDE_LAYOUT,
-  type BriefRecording,
+  type BriefSessionRecord,
   type BuildStats,
   type FactoryLayout,
   type FactoryScript,
@@ -101,13 +101,13 @@ export interface FactoryModel extends JournalScene {
 /**
  * Создаёт модель цеха для записи: сценарий, сторы и действия. На каждый цех на странице —
  * своя модель.
- * @param {BriefRecording} recording Запись сборки без полных текстов реплик и вмешательств:
+ * @param {BriefSessionRecord} recording Запись сборки без полных текстов реплик и вмешательств:
  *   они цеху не нужны.
  * @param {FactoryLayout} layout План цеха в начале; потом его меняет `setLayout`.
  * @returns {FactoryModel} Модель, ещё не запущенная: ждёт готовности графики.
  */
 export function createFactoryModel(
-  recording: BriefRecording,
+  recording: BriefSessionRecord,
   layout: FactoryLayout = WIDE_LAYOUT,
 ): FactoryModel {
   const firstScript = buildScript(recording, layout);

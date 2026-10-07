@@ -82,11 +82,11 @@ export function readPalette(tokens: TokenSource): Palette {
     paper: color("--paper"),
     white: color("--white"),
     stations: {
-      spec: color("--sky"),
-      code: color("--tangerine"),
-      test: mint,
+      planning: color("--sky"),
+      implementation: color("--tangerine"),
+      verification: mint,
       review: color("--grape"),
-      ship: color("--bubblegum"),
+      record: color("--bubblegum"),
     },
     floor: {
       tile: color("--floor"),

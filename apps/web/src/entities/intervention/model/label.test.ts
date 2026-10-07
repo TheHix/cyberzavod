@@ -10,11 +10,11 @@ function interventionFor(reason: BriefInterventionEvent["reason"]): BriefInterve
 describe("labelOf", () => {
   it.each([
     ["question", "ru", "человек · ответ на вопрос"],
-    ["spec_review", "ru", "человек · решение по постановке"],
+    ["plan_review", "ru", "человек · решение по постановке"],
     ["rework_limit", "ru", "человек · вызов после возвратов"],
     ["stop_gate", "ru", "человек · вызов хуком остановки"],
     ["question", "en", "human · answered a question"],
-    ["spec_review", "en", "human · spec decision"],
+    ["plan_review", "en", "human · plan decision"],
     ["rework_limit", "en", "human · called after reworks"],
     ["stop_gate", "en", "human · called by stop hook"],
   ] as const)("называет причину %s на языке %s: «%s»", (reason, locale, expected) => {

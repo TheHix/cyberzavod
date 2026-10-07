@@ -1,52 +1,89 @@
-// Каталоги записей сборок и поиск в них файлов — общее для точек входа.
+// Где адаптер держит свои файлы: сырые журналы сессий и черновики лежат в `capture/` журнала
+// проекта, отметка хука остановки — во временном каталоге. Каталог журнала задаёт конфиг
+// проекта, поэтому журнал может лежать и в репозитории, и рядом с ним.
 
-import { readdir, readFile, stat, unlink } from "node:fs/promises";
+import { readdir, stat, unlink } from "node:fs/promises";
 import path from "node:path";
-import { parseProjectConfig } from "../project.ts";
+import {
+  CAPTURE_DIRECTORY,
+  findProjectRoot,
+  isNotFound,
+  journalDirectory,
+  ProjectFileError,
+  readProjectConfig,
+} from "@cyberzavod/storage";
+import type { ProjectConfig } from "@cyberzavod/core";
 
-// Журналы внешнего проекта ложатся в клон завода (CYBERZAVOD_HOME), а не в сам проект:
-// записи, черновики и публикация живут в одном месте. Пустая строка в переменной — не задано.
-const factoryHome = process.env.CYBERZAVOD_HOME || process.env.CLAUDE_PROJECT_DIR || process.cwd();
-const recordingsDir = path.join(factoryHome, "recordings");
-const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 const DEFAULT_TMP_DIR = "/tmp";
 
 /** Каталог временных файлов хуков: `TMPDIR`, а если он не задан, `/tmp` — как у `state_file`. */
 export const TMP_DIR = process.env.TMPDIR || DEFAULT_TMP_DIR;
 
-/** Путь конфига проекта от корня его репозитория: идентификатор проекта и версия завода. */
-export const PROJECT_CONFIG_FILE = path.join(".cyberzavod", "project.json");
-
-/** Конфиг проекта, в котором идёт сессия. */
-export const PROJECT_CONFIG_PATH = path.join(projectDir, PROJECT_CONFIG_FILE);
-
-/** Каталоги записей: сырые журналы и черновики вне git, опубликованные записи — в git. */
-export const RECORDINGS_DIRS = {
-  raw: path.join(recordingsDir, "raw"),
-  drafts: path.join(recordingsDir, "drafts"),
-  published: path.join(recordingsDir, "published"),
-} as const;
-
-const FILE_NOT_FOUND = "ENOENT";
-const NOT_A_DIRECTORY = "ENOTDIR";
+/** Каталоги адаптера в журнале проекта: сырые журналы сессий и черновики записей. */
+export interface CaptureDirectories {
+  raw: string;
+  drafts: string;
+}
 
 /**
- * Отличает «файла нет» от остальных ошибок файловой системы.
- * @param {unknown} err Ошибка из node:fs.
- * @returns {boolean} true, если файла или каталога нет.
+ * Каталоги адаптера в журнале проекта.
+ * @param {string} journal Абсолютный путь журнала проекта.
+ * @returns {CaptureDirectories} Каталоги сырых журналов и черновиков.
  */
-export function isNotFound(err: unknown): boolean {
-  return hasErrorCode(err, FILE_NOT_FOUND);
+export function captureDirectories(journal: string): CaptureDirectories {
+  const capture = path.join(journal, CAPTURE_DIRECTORY, "claude");
+  return { raw: path.join(capture, "raw"), drafts: path.join(capture, "drafts") };
 }
 
-function hasErrorCode(err: unknown, code: string): boolean {
-  return err instanceof Error && "code" in err && err.code === code;
+/** Проект, найденный на диске: корень, конфиг и журнал. */
+export interface LocatedProject {
+  root: string;
+  config: ProjectConfig;
+  journal: string;
 }
 
-// Для конфига «нет» и тогда, когда на пути лежит файл вместо каталога: путь из команды может
-// вести сквозь файл (ENOTDIR), и проект ищется выше.
-function isConfigMissing(err: unknown): boolean {
-  return isNotFound(err) || hasErrorCode(err, NOT_A_DIRECTORY);
+/**
+ * Находит проект каталога и его журнал.
+ * @param {string} directory Каталог внутри проекта.
+ * @returns {Promise<LocatedProject | undefined>} Проект или undefined, если маркера нет.
+ * @throws {ProjectFileError} Если конфиг проекта битый.
+ */
+export async function locateProject(directory: string): Promise<LocatedProject | undefined> {
+  const root = await findProjectRoot(directory);
+  if (root === undefined) return undefined;
+  const config = await readProjectConfig(root);
+  if (config === undefined) return undefined;
+  return { root, config, journal: journalDirectory(root, config) };
+}
+
+/**
+ * Находит проект каталога для команды, которой без проекта делать нечего.
+ * @param {string} directory Каталог внутри проекта.
+ * @returns {Promise<LocatedProject>} Проект.
+ * @throws {Error} Если маркера нет на всём пути вверх или конфиг битый.
+ */
+export async function requireProject(directory: string): Promise<LocatedProject> {
+  const project = await locateProject(directory);
+  if (project === undefined) {
+    throw new Error(`${directory} не в проекте Cyberzavod: сначала cyberzavod init`);
+  }
+  return project;
+}
+
+/**
+ * Находит проект каталога: поднимается от него вверх до первого маркера. Нет маркера на всём
+ * пути — каталог не принадлежит проекту, битый конфиг — предупреждение.
+ * @param {string} directory Абсолютный путь каталога; может уже не существовать.
+ * @returns {Promise<string | undefined>} `projectId` или undefined, если проекта нет.
+ */
+export async function findProjectId(directory: string): Promise<string | undefined> {
+  try {
+    return (await locateProject(directory))?.config.projectId;
+  } catch (err) {
+    if (!(err instanceof ProjectFileError)) throw err;
+    console.warn(`конфиг проекта не прочитан: ${err.message}`);
+    return undefined;
+  }
 }
 
 // Каталога ещё нет — значит, и файлов в нём нет; другие ошибки не глотаются.
@@ -59,9 +96,9 @@ async function filesIn(dir: string): Promise<string[]> {
   }
 }
 
-// Имя отметки хука остановки совпадает с `state_file … human-call` из .claude/hooks/lib.sh:
+// Имя отметки хука остановки совпадает с `state_file … human-call` из hooks/lib.sh:
 // session_id чистится так же, как там, и пустой остаётся `unknown`.
-const HUMAN_CALL_MARKER_PREFIX = "factory-human-call";
+const HUMAN_CALL_MARKER_PREFIX = "cyberzavod-human-call";
 const UNSAFE_SESSION_CHARACTERS = /[^A-Za-z0-9_-]/g;
 const UNKNOWN_SESSION = "unknown";
 
@@ -97,27 +134,6 @@ export async function claimHumanCallMarker(sessionId: string, tmpDir: string): P
 }
 
 /**
- * Находит проект каталога: поднимается от него вверх до первого `.cyberzavod/project.json`.
- * Нет конфига на всём пути — каталог не принадлежит проекту завода, битый конфиг — предупреждение.
- * @param {string} directory Абсолютный путь каталога.
- * @returns {Promise<string | undefined>} `id` проекта или undefined, если проекта нет.
- */
-export async function findProjectId(directory: string): Promise<string | undefined> {
-  for (let current = directory; ; current = path.dirname(current)) {
-    const configPath = path.join(current, PROJECT_CONFIG_FILE);
-    try {
-      return parseProjectConfig(JSON.parse(await readFile(configPath, "utf8"))).id;
-    } catch (err) {
-      if (!isConfigMissing(err)) {
-        console.warn(`конфиг проекта ${configPath} не прочитан: ${String(err)}`);
-        return undefined;
-      }
-    }
-    if (path.dirname(current) === current) return undefined;
-  }
-}
-
-/**
  * Находит в каталоге самый свежий по времени изменения файл с расширением.
  * @param {string} dir Каталог; если его нет, файлов в нём тоже нет.
  * @param {string} extension Расширение с точкой: `.jsonl`.
@@ -130,13 +146,4 @@ export async function newestFile(dir: string, extension: string): Promise<string
   );
   const [newest] = withTimes.sort((a, b) => b.mtime - a.mtime);
   return newest === undefined ? undefined : path.join(dir, newest.name);
-}
-
-/**
- * Путь для вывода в консоль: от корня записей.
- * @param {string} filePath Абсолютный путь.
- * @returns {string} Путь от корня записей.
- */
-export function fromFactoryHome(filePath: string): string {
-  return path.relative(factoryHome, filePath);
 }

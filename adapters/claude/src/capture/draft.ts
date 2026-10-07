@@ -4,15 +4,17 @@
 
 import {
   INTERVENTION_REASONS,
-  isRecordingId,
+  isRecordId,
   isSpeaker,
-  parseFactoryEvent,
-  parseRecording,
-  type FactoryEvent,
+  parseSessionEvent,
+  parseRecord,
+  RECORD_VERSION,
+  type RecordSource,
+  type SessionEvent,
   type InterventionEvent,
   type InterventionReason,
-  type Recording,
-  type RecordingError,
+  type SessionRecord,
+  type RecordError,
   type Speaker,
   type Stage,
 } from "@cyberzavod/core";
@@ -110,7 +112,7 @@ export interface DraftCheck {
   ok: boolean;
   /** Запуск станции, вынесший вердикт; у проверок основной сессии его нет. */
   run?: string;
-  /** Проект, в чьём каталоге шли проверки основной сессии; `make recording-draft` ставит его. */
+  /** Проект, в чьём каталоге шли проверки основной сессии; `cyberzavod draft` ставит его. */
   project?: string;
 }
 
@@ -120,7 +122,7 @@ export interface DraftCheck {
  * или исход проверок, ещё не прошедшие публикацию.
  */
 export type DraftEvent =
-  | (FactoryEvent & { run?: string; project?: string })
+  | (SessionEvent & { run?: string; project?: string })
   | DraftPrompt
   | DraftMessage
   | DraftIntervention
@@ -132,15 +134,17 @@ export type EditableDraftEvent = DraftPrompt | DraftMessage | DraftIntervention;
 
 /**
  * Сборка в черновике: одна будущая запись. Сессия может нести несколько задач, и тогда
- * каждая публикуется отдельной записью со своими проектом, версией завода и заголовком.
+ * каждая публикуется отдельной записью со своими проектом, версией harness и заголовком.
  */
 export interface DraftBuild {
   /** Идентификатор записи: у первой сборки это `id` черновика. */
   id: string;
   /** Идентификатор проекта; пустая строка — ждёт редактуры, как `title`. */
   project: string;
-  /** Версия завода на момент сборки; пустая строка — ждёт редактуры, как `title`. */
-  factory: string;
+  /** Версия harness на момент сборки; пустая строка — ждёт редактуры, как `title`. */
+  harness: string;
+  /** Процесс разработки сборки; пустая строка — ждёт редактуры, как `title`. */
+  workflow: string;
   title: string;
   /** Запуски станций (`agentId`), которые принадлежат сборке. */
   runs: string[];
@@ -162,8 +166,12 @@ export class DraftError extends Error {}
 const HEADER_FIELD_NAMES = {
   title: "заголовок",
   project: "проект",
-  factory: "версия завода",
+  harness: "версия harness",
+  workflow: "процесс",
 } as const satisfies Partial<Record<keyof DraftBuild, string>>;
+
+// Записи этого адаптера пишет Claude Code — агент Anthropic.
+const CLAUDE_SOURCE: RecordSource = { type: "agent", provider: "anthropic", agent: "claude" };
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -304,40 +312,28 @@ function parseDraftEvent(raw: unknown, index: number): DraftEvent {
   }
   if (isObject(raw) && raw.type === "draft_run") return parseDraftRun(raw, index);
   if (isObject(raw) && raw.type === "draft_check") return parseDraftCheck(raw, index);
-  return { ...parseFactoryEvent(raw, index), ...parseEventMarks(raw, index) };
+  return { ...parseSessionEvent(raw, index), ...parseEventMarks(raw, index) };
 }
 
 function parseBuild(raw: unknown, index: number): DraftBuild {
   if (!isObject(raw)) throw new DraftError(`сборка #${index}: должна быть объектом`);
-  const { id, project, factory, title, runs } = raw;
-  if (!isRecordingId(id)) {
+  const { id, project, harness, workflow, title, runs } = raw;
+  if (!isRecordId(id)) {
     throw new DraftError(`сборка #${index}: id должен состоять из букв, цифр, «_» и «-»`);
   }
-  if (typeof project !== "string" || typeof factory !== "string" || typeof title !== "string") {
-    throw new DraftError(`сборка ${id}: project, factory и title должны быть строками`);
+  if (
+    typeof project !== "string" ||
+    typeof harness !== "string" ||
+    typeof workflow !== "string" ||
+    typeof title !== "string"
+  ) {
+    throw new DraftError(`сборка ${id}: project, harness, workflow и title должны быть строками`);
   }
   if (!isStrings(runs)) throw new DraftError(`сборка ${id}: runs должны быть списком строк`);
-  return { id, project, factory, title, runs: [...runs] };
+  return { id, project, harness, workflow, title, runs: [...runs] };
 }
 
-// Старый черновик несёт шапку одной сборки прямо в корне, а пустые project и factory
-// в нём значат «ждёт редактуры».
-function parseLegacyBuild(raw: Record<string, unknown>, id: string): DraftBuild {
-  const { title } = raw;
-  if (typeof title !== "string") {
-    throw new DraftError("у черновика без builds должен быть title");
-  }
-  const header = (field: "project" | "factory") => {
-    const value = raw[field];
-    if (value === undefined) return "";
-    if (typeof value !== "string") throw new DraftError(`${field} должно быть строкой`);
-    return value;
-  };
-  return { id, project: header("project"), factory: header("factory"), title, runs: [] };
-}
-
-function parseBuilds(raw: Record<string, unknown>, id: string): DraftBuild[] {
-  if (raw.builds === undefined) return [parseLegacyBuild(raw, id)];
+function parseBuilds(raw: Record<string, unknown>): DraftBuild[] {
   if (!Array.isArray(raw.builds) || raw.builds.length === 0) {
     throw new DraftError("у черновика должна быть хотя бы одна сборка в builds");
   }
@@ -392,7 +388,7 @@ function checkEventBuilds(builds: readonly DraftBuild[], events: readonly DraftE
  * @throws {DraftError} Если поля черновика, его сборок, промптов или реплик не того типа,
  *   сборок нет, `id` сборки повторяется, запуск указан в двух сборках или событие ссылается
  *   на неизвестную сборку.
- * @throws {RecordingError} Если событие цеха в черновике не соответствует формату ядра.
+ * @throws {RecordError} Если событие цеха в черновике не соответствует формату ядра.
  */
 export function parseDraft(raw: unknown): Draft {
   if (!isObject(raw)) throw new DraftError("черновик должен быть объектом");
@@ -400,7 +396,7 @@ export function parseDraft(raw: unknown): Draft {
   if (typeof id !== "string" || typeof startedAt !== "string") {
     throw new DraftError("у черновика должны быть id и startedAt");
   }
-  const builds = parseBuilds(raw, id);
+  const builds = parseBuilds(raw);
   checkBuildIds(builds);
   checkRunsAreUnique(builds);
   if (!Array.isArray(events)) throw new DraftError("у черновика нет events");
@@ -493,7 +489,7 @@ function carryOverEvent(event: DraftEvent, edited: readonly EditableDraftEvent[]
   return event;
 }
 
-// Журнал знает проект и версию завода только первой сборки (по ней шла сессия), остальные
+// Журнал знает проект и версию harness только первой сборки (по ней шла сессия), остальные
 // сборки редактор завёл сам и их шапку заполняет тоже он.
 function carryOverBuilds(previous: Draft, next: Draft): DraftBuild[] {
   const fresh = next.builds[0];
@@ -502,7 +498,8 @@ function carryOverBuilds(previous: Draft, next: Draft): DraftBuild[] {
       ? {
           ...build,
           project: filledOr(build.project, fresh.project),
-          factory: filledOr(build.factory, fresh.factory),
+          harness: filledOr(build.harness, fresh.harness),
+          workflow: filledOr(build.workflow, fresh.workflow),
         }
       : build,
   );
@@ -511,7 +508,7 @@ function carryOverBuilds(previous: Draft, next: Draft): DraftBuild[] {
 /**
  * Переносит редактуру из прошлого черновика той же сессии в пересобранный: сборки с их
  * заголовками, проектами, версиями завода и запусками, чистовые промпты, пометки «склеен»,
- * реплики, вмешательства и сборки у промптов, реплик и вмешательств. Пустые проект и версия завода у сборки с `id` первой
+ * реплики, вмешательства и сборки у промптов, реплик и вмешательств. Пустые проект и версия harness у сборки с `id` первой
  * сборки пересобранного черновика берутся из журнала. Новые промпты и реплики остаются пустыми.
  * @param {Draft} previous Прошлый черновик с уже сделанной редактурой.
  * @param {Draft} next Черновик, только что собранный из журнала.
@@ -525,7 +522,7 @@ export function carryOverEdits(previous: Draft, next: Draft): Draft {
 
 /**
  * Называет поля сборок черновика, которые ещё ждут редактуры: пустые заголовок, проект
- * и версия завода.
+ * и версия harness.
  * @param {Draft} draft Черновик записей.
  * @returns {string[]} По строке на каждую сборку с пустыми полями вида
  *   `сборка <id>: заголовок, проект`, поля — по порядку шапки; заполненные сборки пропущены.
@@ -586,7 +583,7 @@ export function reroutedMessages(previous: Draft, next: Draft): DraftMessage[] {
 function toPublishedPrompt(
   prompt: Pick<DraftPrompt, "goal" | "requirements" | "model">,
   t: number,
-): FactoryEvent {
+): SessionEvent {
   const { goal, requirements, model } = prompt;
   return { t, type: "prompt", goal, requirements, ...(model === undefined ? {} : { model }) };
 }
@@ -594,7 +591,7 @@ function toPublishedPrompt(
 function toPublishedIntervention(
   intervention: Pick<InterventionEvent, "reason" | "line" | "text">,
   t: number,
-): FactoryEvent {
+): SessionEvent {
   const { reason, line, text } = intervention;
   return { t, type: "intervention", reason, line, text };
 }
@@ -602,7 +599,7 @@ function toPublishedIntervention(
 function toPublishedMessage(
   message: Pick<DraftMessage, "from" | "to" | "line" | "text">,
   t: number,
-): FactoryEvent {
+): SessionEvent {
   const { from, to, line, text } = message;
   return { t, type: "message", from, to, line, text };
 }
@@ -613,8 +610,8 @@ function toPublishedMessage(
 function toPublishedEvents(
   events: readonly DraftEvent[],
   at: (t: number) => number,
-): FactoryEvent[] {
-  const published: FactoryEvent[] = [];
+): SessionEvent[] {
+  const published: SessionEvent[] = [];
   let hasPrompt = false;
   let currentStage: Stage | undefined;
   events.forEach((event, index) => {
@@ -665,7 +662,7 @@ function toPublishedEvents(
   return published;
 }
 
-function textsOf(event: FactoryEvent): string[] {
+function textsOf(event: SessionEvent): string[] {
   switch (event.type) {
     case "prompt":
       return [
@@ -690,13 +687,8 @@ function textsOf(event: FactoryEvent): string[] {
 }
 
 // Исход сборки — последний вердикт или запуск проверок; без проверок сборка считается удачной.
-// Черновики до #6 несли исход не в `draft_check`, а в `build_end`, поэтому без проверок
-// смотрим на него.
 function checksPassed(events: readonly DraftEvent[]): boolean {
-  const lastCheck = events.findLast((event) => event.type === "draft_check");
-  if (lastCheck !== undefined) return lastCheck.ok;
-  const legacyEnd = events.findLast((event) => event.type === "build_end");
-  return legacyEnd?.ok ?? true;
+  return events.findLast((event) => event.type === "draft_check")?.ok ?? true;
 }
 
 function totalTokens(events: readonly DraftEvent[]): number | undefined {
@@ -714,57 +706,66 @@ function buildOf(draft: Draft, buildId: string): DraftBuild {
  * Превращает одну сборку отредактированного черновика в запись для сайта: только события
  * этой сборки, время от её первого события и без долгих пауз, без исходных текстов промптов
  * и реплик, без исходных текстов вмешательств, без пометок `project`, без склеенных промптов и служебных событий черновика.
- * @param {Draft} draft Черновик с заполненными заголовком, проектом, версией завода,
+ * @param {Draft} draft Черновик с заполненными заголовком, проектом, версией harness,
  *   чистовыми промптами и репликами публикуемой сборки.
  * @param {string} buildId Идентификатор публикуемой сборки.
- * @returns {Recording} Запись с `id` сборки, прошедшая проверку формата ядра.
- * @throws {RecordingError} Если заголовок, проект, версия завода, чистовой промпт или реплика
+ * @returns {SessionRecord} Запись с `id` сборки, прошедшая проверку формата ядра.
+ * @throws {RecordError} Если заголовок, проект, версия harness, чистовой промпт или реплика
  *   сборки пусты или запись не соответствует формату ядра.
  * @throws {DraftError} Если сборки нет, в ней нет событий, склеенный промпт стоит без
  *   предыдущего несклеенного или в тексте для публикации похоже на адрес, ключ или личный путь.
  */
-export function publishBuild(draft: Draft, buildId: string): Recording {
+export function publishBuild(draft: Draft, buildId: string): SessionRecord {
   const build = buildOf(draft, buildId);
   const owners = eventBuilds(draft);
   const events = draft.events.filter((_event, index) => owners[index] === buildId);
   const timeline = buildTimeline(events);
   if (timeline === undefined) throw new DraftError(`в сборке ${buildId} нет событий`);
   const tokens = totalTokens(events);
-  const usage: FactoryEvent[] =
+  const usage: SessionEvent[] =
     tokens === undefined ? [] : [{ t: timeline.end, type: "usage", tokens }];
-  const published: FactoryEvent[] = [
+  const published: SessionEvent[] = [
     { t: 0, type: "build_start" },
     ...toPublishedEvents(events, timeline.at),
     ...usage,
     { t: timeline.end, type: "build_end", ok: checksPassed(events) },
   ];
-  const recording = parseRecording({
-    version: 2,
+  const record = parseRecord({
+    version: RECORD_VERSION,
+    type: "session",
     id: build.id,
-    project: build.project,
-    factory: build.factory,
-    startedAt: new Date(Date.parse(draft.startedAt) + timeline.start).toISOString(),
-    title: build.title,
-    events: published,
+    timestamp: new Date(Date.parse(draft.startedAt) + timeline.start).toISOString(),
+    projectId: build.project,
+    source: CLAUDE_SOURCE,
+    data: {
+      title: build.title,
+      workflow: build.workflow,
+      harness: build.harness,
+      events: published,
+    },
   });
+  if (record.type !== "session") {
+    throw new DraftError(`сборка ${buildId} опубликовалась не сессией`);
+  }
 
-  const texts = [recording.title, recording.factory, ...recording.events.flatMap(textsOf)];
+  const { data } = record;
+  const texts = [data.title, data.harness, data.workflow, ...data.events.flatMap(textsOf)];
   const leaks = texts.flatMap((text) => findLeaks(text).map((kind) => `${kind} в «${text}»`));
   if (leaks.length > 0) {
     throw new DraftError(
       `в тексте для публикации сборки ${buildId} есть то, что нельзя показывать: ${leaks.join("; ")}`,
     );
   }
-  return recording;
+  return record;
 }
 
 /**
  * Превращает все сборки черновика в записи для сайта; если не готова хоть одна, бросает ошибку.
  * @param {Draft} draft Черновик со всеми заполненными сборками.
- * @returns {Recording[]} Записи по порядку сборок черновика.
- * @throws {RecordingError} Если сборка не соответствует формату ядра.
+ * @returns {SessionRecord[]} Записи по порядку сборок черновика.
+ * @throws {RecordError} Если сборка не соответствует формату ядра.
  * @throws {DraftError} По тем же причинам, что и `publishBuild`.
  */
-export function publishDraft(draft: Draft): Recording[] {
+export function publishDraft(draft: Draft): SessionRecord[] {
   return draft.builds.map((build) => publishBuild(draft, build.id));
 }

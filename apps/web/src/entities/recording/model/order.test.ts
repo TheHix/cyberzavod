@@ -1,19 +1,24 @@
 import { describe, expect, it } from "vitest";
-import type { Recording } from "@cyberzavod/core";
+import type { SessionRecord } from "@cyberzavod/core";
 import { newestFirst } from "./order.ts";
 
-function recordingOf(id: string, startedAt: string): Recording {
+function recordingOf(id: string, timestamp: string): SessionRecord {
   return {
-    version: 2,
+    version: 1,
+    type: "session",
     id,
-    project: "test",
-    factory: "0.0.0",
-    startedAt,
-    title: "Сборка",
-    events: [
-      { t: 0, type: "build_start" },
-      { t: 1, type: "build_end", ok: true },
-    ],
+    timestamp,
+    projectId: "test",
+    source: { type: "manual" },
+    data: {
+      title: "Сборка",
+      workflow: "default",
+      harness: "0.0.0",
+      events: [
+        { t: 0, type: "build_start" },
+        { t: 1, type: "build_end", ok: true },
+      ],
+    },
   };
 }
 

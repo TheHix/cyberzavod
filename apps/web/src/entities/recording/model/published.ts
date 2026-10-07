@@ -1,18 +1,25 @@
-import { parseRecording, type Recording } from "@cyberzavod/core";
+import { parseRecord, type JournalRecord, type SessionRecord } from "@cyberzavod/core";
 import { newestFirst } from "./order.ts";
 
 // Записи читаются при сборке сайта: битая запись роняет сборку, а не страницу у зрителя.
-const files = import.meta.glob<unknown>("@recordings/*.json", { eager: true, import: "default" });
+// Ровно один уровень каталогов (`journal/<коллекция>/<id>.json`): рабочие файлы адаптеров
+// лежат глубже, в `journal/capture/…`, и на сайт попадать не должны.
+const files = import.meta.glob<unknown>("@journal/*/*.json", { eager: true, import: "default" });
 
-function parsePublished([file, raw]: [string, unknown]): Recording {
+function parsePublished([file, raw]: [string, unknown]): JournalRecord {
   try {
-    return parseRecording(raw);
+    return parseRecord(raw);
   } catch (err) {
-    throw new Error(`опубликованная запись ${file} не прошла проверку`, { cause: err });
+    throw new Error(`запись журнала ${file} не прошла проверку`, { cause: err });
   }
 }
 
-/** Опубликованные записи сборок, новые первыми. */
-export const publishedRecordings: readonly Recording[] = Object.entries(files)
+function isSession(record: JournalRecord): record is SessionRecord {
+  return record.type === "session";
+}
+
+/** Опубликованные сессии сборок из журнала проекта, новые первыми. */
+export const publishedRecordings: readonly SessionRecord[] = Object.entries(files)
   .map(parsePublished)
+  .filter(isSession)
   .sort(newestFirst);

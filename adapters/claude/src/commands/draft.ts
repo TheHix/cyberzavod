@@ -1,11 +1,11 @@
-// Черновик записи из сырого журнала: `make recording-draft [RAW=recordings/raw/<сессия>.jsonl]`.
-// Без аргумента берётся самый свежий журнал. Черновик кладётся в recordings/drafts/ (вне git);
-// редактура из прошлого черновика той же сессии переносится, включая сборки и их запуски,
-// пустыми остаются новые промпты и реплики. Маршруты реплик пересчитываются по сборкам.
+// Черновик записи из сырого журнала сессии. Без пути журнала берётся самый свежий. Черновик
+// кладётся в `capture/claude/drafts/` журнала проекта (вне git); редактура из прошлого черновика
+// той же сессии переносится, включая сборки и их запуски, пустыми остаются новые промпты
+// и реплики. Маршруты реплик пересчитываются по сборкам.
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { eventBuilds, projectsWithoutBuild, unassignedRuns } from "../builds.ts";
+import { eventBuilds, projectsWithoutBuild, unassignedRuns } from "../capture/builds.ts";
 import {
   carryOverEdits,
   orphanedEdits,
@@ -17,8 +17,8 @@ import {
   type DraftEvent,
   type DraftRun,
   type EditableDraftEvent,
-} from "../draft.ts";
-import { parseRawLog } from "../raw-event.ts";
+} from "../capture/draft.ts";
+import { parseRawLog, type RawEvent } from "../capture/raw-event.ts";
 import {
   directoriesOutsideProjects,
   routeMessages,
@@ -28,7 +28,7 @@ import {
   stationTranscriptPaths,
   toDraft,
   toolDirectories,
-} from "../to-draft.ts";
+} from "../capture/to-draft.ts";
 import {
   agentAssignments,
   agentReports,
@@ -41,14 +41,9 @@ import {
   type ModelReply,
   type TokenUsage,
   type TranscriptText,
-} from "../transcript.ts";
-import {
-  findProjectId,
-  fromFactoryHome,
-  isNotFound,
-  newestFile,
-  RECORDINGS_DIRS,
-} from "./paths.ts";
+} from "../capture/transcript.ts";
+import { isNotFound } from "@cyberzavod/storage";
+import { captureDirectories, findProjectId, newestFile, requireProject } from "../paths.ts";
 
 // Транскрипты читаются по одному: непрочитанный — предупреждение, а не ошибка, черновик полезен
 // и без счётчика токенов. Транскрипты служебных сабагентов Claude Code не сохраняет — о них
@@ -157,7 +152,7 @@ function titleOf(edit: EditableDraftEvent): string {
 }
 
 // Битый прошлый черновик не перезаписывается молча: в нём может быть несохранённая редактура.
-async function readEarlierDraft(draftPath: string): Promise<Draft | undefined> {
+async function readEarlierDraft(draftPath: string, shown: string): Promise<Draft | undefined> {
   let earlier: string;
   try {
     earlier = await readFile(draftPath, "utf8");
@@ -168,10 +163,9 @@ async function readEarlierDraft(draftPath: string): Promise<Draft | undefined> {
   try {
     return parseDraft(JSON.parse(earlier));
   } catch (err) {
-    throw new Error(
-      `прошлый черновик ${fromFactoryHome(draftPath)} не разобран — исправьте или удалите его`,
-      { cause: err },
-    );
+    throw new Error(`прошлый черновик ${shown} не разобран — исправьте или удалите его`, {
+      cause: err,
+    });
   }
 }
 
@@ -233,69 +227,109 @@ function assignmentLineOf(draft: Draft, run: DraftRun): string {
   return line.trim().slice(0, MAX_ASSIGNMENT_LINE);
 }
 
-const rawPath = process.argv[2] ?? (await newestFile(RECORDINGS_DIRS.raw, ".jsonl"));
-if (rawPath === undefined) {
-  throw new Error(`журналов сборок ещё нет: хуки пишут их в ${RECORDINGS_DIRS.raw}`);
+// Черновик только из журнала и транскриптов, ещё без редактуры прошлого черновика.
+async function freshDraftOf(
+  rawPath: string,
+  rawEvents: RawEvent[],
+  projectsByDirectory: Map<string, string>,
+): Promise<Draft> {
+  return toDraft(rawEvents, {
+    sessionId: path.basename(rawPath, ".jsonl"),
+    runTokens: await tokensOfRuns(runTranscriptPaths(rawEvents)),
+    sessionUsages: await usagesOfSession(sessionTranscriptPaths(rawEvents)),
+    ...(await textsFromSessionTranscript(sessionTranscriptPath(rawEvents))),
+    reports: await reportsFromStationTranscripts(stationTranscriptPaths(rawEvents)),
+    projectsByDirectory,
+  });
 }
-const rawEvents = parseRawLog(await readFile(rawPath, "utf8"));
-const session = await textsFromSessionTranscript(sessionTranscriptPath(rawEvents));
-const reports = await reportsFromStationTranscripts(stationTranscriptPaths(rawEvents));
-const projectsByDirectory = await projectsOfDirectories(toolDirectories(rawEvents));
-const fresh = toDraft(rawEvents, {
-  sessionId: path.basename(rawPath, ".jsonl"),
-  runTokens: await tokensOfRuns(runTranscriptPaths(rawEvents)),
-  sessionUsages: await usagesOfSession(sessionTranscriptPaths(rawEvents)),
-  ...session,
-  reports,
-  projectsByDirectory,
-});
-const draftPath = path.join(RECORDINGS_DIRS.drafts, `${fresh.id}.json`);
-const previous = await readEarlierDraft(draftPath);
-const draft = routeMessages(withEarlierEdits(fresh, previous));
 
-await mkdir(RECORDINGS_DIRS.drafts, { recursive: true });
-await writeFile(draftPath, `${JSON.stringify(draft, null, 2)}\n`);
+interface DraftReport {
+  draft: Draft;
+  previous: Draft | undefined;
+  rawEvents: RawEvent[];
+  projectsByDirectory: Map<string, string>;
+  shownPath: string;
+}
 
-const prompts = draft.events.filter((event) => event.type === "draft_prompt");
-const messages = draft.events.filter((event) => event.type === "draft_message");
-const interventions = draft.events.filter((event) => event.type === "draft_intervention");
-const waiting = draft.events.filter(awaitsEditing);
-const owners = eventBuilds(draft);
-console.log(`черновик: ${fromFactoryHome(draftPath)}`);
-console.log(
-  `промптов: ${prompts.length}, реплик: ${messages.length}, вмешательств: ${interventions.length}`,
-);
-for (const build of draft.builds) {
-  const eventCount = owners.filter((owner) => owner === build.id).length;
+// Сводка для редактора: что в черновике и что ещё ждёт редактуры.
+function reportDraft({ draft, previous, rawEvents, projectsByDirectory, shownPath }: DraftReport) {
+  const prompts = draft.events.filter((event) => event.type === "draft_prompt");
+  const messages = draft.events.filter((event) => event.type === "draft_message");
+  const interventions = draft.events.filter((event) => event.type === "draft_intervention");
+  const waiting = draft.events.filter(awaitsEditing);
+  const owners = eventBuilds(draft);
+  console.log(`черновик: ${shownPath}`);
   console.log(
-    `сборка ${build.id}: проект ${build.project || "—"}, завод ${build.factory || "—"}, ` +
-      `запусков: ${build.runs.length}, событий: ${eventCount}`,
+    `промптов: ${prompts.length}, реплик: ${messages.length}, вмешательств: ${interventions.length}`,
   );
-}
-for (const line of unfilledHeader(draft)) console.log(`  не заполнено: ${line}`);
-for (const project of projectsWithoutBuild(draft)) {
-  console.warn(`команды проекта ${project} без сборки: достанутся сборке по времени`);
-}
-for (const directory of directoriesOutsideProjects(rawEvents, projectsByDirectory)) {
-  console.warn(
-    `каталог ${directory} не принадлежит проекту завода: его этапы и проверки не попали в черновик`,
-  );
-}
-console.log(`ждут редактуры: ${waiting.length}`);
-for (const event of waiting) console.log(`  • ${describeWaiting(event)}`);
+  for (const build of draft.builds) {
+    const eventCount = owners.filter((owner) => owner === build.id).length;
+    console.log(
+      `сборка ${build.id}: проект ${build.project || "—"}, harness ${build.harness || "—"}, процесс ${build.workflow || "—"}, ` +
+        `запусков: ${build.runs.length}, событий: ${eventCount}`,
+    );
+  }
+  for (const line of unfilledHeader(draft)) console.log(`  не заполнено: ${line}`);
+  for (const project of projectsWithoutBuild(draft)) {
+    console.warn(`команды проекта ${project} без сборки: достанутся сборке по времени`);
+  }
+  for (const directory of directoriesOutsideProjects(rawEvents, projectsByDirectory)) {
+    console.warn(
+      `каталог ${directory} не принадлежит проекту Cyberzavod: его этапы и проверки не попали в черновик`,
+    );
+  }
+  console.log(`ждут редактуры: ${waiting.length}`);
+  for (const event of waiting) console.log(`  • ${describeWaiting(event)}`);
 
-const unassigned = unassignedRuns(draft);
-if (unassigned.length > 0) {
-  console.log(`запуски станций без сборки (достанутся первой): ${unassigned.length}`);
-  for (const run of unassigned) {
-    console.log(`  • ${run.agent} ${run.run} ${clockOf(run.t)}: ${assignmentLineOf(draft, run)}`);
+  const unassigned = unassignedRuns(draft);
+  if (unassigned.length > 0) {
+    console.log(`запуски станций без сборки (достанутся первой): ${unassigned.length}`);
+    for (const run of unassigned) {
+      console.log(`  • ${run.agent} ${run.run} ${clockOf(run.t)}: ${assignmentLineOf(draft, run)}`);
+    }
+  }
+  for (const run of orphanedRuns(draft)) {
+    console.warn(`запуск ${run} указан в сборке, но в журнале его нет`);
+  }
+  for (const message of previous === undefined ? [] : reroutedMessages(previous, draft)) {
+    console.warn(
+      `у реплики «${message.line}» поменялся маршрут: ${message.from} → ${message.to}, перечитайте строку`,
+    );
   }
 }
-for (const run of orphanedRuns(draft)) {
-  console.warn(`запуск ${run} указан в сборке, но в журнале его нет`);
+
+/** Что собрать в черновик: проект и, если нужно, конкретный сырой журнал. */
+export interface DraftSessionOptions {
+  /** Каталог внутри проекта. */
+  projectDirectory: string;
+  /** Сырой журнал сессии; без него берётся самый свежий. */
+  rawPath?: string;
 }
-for (const message of previous === undefined ? [] : reroutedMessages(previous, draft)) {
-  console.warn(
-    `у реплики «${message.line}» поменялся маршрут: ${message.from} → ${message.to}, перечитайте строку`,
-  );
+
+/**
+ * Собирает черновик записи из сырого журнала сессии и печатает, что ещё ждёт редактуры.
+ * @param {DraftSessionOptions} options Проект и сырой журнал.
+ * @returns {Promise<string>} Путь записанного черновика.
+ * @throws {Error} Если проекта нет, журналов ещё нет или прошлый черновик битый.
+ */
+export async function draftSession(options: DraftSessionOptions): Promise<string> {
+  const project = await requireProject(options.projectDirectory);
+  const directories = captureDirectories(project.journal);
+  const shown = (file: string) => path.relative(project.root, file) || ".";
+  const rawPath = options.rawPath ?? (await newestFile(directories.raw, ".jsonl"));
+  if (rawPath === undefined) {
+    throw new Error(`журналов сессий ещё нет: хуки пишут их в ${shown(directories.raw)}`);
+  }
+  const rawEvents = parseRawLog(await readFile(rawPath, "utf8"));
+  const projectsByDirectory = await projectsOfDirectories(toolDirectories(rawEvents));
+  const fresh = await freshDraftOf(rawPath, rawEvents, projectsByDirectory);
+  const draftPath = path.join(directories.drafts, `${fresh.id}.json`);
+  const previous = await readEarlierDraft(draftPath, shown(draftPath));
+  const draft = routeMessages(withEarlierEdits(fresh, previous));
+
+  await mkdir(directories.drafts, { recursive: true });
+  await writeFile(draftPath, `${JSON.stringify(draft, null, 2)}\n`);
+
+  reportDraft({ draft, previous, rawEvents, projectsByDirectory, shownPath: shown(draftPath) });
+  return draftPath;
 }

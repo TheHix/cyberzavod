@@ -1,14 +1,14 @@
-import type { Recording } from "@cyberzavod/core";
+import type { SessionRecord } from "@cyberzavod/core";
 
 /**
  * Выбирает записи одного проекта.
- * @param {readonly Recording[]} recordings Записи сборок.
+ * @param {readonly SessionRecord[]} recordings Записи сборок.
  * @param {string} projectId Идентификатор проекта.
- * @returns {readonly Recording[]} Записи этого проекта в исходном порядке.
+ * @returns {readonly SessionRecord[]} Записи этого проекта в исходном порядке.
  */
 export function recordingsOfProject(
-  recordings: readonly Recording[],
+  recordings: readonly SessionRecord[],
   projectId: string,
-): readonly Recording[] {
-  return recordings.filter((recording) => recording.project === projectId);
+): readonly SessionRecord[] {
+  return recordings.filter((recording) => recording.projectId === projectId);
 }

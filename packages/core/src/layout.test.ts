@@ -10,7 +10,7 @@ import {
   type FactoryLayout,
   type Point,
 } from "./layout.ts";
-import { STAGES } from "./recording.ts";
+import { STAGES } from "./stage.ts";
 import { DEFAULT_PACING } from "./script.ts";
 
 describe("stopShortOf", () => {

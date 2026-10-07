@@ -1,5 +1,5 @@
 {
-  "name": "@cyberzavod/recorder",
+  "name": "@cyberzavod/adapter-claude",
   "private": true,
   "type": "module",
   "exports": {
@@ -9,6 +9,7 @@
     "check": "tsc -p . && vitest run"
   },
   "dependencies": {
-    "@cyberzavod/core": "workspace:*"
+    "@cyberzavod/core": "workspace:*",
+    "@cyberzavod/storage": "workspace:*"
   }
 }

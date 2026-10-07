@@ -1,6 +1,6 @@
 ---
 import type { GetStaticPaths } from "astro";
-import { briefOf, type Project, type Recording } from "@cyberzavod/core";
+import { briefOf, type Project, type SessionRecord } from "@cyberzavod/core";
 import GameLayout from "@/app/layouts/GameLayout.astro";
 import { Factory } from "@/widgets/factory";
 import { BuildJournal } from "@/widgets/build-journal";
@@ -29,7 +29,7 @@ export const getStaticPaths = (() =>
 interface Props {
   locale: Locale;
   project: Project;
-  recordings: readonly Recording[];
+  recordings: readonly SessionRecord[];
 }
 
 const { locale, project, recordings } = Astro.props;

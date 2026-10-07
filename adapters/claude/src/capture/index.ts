@@ -1,4 +1,4 @@
-// Запись сборок: хук Claude Code пишет сырой журнал, из него собирается черновик,
+// Захват сессий: хук Claude Code пишет сырой журнал, из него собирается черновик,
 // после редактуры промптов черновик публикуется записью для цеха.
 
 export {
@@ -52,7 +52,6 @@ export {
   projectsWithoutBuild,
   unassignedRuns,
 } from "./builds.ts";
-export { parseProjectConfig, ProjectConfigError, type ProjectConfig } from "./project.ts";
 export { findLeaks } from "./leaks.ts";
 export {
   agentAssignments,

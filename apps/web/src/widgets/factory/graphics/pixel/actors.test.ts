@@ -53,7 +53,7 @@ describe("destroyActorTextures", () => {
 
 function workerFrame(overrides: Partial<WorkerFrame> = {}): WorkerFrame {
   return {
-    station: "code",
+    station: "implementation",
     position: { x: 1, y: 1 },
     heading: 0,
     activity: "walk",
@@ -66,7 +66,7 @@ function workerFrame(overrides: Partial<WorkerFrame> = {}): WorkerFrame {
 function partFrame(overrides: Partial<PartFrame> = {}): PartFrame {
   return {
     position: { x: 1.45, y: 1 },
-    holder: "code",
+    holder: "implementation",
     carried: true,
     status: "ok",
     ...overrides,

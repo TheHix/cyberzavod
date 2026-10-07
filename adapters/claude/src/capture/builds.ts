@@ -17,7 +17,7 @@ function runOf(event: DraftEvent): string | undefined {
     : event.run;
 }
 
-// Проект события основной сессии: его ставит `make recording-draft` по каталогу команды.
+// Проект события основной сессии: его ставит `cyberzavod draft` по каталогу команды.
 function projectOfEvent(event: DraftEvent): string | undefined {
   switch (event.type) {
     case "draft_prompt":

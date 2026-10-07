@@ -1,0 +1,16 @@
+{
+  "name": "@cyberzavod/cli",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "cyberzavod": "./src/bin/cyberzavod.ts"
+  },
+  "scripts": {
+    "check": "tsc -p . && vitest run"
+  },
+  "dependencies": {
+    "@cyberzavod/adapter-claude": "workspace:*",
+    "@cyberzavod/core": "workspace:*",
+    "@cyberzavod/storage": "workspace:*"
+  }
+}

@@ -18,7 +18,7 @@ export const SECOND_BUILD_ID = "2026-10-04-744e7547-2";
 export function message(patch: Partial<DraftMessage> & Pick<DraftMessage, "t">): DraftMessage {
   return {
     type: "draft_message",
-    from: "spec",
+    from: "planning",
     to: "foreman",
     source: "assignment",
     said: "Исходный текст",
@@ -40,7 +40,7 @@ export function intervention(
 ): DraftIntervention {
   return {
     type: "draft_intervention",
-    reason: "spec_review",
+    reason: "plan_review",
     said: "ну давай, одобряю",
     line: "Одобряю, делай по плану",
     text: "Одобряю постановку, делай по плану.",
@@ -53,7 +53,7 @@ function window(
   run: string,
   agent: string,
   until: number,
-  stage: "spec" | "code" | "test",
+  stage: "planning" | "implementation" | "verification",
 ): DraftEvent[] {
   return [
     { t, type: "stage_enter", stage, run },
@@ -76,14 +76,16 @@ export function interleavedDraft(): Draft {
       {
         id: FIRST_BUILD_ID,
         project: "cyberzavod",
-        factory: "0.1.0",
+        harness: "0.1.0",
+        workflow: "default",
         title: "Счётчик токенов",
         runs: ["a1", "a2", "a3"],
       },
       {
         id: SECOND_BUILD_ID,
         project: "personal-finance-lab",
-        factory: "0.1.0",
+        harness: "0.1.0",
+        workflow: "default",
         title: "Движок финансов",
         runs: ["b1", "b2"],
       },
@@ -99,7 +101,7 @@ export function interleavedDraft(): Draft {
         model: "claude-opus-5-5",
       },
       { t: 0, type: "usage", tokens: 5 },
-      ...window(1_000, "a1", "analyst", 31_000, "spec"),
+      ...window(1_000, "a1", "analyst", 31_000, "planning"),
       message({ t: 1_500, run: "a1" }),
       {
         t: 2_000,
@@ -110,29 +112,29 @@ export function interleavedDraft(): Draft {
         build: SECOND_BUILD_ID,
       },
       { t: 2_000, type: "usage", tokens: 20 },
-      ...window(3_000, "b1", "coder", 20_000, "code"),
-      message({ t: 3_500, run: "b1", from: "code" }),
+      ...window(3_000, "b1", "coder", 20_000, "implementation"),
+      message({ t: 3_500, run: "b1", from: "implementation" }),
       { t: 20_000, type: "usage", tokens: 200, run: "b1" },
-      ...window(21_000, "b2", "tester", 60_000, "test"),
+      ...window(21_000, "b2", "tester", 60_000, "verification"),
       { t: 31_000, type: "usage", tokens: 300, run: "a1" },
       message({ t: 31_000, run: "a1", source: "report" }),
       { t: 31_500, type: "usage", tokens: 7 },
       { t: 60_000, type: "usage", tokens: 150, run: "b2" },
       { t: 60_000, type: "draft_check", ok: true, run: "b2" },
-      message({ t: 60_000, run: "b2", from: "test", source: "report" }),
-      ...window(200_000, "a2", "coder", 230_000, "code"),
+      message({ t: 60_000, run: "b2", from: "verification", source: "report" }),
+      ...window(200_000, "a2", "coder", 230_000, "implementation"),
       { t: 230_000, type: "usage", tokens: 400, run: "a2" },
-      ...window(231_000, "a3", "tester", 250_000, "test"),
+      ...window(231_000, "a3", "tester", 250_000, "verification"),
       { t: 250_000, type: "draft_check", ok: false, run: "a3" },
       {
         t: 250_000,
         type: "stage_fail",
-        stage: "test",
+        stage: "verification",
         reason: "тестировщик нашёл дефект",
         run: "a3",
       },
       { t: 250_000, type: "usage", tokens: 100, run: "a3" },
-      message({ t: 250_000, run: "a3", from: "test", source: "report" }),
+      message({ t: 250_000, run: "a3", from: "verification", source: "report" }),
     ],
   };
 }

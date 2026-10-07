@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { aisleStop } from "./aisle.ts";
 import { FACTORY_LAYOUTS, distance, headingTo, type Point } from "./layout.ts";
-import { STAGES, type Recording } from "./recording.ts";
+import type { SessionRecord } from "./record.ts";
+import { STAGES } from "./stage.ts";
 import { sceneAt } from "./scene.ts";
 import type { FactoryScript, ForemanMove, WorkerMove } from "./script.ts";
 import {
@@ -15,11 +16,12 @@ import {
   PLAIN_PACING,
   reworkRecording,
   stationAt,
+  withEvents,
 } from "./script.fixtures.ts";
 import { buildScript, DEFAULT_PACING } from "./script.ts";
 
-function recordingOf(events: Recording["events"]): Recording {
-  return { ...reworkRecording(), events };
+function recordingOf(events: SessionRecord["data"]["events"]): SessionRecord {
+  return withEvents(reworkRecording(), events);
 }
 
 describe("buildScript", () => {
@@ -29,7 +31,7 @@ describe("buildScript", () => {
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
     expect(
-      script.workers.spec.map(({ activity, start, end, carrying }) => [
+      script.workers.planning.map(({ activity, start, end, carrying }) => [
         activity,
         start,
         end,
@@ -53,7 +55,7 @@ describe("buildScript", () => {
 
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
-    const route = script.workers.spec
+    const route = script.workers.planning
       .filter((move) => move.activity === "walk" && move.carrying)
       .map((move) => move.to);
     expect(route).toEqual([
@@ -64,16 +66,19 @@ describe("buildScript", () => {
   });
 
   it("не делает лишнего шага, если получатель напротив через проход", () => {
-    const layout = { ...LINE_LAYOUT, stations: { ...LINE_LAYOUT.stations, code: stationAt(0, 4) } };
+    const layout = {
+      ...LINE_LAYOUT,
+      stations: { ...LINE_LAYOUT.stations, implementation: stationAt(0, 4) },
+    };
     const recording = recordingOf([
       { t: 0, type: "build_start" },
-      { t: 1_000, type: "stage_enter", stage: "code" },
+      { t: 1_000, type: "stage_enter", stage: "implementation" },
       { t: 2_000, type: "build_end", ok: true },
     ]);
 
     const script = buildScript(recording, layout, PLAIN_PACING);
 
-    const route = script.workers.spec
+    const route = script.workers.planning
       .filter((move) => move.activity === "walk" && move.carrying)
       .map((move) => move.to);
     expect(route).toEqual([
@@ -91,22 +96,22 @@ describe("buildScript", () => {
       {
         start: 2_000,
         end: 2_200,
-        from: { on: "machine", station: "spec" },
-        to: { on: "hands", station: "spec" },
+        from: { on: "machine", station: "planning" },
+        to: { on: "hands", station: "planning" },
         status: "ok",
       },
       {
         start: 15_200,
         end: 15_300,
-        from: { on: "hands", station: "spec" },
-        to: { on: "hands", station: "code" },
+        from: { on: "hands", station: "planning" },
+        to: { on: "hands", station: "implementation" },
         status: "ok",
       },
       {
         start: 15_300,
         end: 15_500,
-        from: { on: "hands", station: "code" },
-        to: { on: "machine", station: "code" },
+        from: { on: "hands", station: "implementation" },
+        to: { on: "machine", station: "implementation" },
         status: "ok",
       },
     ]);
@@ -118,7 +123,7 @@ describe("buildScript", () => {
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
     // Рабочий кода отнёс деталь на проверки и вернулся только к 44 800.
-    expect(script.workers.test[3]).toEqual(
+    expect(script.workers.verification[3]).toEqual(
       expect.objectContaining({ activity: "handoff", start: 44_800, end: 45_000 }),
     );
   });
@@ -147,8 +152,8 @@ describe("buildScript", () => {
       last: {
         start: 60_300,
         end: 60_300,
-        from: { on: "machine", station: "code" },
-        to: { on: "machine", station: "code" },
+        from: { on: "machine", station: "implementation" },
+        to: { on: "machine", station: "implementation" },
         status: "done",
       },
     });
@@ -181,7 +186,7 @@ describe("buildScript", () => {
   it("кладёт события визита нулевой длины на начало работы", () => {
     const recording = recordingOf([
       { t: 0, type: "build_start" },
-      { t: 2_000, type: "stage_enter", stage: "code" },
+      { t: 2_000, type: "stage_enter", stage: "implementation" },
       { t: 2_000, type: "usage", tokens: 5 },
       { t: 2_000, type: "build_end", ok: true },
     ]);
@@ -197,7 +202,7 @@ describe("buildScript", () => {
 
   it("замораживает сценарий: правка на месте падает, а не портит сцену", () => {
     const script = buildScript(reworkRecording(), LINE_LAYOUT, PLAIN_PACING);
-    const post = script.layout.stations.code.post as { y: number };
+    const post = script.layout.stations.implementation.post as { y: number };
 
     const act = () => {
       post.y = 2;
@@ -214,7 +219,7 @@ describe("buildScript", () => {
     buildScript(recording, layout, pacing);
 
     expect(
-      [recording.events[1], layout.stations.code.post, pacing].map((value) =>
+      [recording.data.events[1], layout.stations.implementation.post, pacing].map((value) =>
         Object.isFrozen(value),
       ),
     ).toEqual([false, false, false]);
@@ -223,14 +228,14 @@ describe("buildScript", () => {
   it("сжимает работу у станка, но не короче минимума и не дольше максимума", () => {
     const recording = recordingOf([
       { t: 0, type: "build_start" },
-      { t: 60_000, type: "stage_enter", stage: "code" },
+      { t: 60_000, type: "stage_enter", stage: "implementation" },
       { t: 3_660_000, type: "build_end", ok: true },
     ]);
     const pacing = { ...PLAIN_PACING, compression: 60, minWorkMs: 1_600, maxWorkMs: 8_000 };
 
     const script = buildScript(recording, LINE_LAYOUT, pacing);
 
-    const workTimes = [...script.workers.spec, ...script.workers.code]
+    const workTimes = [...script.workers.planning, ...script.workers.implementation]
       .filter((move) => move.activity === "work")
       .map((move) => move.end - move.start);
     expect(workTimes).toEqual([1_600, 8_000]);
@@ -249,13 +254,13 @@ function talkingAt(script: { foreman: readonly ForemanMove[] }): ForemanMove[] {
 
 describe("buildScript: мастер", () => {
   const { post, facing } = LINE_LAYOUT.foreman;
-  const specPost = LINE_LAYOUT.stations.spec.foremanPost;
+  const specPost = LINE_LAYOUT.stations.planning.foremanPost;
 
-  function promptRecording(): Recording {
+  function promptRecording(): SessionRecord {
     return recordingOf([
       { t: 0, type: "build_start" },
       { t: 500, type: "prompt", goal: "Добавь счётчик", requirements: [] },
-      messageAt(600, "spec", "foreman"),
+      messageAt(600, "planning", "foreman"),
       { t: 1_000, type: "build_end", ok: true },
     ]);
   }
@@ -288,7 +293,7 @@ describe("buildScript: мастер", () => {
       expect.objectContaining({
         start: 500 + TRIP_TO_SPEC_MS,
         end: 1_500 + TRIP_TO_SPEC_MS,
-        station: "spec",
+        station: "planning",
         index: 0,
       }),
     ]);
@@ -299,7 +304,7 @@ describe("buildScript: мастер", () => {
 
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
-    const toPost = headingTo(specPost, LINE_LAYOUT.stations.spec.post);
+    const toPost = headingTo(specPost, LINE_LAYOUT.stations.planning.post);
     expect(
       talkingAt(script).map(({ activity, start, end, to, heading }) => [
         activity,
@@ -356,8 +361,8 @@ describe("buildScript: мастер", () => {
   it("идёт к новой станции напрямую, если следующий разговор начинается раньше ухода", () => {
     const recording = recordingOf([
       { t: 0, type: "build_start" },
-      messageAt(100, "foreman", "spec"),
-      messageAt(100, "foreman", "code"),
+      messageAt(100, "foreman", "planning"),
+      messageAt(100, "foreman", "implementation"),
       { t: 200, type: "build_end", ok: true },
     ]);
 
@@ -368,7 +373,7 @@ describe("buildScript: мастер", () => {
       ["walk", 28_100, { x: 3, y: 2 }],
       ["walk", 30_100, { x: 13, y: 2 }],
       ["walk", 40_100, { x: 13, y: 0 }],
-      ["talk", 42_100, LINE_LAYOUT.stations.code.foremanPost],
+      ["talk", 42_100, LINE_LAYOUT.stations.implementation.foremanPost],
     ]);
   });
 
@@ -414,7 +419,7 @@ describe("buildScript: реплики", () => {
     const recording = recordingOf([
       { t: 0, type: "build_start" },
       { t: 500, type: "prompt", goal: "Добавь счётчик", requirements: [] },
-      messageAt(500, "spec", "foreman"),
+      messageAt(500, "planning", "foreman"),
       { t: 1_000, type: "build_end", ok: true },
     ]);
 
@@ -436,7 +441,7 @@ describe("buildScript: реплики", () => {
 
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
-    const [work, handoff] = script.workers.spec;
+    const [work, handoff] = script.workers.planning;
     expect([work?.activity, work?.end, handoff?.activity, handoff?.start]).toEqual([
       "work",
       29_500,
@@ -448,8 +453,8 @@ describe("buildScript: реплики", () => {
   it("звучит на месте и не двигает мастера, если реплика не между мастером и станцией", () => {
     const recording = recordingOf([
       { t: 0, type: "build_start" },
-      messageAt(500, "spec", "test"),
-      { t: 1_000, type: "stage_enter", stage: "code" },
+      messageAt(500, "planning", "verification"),
+      { t: 1_000, type: "stage_enter", stage: "implementation" },
       { t: 2_000, type: "build_end", ok: true },
     ]);
 
@@ -467,7 +472,7 @@ describe("buildScript: реплики", () => {
   it("показывает итог после конца последней реплики", () => {
     const recording = recordingOf([
       { t: 0, type: "build_start" },
-      messageAt(1_000, "spec", "code"),
+      messageAt(1_000, "planning", "implementation"),
       { t: 1_100, type: "build_end", ok: true },
     ]);
 
@@ -479,10 +484,10 @@ describe("buildScript: реплики", () => {
   it("нумерует реплики по записи и ставит их в порядке записи", () => {
     const recording = recordingOf([
       { t: 0, type: "build_start" },
-      { t: 100, type: "stage_enter", stage: "code" },
-      messageAt(500, "code", "test"),
-      messageAt(600, "foreman", "code"),
-      { t: 1_000, type: "stage_enter", stage: "test" },
+      { t: 100, type: "stage_enter", stage: "implementation" },
+      messageAt(500, "implementation", "verification"),
+      messageAt(600, "foreman", "implementation"),
+      { t: 1_000, type: "stage_enter", stage: "verification" },
       { t: 2_000, type: "build_end", ok: true },
     ]);
 
@@ -498,7 +503,9 @@ describe("buildScript: реплики", () => {
 
     const liftStart = script.part.find(
       (move) =>
-        move.from.on === "machine" && move.from.station === "code" && move.to.on === "hands",
+        move.from.on === "machine" &&
+        move.from.station === "implementation" &&
+        move.to.on === "hands",
     )?.start;
     const [early, , exchange] = script.messages;
     expect({
@@ -519,8 +526,8 @@ describe("buildScript: обмен при передаче", () => {
 
     const exchange = script.messages.filter(({ index }) => index === 2 || index === 3);
     expect(exchange.map(({ start, end, speaker }) => [start, end, speaker])).toEqual([
-      [88_350, 89_350, "code"],
-      [89_350, 90_350, "test"],
+      [88_350, 89_350, "implementation"],
+      [89_350, 90_350, "verification"],
     ]);
   });
 
@@ -529,8 +536,8 @@ describe("buildScript: обмен при передаче", () => {
 
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
-    const giver = script.workers.code.find((move) => move.start === 88_350);
-    const taker = script.workers.test.find((move) => move.end === 90_450);
+    const giver = script.workers.implementation.find((move) => move.start === 88_350);
+    const taker = script.workers.verification.find((move) => move.end === 90_450);
     expect({ giver, taker }).toEqual({
       giver: expect.objectContaining({
         activity: "handoff",
@@ -548,14 +555,17 @@ describe("buildScript: обмен при передаче", () => {
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
     const handover = script.part.find(
-      (move) => move.from.on === "hands" && move.from.station === "code" && move.to.on === "hands",
+      (move) =>
+        move.from.on === "hands" &&
+        move.from.station === "implementation" &&
+        move.to.on === "hands",
     );
     expect(handover).toEqual(
       expect.objectContaining({
         start: 90_350,
         end: 90_450,
-        from: { on: "hands", station: "code" },
-        to: { on: "hands", station: "test" },
+        from: { on: "hands", station: "implementation" },
+        to: { on: "hands", station: "verification" },
       }),
     );
   });
@@ -574,18 +584,18 @@ describe("buildScript: обмен при передаче", () => {
   it("устраивает обмен и при возврате с браком, и деталь идёт с браком", () => {
     const recording = recordingOf([
       { t: 0, type: "build_start" },
-      { t: 100, type: "stage_enter", stage: "test" },
-      messageAt(1_500, "test", "code"),
-      { t: 1_600, type: "stage_fail", stage: "test", reason: "проверки не прошли" },
-      messageAt(1_700, "code", "test"),
-      { t: 2_000, type: "stage_enter", stage: "code" },
+      { t: 100, type: "stage_enter", stage: "verification" },
+      messageAt(1_500, "verification", "implementation"),
+      { t: 1_600, type: "stage_fail", stage: "verification", reason: "проверки не прошли" },
+      messageAt(1_700, "implementation", "verification"),
+      { t: 2_000, type: "stage_enter", stage: "implementation" },
       { t: 3_000, type: "build_end", ok: true },
     ]);
 
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
     const handover = script.part.find(
-      (move) => move.from.on === "hands" && move.to.station === "code",
+      (move) => move.from.on === "hands" && move.to.station === "implementation",
     );
     const lastExchange = script.messages.at(-1);
     expect({
@@ -629,7 +639,7 @@ function walksOf(moves: readonly (Walk & { readonly activity: string })[]): Walk
   return walks;
 }
 
-function plannedRecordings(): { name: string; recording: Recording }[] {
+function plannedRecordings(): { name: string; recording: SessionRecord }[] {
   return [
     { name: "с браком", recording: reworkRecording() },
     { name: "с репликами", recording: chatRecording() },
@@ -727,7 +737,7 @@ describe("buildScript: отметки", () => {
       ]
         .sort((a, b) => a.start - b.start)
         .map(({ key }) => key);
-      const recorded = recording.events
+      const recorded = recording.data.events
         .filter(
           (event) =>
             event.type === "prompt" || event.type === "intervention" || event.type === "message",
@@ -754,12 +764,12 @@ describe("buildScript: планы", () => {
     const layout = {
       ...LINE_LAYOUT,
       aisle: [{ x: 0, y: 2 }, corner, { x: 20, y: 22 }] as const,
-      stations: { ...LINE_LAYOUT.stations, code: stationAt(22, 12) },
+      stations: { ...LINE_LAYOUT.stations, implementation: stationAt(22, 12) },
     };
 
     const script = buildScript(reworkRecording(), layout, PLAIN_PACING);
 
-    const route = script.workers.spec
+    const route = script.workers.planning
       .filter((move) => move.activity === "walk" && move.carrying)
       .map((move) => move.to);
     expect(route).toEqual([{ x: 0, y: 2 }, corner, { x: 20, y: 12 }, { x: 21, y: 12 }]);
@@ -831,7 +841,7 @@ describe("buildScript: вмешательства", () => {
   it("обмен при передаче не обгоняет вмешательство", () => {
     const recording = recordingOf([
       { t: 0, type: "build_start" },
-      { t: 100, type: "stage_enter", stage: "code" },
+      { t: 100, type: "stage_enter", stage: "implementation" },
       {
         t: 500,
         type: "intervention",
@@ -839,8 +849,8 @@ describe("buildScript: вмешательства", () => {
         line: "Бери вариант с таблицей",
         text: "Бери вариант с таблицей.",
       },
-      messageAt(900, "code", "test"),
-      { t: 1_000, type: "stage_enter", stage: "test" },
+      messageAt(900, "implementation", "verification"),
+      { t: 1_000, type: "stage_enter", stage: "verification" },
       { t: 2_000, type: "build_end", ok: true },
     ]);
 
@@ -853,8 +863,8 @@ describe("buildScript: вмешательства", () => {
   it("обмен перед вмешательством остаётся в работе, а не уходит к передаче", () => {
     const recording = recordingOf([
       { t: 0, type: "build_start" },
-      { t: 100, type: "stage_enter", stage: "code" },
-      messageAt(300, "code", "test"),
+      { t: 100, type: "stage_enter", stage: "implementation" },
+      messageAt(300, "implementation", "verification"),
       {
         t: 500,
         type: "intervention",
@@ -862,7 +872,7 @@ describe("buildScript: вмешательства", () => {
         line: "Бери вариант с таблицей",
         text: "Бери вариант с таблицей.",
       },
-      { t: 1_000, type: "stage_enter", stage: "test" },
+      { t: 1_000, type: "stage_enter", stage: "verification" },
       { t: 2_000, type: "build_end", ok: true },
     ]);
 
@@ -889,6 +899,6 @@ describe("buildScript: вмешательства", () => {
     const works = STAGES.map(
       (stage) => script.workers[stage].filter((move) => move.activity === "work").length,
     );
-    expect(works).toEqual([1, 2, 1, 0, 0]);
+    expect(works).toEqual([1, 2, 0, 1, 0]);
   });
 });

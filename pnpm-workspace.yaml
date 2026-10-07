@@ -1,6 +1,7 @@
 packages:
   - apps/web
   - packages/*
+  - adapters/*
 
 # Установочные скрипты пакетов разрешены только явно перечисленным зависимостям.
 onlyBuiltDependencies:

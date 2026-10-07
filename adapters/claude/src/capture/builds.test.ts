@@ -20,8 +20,15 @@ function draftOf(events: DraftEvent[]): Draft {
     id: "first",
     startedAt: "2026-10-04T09:52:13.000Z",
     builds: [
-      { id: "first", project: "p", factory: "0.1.0", title: "", runs: ["a1"] },
-      { id: "second", project: "p", factory: "0.1.0", title: "", runs: ["b1", "b2"] },
+      { id: "first", project: "p", harness: "0.1.0", workflow: "default", title: "", runs: ["a1"] },
+      {
+        id: "second",
+        project: "p",
+        harness: "0.1.0",
+        workflow: "default",
+        title: "",
+        runs: ["b1", "b2"],
+      },
     ],
     events,
   };
@@ -39,7 +46,7 @@ function prompt(t: number, build?: string): DraftEvent {
 }
 
 function stageEnter(t: number, run?: string): DraftEvent {
-  return { t, type: "stage_enter", stage: "code", ...(run === undefined ? {} : { run }) };
+  return { t, type: "stage_enter", stage: "implementation", ...(run === undefined ? {} : { run }) };
 }
 
 function projectCheck(t: number, project: string): DraftEvent {
@@ -52,9 +59,9 @@ function projectDraftOf(events: DraftEvent[]): Draft {
     id: "first",
     startedAt: "2026-10-04T09:52:13.000Z",
     builds: [
-      { id: "first", project: "a", factory: "0.1.0", title: "", runs: ["a1"] },
-      { id: "other", project: "b", factory: "0.1.0", title: "", runs: ["b1"] },
-      { id: "third", project: "a", factory: "0.1.0", title: "", runs: ["a3"] },
+      { id: "first", project: "a", harness: "0.1.0", workflow: "default", title: "", runs: ["a1"] },
+      { id: "other", project: "b", harness: "0.1.0", workflow: "default", title: "", runs: ["b1"] },
+      { id: "third", project: "a", harness: "0.1.0", workflow: "default", title: "", runs: ["a3"] },
     ],
     events,
   };
@@ -99,7 +106,7 @@ describe("eventBuilds", () => {
       { t: 2, type: "draft_check", ok: true },
       { t: 3, type: "usage", tokens: 5 },
       stageEnter(4, "a1"),
-      { t: 5, type: "stage_enter", stage: "ship" },
+      { t: 5, type: "stage_enter", stage: "record" },
     ]);
 
     const builds = eventBuilds(draft);
@@ -110,7 +117,7 @@ describe("eventBuilds", () => {
   it("отдаёт события до первого определённого первой сборке", () => {
     const draft = draftOf([
       { t: 0, type: "usage", tokens: 5 },
-      { t: 1, type: "stage_enter", stage: "code" },
+      { t: 1, type: "stage_enter", stage: "implementation" },
       stageEnter(2, "b1"),
     ]);
 
@@ -213,7 +220,7 @@ describe("eventBuilds: проект события", () => {
 
   it("ставит запуск выше проекта", () => {
     const draft = projectDraftOf([
-      { t: 1, type: "stage_enter", stage: "code", run: "a1", project: "b" },
+      { t: 1, type: "stage_enter", stage: "implementation", run: "a1", project: "b" },
     ]);
 
     const builds = eventBuilds(draft);
@@ -257,7 +264,7 @@ describe("projectsWithoutBuild", () => {
     const draft = projectDraftOf([
       projectCheck(1, "lab"),
       projectCheck(2, "docs"),
-      { t: 3, type: "stage_enter", stage: "code", project: "lab" },
+      { t: 3, type: "stage_enter", stage: "implementation", project: "lab" },
     ]);
 
     const projects = projectsWithoutBuild(draft);

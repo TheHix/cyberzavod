@@ -1,5 +1,5 @@
 import { createSignal, onCleanup, onMount, Show, untrack, type JSX } from "solid-js";
-import { layoutFor, type BriefRecording } from "@cyberzavod/core";
+import { layoutFor, type BriefSessionRecord } from "@cyberzavod/core";
 import type { ProjectLink } from "@/entities/project";
 import { connectScene } from "@/features/journal-sync";
 import { LocaleProvider } from "@/shared/i18n/locale-context.ts";
@@ -21,7 +21,7 @@ import { PromptBubble } from "./PromptBubble.tsx";
 import styles from "./Factory.module.css";
 
 interface Props {
-  recording: BriefRecording;
+  recording: BriefSessionRecord;
   /** Язык страницы: на нём подписи цеха, HUD и пузырей. */
   locale: Locale;
   /** Проект, который собирали, — ссылка на его страницу в HUD. */
@@ -85,7 +85,7 @@ function fieldWithin(host: HTMLElement, field: HTMLElement): Frame {
  * кабинет мастера, промпты, вмешательства и реплики над говорящими, HUD сборки справа со ссылкой на проект.
  * Графика грузится только в браузере.
  * @param {Props} props Свойства компонента.
- * @param {BriefRecording} props.recording Запись сборки, которую проигрывает цех.
+ * @param {BriefSessionRecord} props.recording Запись сборки, которую проигрывает цех.
  * @param {Locale} props.locale Язык страницы.
  * @param {ProjectLink} props.project Проект, который собирали.
  * @param {"h1" | "h2"} [props.titleLevel] Уровень заголовка с названием сборки.
@@ -167,7 +167,7 @@ export function Factory(props: Props): JSX.Element {
             ref={(element) => (canvasHost = element)}
             class={styles.canvas}
             role="img"
-            aria-label={UI_TEXT.factory.canvasLabel[locale](props.recording.title)}
+            aria-label={UI_TEXT.factory.canvasLabel[locale](props.recording.data.title)}
           />
           <div ref={(element) => (fieldElement = element)} class={styles.field}>
             <Show when={status() === "loading"}>

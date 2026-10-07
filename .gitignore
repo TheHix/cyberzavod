@@ -4,9 +4,9 @@ dist/
 .env
 *.log
 
-# Сырые журналы сборок: до проверки и публикации в репозиторий не попадают
-recordings/raw/
-recordings/drafts/
+# Рабочие файлы адаптеров агентов: сырые журналы сессий и черновики записей до проверки
+# человеком в репозиторий не попадают
+journal/capture/
 .claude/settings.local.json
 .astro/
 .pnpm-store/

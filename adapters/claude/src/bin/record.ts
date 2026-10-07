@@ -1,24 +1,25 @@
-// Точка входа хука: читает JSON события Claude Code из stdin и дописывает строку
-// в recordings/raw/<session_id>.jsonl. Запускается асинхронно и работу агента не тормозит.
+// Точка входа хука записи: читает JSON события Claude Code из stdin и дописывает строку в сырой
+// журнал сессии `capture/claude/raw/<session_id>.jsonl` журнала проекта. Запускается асинхронно
+// и работу агента не тормозит. Проект без маркера Cyberzavod не записывается.
 
-import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
-import { parseProjectConfig, type ProjectConfig } from "../project.ts";
+import { ProjectFileError } from "@cyberzavod/storage";
+import { isHumanPrompt } from "../capture/to-draft.ts";
 import {
   fromHookPayload,
   isSafeSessionId,
   markAfterStopGate,
   stampProject,
   type RawEvent,
-} from "../raw-event.ts";
-import { isHumanPrompt } from "../to-draft.ts";
+} from "../capture/raw-event.ts";
 import {
+  captureDirectories,
   claimHumanCallMarker,
-  isNotFound,
-  PROJECT_CONFIG_PATH,
-  RECORDINGS_DIRS,
+  locateProject,
   TMP_DIR,
-} from "./paths.ts";
+  type LocatedProject,
+} from "../paths.ts";
 
 async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
@@ -26,23 +27,19 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-// Хук не должен падать из-за конфига: без него сессия пишется без проекта, а причина
-// остаётся предупреждением.
-async function readProjectConfig(): Promise<ProjectConfig | undefined> {
+// Хук не должен падать из-за конфига: битый конфиг — предупреждение, сессия не пишется.
+async function sessionProject(): Promise<LocatedProject | undefined> {
   try {
-    return parseProjectConfig(JSON.parse(await readFile(PROJECT_CONFIG_PATH, "utf8")));
+    return await locateProject(process.env.CLAUDE_PROJECT_DIR || process.cwd());
   } catch (err) {
-    if (!isNotFound(err)) {
-      console.warn(`конфиг проекта ${PROJECT_CONFIG_PATH} не прочитан: ${String(err)}`);
-    }
+    if (!(err instanceof ProjectFileError)) throw err;
+    console.warn(`сессия не записана: ${err.message}`);
     return undefined;
   }
 }
 
-async function withProject(event: RawEvent): Promise<RawEvent> {
-  if (event.kind !== "session_start") return event;
-  const project = await readProjectConfig();
-  return project === undefined ? event : stampProject(event, project);
+function withProject(event: RawEvent, project: LocatedProject): RawEvent {
+  return event.kind === "session_start" ? stampProject(event, project.config) : event;
 }
 
 // Отметку оставляет хук остановки, когда сдался; забирает её промпт человека. Служебное
@@ -54,15 +51,13 @@ async function withStopGateMark(event: RawEvent, sessionId: string): Promise<Raw
 
 const payload: unknown = JSON.parse(await readStdin());
 const hookEvent = fromHookPayload(payload, Date.now());
-const event = hookEvent === null ? null : await withProject(hookEvent);
+const project = hookEvent === null ? undefined : await sessionProject();
 
-if (event !== null) {
+if (hookEvent !== null && project !== undefined) {
   const sessionId = (payload as { session_id?: unknown }).session_id;
   if (!isSafeSessionId(sessionId)) throw new Error(`недопустимый session_id: ${String(sessionId)}`);
-  const recorded = await withStopGateMark(event, sessionId);
-  await mkdir(RECORDINGS_DIRS.raw, { recursive: true });
-  await appendFile(
-    path.join(RECORDINGS_DIRS.raw, `${sessionId}.jsonl`),
-    `${JSON.stringify(recorded)}\n`,
-  );
+  const recorded = await withStopGateMark(withProject(hookEvent, project), sessionId);
+  const { raw } = captureDirectories(project.journal);
+  await mkdir(raw, { recursive: true });
+  await appendFile(path.join(raw, `${sessionId}.jsonl`), `${JSON.stringify(recorded)}\n`);
 }

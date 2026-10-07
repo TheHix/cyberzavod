@@ -5,7 +5,7 @@
 // Каждая запись — остров client:visible со статичным телом в слоте: пока журнал закрыт, его
 // не видно и JS не грузится. Подсветка записи, до которой дошёл цех, и кнопка «показать в цехе»
 // появляются только с JS, когда запись на экране; без него остаётся эта же разметка.
-import type { InterventionEvent, MessageEvent, PromptEvent, Recording } from "@cyberzavod/core";
+import type { InterventionEvent, MessageEvent, PromptEvent, SessionRecord } from "@cyberzavod/core";
 import { interventionAnchor, labelOf } from "@/entities/intervention";
 import { recipientOf } from "@/entities/prompt";
 import { messageAnchor, paragraphsOf, routeOf } from "@/entities/message";
@@ -18,7 +18,7 @@ import { JournalEntry } from "./JournalEntry.tsx";
 
 interface Props {
   /** Полная запись: в журнале, в отличие от цеха, есть полные тексты реплик. */
-  recording: Recording;
+  recording: SessionRecord;
   /** Язык страницы: на нём метки и подписи журнала. */
   locale: Locale;
 }
@@ -36,7 +36,7 @@ const { recording, locale } = Astro.props;
 
 // Номера промптов, вмешательств и реплик — те же, что у пузырей в цехе: по ним цех и журнал находят друг
 // друга, а по номеру вмешательства или реплики «подробнее» находит запись.
-function entriesOf(events: Recording["events"]): Entry[] {
+function entriesOf(events: SessionRecord["data"]["events"]): Entry[] {
   let promptIndex = 0;
   let interventionIndex = 0;
   let messageIndex = 0;
@@ -71,7 +71,7 @@ function entriesOf(events: Recording["events"]): Entry[] {
   });
 }
 
-const entries = entriesOf(recording.events);
+const entries = entriesOf(recording.data.events);
 ---
 
 {entries.length === 0 ? (

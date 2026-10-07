@@ -7,6 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
+    "cyberzavod": "node packages/cli/src/bin/cyberzavod.ts",
     "dev": "pnpm --filter @cyberzavod/web dev",
     "lint": "prettier --check . && eslint . --max-warnings 0",
     "format": "prettier --write . && eslint --fix . && prettier --write .",

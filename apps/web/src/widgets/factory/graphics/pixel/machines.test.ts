@@ -4,7 +4,7 @@ import type { MachineWork, WorkBeat } from "./frames.ts";
 import { MACHINE_WORK_ART, showMachineWork, type MachineSprites } from "./machines.ts";
 
 // Такты берутся по ключам таблицы накладок: новый такт попадает в тест сам.
-const BEATS = Object.keys(MACHINE_WORK_ART.spec.frames) as WorkBeat[];
+const BEATS = Object.keys(MACHINE_WORK_ART.planning.frames) as WorkBeat[];
 
 // Настоящие спрайты Pixi без текстур: видимость — их собственное свойство, холст не нужен.
 function machineSprites(lampOn = true): MachineSprites {

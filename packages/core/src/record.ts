@@ -1,13 +1,13 @@
-// Формат записи сборки. Цех на сайте проигрывает запись по этим событиям,
-// поэтому всё, что видно на экране, должно выводиться отсюда.
+// Записи журнала проекта — один формат для CLI, хранилища и просмотрщика. Запись — конверт
+// (кто, когда, в каком проекте) и данные её типа: сессия работы над задачей, решение или
+// заметка. Цех на сайте проигрывает сессию по её событиям, поэтому всё, что видно на экране,
+// должно выводиться отсюда.
 
 import { isLine, isObject } from "./guards.ts";
+import { isStage, type Stage } from "./stage.ts";
 
-/** Этапы сборки по порядку: постановка, код, проверки, ревью, выпуск. */
-export const STAGES = ["spec", "code", "test", "review", "ship"] as const;
-
-/** Этап сборки — одна из станций цеха. */
-export type Stage = (typeof STAGES)[number];
+/** Версия формата записи. Добавление нового типа записи или события версию не меняет. */
+export const RECORD_VERSION = 1;
 
 /**
  * Промпт человека в чистовом виде: главное указание одной строкой и уточнения списком.
@@ -42,12 +42,12 @@ export interface MessageEvent {
 }
 
 /**
- * Что остановило автоматику и позвало человека: ответ на вопрос модели, решение по постановке,
+ * Что остановило автоматику и позвало человека: ответ на вопрос агента, решение по постановке,
  * вызов после возвратов, вызов хуком остановки. Что решил человек, лежит в `line` и `text`.
  */
 export const INTERVENTION_REASONS = [
   "question",
-  "spec_review",
+  "plan_review",
   "rework_limit",
   "stop_gate",
 ] as const;
@@ -70,8 +70,8 @@ export interface InterventionEvent {
   text: string;
 }
 
-/** Событие записи сборки; `t` — миллисекунды от начала сборки. */
-export type FactoryEvent =
+/** Событие сессии; `t` — миллисекунды от начала сессии (`timestamp` записи). */
+export type SessionEvent =
   | { t: number; type: "build_start" }
   | PromptEvent
   | MessageEvent
@@ -81,20 +81,56 @@ export type FactoryEvent =
   | { t: number; type: "usage"; tokens: number }
   | { t: number; type: "build_end"; ok: boolean };
 
-/** Запись сборки: последовательность событий, которую проигрывает цех. */
-export interface Recording {
-  version: 2;
+/** Кто сделал запись: агент (провайдер и агент из его адаптера) или человек вручную. */
+export type RecordSource = { type: "agent"; provider: string; agent: string } | { type: "manual" };
+
+/** Общее у записей всех типов: кто, когда и в каком проекте. */
+export interface RecordHeader {
+  version: typeof RECORD_VERSION;
   /** Идентификатор записи: он же имя файла и часть адреса страницы. */
   id: string;
-  /** Идентификатор проекта, который собирали: те же правила, что у `id` записи. */
-  project: string;
-  /** Версия завода на момент сборки одной строкой, например `0.1.0`. */
-  factory: string;
-  /** Время начала сборки в ISO 8601 по UTC, как у `Date.prototype.toISOString`. */
-  startedAt: string;
-  title: string;
-  events: FactoryEvent[];
+  /** Момент записи в ISO 8601 по UTC, как у `Date.prototype.toISOString`; у сессии — её начало. */
+  timestamp: string;
+  /** Идентификатор проекта: те же правила, что у `id`. */
+  projectId: string;
+  /** Сессия агента, из которой запись; нет, если неизвестна или запись сделана вручную. */
+  sessionId?: string;
+  source: RecordSource;
 }
+
+/** Данные сессии: задача прошла по этапам процесса, события — то, что проигрывает цех. */
+export interface SessionData {
+  title: string;
+  /** Имя процесса из `harness/workflows/`. */
+  workflow: string;
+  /** Версия harness одной строкой, например `0.3.0`: по ней видно, какие правила работали. */
+  harness: string;
+  events: SessionEvent[];
+}
+
+/** Сессия работы над задачей: её проигрывает цех. */
+export interface SessionRecord extends RecordHeader {
+  type: "session";
+  data: SessionData;
+}
+
+/** Решение по проекту: что выбрали и почему. */
+export interface DecisionRecord extends RecordHeader {
+  type: "decision";
+  data: { title: string; description: string };
+}
+
+/** Заметка о проекте свободным текстом. */
+export interface NoteRecord extends RecordHeader {
+  type: "note";
+  data: { text: string };
+}
+
+/** Запись журнала проекта — размеченное объединение по `type`. */
+export type JournalRecord = SessionRecord | DecisionRecord | NoteRecord;
+
+/** Тип записи журнала. */
+export type RecordType = JournalRecord["type"];
 
 /** Реплика без полного текста: цеху нужна только строка над говорящим. */
 export type BriefMessageEvent = Omit<MessageEvent, "text">;
@@ -102,19 +138,19 @@ export type BriefMessageEvent = Omit<MessageEvent, "text">;
 /** Вмешательство без полного текста: цеху нужна только строка над мастером. */
 export type BriefInterventionEvent = Omit<InterventionEvent, "text">;
 
-/** Событие записи, как его видит цех: у реплик и вмешательств нет полного текста. */
-export type BriefFactoryEvent =
-  | Exclude<FactoryEvent, MessageEvent | InterventionEvent>
+/** Событие сессии, как его видит цех: у реплик и вмешательств нет полного текста. */
+export type BriefSessionEvent =
+  | Exclude<SessionEvent, MessageEvent | InterventionEvent>
   | BriefMessageEvent
   | BriefInterventionEvent;
 
-/** Запись без полных текстов реплик: её получает цех, а полный текст остаётся в журнале. */
-export interface BriefRecording extends Omit<Recording, "events"> {
-  events: BriefFactoryEvent[];
+/** Сессия без полных текстов реплик: её получает цех, а полный текст остаётся в журнале. */
+export interface BriefSessionRecord extends Omit<SessionRecord, "data"> {
+  data: Omit<SessionData, "events"> & { events: BriefSessionEvent[] };
 }
 
 /**
- * Счётчики сборки на какой-то момент: токены, промпты человека, возвраты на доработку
+ * Счётчики сессии на какой-то момент: токены, промпты человека, возвраты на доработку
  * и вмешательства человека (их промпты не считаются).
  */
 export interface Tally {
@@ -124,7 +160,7 @@ export interface Tally {
   interventions: number;
 }
 
-/** Счётчики сборки, которые показываются над цехом. */
+/** Счётчики сессии, которые показываются над цехом. */
 export interface BuildStats extends Tally {
   durationMs: number;
   ok: boolean;
@@ -134,11 +170,7 @@ export interface BuildStats extends Tally {
 export const NO_TALLY: Tally = { tokens: 0, prompts: 0, reworks: 0, interventions: 0 };
 
 /** Ошибка формата записи: запись пришла извне и не прошла проверку. */
-export class RecordingError extends Error {}
-
-function isStage(value: unknown): value is Stage {
-  return (STAGES as readonly unknown[]).includes(value);
-}
+export class RecordError extends Error {}
 
 /**
  * Проверяет, что значение — участник разговора в цехе.
@@ -157,6 +189,10 @@ function isLines(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(isLine);
 }
 
+function isText(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "";
+}
+
 // id уходит в имя файла и в адрес страницы: только буквы, цифры, `_` и `-`.
 const ID_PATTERN = /^[\w-]+$/;
 
@@ -165,16 +201,16 @@ const ID_PATTERN = /^[\w-]+$/;
  * @param {unknown} value Проверяемое значение.
  * @returns {value is string} true, если это строка из букв, цифр, «_» и «-».
  */
-export function isRecordingId(value: unknown): value is string {
+export function isRecordId(value: unknown): value is string {
   return typeof value === "string" && ID_PATTERN.test(value);
 }
 
 /**
- * Проверяет, что значение — версия завода: непустая строка без переводов строки.
+ * Проверяет, что значение — версия harness: непустая строка без переводов строки.
  * @param {unknown} value Проверяемое значение.
  * @returns {value is string} true, если значение можно показать версией в одну строку.
  */
-export function isFactoryVersion(value: unknown): value is string {
+export function isHarnessVersion(value: unknown): value is string {
   return isLine(value);
 }
 
@@ -186,7 +222,7 @@ function isInstant(value: unknown): value is string {
   return !Number.isNaN(time) && new Date(time).toISOString() === value;
 }
 
-type Fail = (why: string) => RecordingError;
+type Fail = (why: string) => RecordError;
 
 function parsePrompt(raw: Record<string, unknown>, t: number, fail: Fail): PromptEvent {
   const { goal, requirements, model } = raw;
@@ -206,9 +242,7 @@ function parseMessage(raw: Record<string, unknown>, t: number, fail: Fail): Mess
   if (!isSpeaker(to)) throw fail(`неизвестный адресат ${String(to)}`);
   if (from === to) throw fail(`${from} не может говорить сам с собой`);
   if (!isLine(line)) throw fail("line должна быть непустой строкой без переводов строки");
-  if (typeof text !== "string" || text.trim() === "") {
-    throw fail("text должен быть непустой строкой");
-  }
+  if (!isText(text)) throw fail("text должен быть непустой строкой");
   return { t, type: "message", from, to, line, text };
 }
 
@@ -216,21 +250,19 @@ function parseIntervention(raw: Record<string, unknown>, t: number, fail: Fail):
   const { reason, line, text } = raw;
   if (!isInterventionReason(reason)) throw fail(`неизвестная причина ${String(reason)}`);
   if (!isLine(line)) throw fail("line должна быть непустой строкой без переводов строки");
-  if (typeof text !== "string" || text.trim() === "") {
-    throw fail("text должен быть непустой строкой");
-  }
+  if (!isText(text)) throw fail("text должен быть непустой строкой");
   return { t, type: "intervention", reason, line, text };
 }
 
 /**
- * Проверяет одно событие записи, пришедшее извне.
+ * Проверяет одно событие сессии, пришедшее извне.
  * @param {unknown} raw Разобранный JSON события.
- * @param {number} index Номер события в записи — для сообщения об ошибке.
- * @returns {FactoryEvent} Проверенное событие.
- * @throws {RecordingError} Если событие не соответствует формату.
+ * @param {number} index Номер события в сессии — для сообщения об ошибке.
+ * @returns {SessionEvent} Проверенное событие.
+ * @throws {RecordError} Если событие не соответствует формату.
  */
-export function parseFactoryEvent(raw: unknown, index: number): FactoryEvent {
-  const fail: Fail = (why) => new RecordingError(`событие #${index}: ${why}`);
+export function parseSessionEvent(raw: unknown, index: number): SessionEvent {
+  const fail: Fail = (why) => new RecordError(`событие #${index}: ${why}`);
   if (!isObject(raw)) throw fail("не объект");
 
   const { t, type } = raw;
@@ -263,63 +295,117 @@ export function parseFactoryEvent(raw: unknown, index: number): FactoryEvent {
   }
 }
 
-/**
- * Проверяет запись, пришедшую извне, и возвращает её типизированной.
- * @param {unknown} raw Разобранный JSON записи.
- * @returns {Recording} Проверенная запись.
- * @throws {RecordingError} Если запись не соответствует формату.
- */
-export function parseRecording(raw: unknown): Recording {
-  if (!isObject(raw)) throw new RecordingError("запись должна быть объектом");
-  if (raw.version !== 2) throw new RecordingError(`неподдерживаемая версия ${String(raw.version)}`);
-  if (!isRecordingId(raw.id)) {
-    throw new RecordingError("id должен состоять из букв, цифр, «_» и «-»");
+function parseSource(raw: unknown): RecordSource {
+  if (!isObject(raw)) throw new RecordError("source должен быть объектом");
+  switch (raw.type) {
+    case "manual":
+      return { type: "manual" };
+    case "agent":
+      if (!isLine(raw.provider)) throw new RecordError("у source нет provider");
+      if (!isLine(raw.agent)) throw new RecordError("у source нет agent");
+      return { type: "agent", provider: raw.provider, agent: raw.agent };
+    default:
+      throw new RecordError(`неизвестный источник ${String(raw.type)}`);
   }
-  if (!isRecordingId(raw.project)) {
-    throw new RecordingError("project должен состоять из букв, цифр, «_» и «-»");
-  }
-  if (!isFactoryVersion(raw.factory)) {
-    throw new RecordingError("factory должна быть непустой строкой без переводов строки");
-  }
-  if (!isInstant(raw.startedAt)) {
-    throw new RecordingError("startedAt должно быть временем ISO 8601 по UTC, как у toISOString");
-  }
-  if (!isLine(raw.title)) {
-    throw new RecordingError("title должен быть непустой строкой без переводов строки");
-  }
-  if (!Array.isArray(raw.events)) throw new RecordingError("нет events");
+}
 
-  const events = raw.events.map(parseFactoryEvent);
+function parseHeader(raw: Record<string, unknown>): RecordHeader {
+  if (raw.version !== RECORD_VERSION) {
+    throw new RecordError(`неподдерживаемая версия ${String(raw.version)}`);
+  }
+  if (!isRecordId(raw.id)) throw new RecordError("id должен состоять из букв, цифр, «_» и «-»");
+  if (!isRecordId(raw.projectId)) {
+    throw new RecordError("projectId должен состоять из букв, цифр, «_» и «-»");
+  }
+  if (!isInstant(raw.timestamp)) {
+    throw new RecordError("timestamp должен быть временем ISO 8601 по UTC, как у toISOString");
+  }
+  const header: RecordHeader = {
+    version: RECORD_VERSION,
+    id: raw.id,
+    timestamp: raw.timestamp,
+    projectId: raw.projectId,
+    source: parseSource(raw.source),
+  };
+  if (raw.sessionId === undefined) return header;
+  if (!isLine(raw.sessionId)) throw new RecordError("sessionId должен быть непустой строкой");
+  return { ...header, sessionId: raw.sessionId };
+}
+
+function parseEvents(raw: unknown): SessionEvent[] {
+  if (!Array.isArray(raw)) throw new RecordError("нет events");
+  const events = raw.map(parseSessionEvent);
   if (events[0]?.type !== "build_start") {
-    throw new RecordingError("запись должна начинаться с build_start");
+    throw new RecordError("сессия должна начинаться с build_start");
   }
   if (events.at(-1)?.type !== "build_end") {
-    throw new RecordingError("запись должна заканчиваться build_end");
+    throw new RecordError("сессия должна заканчиваться build_end");
   }
   let prevT = 0;
   events.forEach((event, i) => {
-    if (event.t < prevT) throw new RecordingError(`событие #${i}: время идёт назад`);
+    if (event.t < prevT) throw new RecordError(`событие #${i}: время идёт назад`);
     prevT = event.t;
   });
+  return events;
+}
 
-  return {
-    version: 2,
-    id: raw.id,
-    project: raw.project,
-    factory: raw.factory,
-    startedAt: raw.startedAt,
-    title: raw.title,
-    events,
-  };
+function parseSessionData(raw: unknown): SessionData {
+  if (!isObject(raw)) throw new RecordError("data должна быть объектом");
+  const { title, workflow, harness } = raw;
+  if (!isLine(title)) {
+    throw new RecordError("title должен быть непустой строкой без переводов строки");
+  }
+  if (!isLine(workflow)) throw new RecordError("workflow должен быть непустой строкой");
+  if (!isHarnessVersion(harness)) {
+    throw new RecordError("harness должна быть непустой строкой без переводов строки");
+  }
+  return { title, workflow, harness, events: parseEvents(raw.events) };
+}
+
+function parseDecisionData(raw: unknown): DecisionRecord["data"] {
+  if (!isObject(raw)) throw new RecordError("data должна быть объектом");
+  const { title, description } = raw;
+  if (!isLine(title)) {
+    throw new RecordError("title должен быть непустой строкой без переводов строки");
+  }
+  if (typeof description !== "string") throw new RecordError("description должно быть строкой");
+  return { title, description };
+}
+
+function parseNoteData(raw: unknown): NoteRecord["data"] {
+  if (!isObject(raw)) throw new RecordError("data должна быть объектом");
+  if (!isText(raw.text)) throw new RecordError("text должен быть непустой строкой");
+  return { text: raw.text };
 }
 
 /**
- * Добавляет событие записи к счётчикам сборки.
+ * Проверяет запись журнала, пришедшую извне, и возвращает её типизированной.
+ * @param {unknown} raw Разобранный JSON записи.
+ * @returns {JournalRecord} Проверенная запись; неизвестные поля отброшены.
+ * @throws {RecordError} Если запись не соответствует формату.
+ */
+export function parseRecord(raw: unknown): JournalRecord {
+  if (!isObject(raw)) throw new RecordError("запись должна быть объектом");
+  const header = parseHeader(raw);
+  switch (raw.type) {
+    case "session":
+      return { ...header, type: "session", data: parseSessionData(raw.data) };
+    case "decision":
+      return { ...header, type: "decision", data: parseDecisionData(raw.data) };
+    case "note":
+      return { ...header, type: "note", data: parseNoteData(raw.data) };
+    default:
+      throw new RecordError(`неизвестный тип записи ${String(raw.type)}`);
+  }
+}
+
+/**
+ * Добавляет событие сессии к счётчикам.
  * @param {Tally} counts Счётчики до события.
- * @param {BriefFactoryEvent} event Событие записи.
+ * @param {BriefSessionEvent} event Событие сессии.
  * @returns {Tally} Счётчики после события.
  */
-export function tally(counts: Tally, event: BriefFactoryEvent): Tally {
+export function tally(counts: Tally, event: BriefSessionEvent): Tally {
   switch (event.type) {
     case "usage":
       return { ...counts, tokens: counts.tokens + event.tokens };
@@ -341,26 +427,26 @@ export function tally(counts: Tally, event: BriefFactoryEvent): Tally {
 }
 
 /**
- * Итог сборки: удалась ли она по последнему событию записи.
- * @param {BriefRecording} recording Проверенная запись сборки.
- * @returns {boolean} true, если запись кончается удачным build_end.
+ * Итог сессии: удалась ли она по последнему событию.
+ * @param {BriefSessionRecord} session Проверенная сессия.
+ * @returns {boolean} true, если сессия кончается удачным build_end.
  */
-export function succeeded(recording: BriefRecording): boolean {
-  const last = recording.events.at(-1);
+export function succeeded(session: BriefSessionRecord): boolean {
+  const last = session.data.events.at(-1);
   return last?.type === "build_end" && last.ok;
 }
 
 /**
- * Считает счётчики сборки по её записи.
- * @param {BriefRecording} recording Проверенная запись сборки.
- * @returns {BuildStats} Длительность, токены, число промптов, возвратов и вмешательств, итог сборки.
+ * Считает счётчики сессии по её событиям.
+ * @param {BriefSessionRecord} session Проверенная сессия.
+ * @returns {BuildStats} Длительность, токены, число промптов, возвратов и вмешательств, итог.
  */
-export function summarize(recording: BriefRecording): BuildStats {
-  const { events } = recording;
+export function summarize(session: BriefSessionRecord): BuildStats {
+  const { events } = session.data;
   return {
     durationMs: (events.at(-1)?.t ?? 0) - (events[0]?.t ?? 0),
     ...events.reduce(tally, NO_TALLY),
-    ok: succeeded(recording),
+    ok: succeeded(session),
   };
 }
 
@@ -384,7 +470,7 @@ export function briefIntervention(event: BriefInterventionEvent): BriefIntervent
   return { t, type, reason, line };
 }
 
-function briefEvent(event: FactoryEvent): BriefFactoryEvent {
+function briefEvent(event: SessionEvent): BriefSessionEvent {
   switch (event.type) {
     case "message":
       return briefMessage(event);
@@ -406,9 +492,9 @@ function briefEvent(event: FactoryEvent): BriefFactoryEvent {
 /**
  * Убирает у реплик и вмешательств полный текст: цеху он не нужен, а в страницу с цехом
  * попадать не должен.
- * @param {Recording} recording Полная запись сборки.
- * @returns {BriefRecording} Та же запись, у реплик и вмешательств которой нет `text`.
+ * @param {SessionRecord} session Полная сессия.
+ * @returns {BriefSessionRecord} Та же сессия, у реплик и вмешательств которой нет `text`.
  */
-export function briefOf(recording: Recording): BriefRecording {
-  return { ...recording, events: recording.events.map(briefEvent) };
+export function briefOf(session: SessionRecord): BriefSessionRecord {
+  return { ...session, data: { ...session.data, events: session.data.events.map(briefEvent) } };
 }

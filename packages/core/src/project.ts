@@ -1,14 +1,14 @@
 // Карточка проекта: то, что сайт показывает о проекте, который собирает завод.
 
 import { isLine, isObject } from "./guards.ts";
-import { isRecordingId } from "./recording.ts";
+import { isRecordId } from "./record.ts";
 
 /**
  * Карточка проекта для сайта: название, описание и ссылки. Как проект собирать — в
  * `.cyberzavod/project.json` его репозитория, сюда это не попадает.
  */
 export interface Project {
-  /** Идентификатор проекта: тот же, что `Recording.project`, и часть адреса страницы проекта. */
+  /** Идентификатор проекта: тот же, что `SessionRecord.project`, и часть адреса страницы проекта. */
   id: string;
   name: string;
   /** Описание одной строкой. */
@@ -49,7 +49,7 @@ function parseLink(raw: Record<string, unknown>, field: "repo" | "website"): Par
 export function parseProject(raw: unknown): Project {
   if (!isObject(raw)) throw new ProjectError("карточка проекта должна быть объектом");
   const { id, name, description } = raw;
-  if (!isRecordingId(id)) throw new ProjectError("id должен состоять из букв, цифр, «_» и «-»");
+  if (!isRecordId(id)) throw new ProjectError("id должен состоять из букв, цифр, «_» и «-»");
   if (!isLine(name)) {
     throw new ProjectError("name должно быть непустой строкой без переводов строки");
   }

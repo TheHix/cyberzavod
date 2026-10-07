@@ -1,12 +1,12 @@
-import type { Recording } from "@cyberzavod/core";
+import type { SessionRecord } from "@cyberzavod/core";
 
 /**
  * Порядок записей в списке: начатые позже — первыми.
- * @param {Recording} a Первая запись.
- * @param {Recording} b Вторая запись.
+ * @param {SessionRecord} a Первая запись.
+ * @param {SessionRecord} b Вторая запись.
  * @returns {number} Отрицательное число, если `a` идёт раньше `b`.
  */
-export function newestFirst(a: Recording, b: Recording): number {
+export function newestFirst(a: SessionRecord, b: SessionRecord): number {
   // Время в ISO 8601 по UTC сравнивается как строка; при равном времени порядок задаёт id.
-  return b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id);
+  return b.timestamp.localeCompare(a.timestamp) || b.id.localeCompare(a.id);
 }

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { sceneAt } from "./scene.ts";
 import { headingTo } from "./layout.ts";
-import type { Recording } from "./recording.ts";
 import {
   chatRecording,
   interventionRecording,
@@ -11,6 +10,7 @@ import {
   PLAYBACK_SETUPS,
   reworkRecording,
   SPEECH_RECORDINGS,
+  withEvents,
 } from "./script.fixtures.ts";
 import { buildScript, type FactoryScript } from "./script.ts";
 
@@ -29,14 +29,14 @@ describe("sceneAt", () => {
 
     expect({ worker: scene.workers[0], part: scene.part }).toEqual({
       worker: {
-        station: "spec",
+        station: "planning",
         position: { x: 5, y: 2 },
         heading: 0,
         activity: "walk",
         elapsed: 7_000,
         carrying: true,
       },
-      part: { position: { x: 5.45, y: 2 }, holder: "spec", carried: true, status: "ok" },
+      part: { position: { x: 5.45, y: 2 }, holder: "planning", carried: true, status: "ok" },
     });
   });
 
@@ -64,7 +64,7 @@ describe("sceneAt", () => {
     // на полпути поворота это 5π/4, а не π/4, как вышло бы в обход через ноль.
     const scene = sceneAt(script, 57_075);
 
-    expect(scene.workers[2]?.heading).toBeCloseTo(1.25 * Math.PI);
+    expect(scene.workers[3]?.heading).toBeCloseTo(1.25 * Math.PI);
   });
 
   it("передаёт деталь из рук в руки, а не перескоком", () => {
@@ -76,7 +76,7 @@ describe("sceneAt", () => {
     expect([scene.part.position.x, scene.part.position.y, scene.part.holder]).toEqual([
       10,
       expect.closeTo(0.5),
-      "code",
+      "implementation",
     ]);
   });
 
@@ -85,8 +85,8 @@ describe("sceneAt", () => {
 
     const scene = sceneAt(script, 5_000);
 
-    expect(scene.workers[2]).toEqual({
-      station: "test",
+    expect(scene.workers[3]).toEqual({
+      station: "verification",
       position: { x: 20, y: 0 },
       heading: -Math.PI / 2,
       activity: "idle",
@@ -102,7 +102,7 @@ describe("sceneAt", () => {
 
     expect({ worker: scene.workers[1]?.activity, part: scene.part }).toEqual({
       worker: "work",
-      part: { position: { x: 10, y: -1 }, holder: "code", carried: false, status: "ok" },
+      part: { position: { x: 10, y: -1 }, holder: "implementation", carried: false, status: "ok" },
     });
   });
 
@@ -144,8 +144,8 @@ describe("sceneAt", () => {
 
 describe("sceneAt: мастер и реплики", () => {
   const { post, facing } = LINE_LAYOUT.foreman;
-  const specPost = LINE_LAYOUT.stations.spec.foremanPost;
-  const towardSpec = headingTo(specPost, LINE_LAYOUT.stations.spec.post);
+  const specPost = LINE_LAYOUT.stations.planning.foremanPost;
+  const towardSpec = headingTo(specPost, LINE_LAYOUT.stations.planning.post);
 
   // Мастер идёт к постановке 500–27 500, говорит промпт до 28 500, слушает «принял» до 29 500,
   // с 30 000 возвращается: к 57 000 он у стола и поворачивается за 150 мс.
@@ -203,14 +203,11 @@ describe("sceneAt: мастер и реплики", () => {
   });
 
   it("оставляет мастера у стола лицом к столу после возвращения", () => {
-    const recording = {
-      ...reworkRecording(),
-      events: [
-        { t: 0, type: "build_start" },
-        messageAt(100, "foreman", "spec"),
-        { t: 200, type: "build_end", ok: true },
-      ],
-    } satisfies Recording;
+    const recording = withEvents(reworkRecording(), [
+      { t: 0, type: "build_start" },
+      messageAt(100, "foreman", "planning"),
+      { t: 200, type: "build_end", ok: true },
+    ]);
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
     // Мастер говорит 27 100–28 100, с 28 600 идёт назад 27 с и поворачивается за 150 мс.
@@ -244,7 +241,10 @@ describe("sceneAt: мастер и реплики", () => {
 
     const scene = sceneAt(script, 74_650);
 
-    expect(scene.message).toMatchObject({ cue: { index: 1, speaker: "code" }, elapsed: 500 });
+    expect(scene.message).toMatchObject({
+      cue: { index: 1, speaker: "implementation" },
+      elapsed: 500,
+    });
   });
 
   it("не показывает реплику между репликами и после них", () => {
