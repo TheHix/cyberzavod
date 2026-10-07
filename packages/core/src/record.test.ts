@@ -21,6 +21,7 @@ interface RawSession {
   source: Record<string, unknown>;
   data: {
     title: string;
+    language?: string;
     workflow: string;
     harness: string;
     events: Record<string, unknown>[];
@@ -37,6 +38,7 @@ function validSession(): RawSession {
     source: { type: "agent", provider: "anthropic", agent: "claude" },
     data: {
       title: "Счётчики над цехом",
+      language: "ru",
       workflow: "default",
       harness: "0.1.0",
       events: [
@@ -152,6 +154,30 @@ describe("parseRecord", () => {
     const act = () => parseRecord(raw);
 
     expect(act).toThrow(/harness/);
+  });
+
+  it.each(["ru", "en", "deu"])("принимает язык записи %s", (language) => {
+    const raw = withData({ language });
+
+    const recording = parseSession(raw);
+
+    expect(recording.data.language).toBe(language);
+  });
+
+  it("считает запись без языка русской", () => {
+    const raw = withData({ language: undefined });
+
+    const recording = parseSession(raw);
+
+    expect(recording.data.language).toBe("ru");
+  });
+
+  it.each(["", "russian", "RU", "ru-RU", 7])("отклоняет язык записи «%s»", (language) => {
+    const raw = withData({ language });
+
+    const act = () => parseRecord(raw);
+
+    expect(act).toThrow(/language/);
   });
 
   it("отклоняет неизвестный этап", () => {

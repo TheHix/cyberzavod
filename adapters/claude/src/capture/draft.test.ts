@@ -59,6 +59,7 @@ function editedDraft(): Draft {
         harness: "0.1.0",
         workflow: "default",
         title: "Счётчик токенов",
+        language: "ru",
         runs: [],
       },
     ],
@@ -106,7 +107,7 @@ describe("parseDraft", () => {
     expect(draft).toEqual(uneditedDraft());
   });
 
-  it.each(["project", "harness", "workflow"] as const)(
+  it.each(["project", "harness", "workflow", "language"] as const)(
     "отклоняет %s сборки не строкой",
     (field) => {
       const raw = { ...uneditedDraft(), builds: [{ ...uneditedDraft().builds[0], [field]: 5 }] };
@@ -116,6 +117,16 @@ describe("parseDraft", () => {
       expect(act).toThrow(new RegExp(field));
     },
   );
+
+  it("ждёт редактуры языка у черновика, собранного до поля language", () => {
+    const raw: Record<string, unknown> = JSON.parse(JSON.stringify(uneditedDraft()));
+    const builds = raw.builds as Record<string, unknown>[];
+    delete builds[0]?.language;
+
+    const draft = parseDraft(raw);
+
+    expect(draft.builds[0]?.language).toBe("");
+  });
 
   it.each([
     ["событие цеха", { t: 2_000, type: "stage_enter", stage: "verification", project: "b" }],
@@ -779,19 +790,22 @@ describe("publishBuild", () => {
       type: "session",
       projectId: "cyberzavod",
       source: { type: "agent", provider: "anthropic", agent: "claude" },
-      data: { harness: "0.1.0", workflow: "default" },
+      data: { harness: "0.1.0", workflow: "default", language: "ru" },
     });
   });
 
-  it.each(["project", "harness"] as const)("не публикует сборку с пустым полем %s", (field) => {
-    const draft = editedDraft();
-    buildOf(draft, 0)[field] = "";
+  it.each(["project", "harness", "language"] as const)(
+    "не публикует сборку с пустым полем %s",
+    (field) => {
+      const draft = editedDraft();
+      buildOf(draft, 0)[field] = "";
 
-    const act = () => publishOnly(draft);
+      const act = () => publishOnly(draft);
 
-    expect(act).toThrow(RecordError);
-    expect(act).toThrow(new RegExp(field));
-  });
+      expect(act).toThrow(RecordError);
+      expect(act).toThrow(new RegExp(field));
+    },
+  );
 
   it("проверяет на утечки версию harness", () => {
     const draft = editedDraft();
@@ -1027,6 +1041,7 @@ describe("publishBuild", () => {
       harness: "0.1.0",
       workflow: "default",
       title: "Пустая",
+      language: "ru",
       runs: [],
     });
 
@@ -1199,11 +1214,11 @@ describe("unfilledHeader", () => {
 
   it("называет все пустые поля сборки по порядку шапки", () => {
     const draft = editedDraft();
-    draft.builds = [{ ...buildOf(draft, 0), title: "", project: "", harness: "" }];
+    draft.builds = [{ ...buildOf(draft, 0), title: "", language: "", project: "", harness: "" }];
 
     const names = unfilledHeader(draft);
 
-    expect(names).toEqual([`сборка ${BUILD_ID}: заголовок, проект, версия harness`]);
+    expect(names).toEqual([`сборка ${BUILD_ID}: заголовок, язык, проект, версия harness`]);
   });
 
   it("называет пустые поля по каждой сборке и пропускает заполненные", () => {

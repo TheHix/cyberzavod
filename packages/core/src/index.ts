@@ -44,6 +44,8 @@ export {
   isSpeaker,
   isRecordId,
   isHarnessVersion,
+  isLanguageCode,
+  LEGACY_SESSION_LANGUAGE,
   FOREMAN,
   NO_TALLY,
   type Tally,

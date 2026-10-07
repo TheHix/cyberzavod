@@ -136,7 +136,7 @@ If one session handled several tasks, each one is published as a separate record
 The site takes recordings from the factory's `.cyberzavod/journal/sessions/` and project cards from `projects/` at build time. This is the only case when you need a clone of the factory. To show your work, open a pull request to the [factory repository](https://github.com/bysavelii/cyberzavod) with two files:
 
 - the recording `.cyberzavod/journal/sessions/<id>.json` from your project log;
-- the card `projects/<id>.json`: `id`, `name`, a one-line `description` and optional `repo` and `website`, `https` only.
+- the card `projects/<id>.json`: `id`, `name` and a one-line `description` in every site language (`{ "en": …, "ru": … }`) and optional `repo` and `website`, `https` only.
 
 Before that, run `pnpm install` and `make check-web` in the clone: it builds the site and catches a broken card or recording. To preview the recording locally, run `pnpm dev` in the clone: the site opens at `http://localhost:4321`, and the recording is at `/recordings/<id>/`.
 

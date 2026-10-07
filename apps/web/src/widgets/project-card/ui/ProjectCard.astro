@@ -1,14 +1,14 @@
 ---
 // Карточка проекта: описание и ссылки. Название — в заголовке панели, где карточку показывают.
-import type { Project } from "@cyberzavod/core";
+import type { PublishedProject } from "@/entities/project";
 import { localizeHref } from "@/shared/i18n/links.ts";
-import { CONTENT_LOCALE, type Locale } from "@/shared/i18n/locale.ts";
+import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { ButtonLink } from "@/shared/ui";
 
 interface Props {
-  project: Project;
-  /** Язык страницы: на нём интерфейс вокруг карточки; описание — в оригинале. */
+  project: PublishedProject;
+  /** Язык страницы: на нём карточка и интерфейс вокруг неё. */
   locale: Locale;
 }
 
@@ -18,9 +18,7 @@ const { origin } = Astro.site;
 ---
 
 <div class="card">
-  <p class="description" lang={CONTENT_LOCALE}>
-    {project.description}
-  </p>
+  <p class="description">{project.description[locale]}</p>
   {(project.repo !== undefined || project.website !== undefined) && (
     <ul class="links">
       {project.repo !== undefined && (

@@ -3,16 +3,20 @@
 import { isLine, isObject } from "./guards.ts";
 import { isRecordId } from "./record.ts";
 
+/** Текст карточки на каждом языке витрины: язык — ключ, перевод — значение. */
+export type ProjectText<Language extends string> = Readonly<Record<Language, string>>;
+
 /**
- * Карточка проекта для сайта: название, описание и ссылки. Как проект собирать — в
- * `.cyberzavod/project.json` его репозитория, сюда это не попадает.
+ * Карточка проекта для сайта: название, описание и ссылки. Тексты — на каждом языке витрины,
+ * ссылки общие. Как проект собирать — в `.cyberzavod/project.json` его репозитория, сюда это
+ * не попадает.
  */
-export interface Project {
+export interface Project<Language extends string> {
   /** Идентификатор проекта: тот же, что `SessionRecord.project`, и часть адреса страницы проекта. */
   id: string;
-  name: string;
-  /** Описание одной строкой. */
-  description: string;
+  name: ProjectText<Language>;
+  /** Описание одной строкой на каждом языке. */
+  description: ProjectText<Language>;
   /** Адрес репозитория, https. */
   repo?: string;
   /** Адрес сайта проекта, https. */
@@ -31,7 +35,10 @@ function isSecureUrl(value: unknown): value is string {
 }
 
 // Необязательная ссылка: нет в карточке — нет и в результате, а не `undefined`.
-function parseLink(raw: Record<string, unknown>, field: "repo" | "website"): Partial<Project> {
+function parseLink(
+  raw: Record<string, unknown>,
+  field: "repo" | "website",
+): Pick<Project<string>, "repo" | "website"> {
   const value = raw[field];
   if (value === undefined) return {};
   if (!isSecureUrl(value)) {
@@ -40,22 +47,45 @@ function parseLink(raw: Record<string, unknown>, field: "repo" | "website"): Par
   return { [field]: value };
 }
 
+function parseText<Language extends string>(
+  raw: unknown,
+  field: "name" | "description",
+  languages: readonly Language[],
+): ProjectText<Language> {
+  if (!isObject(raw)) {
+    throw new ProjectError(`${field} должно быть объектом с переводами: ${languages.join(", ")}`);
+  }
+  const missing = languages.filter((language) => !isLine(raw[language]));
+  if (missing.length > 0) {
+    throw new ProjectError(
+      `${field} на ${missing.join(", ")} должно быть непустой строкой без переводов строки`,
+    );
+  }
+  return Object.fromEntries(
+    languages.map((language) => [language, raw[language]]),
+  ) as ProjectText<Language>;
+}
+
 /**
  * Проверяет карточку проекта, пришедшую извне, и возвращает её типизированной.
  * @param {unknown} raw Разобранный JSON карточки.
- * @returns {Project} Проверенная карточка; неизвестные поля отброшены.
- * @throws {ProjectError} Если карточка не соответствует формату.
+ * @param {readonly Language[]} languages Языки витрины: название и описание нужны на каждом.
+ * @returns {Project<Language>} Проверенная карточка; неизвестные поля и языки отброшены.
+ * @throws {ProjectError} Если карточка не соответствует формату или в ней нет перевода.
  */
-export function parseProject(raw: unknown): Project {
+export function parseProject<Language extends string>(
+  raw: unknown,
+  languages: readonly Language[],
+): Project<Language> {
   if (!isObject(raw)) throw new ProjectError("карточка проекта должна быть объектом");
-  const { id, name, description } = raw;
+  const { id } = raw;
   if (!isRecordId(id)) throw new ProjectError("id должен состоять из букв, цифр, «_» и «-»");
-  if (!isLine(name)) {
-    throw new ProjectError("name должно быть непустой строкой без переводов строки");
-  }
-  if (!isLine(description)) {
-    throw new ProjectError("description должно быть непустой строкой без переводов строки");
-  }
 
-  return { id, name, description, ...parseLink(raw, "repo"), ...parseLink(raw, "website") };
+  return {
+    id,
+    name: parseText(raw.name, "name", languages),
+    description: parseText(raw.description, "description", languages),
+    ...parseLink(raw, "repo"),
+    ...parseLink(raw, "website"),
+  };
 }

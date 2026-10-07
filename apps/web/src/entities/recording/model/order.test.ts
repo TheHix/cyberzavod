@@ -12,6 +12,7 @@ function recordingOf(id: string, timestamp: string): SessionRecord {
     source: { type: "manual" },
     data: {
       title: "Сборка",
+      language: "ru",
       workflow: "default",
       harness: "0.0.0",
       events: [

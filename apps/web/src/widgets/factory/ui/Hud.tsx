@@ -1,4 +1,4 @@
-import type { JSX } from "solid-js";
+import { Show, type JSX } from "solid-js";
 import type { BriefSessionRecord } from "@cyberzavod/core";
 import type { ProjectLink } from "@/entities/project";
 import { useLocale } from "@/shared/i18n/locale-context.ts";
@@ -14,6 +14,8 @@ interface Props {
   recording: BriefSessionRecord;
   /** Проект, который собирали: ссылка на него стоит рядом с датой. */
   project: ProjectLink;
+  /** Пометка о языке оригинала записи рядом с датой; нет, если запись на языке страницы. */
+  languageNote: string | undefined;
   /** Уровень заголовка: на странице записи это главный заголовок, на главной — нет. */
   titleLevel: "h1" | "h2";
 }
@@ -25,6 +27,7 @@ interface Props {
  * @param {Props} props Свойства компонента.
  * @param {BriefSessionRecord} props.recording Запись, которую проигрывает цех.
  * @param {ProjectLink} props.project Проект, который собирали.
+ * @param {string | undefined} props.languageNote Пометка о языке оригинала записи.
  * @param {"h1" | "h2"} props.titleLevel Уровень заголовка с названием сборки.
  * @returns {JSX.Element} Панель сборки.
  */
@@ -42,7 +45,7 @@ export function Hud(props: Props): JSX.Element {
   return (
     <Panel label={UI_TEXT.hud.label[locale]} class={styles.hud}>
       <header class={styles.header}>
-        <Title as={props.titleLevel} size="xl">
+        <Title as={props.titleLevel} size="xl" lang={props.recording.data.language}>
           {props.recording.data.title}
         </Title>
         <p class={styles.date}>
@@ -50,6 +53,7 @@ export function Hud(props: Props): JSX.Element {
             {props.project.name}
           </ButtonLink>{" "}
           · {formatDate(props.recording.timestamp, locale)}
+          <Show when={props.languageNote}>{(note) => ` · ${note()}`}</Show>
         </p>
       </header>
       <div class={styles.stats}>

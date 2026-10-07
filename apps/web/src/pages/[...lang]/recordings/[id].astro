@@ -5,7 +5,7 @@ import GameLayout from "@/app/layouts/GameLayout.astro";
 import { Factory } from "@/widgets/factory";
 import { BuildJournal } from "@/widgets/build-journal";
 import { projectLinkOf, projectOf, publishedProjects, type ProjectLink } from "@/entities/project";
-import { publishedRecordings } from "@/entities/recording";
+import { languageNoteOf, publishedRecordings } from "@/entities/recording";
 import { PANELS } from "@/shared/config/panels.ts";
 import { LOCALES, type Locale } from "@/shared/i18n/locale.ts";
 import { localeParam } from "@/shared/i18n/path.ts";
@@ -35,7 +35,13 @@ const description = UI_TEXT.pages.recordingDescription[locale](recording.data.ti
 ---
 
 <GameLayout locale={locale} title={recording.data.title} description={description} journal>
-  <Factory client:load locale={locale} recording={briefOf(recording)} project={project} />
+  <Factory
+    client:load
+    locale={locale}
+    recording={briefOf(recording)}
+    project={project}
+    languageNote={languageNoteOf(recording.data.language, locale)}
+  />
   <Drawer
     slot="drawers"
     id={PANELS.journal}

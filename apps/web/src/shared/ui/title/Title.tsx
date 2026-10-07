@@ -10,6 +10,8 @@ interface Props {
   /** Сколько строк занимает текст: блок постоянной высоты, лишнее обрезается. */
   lines?: number | undefined;
   class?: string | undefined;
+  /** Язык текста, если он не совпадает с языком страницы: например, запись в оригинале. */
+  lang?: string | undefined;
   children: JSX.Element;
 }
 
@@ -20,6 +22,7 @@ interface Props {
  * @param {"m" | "l" | "xl"} [props.size] Размер; по умолчанию `l`.
  * @param {number} [props.lines] Число строк постоянной высоты; без него текст растёт как есть.
  * @param {string} [props.class] Дополнительный класс для раскладки снаружи.
+ * @param {string} [props.lang] Язык текста, если он не совпадает с языком страницы.
  * @param {JSX.Element} props.children Текст.
  * @returns {JSX.Element} Заголовок.
  */
@@ -34,6 +37,7 @@ export function Title(props: Props): JSX.Element {
         props.class,
       )}
       style={props.lines === undefined ? undefined : { "--lines": props.lines }}
+      lang={props.lang}
     >
       {props.children}
     </Dynamic>

@@ -13,6 +13,7 @@ function recording(): SessionRecord {
     source: { type: "manual" },
     data: {
       title: "Тест",
+      language: "ru",
       workflow: "default",
       harness: "0.0.0",
       events: [

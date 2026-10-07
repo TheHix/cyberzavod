@@ -146,6 +146,11 @@ export interface DraftBuild {
   /** Процесс разработки сборки; пустая строка — ждёт редактуры, как `title`. */
   workflow: string;
   title: string;
+  /**
+   * Язык промптов и реплик сборки — код ISO 639 (`ru`, `en`); пустая строка — ждёт редактуры,
+   * как `title`.
+   */
+  language: string;
   /** Запуски станций (`agentId`), которые принадлежат сборке. */
   runs: string[];
 }
@@ -165,6 +170,7 @@ export class DraftError extends Error {}
 // Поля шапки сборки, которые заполняет редактор, если журнал их не принёс, и их названия для людей.
 const HEADER_FIELD_NAMES = {
   title: "заголовок",
+  language: "язык",
   project: "проект",
   harness: "версия harness",
   workflow: "процесс",
@@ -317,7 +323,9 @@ function parseDraftEvent(raw: unknown, index: number): DraftEvent {
 
 function parseBuild(raw: unknown, index: number): DraftBuild {
   if (!isObject(raw)) throw new DraftError(`сборка #${index}: должна быть объектом`);
-  const { id, project, harness, workflow, title, runs } = raw;
+  // Черновики до поля language лежат в capture/ и переносят редактуру в пересобранный черновик:
+  // у них язык ещё ждёт редактуры.
+  const { id, project, harness, workflow, title, language = "", runs } = raw;
   if (!isRecordId(id)) {
     throw new DraftError(`сборка #${index}: id должен состоять из букв, цифр, «_» и «-»`);
   }
@@ -325,12 +333,15 @@ function parseBuild(raw: unknown, index: number): DraftBuild {
     typeof project !== "string" ||
     typeof harness !== "string" ||
     typeof workflow !== "string" ||
-    typeof title !== "string"
+    typeof title !== "string" ||
+    typeof language !== "string"
   ) {
-    throw new DraftError(`сборка ${id}: project, harness, workflow и title должны быть строками`);
+    throw new DraftError(
+      `сборка ${id}: project, harness, workflow, title и language должны быть строками`,
+    );
   }
   if (!isStrings(runs)) throw new DraftError(`сборка ${id}: runs должны быть списком строк`);
-  return { id, project, harness, workflow, title, runs: [...runs] };
+  return { id, project, harness, workflow, title, language, runs: [...runs] };
 }
 
 function parseBuilds(raw: Record<string, unknown>): DraftBuild[] {
@@ -739,6 +750,7 @@ export function publishBuild(draft: Draft, buildId: string): SessionRecord {
     source: CLAUDE_SOURCE,
     data: {
       title: build.title,
+      language: build.language,
       workflow: build.workflow,
       harness: build.harness,
       events: published,

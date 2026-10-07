@@ -130,3 +130,17 @@ function wordFor(count: number, words: PluralWords, locale: Locale): string {
 export function formatCount(count: number, words: PluralWords, locale: Locale): string {
   return `${COUNT_FORMATTERS[locale].format(count)} ${wordFor(count, words, locale)}`;
 }
+
+const LANGUAGE_NAMES = byLocale(
+  (locale) => new Intl.DisplayNames(LOCALE_TAGS[locale], { type: "language", fallback: "code" }),
+);
+
+/**
+ * Называет язык по коду на языке страницы: так зритель узнаёт, на каком языке запись.
+ * @param {string} code Код языка ISO 639: `ru`, `en`.
+ * @param {Locale} locale Язык страницы.
+ * @returns {string} Название языка: «Russian», «английский»; незнакомый код — как есть.
+ */
+export function formatLanguage(code: string, locale: Locale): string {
+  return LANGUAGE_NAMES[locale].of(code) ?? code;
+}

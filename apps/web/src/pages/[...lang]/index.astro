@@ -5,7 +5,7 @@ import GameLayout from "@/app/layouts/GameLayout.astro";
 import { Factory } from "@/widgets/factory";
 import { BuildJournal } from "@/widgets/build-journal";
 import { projectLinkOf, projectOf, publishedProjects } from "@/entities/project";
-import { publishedRecordings } from "@/entities/recording";
+import { languageNoteOf, publishedRecordings } from "@/entities/recording";
 import { PANELS } from "@/shared/config/panels.ts";
 import { site } from "@/shared/config/site.ts";
 import { LOCALES, type Locale } from "@/shared/i18n/locale.ts";
@@ -37,6 +37,7 @@ const [latest] = publishedRecordings;
       client:load
       locale={locale}
       recording={briefOf(latest)}
+      languageNote={languageNoteOf(latest.data.language, locale)}
       project={projectLinkOf(projectOf(publishedProjects, latest.projectId), locale)}
       titleLevel="h2"
     />

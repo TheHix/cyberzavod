@@ -120,6 +120,13 @@ export const UI_TEXT = {
     minute: { en: "min", ru: "мин" },
     second: { en: "s", ru: "с" },
   },
+  /** Запись сборки: она не переводится, язык оригинала подписан. */
+  recording: {
+    language: {
+      en: (language: string) => `recorded in ${language}`,
+      ru: (language: string) => `язык записи: ${language}`,
+    },
+  },
   /** Остров цеха. */
   factory: {
     canvasLabel: {

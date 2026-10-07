@@ -19,12 +19,6 @@ export const LOCALE_TAGS: Translated = { en: "en-US", ru: "ru-RU" };
 export const LOCALE_NAMES: Translated = { en: "English", ru: "Русский" };
 
 /**
- * Язык содержимого, которое пока существует только в оригинале: карточки проектов.
- * Интерфейс вокруг переводится, содержимое помечается этим языком через `lang`.
- */
-export const CONTENT_LOCALE: Locale = "ru";
-
-/**
  * Проверяет, что строка извне — код языка сайта.
  * @param {string} value Строка, например часть имени файла.
  * @returns {boolean} `true`, если это член `LOCALES`.

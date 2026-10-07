@@ -27,6 +27,8 @@ interface Props {
   locale: Locale;
   /** Проект, который собирали, — ссылка на его страницу в HUD. */
   project: ProjectLink;
+  /** Пометка о языке оригинала записи; нет, если запись на языке страницы. */
+  languageNote: string | undefined;
   /** Уровень заголовка с названием сборки; по умолчанию — главный заголовок страницы. */
   titleLevel?: "h1" | "h2" | undefined;
 }
@@ -89,6 +91,7 @@ function fieldWithin(host: HTMLElement, field: HTMLElement): Frame {
  * @param {BriefSessionRecord} props.recording Запись сборки, которую проигрывает цех.
  * @param {Locale} props.locale Язык страницы.
  * @param {ProjectLink} props.project Проект, который собирали.
+ * @param {string | undefined} props.languageNote Пометка о языке оригинала записи.
  * @param {"h1" | "h2"} [props.titleLevel] Уровень заголовка с названием сборки.
  * @returns {JSX.Element} Цех с HUD.
  */
@@ -181,6 +184,7 @@ export function Factory(props: Props): JSX.Element {
           <Hud
             recording={props.recording}
             project={props.project}
+            languageNote={props.languageNote}
             titleLevel={props.titleLevel ?? "h1"}
           />
           <div class={styles.overlay}>

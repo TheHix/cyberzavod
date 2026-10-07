@@ -1,13 +1,13 @@
 ---
 import type { GetStaticPaths } from "astro";
-import { briefOf, type Project, type SessionRecord } from "@cyberzavod/core";
+import { briefOf, type SessionRecord } from "@cyberzavod/core";
 import GameLayout from "@/app/layouts/GameLayout.astro";
 import { Factory } from "@/widgets/factory";
 import { BuildJournal } from "@/widgets/build-journal";
 import { ProjectCard } from "@/widgets/project-card";
 import { RecordingList } from "@/widgets/recording-list";
-import { projectLinkOf, publishedProjects } from "@/entities/project";
-import { publishedRecordings, recordingsOfProject } from "@/entities/recording";
+import { projectLinkOf, publishedProjects, type PublishedProject } from "@/entities/project";
+import { languageNoteOf, publishedRecordings, recordingsOfProject } from "@/entities/recording";
 import { PANELS } from "@/shared/config/panels.ts";
 import { LOCALES, type Locale } from "@/shared/i18n/locale.ts";
 import { localeParam } from "@/shared/i18n/path.ts";
@@ -28,7 +28,7 @@ export const getStaticPaths = (() =>
 
 interface Props {
   locale: Locale;
-  project: Project;
+  project: PublishedProject;
   recordings: readonly SessionRecord[];
 }
 
@@ -39,9 +39,9 @@ const [latest] = recordings;
 
 <GameLayout
   locale={locale}
-  title={UI_TEXT.pages.projectTitle[locale](project.name)}
-  description={project.description}
-  heading={project.name}
+  title={UI_TEXT.pages.projectTitle[locale](project.name[locale])}
+  description={project.description[locale]}
+  heading={project.name[locale]}
   journal={latest !== undefined}
   project
 >
@@ -50,6 +50,7 @@ const [latest] = recordings;
       client:load
       locale={locale}
       recording={briefOf(latest)}
+      languageNote={languageNoteOf(latest.data.language, locale)}
       project={projectLinkOf(project, locale)}
       titleLevel="h2"
     />
@@ -68,7 +69,7 @@ const [latest] = recordings;
       <BuildJournal recording={latest} locale={locale} />
     </Drawer>
   )}
-  <Drawer slot="drawers" id={PANELS.project} title={project.name} closeLabel={closeLabel}>
+  <Drawer slot="drawers" id={PANELS.project} title={project.name[locale]} closeLabel={closeLabel}>
     <div class="project">
       <ProjectCard project={project} locale={locale} />
       <RecordingList recordings={recordings} locale={locale} />

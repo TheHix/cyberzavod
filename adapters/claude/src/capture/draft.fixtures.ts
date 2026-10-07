@@ -79,6 +79,7 @@ export function interleavedDraft(): Draft {
         harness: "0.1.0",
         workflow: "default",
         title: "Счётчик токенов",
+        language: "ru",
         runs: ["a1", "a2", "a3"],
       },
       {
@@ -87,6 +88,7 @@ export function interleavedDraft(): Draft {
         harness: "0.1.0",
         workflow: "default",
         title: "Движок финансов",
+        language: "ru",
         runs: ["b1", "b2"],
       },
     ],

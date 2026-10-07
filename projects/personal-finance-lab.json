@@ -1,6 +1,12 @@
 {
   "id": "personal-finance-lab",
-  "name": "Personal Finance Lab",
-  "description": "Финансовая лаборатория для моделирования будущего: сценарии «что если», таймлайн капитала, цели и запас прочности без дохода. Первый внешний проект завода.",
+  "name": {
+    "en": "Personal Finance Lab",
+    "ru": "Personal Finance Lab"
+  },
+  "description": {
+    "en": "A finance lab for modelling the future: what-if scenarios, a capital timeline, goals and a safety margin without income. The factory's first external project.",
+    "ru": "Финансовая лаборатория для моделирования будущего: сценарии «что если», таймлайн капитала, цели и запас прочности без дохода. Первый внешний проект завода."
+  },
   "website": "https://finance.bysavelii.com"
 }
