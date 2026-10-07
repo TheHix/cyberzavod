@@ -13,6 +13,7 @@ let root: string;
 
 async function writeProjectFile(relative: string, content: string): Promise<void> {
   const file = path.join(root, relative);
+
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, content);
 }
@@ -32,6 +33,7 @@ async function newProject(): Promise<void> {
     journal: ".cyberzavod/journal",
     verification: { commands: ["npm test"], paths: [] },
   };
+
   await writeProjectFile(PROJECT_CONFIG_FILE, JSON.stringify(config));
   await writeProjectFile("AGENTS.md", "# Правила\n");
   await writeProjectFile("src/AGENTS.md", "# Правила src\n");
@@ -65,6 +67,7 @@ describe("syncClaude", () => {
     const report = await sync();
 
     const settings = await readFile(path.join(root, ".claude/settings.json"), "utf8");
+
     expect({
       changed: report.changed.includes("src/CLAUDE.md"),
       agent: await exists(".claude/agents/coder.md"),
@@ -79,6 +82,7 @@ describe("syncClaude", () => {
       path.join(root, ".claude/skills/publish-recording/SKILL.md"),
       "utf8",
     );
+
     expect(skill).toContain("`node .cyberzavod/bin/cyberzavod.mjs draft`");
   });
 

@@ -139,8 +139,10 @@ export function createFactoryModel(
   // Мастер говорит там, где он сейчас, рабочий — где стоит: у своего станка или у места встречи.
   const $messagePosition = computed($scene, (scene) => {
     const cue = scene.message?.cue;
+
     if (cue === undefined) return null;
     if (cue.speaker === FOREMAN) return scene.foreman.position;
+
     return scene.workers.find((worker) => worker.station === cue.speaker)?.position ?? null;
   });
 
@@ -152,12 +154,14 @@ export function createFactoryModel(
   // Промпты разных сценариев — разные объекты, поэтому «тот же промпт» — по номеру.
   const closingDetailsOnNewPrompt = (change: () => void) => {
     const promptBefore = $prompt.get()?.index;
+
     change();
     if ($prompt.get()?.index !== promptBefore) $promptDetailsOpen.set(false);
   };
   const update = (change: (playback: Playback) => Playback) =>
     closingDetailsOnNewPrompt(() => {
       const state = $state.get();
+
       $state.set({ ...state, playback: change(state.playback) });
     });
   const pause = () => {
@@ -193,17 +197,21 @@ export function createFactoryModel(
     setSpeed: (speed) => update((playback) => ({ ...playback, speed })),
     togglePromptDetails: () => {
       if ($prompt.get() === null) return;
+
       const open = !$promptDetailsOpen.get();
+
       $promptDetailsOpen.set(open);
       // Чтобы прочитать уточнения, сцену останавливаем.
       if (open) pause();
     },
     seekToSpeech: (speech) => {
       const start = speechStart($timeline.get(), speech);
+
       if (start !== undefined) update((playback) => seek(playback, start));
     },
     setLayout: (next) => {
       if (next === $layout.get()) return;
+
       const previous = $script.get();
       const script = buildScript(recording, next);
       const playback = $playback.get();
@@ -212,6 +220,7 @@ export function createFactoryModel(
         script.duration,
         carryTime(previous, script, playback.position),
       );
+
       closingDetailsOnNewPrompt(() => $state.set({ layout: next, script, playback: carried }));
     },
   };

@@ -23,12 +23,14 @@ export function formatDuration(ms: number, locale: Locale): string {
   const totalSeconds = Math.round(ms / SECOND_MS);
   const totalMinutes = Math.floor(totalSeconds / MINUTE_SECONDS);
   const hours = Math.floor(totalMinutes / HOUR_MINUTES);
+
   if (hours > 0) {
     return `${hours} ${hour[locale]} ${twoDigits(totalMinutes % HOUR_MINUTES)} ${minute[locale]}`;
   }
   if (totalMinutes > 0) {
     return `${totalMinutes} ${minute[locale]} ${twoDigits(totalSeconds % MINUTE_SECONDS)} ${second[locale]}`;
   }
+
   return `${totalSeconds} ${second[locale]}`;
 }
 
@@ -42,7 +44,9 @@ export function formatClock(ms: number): string {
   const totalMinutes = Math.floor(totalSeconds / MINUTE_SECONDS);
   const hours = Math.floor(totalMinutes / HOUR_MINUTES);
   const seconds = twoDigits(totalSeconds % MINUTE_SECONDS);
+
   if (hours === 0) return `${totalMinutes}:${seconds}`;
+
   return `${hours}:${twoDigits(totalMinutes % HOUR_MINUTES)}:${seconds}`;
 }
 
@@ -90,9 +94,13 @@ const CLAUDE_MODEL_ID = /^claude-([a-z]+)-(\d{1,2})(?:-(\d{1,2}))?(?:-\d{8})?$/;
  */
 export function formatModel(id: string): string {
   const [, family, major, minor] = CLAUDE_MODEL_ID.exec(id) ?? [];
+
   if (family === undefined || major === undefined) return id;
+
   const version = minor === undefined ? major : `${major}.${minor}`;
-  return `Claude ${family.charAt(0).toUpperCase()}${family.slice(1)} ${version}`;
+  const familyName = family.charAt(0).toUpperCase() + family.slice(1);
+
+  return `Claude ${familyName} ${version}`;
 }
 
 /** Формы слова для числа на каждом языке: русский различает три формы, английский две. */
@@ -106,12 +114,23 @@ export interface PluralWords {
 const PLURAL_RULES = byLocale((locale) => new Intl.PluralRules(LOCALE_TAGS[locale]));
 const COUNT_FORMATTERS = byLocale((locale) => new Intl.NumberFormat(LOCALE_TAGS[locale]));
 
+function russianWordFor(count: number, words: PluralWords["ru"]): string {
+  const category = PLURAL_RULES.ru.select(count);
+
+  switch (category) {
+    case "one":
+      return words.one;
+    case "few":
+      return words.few;
+    default:
+      return words.many;
+  }
+}
+
 function wordFor(count: number, words: PluralWords, locale: Locale): string {
   switch (locale) {
-    case "ru": {
-      const category = PLURAL_RULES.ru.select(count);
-      return category === "one" ? words.ru.one : category === "few" ? words.ru.few : words.ru.many;
-    }
+    case "ru":
+      return russianWordFor(count, words.ru);
     case "en":
       return PLURAL_RULES.en.select(count) === "one" ? words.en.one : words.en.other;
     default:

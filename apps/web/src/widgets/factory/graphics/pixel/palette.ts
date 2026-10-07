@@ -49,6 +49,7 @@ export function readPalette(tokens: TokenSource): Palette {
   const color = (name: string) => parseColor(tokens.getPropertyValue(name));
   const mint = color("--mint");
   const inkSoft = color("--ink-soft");
+
   return {
     ink: color("--ink"),
     inkSoft,

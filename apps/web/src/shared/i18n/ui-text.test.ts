@@ -25,16 +25,24 @@ function textLeaves(value: unknown, path: string): TextLeaf[] {
   if (typeof value === "string") return [{ path, text: value, probes: [] }];
   if (typeof value === "function") {
     const probes = probesOf(value as TextFunction);
+
     return [{ path, text: String((value as TextFunction)(...probes)), probes }];
   }
   if (typeof value === "object" && value !== null) {
     return Object.entries(value).flatMap(([key, child]) => textLeaves(child, `${path}.${key}`));
   }
+
   return [{ path, text: String(value), probes: [] }];
 }
 
 function leafCases(value: unknown, path: string): [string, TextLeaf][] {
   return textLeaves(value, path).map((leaf) => [leaf.path, leaf]);
+}
+
+function translatedTexts(): (readonly [string, object])[] {
+  return Object.entries(UI_TEXT).flatMap(([group, entries]) =>
+    Object.entries(entries).map(([key, translated]) => [`${group}.${key}`, translated] as const),
+  );
 }
 
 describe("UI_TEXT", () => {
@@ -48,12 +56,10 @@ describe("UI_TEXT", () => {
     expect(missing).toEqual([]);
   });
 
-  it.each(
-    Object.entries(UI_TEXT).flatMap(([group, entries]) =>
-      Object.entries(entries).map(([key, translated]) => [`${group}.${key}`, translated] as const),
-    ),
-  )("описывает %s на каждом языке", (_path, translated) => {
-    expect(Object.keys(translated).sort()).toEqual([...LOCALES].sort());
+  it.each(translatedTexts())("описывает %s на каждом языке", (_path, translated) => {
+    const locales = Object.keys(translated).sort();
+
+    expect(locales).toEqual([...LOCALES].sort());
   });
 
   it("подставляет параметры в тексты с параметрами", () => {

@@ -11,6 +11,8 @@ import { createSignal, onCleanup, type Accessor } from "solid-js";
  */
 export function useStoreValue<T>(store: ReadableAtom<T>): Accessor<T> {
   const [value, setValue] = createSignal(store.get());
+
   onCleanup(store.listen((next) => setValue(() => next)));
+
   return value;
 }

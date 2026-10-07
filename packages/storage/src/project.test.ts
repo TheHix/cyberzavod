@@ -13,6 +13,7 @@ import {
 describe("readProjectConfig", () => {
   it("читает то, что записал writeProjectConfig", async () => {
     const root = await temporaryDirectory();
+
     await writeProjectConfig(root, validConfig());
 
     const config = await readProjectConfig(root);
@@ -30,6 +31,7 @@ describe("readProjectConfig", () => {
 
   it("называет файл, если конфиг битый", async () => {
     const root = await temporaryDirectory();
+
     await writeProjectConfig(root, validConfig());
     await writeFile(path.join(root, PROJECT_CONFIG_FILE), '{"projectId": "../x"}');
 
@@ -42,8 +44,10 @@ describe("readProjectConfig", () => {
 describe("findProjectRoot", () => {
   it("находит корень проекта из вложенного каталога", async () => {
     const root = await temporaryDirectory();
+
     await writeProjectConfig(root, validConfig());
     const nested = path.join(root, "apps", "web");
+
     await mkdir(nested, { recursive: true });
 
     const found = await findProjectRoot(nested);

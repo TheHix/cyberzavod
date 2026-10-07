@@ -26,8 +26,10 @@ export interface ProjectAt {
 export async function requireProjectAt(directory: string): Promise<ProjectAt> {
   const root = await findProjectRoot(directory);
   const config = root === undefined ? undefined : await readProjectConfig(root);
+
   if (root === undefined || config === undefined) {
     throw new CommandError(`${directory} не в проекте Cyberzavod: сначала cyberzavod init`);
   }
+
   return { root, config, journal: journalDirectory(root, config) };
 }

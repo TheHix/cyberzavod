@@ -54,13 +54,19 @@ const FRONTMATTER_LINE = /^([a-z]+):\s*(.*)$/;
 
 function frontmatterOf(text: string, stage: Stage): { fields: Map<string, string>; body: string } {
   const match = FRONTMATTER.exec(text);
+
   if (match === null) throw new HarnessError(`этап ${stage}: нет шапки между строками ---`);
+
   const fields = new Map<string, string>();
+
   for (const line of (match[1] ?? "").split("\n")) {
     const field = FRONTMATTER_LINE.exec(line);
+
     if (field === null) throw new HarnessError(`этап ${stage}: строка шапки «${line}» не поле`);
+
     fields.set(field[1] ?? "", (field[2] ?? "").trim());
   }
+
   return { fields, body: text.slice(match[0].length).trim() };
 }
 
@@ -70,14 +76,18 @@ function isStageAccess(value: unknown): value is StageAccess {
 
 function roleOf(fields: ReadonlyMap<string, string>, stage: Stage): StageRole | undefined {
   const name = fields.get("role");
+
   if (name === undefined) return undefined;
   if (!/^[a-z][a-z-]*$/.test(name)) {
     throw new HarnessError(`этап ${stage}: role — строчные латинские буквы и «-»`);
   }
+
   const access = fields.get("access");
+
   if (!isStageAccess(access)) {
     throw new HarnessError(`этап ${stage}: access должен быть ${STAGE_ACCESS.join(" или ")}`);
   }
+
   return { name, access };
 }
 
@@ -92,10 +102,13 @@ export function parseStageGuide(stage: Stage, text: string): StageGuide {
   const { fields, body } = frontmatterOf(text.replace(/\r\n/g, "\n"), stage);
   const title = fields.get("title");
   const description = fields.get("description");
+
   if (!isLine(title) || !isLine(description)) {
     throw new HarnessError(`этап ${stage}: в шапке нужны title и description`);
   }
+
   const role = roleOf(fields, stage);
+
   return role === undefined
     ? { stage, title, description, body }
     : { stage, title, description, role, body };
@@ -116,34 +129,49 @@ const CONDUCTOR = "conductor.md";
 
 function requiredFile(files: HarnessFiles, name: string): string {
   const text = files[name];
+
   if (text === undefined) throw new HarnessError(`в harness нет файла ${name}`);
+
   return text;
+}
+
+function compareNames(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+
+  return 0;
 }
 
 // Файлы прямо в каталоге, без вложенных: порядок по имени, чтобы тексты не зависели от того,
 // в каком порядке их отдал диск.
 function filesIn(files: HarnessFiles, directory: string, extension: string): [string, string][] {
-  return Object.entries(files)
-    .filter(([name]) => name.startsWith(directory) && name.endsWith(extension))
-    .map(([name, text]): [string, string] => [
-      name.slice(directory.length, -extension.length),
-      text,
-    ])
-    .filter(([name]) => !name.includes("/"))
-    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+  const matching = Object.entries(files).filter(
+    ([path]) => path.startsWith(directory) && path.endsWith(extension),
+  );
+  const named = matching.map(([path, text]): [string, string] => [
+    path.slice(directory.length, -extension.length),
+    text,
+  ]);
+  const direct = named.filter(([name]) => !name.includes("/"));
+
+  return direct.sort(([left], [right]) => compareNames(left, right));
 }
 
 function workflowFrom(name: string, text: string): Workflow {
   let raw: unknown;
+
   try {
     raw = JSON.parse(text);
   } catch (err) {
     throw new HarnessError(`процесс ${name}: не JSON`, { cause: err });
   }
+
   const workflow = parseWorkflow(raw);
+
   if (workflow.name !== name) {
     throw new HarnessError(`процесс ${name}: name должен совпадать с именем файла`);
   }
+
   return workflow;
 }
 
@@ -161,15 +189,13 @@ export function parseHarness(files: HarnessFiles): Harness {
       parseStageGuide(stage, requiredFile(files, `${STAGES_DIRECTORY}${stage}${MARKDOWN}`)),
     ]),
   ) as Record<Stage, StageGuide>;
-  return {
-    principles: filesIn(files, PRINCIPLES, MARKDOWN).map(([name, text]) => ({
-      name,
-      text: text.trim(),
-    })),
-    stages,
-    workflows: filesIn(files, WORKFLOWS, JSON_EXTENSION).map(([name, text]) =>
-      workflowFrom(name, text),
-    ),
-    conductor: requiredFile(files, CONDUCTOR).trim(),
-  };
+  const principles = filesIn(files, PRINCIPLES, MARKDOWN).map(([name, text]) => ({
+    name,
+    text: text.trim(),
+  }));
+  const workflows = filesIn(files, WORKFLOWS, JSON_EXTENSION).map(([name, text]) =>
+    workflowFrom(name, text),
+  );
+
+  return { principles, stages, workflows, conductor: requiredFile(files, CONDUCTOR).trim() };
 }

@@ -21,6 +21,7 @@ export function PixelPlaque(props: Props): JSX.Element {
   const art = () => plaqueArt(props.lines);
   const width = () => art()[0]?.length ?? 0;
   const height = () => art().length;
+
   return (
     <svg
       class={cx(styles.plaque, props.class)}

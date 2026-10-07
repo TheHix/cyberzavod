@@ -13,8 +13,10 @@ function assertSameRecording(source: FactoryScript, target: FactoryScript): void
       `у сценариев разное число отметок: ${source.marks.length} и ${target.marks.length}`,
     );
   }
+
   for (const [index, mark] of source.marks.entries()) {
     const targetMark = target.marks[index];
+
     if (targetMark?.recordingTime !== mark.recordingTime) {
       throw new ScriptMismatchError(`у отметки ${index} разное время записи`);
     }
@@ -38,16 +40,20 @@ function atOf(mark: Mark): number {
 export function carryTime(source: FactoryScript, target: FactoryScript, time: number): number {
   assertSameRecording(source, target);
   const index = lastStartedIndex(source.marks, time, atOf);
-  const from = source.marks[Math.max(index, 0)];
-  const to = target.marks[Math.max(index, 0)];
+  const anchorIndex = Math.max(index, 0);
+  const from = source.marks[anchorIndex];
+  const to = target.marks[anchorIndex];
+
   if (from === undefined || to === undefined) return clampTo(target, time);
 
   const next = source.marks[index + 1];
   const targetNext = target.marks[index + 1];
-  if (index < 0 || next === undefined || targetNext === undefined) {
-    return clampTo(target, to.at + (time - from.at));
-  }
+  const isOutsideMarkedSpan = index < 0 || next === undefined || targetNext === undefined;
+
+  if (isOutsideMarkedSpan) return clampTo(target, to.at + (time - from.at));
+
   const share = (time - from.at) / (next.at - from.at);
+
   return clampTo(target, to.at + share * (targetNext.at - to.at));
 }
 

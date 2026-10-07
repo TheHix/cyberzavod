@@ -4,6 +4,7 @@ import { recipientOf } from "./recipient.ts";
 
 function promptTo(model?: string): PromptEvent {
   const prompt: PromptEvent = { t: 0, type: "prompt", goal: "Продолжай", requirements: [] };
+
   return model === undefined ? prompt : { ...prompt, model };
 }
 

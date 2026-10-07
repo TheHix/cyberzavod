@@ -15,28 +15,32 @@ const MAX_FRAME_MS = 100;
 export function startFrameClock(model: FactoryModel, container: HTMLElement): () => void {
   let frameId = 0;
   let lastTime = 0;
-  let onScreen = true;
+  let isOnScreen = true;
 
-  const running = () => model.$playing.get() && onScreen && document.visibilityState === "visible";
+  const isRunning = () =>
+    model.$playing.get() && isOnScreen && document.visibilityState === "visible";
 
   const tick = (now: number) => {
     const elapsed = Math.min(MAX_FRAME_MS, Math.max(0, now - lastTime));
+
     lastTime = now;
     // Пока идёт шаг, frameId ещё не ноль — подписка на $playing не запустит второй цикл.
     model.advance(elapsed);
-    frameId = running() ? requestAnimationFrame(tick) : 0;
+    frameId = isRunning() ? requestAnimationFrame(tick) : 0;
   };
 
   const resume = () => {
-    if (frameId !== 0 || !running()) return;
+    if (frameId !== 0 || !isRunning()) return;
+
     lastTime = performance.now();
     frameId = requestAnimationFrame(tick);
   };
 
   const intersection = new IntersectionObserver(([entry]) => {
-    onScreen = entry?.isIntersecting ?? true;
+    isOnScreen = entry?.isIntersecting ?? true;
     resume();
   });
+
   intersection.observe(container);
   document.addEventListener("visibilitychange", resume);
   const stopListening = model.$playing.subscribe(resume);

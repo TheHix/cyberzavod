@@ -14,12 +14,14 @@ interface Props {
 // Блок кода получает обёртку и кнопку только в браузере; без JS остаётся прежний `<pre>`.
 function addCopyButton(code: HTMLElement, pre: HTMLElement, locale: Locale): () => void {
   const block = document.createElement("div");
-  block.className = codeBlockClass();
   const buttonSlot = document.createElement("div");
+
+  block.className = codeBlockClass();
   // Статья может быть в оригинале на другом языке: кнопка подписана на языке страницы.
   buttonSlot.lang = locale;
   pre.before(block);
   block.append(pre, buttonSlot);
+
   const disposeButton = render(
     () => <CopyButton text={() => code.textContent ?? ""} labels={UI_TEXT.copy.labels[locale]} />,
     buttonSlot,
@@ -30,6 +32,20 @@ function addCopyButton(code: HTMLElement, pre: HTMLElement, locale: Locale): () 
     block.before(pre);
     block.remove();
   };
+}
+
+function addCopyButtons(article: HTMLElement, locale: Locale): (() => void)[] {
+  const removers: (() => void)[] = [];
+
+  for (const code of article.querySelectorAll<HTMLElement>("pre > code")) {
+    const pre = code.parentElement;
+
+    if (pre === null) continue;
+
+    removers.push(addCopyButton(code, pre, locale));
+  }
+
+  return removers;
 }
 
 /**
@@ -44,12 +60,11 @@ function addCopyButton(code: HTMLElement, pre: HTMLElement, locale: Locale): () 
 export function CopyCode(props: Props): null {
   onMount(() => {
     const article = document.getElementById(props.scope);
+
     if (article === null) throw new Error(`нет элемента статьи с id ${props.scope}`);
 
-    const removers = Array.from(article.querySelectorAll<HTMLElement>("pre > code")).flatMap(
-      (code) =>
-        code.parentElement === null ? [] : [addCopyButton(code, code.parentElement, props.locale)],
-    );
+    const removers = addCopyButtons(article, props.locale);
+
     onCleanup(() => removers.forEach((remove) => remove()));
   });
 

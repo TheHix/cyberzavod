@@ -20,13 +20,15 @@ const files = import.meta.glob<MarkdownFile>("@guides/*.md", {
 function parseFile([file, markdown]: [string, MarkdownFile]): GuideFile<GuideContent> {
   try {
     const { id, locale } = guideFileOf(file);
+
     return { meta: parseGuideMeta(id, markdown.frontmatter), locale, body: markdown.Content };
   } catch (err) {
     throw new Error(`гайд ${file} не прошёл проверку`, { cause: err });
   }
 }
 
+const guideFiles = Object.entries(files).map(parseFile);
+
 /** Гайды сайта в порядке `order`. */
-export const publishedGuides: readonly PublishedGuide[] = pairTranslations(
-  Object.entries(files).map(parseFile),
-).sort(byGuideOrder);
+export const publishedGuides: readonly PublishedGuide[] =
+  pairTranslations(guideFiles).sort(byGuideOrder);

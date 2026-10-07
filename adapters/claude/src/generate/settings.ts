@@ -66,6 +66,7 @@ function adapterHooks(): AdapterHooks {
     statusMessage: "Запускаю проверки проекта…",
   };
   const recordOnly = [{ hooks: [record] }];
+
   return {
     SessionStart: recordOnly,
     UserPromptSubmit: [{ hooks: [record, turnStart] }],
@@ -96,6 +97,7 @@ function groupsOf(event: string, value: unknown): HookGroup[] {
   if (!Array.isArray(value) || !value.every(isHookGroup)) {
     throw new SettingsError(`hooks.${event} должен быть списком групп с обработчиками`);
   }
+
   return value;
 }
 
@@ -109,25 +111,35 @@ function mergedHooks(existing: unknown, own: AdapterHooks): Record<string, HookG
   if (existing !== undefined && !isObject(existing)) {
     throw new SettingsError("hooks должен быть объектом");
   }
+
   const merged: Record<string, HookGroup[]> = {};
+
   for (const [event, groups] of Object.entries(existing ?? {})) {
     merged[event] = withoutOwnHandlers(groupsOf(event, groups));
   }
+
   for (const [event, groups] of Object.entries(own)) {
     merged[event] = [...(merged[event] ?? []), ...groups];
   }
-  return Object.fromEntries(Object.entries(merged).filter(([, groups]) => groups.length > 0));
+
+  const nonEmpty = Object.entries(merged).filter(([, groups]) => groups.length > 0);
+
+  return Object.fromEntries(nonEmpty);
 }
 
 function mergedPermissions(existing: unknown): Record<string, unknown> {
   if (existing !== undefined && !isObject(existing)) {
     throw new SettingsError("permissions должен быть объектом");
   }
+
   const { deny = [] } = existing ?? {};
+
   if (!Array.isArray(deny) || !deny.every((rule) => typeof rule === "string")) {
     throw new SettingsError("permissions.deny должен быть списком строк");
   }
+
   const missing = ADAPTER_DENY.filter((rule) => !deny.includes(rule));
+
   return { ...existing, deny: [...deny, ...missing] };
 }
 

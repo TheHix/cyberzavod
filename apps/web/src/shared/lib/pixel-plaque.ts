@@ -76,7 +76,9 @@ const { ink: INK, paper: PAPER, paperShade: PAPER_SHADE, blank: BLANK } = PLAQUE
 
 function glyphOf(letter: string): PlaqueArt {
   const glyph = PLAQUE_GLYPHS[letter];
+
   if (glyph === undefined) throw new Error(`в шрифте табличек нет буквы «${letter}»`);
+
   return glyph;
 }
 
@@ -84,6 +86,7 @@ function glyphOf(letter: string): PlaqueArt {
 function lineArt(text: string): string[] {
   const letters = [...text.toLocaleUpperCase("ru-RU")].map(glyphOf);
   const gap = BLANK.repeat(LETTER_GAP);
+
   return Array.from({ length: GLYPH_HEIGHT }, (_, row) =>
     letters
       .map((glyph) => glyph[row] ?? "")
@@ -95,6 +98,7 @@ function lineArt(text: string): string[] {
 // Короткая строка встаёт по центру самой длинной.
 function centered(row: string, width: number): string {
   const before = Math.floor((width - row.length) / 2);
+
   return PAPER.repeat(before) + row + PAPER.repeat(width - row.length - before);
 }
 
@@ -116,14 +120,16 @@ function edgeRow(width: number): string {
  */
 export function plaqueArt(lines: readonly string[]): PlaqueArt {
   const lineRows = lines.map(lineArt);
-  const textWidth = Math.max(0, ...lineRows.map((rows) => rows[0]?.length ?? 0));
+  const lineWidths = lineRows.map((rows) => rows[0]?.length ?? 0);
+  const textWidth = Math.max(0, ...lineWidths);
   const text = lineRows.flatMap((rows, index) => [
-    ...(index === 0 ? [] : paperRows(LINE_GAP, textWidth)),
+    ...paperRows(index === 0 ? 0 : LINE_GAP, textWidth),
     ...rows.map((row) => centered(row, textWidth)),
   ]);
   const inner = [...paperRows(PADDING_Y, textWidth), ...text];
   const margin = PAPER.repeat(PADDING_X);
   const width = textWidth + 2 * (PADDING_X + OUTLINE);
+
   return [
     edgeRow(width),
     ...inner.map((row) => INK + margin + row + margin + INK),
@@ -152,22 +158,28 @@ const INK_OF_LETTER: Readonly<Record<string, PlaqueInk>> = {
 
 function inkOf(letter: string): PlaqueInk {
   const ink = INK_OF_LETTER[letter];
+
   if (ink === undefined) throw new Error(`в рисунке таблички нет краски «${letter}»`);
+
   return ink;
 }
 
 function rowRuns(row: string, y: number): PlaqueRun[] {
   const runs: PlaqueRun[] = [];
+
   for (const [x, letter] of [...row].entries()) {
     if (letter === BLANK) continue;
+
     const ink = inkOf(letter);
     const last = runs.at(-1);
+
     if (last?.ink === ink && last.x + last.width === x) {
       runs[runs.length - 1] = { ...last, width: last.width + 1 };
     } else {
       runs.push({ ink, x, y, width: 1 });
     }
   }
+
   return runs;
 }
 

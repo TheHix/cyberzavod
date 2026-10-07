@@ -19,6 +19,7 @@ describe("DirectoryRecordStore", () => {
 
   it("перечисляет записанные записи", async () => {
     const store = new DirectoryRecordStore(await temporaryDirectory());
+
     await store.write(validSession());
     await store.write(validDecision());
 
@@ -38,6 +39,7 @@ describe("DirectoryRecordStore", () => {
 
   it("не читает рабочие файлы адаптеров как записи", async () => {
     const directory = await temporaryDirectory();
+
     await mkdir(path.join(directory, "capture", "drafts"), { recursive: true });
     await writeFile(path.join(directory, "capture", "drafts", "draft.json"), "{}");
     const store = new DirectoryRecordStore(directory);
@@ -49,6 +51,7 @@ describe("DirectoryRecordStore", () => {
 
   it("называет битый файл записи", async () => {
     const directory = await temporaryDirectory();
+
     await mkdir(path.join(directory, "notes"));
     await writeFile(path.join(directory, "notes", "broken.json"), '{"version": 9}');
     const store = new DirectoryRecordStore(directory);

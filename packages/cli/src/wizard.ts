@@ -12,7 +12,7 @@ import {
   type Stage,
 } from "@cyberzavod/core";
 import { DEFAULT_JOURNAL, workflowOf } from "@cyberzavod/storage";
-import { projectIdOf, type DetectedProject } from "./detect.ts";
+import { projectIdOf, stackOf, type DetectedProject } from "./detect.ts";
 
 /** Кто отвечает на вопросы мастера: человек в терминале или значения по умолчанию. */
 export interface Prompter {
@@ -49,10 +49,13 @@ export function defaultsPrompter(): Prompter {
  */
 export function terminalPrompter(): Prompter {
   const terminal = createInterface({ input: process.stdin, output: process.stdout });
+
   return {
     ask: async (question, fallback) => {
       const answer = await terminal.question(`${question} [${fallback}]: `);
-      return answer.trim() === "" ? fallback : answer.trim();
+      const trimmed = answer.trim();
+
+      return trimmed === "" ? fallback : trimmed;
     },
     close: () => {
       terminal.close();
@@ -68,6 +71,7 @@ export function terminalPrompter(): Prompter {
  */
 export function describeDetected(root: string, detected: DetectedProject): string[] {
   const listed = (values: string[]) => (values.length === 0 ? "не найдены" : values.join(", "));
+
   return [
     `Проект: ${detected.name} (${root})`,
     `Языки: ${listed(detected.languages)}`,
@@ -79,10 +83,9 @@ export function describeDetected(root: string, detected: DetectedProject): strin
 }
 
 function splitList(answer: string): string[] {
-  return answer
-    .split(LIST_SEPARATOR)
-    .map((item) => item.trim())
-    .filter((item) => item !== "");
+  const parts = answer.split(LIST_SEPARATOR).map((part) => part.trim());
+
+  return parts.filter((part) => part !== "");
 }
 
 async function askAgents(
@@ -91,15 +94,20 @@ async function askAgents(
   prompter: Prompter,
 ): Promise<Partial<Record<Stage, AgentConfig>>> {
   const agents: Partial<Record<Stage, AgentConfig>> = {};
+
   for (const stage of stages) {
     const guide = harness.stages[stage];
+
     if (guide.role === undefined) continue;
+
     const model = await prompter.ask(
       `Модель этапа «${guide.title}» (агент ${DEFAULT_AGENT.agent})`,
       DEFAULT_MODEL,
     );
+
     agents[stage] = { ...DEFAULT_AGENT, model };
   }
+
   return agents;
 }
 
@@ -116,26 +124,23 @@ export async function askProjectConfig(
   harness: Harness,
   prompter: Prompter,
 ): Promise<Omit<ProjectConfig, "harness">> {
-  const projectId = projectIdOf(
-    await prompter.ask("Идентификатор проекта", projectIdOf(detected.name)),
-  );
-  const workflow = workflowOf(harness, await prompter.ask("Процесс", "default"));
+  const projectIdAnswer = await prompter.ask("Идентификатор проекта", projectIdOf(detected.name));
+  const workflowName = await prompter.ask("Процесс", "default");
+  const projectId = projectIdOf(projectIdAnswer);
+  const workflow = workflowOf(harness, workflowName);
   const agents = await askAgents(harness, workflow.stages, prompter);
   const journal = await prompter.ask("Каталог журнала от корня проекта", DEFAULT_JOURNAL);
   const commands = await prompter.ask(
     `Команды проверки через «${LIST_SEPARATOR}»`,
     detected.verification.join(`${LIST_SEPARATOR} `),
   );
+
   return {
     projectId,
     workflow: workflow.name,
     journal: journal.split(path.sep).join("/"),
     agents,
     verification: { commands: splitList(commands), paths: [] },
-    stack: {
-      languages: detected.languages,
-      frameworks: detected.frameworks,
-      ...(detected.packageManager === undefined ? {} : { packageManager: detected.packageManager }),
-    },
+    stack: stackOf(detected),
   };
 }

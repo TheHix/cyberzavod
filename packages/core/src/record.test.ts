@@ -64,12 +64,15 @@ function validSession(): RawSession {
 
 function withData(patch: Record<string, unknown>): RawSession {
   const raw = validSession();
+
   return { ...raw, data: { ...raw.data, ...patch } };
 }
 
 function parseSession(raw: unknown): SessionRecord {
   const record = parseRecord(raw);
+
   if (record.type !== "session") throw new Error(`ждали сессию, пришло ${record.type}`);
+
   return record;
 }
 
@@ -182,6 +185,7 @@ describe("parseRecord", () => {
 
   it("отклоняет неизвестный этап", () => {
     const raw = validSession();
+
     raw.data.events[2] = { t: 20, type: "stage_enter", stage: "deploy" };
 
     const act = () => parseRecord(raw);
@@ -191,6 +195,7 @@ describe("parseRecord", () => {
 
   it("не даёт времени идти назад", () => {
     const raw = validSession();
+
     raw.data.events[3] = { t: 5, type: "usage", tokens: 1200 };
 
     const act = () => parseRecord(raw);
@@ -200,6 +205,7 @@ describe("parseRecord", () => {
 
   it("отклоняет промпт без цели", () => {
     const raw = validSession();
+
     raw.data.events[1] = { t: 10, type: "prompt", goal: " ", requirements: [] };
 
     const act = () => parseRecord(raw);
@@ -217,6 +223,7 @@ describe("parseRecord", () => {
 
   it("принимает промпт без модели", () => {
     const raw = validSession();
+
     raw.data.events[1] = { t: 10, type: "prompt", goal: "Цель", requirements: [] };
 
     const recording = parseSession(raw);
@@ -226,6 +233,7 @@ describe("parseRecord", () => {
 
   it("отклоняет пустую модель", () => {
     const raw = validSession();
+
     raw.data.events[1] = { t: 10, type: "prompt", goal: "Цель", requirements: [], model: "" };
 
     const act = () => parseRecord(raw);
@@ -235,6 +243,7 @@ describe("parseRecord", () => {
 
   it("отклоняет требование в несколько строк", () => {
     const raw = validSession();
+
     raw.data.events[1] = { t: 10, type: "prompt", goal: "Цель", requirements: ["первое\nвторое"] };
 
     const act = () => parseRecord(raw);
@@ -271,6 +280,7 @@ describe("parseRecord", () => {
 
   it("отклоняет запись без build_end", () => {
     const raw = validSession();
+
     raw.data.events.pop();
 
     const act = () => parseRecord(raw);
@@ -297,6 +307,7 @@ describe("summarize", () => {
 
   it("считает вмешательства отдельно от промптов", () => {
     const raw = validSession();
+
     raw.data.events.splice(3, 0, interventionEvent(), interventionEvent({ t: 26 }));
     const recording = parseSession(raw);
 
@@ -321,6 +332,7 @@ function messageEvent(patch: Record<string, unknown> = {}): Record<string, unkno
 describe("parseRecord: реплики", () => {
   it("принимает реплику мастера станции, станции мастеру и станции станции", () => {
     const raw = validSession();
+
     raw.data.events.splice(
       3,
       0,
@@ -330,8 +342,9 @@ describe("parseRecord: реплики", () => {
     );
 
     const recording = parseSession(raw);
+    const messages = recording.data.events.filter((event) => event.type === "message");
 
-    expect(recording.data.events.filter((event) => event.type === "message")).toHaveLength(3);
+    expect(messages).toHaveLength(3);
   });
 
   it.each([
@@ -353,6 +366,7 @@ describe("parseRecord: реплики", () => {
     ["текст не строка", { text: 5 }, /text/],
   ])("отклоняет реплику: %s", (_name, patch, message) => {
     const raw = validSession();
+
     raw.data.events.splice(3, 0, messageEvent(patch));
 
     const act = () => parseRecord(raw);
@@ -362,6 +376,7 @@ describe("parseRecord: реплики", () => {
 
   it("сохраняет переводы строк в полном тексте", () => {
     const raw = validSession();
+
     raw.data.events.splice(3, 0, messageEvent());
 
     const recording = parseSession(raw);
@@ -373,6 +388,7 @@ describe("parseRecord: реплики", () => {
 describe("briefOf", () => {
   it("убирает полный текст у реплик и не трогает остальное", () => {
     const raw = validSession();
+
     raw.data.events.splice(3, 0, messageEvent());
     const recording = parseSession(raw);
 
@@ -387,6 +403,7 @@ describe("briefOf", () => {
 
   it("убирает полный текст у вмешательства", () => {
     const raw = validSession();
+
     raw.data.events.splice(3, 0, interventionEvent());
     const recording = parseSession(raw);
 
@@ -444,6 +461,7 @@ function interventionEvent(patch: Record<string, unknown> = {}): Record<string, 
 describe("parseRecord: вмешательства", () => {
   it.each(INTERVENTION_REASONS)("принимает причину %s", (reason) => {
     const raw = validSession();
+
     raw.data.events.splice(3, 0, interventionEvent({ reason }));
 
     const recording = parseSession(raw);
@@ -453,6 +471,7 @@ describe("parseRecord: вмешательства", () => {
 
   it("отклоняет неизвестную причину", () => {
     const raw = validSession();
+
     raw.data.events.splice(3, 0, interventionEvent({ reason: "approval" }));
 
     const act = () => parseRecord(raw);
@@ -467,6 +486,7 @@ describe("parseRecord: вмешательства", () => {
     ["текст не строка", { text: 5 }, /text/],
   ])("отклоняет вмешательство: %s", (_name, patch, message) => {
     const raw = validSession();
+
     raw.data.events.splice(3, 0, interventionEvent(patch));
 
     const act = () => parseRecord(raw);
@@ -476,6 +496,7 @@ describe("parseRecord: вмешательства", () => {
 
   it("сохраняет переводы строк в полном тексте", () => {
     const raw = validSession();
+
     raw.data.events.splice(3, 0, interventionEvent());
 
     const recording = parseSession(raw);
@@ -486,6 +507,7 @@ describe("parseRecord: вмешательства", () => {
 
 function manualRecord(type: string, data: Record<string, unknown>): Record<string, unknown> {
   const { version, timestamp, projectId } = validSession();
+
   return {
     version,
     type,

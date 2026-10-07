@@ -31,17 +31,22 @@ function pointsOf(layout: FactoryLayout): Point[] {
   const { stations, foreman, aisle } = layout;
   const stationPoints = STAGES.flatMap((stage) => {
     const { machine, post, foremanPost } = stations[stage];
+
     return [machine, post, foremanPost];
   });
+
   return [...stationPoints, foreman.desk, foreman.post, foreman.door, ...aisle];
 }
 
 function distanceToSegment(point: Point, from: Point, to: Point): number {
   const length = distance(from, to);
+
   if (length === 0) return distance(point, from);
+
   const share =
     ((point.x - from.x) * (to.x - from.x) + (point.y - from.y) * (to.y - from.y)) / length ** 2;
   const clamped = Math.min(1, Math.max(0, share));
+
   return distance(point, {
     x: from.x + (to.x - from.x) * clamped,
     y: from.y + (to.y - from.y) * clamped,

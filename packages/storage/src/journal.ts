@@ -45,16 +45,20 @@ export function journalDirectory(root: string, config: ProjectConfig): string {
 async function recordFilesIn(directory: string): Promise<string[]> {
   try {
     const names = await readdir(directory);
+
     return names.filter((name) => name.endsWith(RECORD_EXTENSION)).sort();
   } catch (err) {
     if (isNotFound(err)) return [];
+
     throw err;
   }
 }
 
 async function readRecord(file: string): Promise<JournalRecord> {
   try {
-    return parseRecord(JSON.parse(await readFile(file, "utf8")));
+    const text = await readFile(file, "utf8");
+
+    return parseRecord(JSON.parse(text));
   } catch (err) {
     throw new JournalError(`запись ${file} не прошла проверку: ${(err as Error).message}`, {
       cause: err,
@@ -81,12 +85,15 @@ export class DirectoryRecordStore implements RecordStore {
    */
   async list(): Promise<JournalRecord[]> {
     const records: JournalRecord[] = [];
+
     for (const collection of Object.values(RECORD_COLLECTIONS)) {
       const directory = path.join(this.#directory, collection);
+
       for (const name of await recordFilesIn(directory)) {
         records.push(await readRecord(path.join(directory, name)));
       }
     }
+
     return records;
   }
 
@@ -97,6 +104,7 @@ export class DirectoryRecordStore implements RecordStore {
    */
   async write(record: JournalRecord): Promise<void> {
     const file = this.pathOf(record);
+
     await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, `${JSON.stringify(record, null, 2)}\n`);
   }

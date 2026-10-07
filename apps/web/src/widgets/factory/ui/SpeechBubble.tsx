@@ -28,7 +28,9 @@ export function SpeechBubble(props: Props): JSX.Element {
   const placement = createMemo(() => {
     const point = props.position;
     const graphics = props.graphics;
+
     if (point === null || graphics === undefined) return null;
+
     return placeBubble(graphics.toScreen(point), props.field);
   });
 

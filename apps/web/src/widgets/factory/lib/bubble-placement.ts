@@ -20,6 +20,18 @@ const MIDDLE = 0.5;
 export function placeBubble(point: ScreenPoint, field: Frame): BubblePlacement {
   const across = (point.x - field.x) / field.width;
   const down = (point.y - field.y) / field.height;
-  const horizontal = across < EDGE_ZONE ? "start" : across > 1 - EDGE_ZONE ? "end" : "center";
-  return { x: point.x, y: point.y, vertical: down < MIDDLE ? "below" : "above", horizontal };
+
+  return {
+    x: point.x,
+    y: point.y,
+    vertical: down < MIDDLE ? "below" : "above",
+    horizontal: horizontalSideOf(across),
+  };
+}
+
+function horizontalSideOf(across: number): BubblePlacement["horizontal"] {
+  if (across < EDGE_ZONE) return "start";
+  if (across > 1 - EDGE_ZONE) return "end";
+
+  return "center";
 }

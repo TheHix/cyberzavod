@@ -9,13 +9,14 @@ import type { InterventionEvent, MessageEvent, PromptEvent, SessionRecord } from
 import { interventionAnchor, labelOf } from "@/entities/intervention";
 import { recipientOf } from "@/entities/prompt";
 import { languageNoteOf } from "@/entities/recording";
-import { messageAnchor, paragraphsOf, routeOf } from "@/entities/message";
+import { messageAnchor, routeOf } from "@/entities/message";
 import type { Speech } from "@/features/journal-sync";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { formatClock } from "@/shared/lib/format.ts";
 import { BulletList, buttonClass, Title } from "@/shared/ui";
 import { JournalEntry } from "./JournalEntry.tsx";
+import SpokenText from "./SpokenText.astro";
 
 interface Props {
   /** Полная запись: в журнале, в отличие от цеха, есть полные тексты реплик. */
@@ -41,6 +42,7 @@ function entriesOf(events: SessionRecord["data"]["events"]): Entry[] {
   let promptIndex = 0;
   let interventionIndex = 0;
   let messageIndex = 0;
+
   return events.flatMap((event): Entry[] => {
     switch (event.type) {
       case "prompt":
@@ -85,7 +87,9 @@ const languageNote = languageNoteOf(language, locale);
   <ol class="timeline">
     {entries.map((entry) => {
       switch (entry.kind) {
-        case "prompt":
+        case "prompt": {
+          const hasRequirements = entry.prompt.requirements.length > 0;
+
           return (
             <li>
               <JournalEntry
@@ -95,9 +99,7 @@ const languageNote = languageNoteOf(language, locale);
                 clock={formatClock(entry.prompt.t)}
                 route={UI_TEXT.speech.humanTo[locale](recipientOf(entry.prompt, locale))}
               >
-                {entry.prompt.requirements.length === 0 ? (
-                  <Title lang={language}>{entry.prompt.goal}</Title>
-                ) : (
+                {hasRequirements ? (
                   <details class="details">
                     <summary>
                       <Title as="span" lang={language}>
@@ -109,10 +111,14 @@ const languageNote = languageNoteOf(language, locale);
                     </summary>
                     <BulletList items={entry.prompt.requirements} lang={language} />
                   </details>
+                ) : (
+                  <Title lang={language}>{entry.prompt.goal}</Title>
                 )}
               </JournalEntry>
             </li>
           );
+        }
+
         case "intervention":
           return (
             <li id={interventionAnchor(entry.speech.index)}>
@@ -123,12 +129,11 @@ const languageNote = languageNoteOf(language, locale);
                 clock={formatClock(entry.intervention.t)}
                 route={labelOf(entry.intervention, locale)}
               >
-                <Title lang={language}>{entry.intervention.line}</Title>
-                <div class="text" lang={language}>
-                  {paragraphsOf(entry.intervention.text).map((paragraph) => (
-                    <p>{paragraph}</p>
-                  ))}
-                </div>
+                <SpokenText
+                  line={entry.intervention.line}
+                  text={entry.intervention.text}
+                  language={language}
+                />
               </JournalEntry>
             </li>
           );
@@ -142,12 +147,11 @@ const languageNote = languageNoteOf(language, locale);
                 clock={formatClock(entry.message.t)}
                 route={routeOf(entry.message, locale)}
               >
-                <Title lang={language}>{entry.message.line}</Title>
-                <div class="text" lang={language}>
-                  {paragraphsOf(entry.message.text).map((paragraph) => (
-                    <p>{paragraph}</p>
-                  ))}
-                </div>
+                <SpokenText
+                  line={entry.message.line}
+                  text={entry.message.text}
+                  language={language}
+                />
               </JournalEntry>
             </li>
           );
@@ -170,17 +174,6 @@ const languageNote = languageNoteOf(language, locale);
   /* Вмешательство или реплику, к которой пришли по «подробнее», не прячет под край панели. */
   .timeline > li {
     scroll-margin: var(--space-l);
-  }
-
-  .text {
-    display: grid;
-    gap: var(--space-s);
-    margin-top: var(--space-xs);
-  }
-
-  .text p {
-    margin: 0;
-    white-space: pre-line;
   }
 
   .details summary {

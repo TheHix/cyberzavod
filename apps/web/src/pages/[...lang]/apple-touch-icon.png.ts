@@ -19,5 +19,8 @@ export const getStaticPaths = (() =>
  * @param {object} context.props Свойства из `getStaticPaths`: язык.
  * @returns {Promise<Response>} Картинка PNG.
  */
-export const GET: APIRoute<{ locale: Locale }> = async ({ props }) =>
-  new Response(await touchIconPng(props.locale), { headers: { "Content-Type": "image/png" } });
+export const GET: APIRoute<{ locale: Locale }> = async ({ props }) => {
+  const icon = await touchIconPng(props.locale);
+
+  return new Response(icon, { headers: { "Content-Type": "image/png" } });
+};

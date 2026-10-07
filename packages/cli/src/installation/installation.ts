@@ -7,7 +7,7 @@ import { CommandError } from "../errors.ts";
 import { readAssets } from "./assets.ts";
 
 /** Версия Cyberzavod: её ставит в конфиг проекта этот CLI, она же — версия npm-пакета. */
-export const HARNESS_VERSION = "0.5.0";
+export const HARNESS_VERSION = "0.6.0";
 
 const RULES_TEMPLATE = "rules.md";
 
@@ -23,7 +23,9 @@ export interface Installation {
 
 function template(templates: Readonly<Record<string, string>>, name: string): string {
   const text = templates[name];
+
   if (text === undefined) throw new Error(`в установке нет шаблона ${name}`);
+
   return text;
 }
 
@@ -34,6 +36,7 @@ function template(templates: Readonly<Record<string, string>>, name: string): st
  */
 export async function readInstallation(): Promise<Installation> {
   const { harness, templates, tool } = await readAssets();
+
   return {
     harness: parseHarness(harness),
     rulesTemplate: template(templates, RULES_TEMPLATE),
@@ -57,5 +60,6 @@ export function toolOf(installation: Installation): string {
       "CLI запущен из исходников: соберите его (pnpm cyberzavod) и запустите собранный",
     );
   }
+
   return installation.tool;
 }

@@ -24,6 +24,7 @@ async function configOrNothing(root: string): Promise<ProjectConfig | undefined>
     return await readProjectConfig(root);
   } catch (err) {
     if (err instanceof ProjectFileError) return undefined;
+
     throw err;
   }
 }
@@ -37,11 +38,16 @@ async function configOrNothing(root: string): Promise<ProjectConfig | undefined>
 export async function startTurn(context: HookContext): Promise<HookOutcome> {
   const config = await configOrNothing(context.projectDirectory);
   const checks = config === undefined ? undefined : checksOf(config);
+
   if (checks === undefined) return SILENT_EXIT;
+
   const sessionId = sessionIdOf(context.payload);
   const turnStart = hookStatePath(context.tmpDir, sessionId, "turn-start");
+
   if (existsSync(turnStart)) return SILENT_EXIT;
+
   await rm(hookStatePath(context.tmpDir, sessionId, "stop-blocks"), { force: true });
   await writeFile(turnStart, codeFingerprint(context.projectDirectory, checks.paths));
+
   return SILENT_EXIT;
 }

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { detectProject, projectIdOf } from "./detect.ts";
+import { detectProject, projectIdOf, stackOf, type DetectedProject } from "./detect.ts";
 
 let root: string;
 
@@ -122,5 +122,35 @@ describe("projectIdOf", () => {
     const id = projectIdOf(name);
 
     expect(id).toBe(expected);
+  });
+});
+
+function detected(patch: Partial<DetectedProject> = {}): DetectedProject {
+  return {
+    name: "shop",
+    languages: ["go"],
+    frameworks: [],
+    git: false,
+    scripts: [],
+    verification: [],
+    ...patch,
+  };
+}
+
+describe("stackOf", () => {
+  it("берёт языки, фреймворки и менеджер пакетов", () => {
+    const project = detected({ frameworks: ["react"], packageManager: "pnpm" });
+
+    const stack = stackOf(project);
+
+    expect(stack).toEqual({ languages: ["go"], frameworks: ["react"], packageManager: "pnpm" });
+  });
+
+  it("без менеджера пакетов не добавляет пустое поле", () => {
+    const project = detected();
+
+    const stack = stackOf(project);
+
+    expect(stack).toEqual({ languages: ["go"], frameworks: [] });
   });
 });

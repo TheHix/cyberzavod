@@ -22,6 +22,7 @@ const UNKNOWN_SESSION = "unknown";
  */
 export function hookStatePath(tmpDir: string, sessionId: string, name: HookStateName): string {
   const safeSession = sessionId.replace(UNSAFE_SESSION_CHARACTERS, "") || UNKNOWN_SESSION;
+
   return path.join(tmpDir, `${STATE_PREFIX}-${name}-${safeSession}`);
 }
 
@@ -35,11 +36,14 @@ export function hookStatePath(tmpDir: string, sessionId: string, name: HookState
  */
 export async function claimHumanCallMarker(sessionId: string, tmpDir: string): Promise<boolean> {
   const markerPath = hookStatePath(tmpDir, sessionId, "human-call");
+
   try {
     await unlink(markerPath);
+
     return true;
   } catch (err) {
     if (!isNotFound(err)) console.warn(`отметка ${markerPath} не забрана: ${String(err)}`);
+
     return false;
   }
 }

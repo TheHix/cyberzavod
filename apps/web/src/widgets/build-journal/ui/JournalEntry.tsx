@@ -33,6 +33,7 @@ export function JournalEntry(props: Props): JSX.Element {
   // Подсветка и кнопка только после монтирования: разметка с сервера совпадает с первым
   // рендером в браузере, а без JS их нет вовсе.
   const [hydrated, setHydrated] = createSignal(false);
+
   onMount(() => setHydrated(true));
   const current = () => hydrated() && isSameSpeech(sceneSpeech(), props.speech);
 

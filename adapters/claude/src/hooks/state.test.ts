@@ -38,6 +38,7 @@ describe("claimHumanCallMarker", () => {
 
   it("удаляет отметку и сообщает, что она была", async () => {
     const markerPath = hookStatePath(root, "s1", "human-call");
+
     await writeFile(markerPath, "4");
 
     const claimed = await claimHumanCallMarker("s1", root);
@@ -64,6 +65,7 @@ describe("claimHumanCallMarker", () => {
 
   it("при другой ошибке предупреждает и возвращает false", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
     await mkdir(hookStatePath(root, "s1", "human-call"));
 
     const claimed = await claimHumanCallMarker("s1", root);

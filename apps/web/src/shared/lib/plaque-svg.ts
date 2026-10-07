@@ -1,4 +1,4 @@
-import { plaqueArt, plaqueRuns, type PlaqueInk } from "./pixel-plaque.ts";
+import { plaqueArt, plaqueRuns, type PlaqueInk, type PlaqueRun } from "./pixel-plaque.ts";
 
 // Табличка строкой SVG — для картинок, которые собираются при сборке без Solid и DOM:
 // иконки вкладки и превью ссылок. В меню ту же табличку рисует компонент PixelPlaque.
@@ -18,6 +18,16 @@ export interface PlaqueCanvas {
   readonly background?: string;
 }
 
+function backgroundRect(canvas: PlaqueCanvas): string {
+  if (canvas.background === undefined) return "";
+
+  return `<rect width="${String(canvas.width)}" height="${String(canvas.height)}" fill="${canvas.background}"/>`;
+}
+
+function runRect(run: PlaqueRun, paint: string): string {
+  return `<rect x="${String(run.x)}" y="${String(run.y)}" width="${String(run.width)}" height="1" fill="${paint}"/>`;
+}
+
 /**
  * Рисует табличку с надписью посередине холста. Пиксель таблички — целое число пикселей
  * картинки, чтобы края оставались чёткими и после перевода в PNG.
@@ -35,24 +45,18 @@ export function plaqueSvg(
   const art = plaqueArt(lines);
   const artWidth = art[0]?.length ?? 0;
   const artHeight = art.length;
-  const scale = Math.max(
-    1,
-    Math.floor(
-      Math.min((canvas.width * canvas.fill) / artWidth, (canvas.height * canvas.fill) / artHeight),
-    ),
+  const fitScale = Math.min(
+    (canvas.width * canvas.fill) / artWidth,
+    (canvas.height * canvas.fill) / artHeight,
   );
+  const scale = Math.max(1, Math.floor(fitScale));
   const left = Math.floor((canvas.width - artWidth * scale) / 2);
   const top = Math.floor((canvas.height - artHeight * scale) / 2);
-  const background =
-    canvas.background === undefined
-      ? ""
-      : `<rect width="${String(canvas.width)}" height="${String(canvas.height)}" fill="${canvas.background}"/>`;
+  const background = backgroundRect(canvas);
   const runs = plaqueRuns(art)
-    .map(
-      (run) =>
-        `<rect x="${String(run.x)}" y="${String(run.y)}" width="${String(run.width)}" height="1" fill="${paints[run.ink]}"/>`,
-    )
+    .map((run) => runRect(run, paints[run.ink]))
     .join("");
+
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${String(canvas.width)}" height="${String(canvas.height)}" ` +
     `viewBox="0 0 ${String(canvas.width)} ${String(canvas.height)}" shape-rendering="crispEdges">` +

@@ -24,6 +24,7 @@ func Load() (Config, error) {
 		Addr:        Addr(),
 		DatabaseURL: os.Getenv("DATABASE_URL"),
 	}
+
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("не задана переменная DATABASE_URL")
 	}
@@ -32,9 +33,11 @@ func Load() (Config, error) {
 
 // Addr возвращает адрес HTTP-сервера. Отдельно от Load, потому что healthcheck база не нужна.
 func Addr() string {
-	if v := os.Getenv("API_ADDR"); v != "" {
-		return v
+	addr := os.Getenv("API_ADDR")
+	if addr != "" {
+		return addr
 	}
+
 	return defaultAddr
 }
 

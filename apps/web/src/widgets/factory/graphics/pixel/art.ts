@@ -182,21 +182,39 @@ export function artSize(art: SpriteArt): ArtSize {
  */
 export function paintArt(art: SpriteArt, inks: Inks): PixelImage {
   const { width, height } = artSize(art);
+
   if (width === 0) throw new Error("рисунок пуст");
+
   const pixels = new Uint8ClampedArray(width * height * BYTES_PER_PIXEL);
+
   for (const [row, line] of art.entries()) {
     if (line.length !== width) {
       throw new Error(`строка ${row} длиной ${line.length}, а в рисунке ${width}`);
     }
-    for (const [column, letter] of [...line].entries()) {
-      const ink = ART_LEGEND[letter];
-      if (ink === undefined) throw new Error(`в рисунке неизвестная буква «${letter}»`);
-      if (ink === null) continue;
-      const at = (row * width + column) * BYTES_PER_PIXEL;
-      setPixel(pixels, at, inks[ink]);
-    }
+
+    paintRow(pixels, { row, line, width }, inks);
   }
+
   return { width, height, pixels };
+}
+
+interface ArtRow {
+  readonly row: number;
+  readonly line: string;
+  readonly width: number;
+}
+
+function paintRow(pixels: Uint8ClampedArray, { row, line, width }: ArtRow, inks: Inks): void {
+  for (const [column, letter] of [...line].entries()) {
+    const ink = ART_LEGEND[letter];
+
+    if (ink === undefined) throw new Error(`в рисунке неизвестная буква «${letter}»`);
+    if (ink === null) continue;
+
+    const at = (row * width + column) * BYTES_PER_PIXEL;
+
+    setPixel(pixels, at, inks[ink]);
+  }
 }
 
 function setPixel(pixels: Uint8ClampedArray, at: number, color: number): void {
@@ -235,6 +253,7 @@ export function fillRect(
 ): void {
   const right = Math.min(left + width, image.width);
   const bottom = Math.min(top + height, image.height);
+
   for (let row = Math.max(top, 0); row < bottom; row++) {
     for (let column = Math.max(left, 0); column < right; column++) {
       setPixel(image.pixels, (row * image.width + column) * BYTES_PER_PIXEL, color);
@@ -250,5 +269,6 @@ export function fillRect(
  */
 export function clearPixel(image: PixelImage, column: number, row: number): void {
   const at = (row * image.width + column) * BYTES_PER_PIXEL;
+
   image.pixels.fill(0, at, at + BYTES_PER_PIXEL);
 }

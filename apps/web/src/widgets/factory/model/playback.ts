@@ -33,7 +33,9 @@ export function startPlayback(duration: number, playing: boolean): Playback {
  */
 export function advance(playback: Playback, elapsedMs: number): Playback {
   if (!playback.playing) return playback;
+
   const position = Math.min(playback.duration, playback.position + elapsedMs * playback.speed);
+
   return { ...playback, position, playing: position < playback.duration };
 }
 
@@ -65,7 +67,9 @@ export function withDuration(playback: Playback, duration: number, position: num
  */
 export function togglePlaying(playback: Playback): Playback {
   if (playback.playing) return { ...playback, playing: false };
+
   const atEnd = playback.position >= playback.duration;
+
   return { ...playback, position: atEnd ? 0 : playback.position, playing: true };
 }
 

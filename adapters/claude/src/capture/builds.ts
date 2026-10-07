@@ -2,7 +2,7 @@
 // Сборка — набор событий, а не отрезок времени: задачи в одной сессии идут вперемешку, а команды
 // основной сессии относятся к сборке своего проекта по пометке `project`.
 
-import type { Draft, DraftEvent, DraftRun } from "./draft.ts";
+import type { Draft, DraftBuild, DraftEvent, DraftRun } from "./draft.ts";
 
 /**
  * Самая долгая пауза в записи сборки: промежуток, в котором у сборки не работает ни одна
@@ -37,16 +37,26 @@ function namedBuild(
   buildOfRun: ReadonlyMap<string, string>,
   firstBuild: string,
 ): string | undefined {
-  if (
-    (event.type === "draft_prompt" ||
-      event.type === "draft_message" ||
-      event.type === "draft_intervention") &&
-    event.build !== undefined
-  ) {
-    return event.build;
-  }
+  const canNameBuild =
+    event.type === "draft_prompt" ||
+    event.type === "draft_message" ||
+    event.type === "draft_intervention";
+
+  if (canNameBuild && event.build !== undefined) return event.build;
+
   const run = runOf(event);
+
   return run === undefined ? undefined : (buildOfRun.get(run) ?? firstBuild);
+}
+
+function firstBuildsOfProjects(builds: readonly DraftBuild[]): Map<string, string> {
+  const firstBuilds = new Map<string, string>();
+
+  for (const { id, project } of builds) {
+    if (project !== "" && !firstBuilds.has(project)) firstBuilds.set(project, id);
+  }
+
+  return firstBuilds;
 }
 
 /**
@@ -66,18 +76,23 @@ function namedBuild(
  */
 export function eventBuilds(draft: Draft): string[] {
   const firstBuild = draft.builds[0]?.id;
+
   if (firstBuild === undefined) throw new Error("в черновике нет сборок");
-  const buildOfRun = new Map(draft.builds.flatMap(({ id, runs }) => runs.map((run) => [run, id])));
+
+  const runBuilds = draft.builds.flatMap(({ id, runs }) =>
+    runs.map((run): [string, string] => [run, id]),
+  );
+  const buildOfRun = new Map(runBuilds);
   const projectOfBuild = new Map(draft.builds.map(({ id, project }) => [id, project]));
-  const firstBuildOfProject = new Map<string, string>();
-  for (const { id, project } of draft.builds) {
-    if (project !== "" && !firstBuildOfProject.has(project)) firstBuildOfProject.set(project, id);
-  }
+  const firstBuildOfProject = firstBuildsOfProjects(draft.builds);
   const lastBuildOfProject = new Map<string, string>();
   let current = firstBuild;
+
   return draft.events.map((event) => {
     const named = namedBuild(event, buildOfRun, firstBuild);
+
     if (named !== undefined) current = named;
+
     const project = projectOfEvent(event);
     const byProject =
       project === undefined
@@ -85,9 +100,11 @@ export function eventBuilds(draft: Draft): string[] {
         : (lastBuildOfProject.get(project) ?? firstBuildOfProject.get(project));
     const owner = named ?? byProject ?? current;
     const ownerProject = projectOfBuild.get(owner);
+
     if (ownerProject !== undefined && ownerProject !== "") {
       lastBuildOfProject.set(ownerProject, owner);
     }
+
     return owner;
   });
 }
@@ -101,9 +118,12 @@ export function eventBuilds(draft: Draft): string[] {
 export function unassignedRuns(draft: Draft): DraftRun[] {
   const assigned = new Set(draft.builds.flatMap(({ runs }) => runs));
   const seen = new Set<string>();
+
   return draft.events.flatMap((event) => {
     if (event.type !== "draft_run" || assigned.has(event.run) || seen.has(event.run)) return [];
+
     seen.add(event.run);
+
     return [event];
   });
 }
@@ -117,10 +137,13 @@ export function unassignedRuns(draft: Draft): DraftRun[] {
 export function projectsWithoutBuild(draft: Draft): string[] {
   const withBuild = new Set(draft.builds.map(({ project }) => project));
   const missing = new Set<string>();
+
   for (const event of draft.events) {
     const project = projectOfEvent(event);
+
     if (project !== undefined && !withBuild.has(project)) missing.add(project);
   }
+
   return [...missing];
 }
 
@@ -155,11 +178,14 @@ function spanOf(event: DraftEvent): Span {
 function mergedSpans(events: readonly DraftEvent[]): Span[] {
   const merged: Span[] = [];
   const spans = events.filter(isTimed).map(spanOf);
+
   for (const span of spans.sort((a, b) => a.from - b.from)) {
     const last = merged.at(-1);
+
     if (last !== undefined && span.from <= last.to) last.to = Math.max(last.to, span.to);
     else merged.push({ ...span });
   }
+
   return merged;
 }
 
@@ -175,12 +201,17 @@ export function buildTimeline(events: readonly DraftEvent[]): BuildTimeline | un
   const spans = mergedSpans(events);
   const first = spans[0];
   const last = spans.at(-1);
+
   if (first === undefined || last === undefined) return undefined;
+
   const cuts = spans.slice(1).flatMap((span, index) => {
     const gap = span.from - (spans[index]?.to ?? span.from);
+
     return gap > IDLE_GAP_MS ? [{ before: span.from, cut: gap - IDLE_GAP_MS }] : [];
   });
-  const at = (t: number) =>
-    t - first.from - cuts.filter(({ before }) => before <= t).reduce((sum, c) => sum + c.cut, 0);
+  const cutBefore = (t: number) =>
+    cuts.filter(({ before }) => before <= t).reduce((sum, { cut }) => sum + cut, 0);
+  const at = (t: number) => t - first.from - cutBefore(t);
+
   return { start: first.from, end: at(last.to), at };
 }

@@ -53,12 +53,15 @@ function isMissing(err: unknown): boolean {
 export async function readProjectConfig(root: string): Promise<ProjectConfig | undefined> {
   const configPath = path.join(root, PROJECT_CONFIG_FILE);
   let text: string;
+
   try {
     text = await readFile(configPath, "utf8");
   } catch (err) {
     if (isMissing(err)) return undefined;
+
     throw new ProjectFileError(`${configPath} не читается`, { cause: err });
   }
+
   try {
     return parseProjectConfig(JSON.parse(text));
   } catch (err) {
@@ -82,9 +85,12 @@ export async function findProjectRoot(directory: string): Promise<string | undef
 
 async function isFile(file: string): Promise<boolean> {
   try {
-    return (await stat(file)).isFile();
+    const stats = await stat(file);
+
+    return stats.isFile();
   } catch (err) {
     if (isMissing(err)) return false;
+
     throw err;
   }
 }

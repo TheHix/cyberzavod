@@ -29,9 +29,9 @@ export class ProjectError extends Error {}
 const SECURE_PROTOCOL = "https:";
 
 function isSecureUrl(value: unknown): value is string {
-  return (
-    typeof value === "string" && URL.canParse(value) && new URL(value).protocol === SECURE_PROTOCOL
-  );
+  if (typeof value !== "string" || !URL.canParse(value)) return false;
+
+  return new URL(value).protocol === SECURE_PROTOCOL;
 }
 
 // Необязательная ссылка: нет в карточке — нет и в результате, а не `undefined`.
@@ -40,10 +40,12 @@ function parseLink(
   field: "repo" | "website",
 ): Pick<Project<string>, "repo" | "website"> {
   const value = raw[field];
+
   if (value === undefined) return {};
   if (!isSecureUrl(value)) {
     throw new ProjectError(`${field} должен быть адресом с https`);
   }
+
   return { [field]: value };
 }
 
@@ -55,12 +57,15 @@ function parseText<Language extends string>(
   if (!isObject(raw)) {
     throw new ProjectError(`${field} должно быть объектом с переводами: ${languages.join(", ")}`);
   }
+
   const missing = languages.filter((language) => !isLine(raw[language]));
+
   if (missing.length > 0) {
     throw new ProjectError(
       `${field} на ${missing.join(", ")} должно быть непустой строкой без переводов строки`,
     );
   }
+
   return Object.fromEntries(
     languages.map((language) => [language, raw[language]]),
   ) as ProjectText<Language>;
@@ -78,7 +83,9 @@ export function parseProject<Language extends string>(
   languages: readonly Language[],
 ): Project<Language> {
   if (!isObject(raw)) throw new ProjectError("карточка проекта должна быть объектом");
+
   const { id } = raw;
+
   if (!isRecordId(id)) throw new ProjectError("id должен состоять из букв, цифр, «_» и «-»");
 
   return {

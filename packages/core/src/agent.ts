@@ -32,12 +32,17 @@ const AGENT_FIELDS = ["provider", "agent", "model"] as const;
  */
 export function parseAgentConfig(raw: unknown): AgentConfig {
   if (!isObject(raw)) throw new AgentConfigError("агент должен быть объектом");
+
   const config: AgentConfig = {};
+
   for (const field of AGENT_FIELDS) {
     const value = raw[field];
+
     if (value === undefined) continue;
     if (!isLine(value)) throw new AgentConfigError(`${field} должен быть непустой строкой`);
+
     config[field] = value;
   }
+
   return config;
 }

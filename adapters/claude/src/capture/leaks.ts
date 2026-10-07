@@ -32,5 +32,6 @@ const LEAK_PATTERNS: readonly { kind: string; pattern: RegExp }[] = [
  */
 export function findLeaks(text: string): string[] {
   const kinds = LEAK_PATTERNS.filter(({ pattern }) => pattern.test(text)).map(({ kind }) => kind);
+
   return [...new Set(kinds)];
 }

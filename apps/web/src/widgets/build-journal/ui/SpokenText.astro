@@ -1,0 +1,36 @@
+---
+// Реплика или вмешательство в журнале: строка из цеха и полный текст абзацами.
+import { paragraphsOf } from "@/entities/message";
+import { Title } from "@/shared/ui";
+
+interface Props {
+  /** Строка, которую говорящий произносит над станком. */
+  line: string;
+  /** Полный текст: абзацы разделены пустой строкой. */
+  text: string;
+  /** Язык записи: тексты не переводятся и несут свой `lang`. */
+  language: string;
+}
+
+const { line, text, language } = Astro.props;
+---
+
+<Title lang={language}>{line}</Title>
+<div class="text" lang={language}>
+  {paragraphsOf(text).map((paragraph) => (
+    <p>{paragraph}</p>
+  ))}
+</div>
+
+<style>
+  .text {
+    display: grid;
+    gap: var(--space-s);
+    margin-top: var(--space-xs);
+  }
+
+  .text p {
+    margin: 0;
+    white-space: pre-line;
+  }
+</style>

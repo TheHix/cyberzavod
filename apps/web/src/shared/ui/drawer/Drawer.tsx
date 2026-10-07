@@ -3,6 +3,8 @@ import type { JSX } from "solid-js";
 import { Button } from "../button/Button.tsx";
 import styles from "./Drawer.module.css";
 
+const ICON_STROKE = 3;
+
 interface Props {
   /** id панели: его указывают кнопки, которые её открывают (`popovertarget`). */
   id: string;
@@ -24,6 +26,7 @@ interface Props {
  */
 export function Drawer(props: Props): JSX.Element {
   const titleId = () => `${props.id}-title`;
+
   return (
     <aside id={props.id} popover="auto" class={styles.drawer} aria-labelledby={titleId()}>
       <header class={styles.header}>
@@ -36,7 +39,7 @@ export function Drawer(props: Props): JSX.Element {
           popovertargetaction="hide"
           aria-label={props.closeLabel}
         >
-          <X stroke-width={3} />
+          <X stroke-width={ICON_STROKE} />
         </Button>
       </header>
       <div class={styles.body}>{props.children}</div>

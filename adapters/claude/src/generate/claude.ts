@@ -50,12 +50,14 @@ export function claudeModelOf(stage: Stage, agent: AgentConfig | undefined): str
     agent: name = CLAUDE_AGENT,
     model = DEFAULT_MODEL,
   } = agent ?? {};
+
   if (provider !== CLAUDE_PROVIDER || name !== CLAUDE_AGENT) {
     throw new GenerateError(
       `этап ${stage}: ${provider}/${name} не поддерживается, пока есть только адаптер ` +
         `${CLAUDE_PROVIDER}/${CLAUDE_AGENT}`,
     );
   }
+
   return model === DEFAULT_MODEL ? DEFAULT_MODELS[stage] : model;
 }
 

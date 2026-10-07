@@ -190,14 +190,16 @@ export function layoutFor(
   layouts: readonly [FactoryLayout, ...FactoryLayout[]] = FACTORY_LAYOUTS,
 ): FactoryLayout {
   const narrowest = layouts[layouts.length - 1] ?? layouts[0];
+
   if (!hasArea(field) || !hasArea(screen)) return narrowest;
+
   const fieldAspect = aspectOf(field);
   const screenAspect = aspectOf(screen);
-  return (
-    layouts.find(
-      (layout) => layout.minFieldAspect <= fieldAspect && layout.minScreenAspect <= screenAspect,
-    ) ?? narrowest
-  );
+
+  const fits = (layout: FactoryLayout) =>
+    layout.minFieldAspect <= fieldAspect && layout.minScreenAspect <= screenAspect;
+
+  return layouts.find(fits) ?? narrowest;
 }
 
 /**
@@ -240,6 +242,8 @@ export function headingTo(from: Point, to: Point): number {
  */
 export function stopShortOf(from: Point, target: Point, gap: number): Point {
   const length = distance(from, target);
+
   if (length <= gap) return from;
+
   return pointBetween(from, target, (length - gap) / length);
 }

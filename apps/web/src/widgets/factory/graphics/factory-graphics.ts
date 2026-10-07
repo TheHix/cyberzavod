@@ -48,5 +48,6 @@ export interface FactoryGraphics {
  */
 export async function loadFactoryGraphics(locale: Locale): Promise<FactoryGraphics> {
   const { PixelGraphics } = await import("./pixel/pixel-graphics.ts");
+
   return new PixelGraphics(locale);
 }

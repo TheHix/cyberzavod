@@ -13,6 +13,8 @@ export const LocaleProvider = LocaleContext.Provider;
  */
 export function useLocale(): Locale {
   const locale = useContext(LocaleContext);
+
   if (locale === undefined) throw new Error("компонент стоит вне LocaleProvider");
+
   return locale;
 }

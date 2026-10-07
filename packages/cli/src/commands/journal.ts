@@ -27,6 +27,7 @@ const ID_SUFFIX_LENGTH = 8;
 export function manualHeader(projectId: string, now: Date): RecordHeader {
   const timestamp = now.toISOString();
   const suffix = randomUUID().slice(0, ID_SUFFIX_LENGTH);
+
   return {
     version: RECORD_VERSION,
     id: `${timestamp.slice(0, DATE_LENGTH)}-${suffix}`,
@@ -44,6 +45,7 @@ async function writeRecord(
   const project = await requireProjectAt(directory);
   const store = new DirectoryRecordStore(project.journal);
   const record = parseRecord(build(project.config.projectId));
+
   await store.write(record);
   console.log(`записано: ${path.relative(project.root, store.pathOf(record))}`);
 }

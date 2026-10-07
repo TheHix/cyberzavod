@@ -28,18 +28,23 @@ function sortedByName(texts: Readonly<Record<string, string>>): Record<string, s
 
 async function readTemplates(): Promise<Record<string, string>> {
   const templates: Record<string, string> = {};
+
   for (const directory of TEMPLATE_DIRECTORIES) {
     for (const name of await readdir(directory)) {
       templates[name] = await readFile(path.join(directory, name), "utf8");
     }
   }
+
   return templates;
 }
 
 // Собранный CLI знает себя сам: читает свой файл, чтобы положить его в проект.
 async function embeddedAssetsModule(): Promise<string> {
-  const harness = sortedByName(await readHarnessFiles(HARNESS_DIRECTORY));
-  const templates = sortedByName(await readTemplates());
+  const harnessFiles = await readHarnessFiles(HARNESS_DIRECTORY);
+  const templateFiles = await readTemplates();
+  const harness = sortedByName(harnessFiles);
+  const templates = sortedByName(templateFiles);
+
   return `import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -59,6 +64,7 @@ const embeddedAssets: Plugin = {
       // Путь в пространстве плагина — постоянный, а не путь на диске: он попадает в комментарий
       // собранного файла, а файл должен совпадать байт в байт на любой машине.
       const resolved = path.resolve(args.resolveDir, args.path);
+
       return resolved === ASSETS_MODULE ? { path: "assets", namespace: ASSETS_NAMESPACE } : null;
     });
     builder.onLoad({ filter: /.*/, namespace: ASSETS_NAMESPACE }, async () => ({

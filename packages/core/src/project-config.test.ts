@@ -24,6 +24,7 @@ describe("parseProjectConfig", () => {
 
   it("без agents и verification даёт пустые значения", () => {
     const raw = validConfig();
+
     delete raw.agents;
     delete raw.verification;
     delete raw.stack;

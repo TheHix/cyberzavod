@@ -51,7 +51,9 @@ const BLINK_PHASES = 2;
 export function facingOf(heading: number): Pick<ActorFrame, "facing" | "mirrored"> {
   const across = Math.cos(heading);
   const down = Math.sin(heading);
+
   if (Math.abs(across) > Math.abs(down)) return { facing: "side", mirrored: across < 0 };
+
   return { facing: down > 0 ? "down" : "up", mirrored: false };
 }
 
@@ -139,7 +141,7 @@ export function machineWorkOf(worker: WorkerFrame): MachineWork {
   }
 }
 
-function blinkOn(time: number, periodMs: number): boolean {
+function isBlinkOn(time: number, periodMs: number): boolean {
   return Math.floor(time / periodMs) % BLINK_PHASES === 0;
 }
 
@@ -149,7 +151,7 @@ function blinkOn(time: number, periodMs: number): boolean {
  * @returns {boolean} `true`, если лампа в этот момент светится.
  */
 export function lampLit(time: number): boolean {
-  return blinkOn(time, LAMP_BLINK_MS);
+  return isBlinkOn(time, LAMP_BLINK_MS);
 }
 
 /**
@@ -158,5 +160,5 @@ export function lampLit(time: number): boolean {
  * @returns {boolean} `true`, если свечение в этот момент видно.
  */
 export function glowLit(time: number): boolean {
-  return blinkOn(time, GLOW_BLINK_MS);
+  return isBlinkOn(time, GLOW_BLINK_MS);
 }

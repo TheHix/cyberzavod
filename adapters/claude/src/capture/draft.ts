@@ -189,6 +189,7 @@ function isStrings(value: unknown): value is string[] {
 
 function parseDraftPrompt(raw: Record<string, unknown>, index: number): DraftPrompt {
   const { t, said, goal, requirements, model, joined, build } = raw;
+
   if (typeof t !== "number" || typeof said !== "string" || typeof goal !== "string") {
     throw new DraftError(`событие #${index}: у промпта должны быть t, said и goal`);
   }
@@ -204,6 +205,7 @@ function parseDraftPrompt(raw: Record<string, unknown>, index: number): DraftPro
   if (build !== undefined && typeof build !== "string") {
     throw new DraftError(`событие #${index}: build должна быть строкой`);
   }
+
   return {
     t,
     type: "draft_prompt",
@@ -218,6 +220,7 @@ function parseDraftPrompt(raw: Record<string, unknown>, index: number): DraftPro
 
 function parseDraftMessage(raw: Record<string, unknown>, index: number): DraftMessage {
   const { t, from, to, source, said, line, text, run, build } = raw;
+
   if (typeof t !== "number" || typeof said !== "string") {
     throw new DraftError(`событие #${index}: у реплики должны быть t и said`);
   }
@@ -236,6 +239,7 @@ function parseDraftMessage(raw: Record<string, unknown>, index: number): DraftMe
   if (build !== undefined && typeof build !== "string") {
     throw new DraftError(`событие #${index}: build должна быть строкой`);
   }
+
   return {
     t,
     type: "draft_message",
@@ -252,6 +256,7 @@ function parseDraftMessage(raw: Record<string, unknown>, index: number): DraftMe
 
 function parseDraftIntervention(raw: Record<string, unknown>, index: number): DraftIntervention {
   const { t, reason, said, line, text, build } = raw;
+
   if (typeof t !== "number" || typeof said !== "string") {
     throw new DraftError(`событие #${index}: у вмешательства должны быть t и said`);
   }
@@ -264,6 +269,7 @@ function parseDraftIntervention(raw: Record<string, unknown>, index: number): Dr
   if (build !== undefined && typeof build !== "string") {
     throw new DraftError(`событие #${index}: build должна быть строкой`);
   }
+
   return {
     t,
     type: "draft_intervention",
@@ -277,20 +283,24 @@ function parseDraftIntervention(raw: Record<string, unknown>, index: number): Dr
 
 function parseDraftRun(raw: Record<string, unknown>, index: number): DraftRun {
   const { t, run, agent, until } = raw;
+
   if (typeof t !== "number" || typeof run !== "string" || typeof agent !== "string") {
     throw new DraftError(`событие #${index}: у запуска должны быть t, run и agent`);
   }
   if (typeof until !== "number") {
     throw new DraftError(`событие #${index}: until запуска должно быть числом`);
   }
+
   return { t, type: "draft_run", run, agent, until };
 }
 
 function parseDraftCheck(raw: Record<string, unknown>, index: number): DraftCheck {
   const { t, ok } = raw;
+
   if (typeof t !== "number" || typeof ok !== "boolean") {
     throw new DraftError(`событие #${index}: у проверки должны быть t и ok`);
   }
+
   return { t, type: "draft_check", ok, ...parseEventMarks(raw, index) };
 }
 
@@ -298,12 +308,14 @@ function parseDraftCheck(raw: Record<string, unknown>, index: number): DraftChec
 // пометки черновика — запуск `run` и проект `project` — читаем отдельно.
 function parseEventMarks(raw: unknown, index: number): { run?: string; project?: string } {
   const { run, project } = isObject(raw) ? raw : { run: undefined, project: undefined };
+
   if (run !== undefined && typeof run !== "string") {
     throw new DraftError(`событие #${index}: run должен быть строкой`);
   }
   if (project !== undefined && typeof project !== "string") {
     throw new DraftError(`событие #${index}: project должен быть строкой`);
   }
+
   return {
     ...(run === undefined ? {} : { run }),
     ...(project === undefined ? {} : { project }),
@@ -311,21 +323,31 @@ function parseEventMarks(raw: unknown, index: number): { run?: string; project?:
 }
 
 function parseDraftEvent(raw: unknown, index: number): DraftEvent {
-  if (isObject(raw) && raw.type === "draft_prompt") return parseDraftPrompt(raw, index);
-  if (isObject(raw) && raw.type === "draft_message") return parseDraftMessage(raw, index);
-  if (isObject(raw) && raw.type === "draft_intervention") {
-    return parseDraftIntervention(raw, index);
+  if (isObject(raw)) {
+    switch (raw.type) {
+      case "draft_prompt":
+        return parseDraftPrompt(raw, index);
+      case "draft_message":
+        return parseDraftMessage(raw, index);
+      case "draft_intervention":
+        return parseDraftIntervention(raw, index);
+      case "draft_run":
+        return parseDraftRun(raw, index);
+      case "draft_check":
+        return parseDraftCheck(raw, index);
+    }
   }
-  if (isObject(raw) && raw.type === "draft_run") return parseDraftRun(raw, index);
-  if (isObject(raw) && raw.type === "draft_check") return parseDraftCheck(raw, index);
+
   return { ...parseSessionEvent(raw, index), ...parseEventMarks(raw, index) };
 }
 
 function parseBuild(raw: unknown, index: number): DraftBuild {
   if (!isObject(raw)) throw new DraftError(`сборка #${index}: должна быть объектом`);
+
   // Черновики до поля language лежат в capture/ и переносят редактуру в пересобранный черновик:
   // у них язык ещё ждёт редактуры.
   const { id, project, harness, workflow, title, language = "", runs } = raw;
+
   if (!isRecordId(id)) {
     throw new DraftError(`сборка #${index}: id должен состоять из букв, цифр, «_» и «-»`);
   }
@@ -341,6 +363,7 @@ function parseBuild(raw: unknown, index: number): DraftBuild {
     );
   }
   if (!isStrings(runs)) throw new DraftError(`сборка ${id}: runs должны быть списком строк`);
+
   return { id, project, harness, workflow, title, language, runs: [...runs] };
 }
 
@@ -348,27 +371,32 @@ function parseBuilds(raw: Record<string, unknown>): DraftBuild[] {
   if (!Array.isArray(raw.builds) || raw.builds.length === 0) {
     throw new DraftError("у черновика должна быть хотя бы одна сборка в builds");
   }
+
   return raw.builds.map(parseBuild);
 }
 
 function checkBuildIds(builds: readonly DraftBuild[]): void {
   const seen = new Set<string>();
+
   for (const { id } of builds) {
     if (seen.has(id)) throw new DraftError(`сборка ${id} указана в builds дважды`);
+
     seen.add(id);
   }
 }
 
 function checkRunsAreUnique(builds: readonly DraftBuild[]): void {
   const owners = new Map<string, string>();
-  for (const build of builds) {
-    for (const run of build.runs) {
-      const owner = owners.get(run);
-      if (owner !== undefined && owner !== build.id) {
-        throw new DraftError(`запуск ${run} указан в двух сборках: ${owner} и ${build.id}`);
-      }
-      owners.set(run, build.id);
+  const claims = builds.flatMap((build) => build.runs.map((run) => ({ run, buildId: build.id })));
+
+  for (const { run, buildId } of claims) {
+    const owner = owners.get(run);
+
+    if (owner !== undefined && owner !== buildId) {
+      throw new DraftError(`запуск ${run} указан в двух сборках: ${owner} и ${buildId}`);
     }
+
+    owners.set(run, buildId);
   }
 }
 
@@ -382,6 +410,7 @@ function isEditable(event: DraftEvent): event is EditableDraftEvent {
 
 function checkEventBuilds(builds: readonly DraftBuild[], events: readonly DraftEvent[]): void {
   const known = new Set(builds.map(({ id }) => id));
+
   events.forEach((event, index) => {
     if (!isEditable(event)) return;
     if (event.build !== undefined && !known.has(event.build)) {
@@ -403,16 +432,24 @@ function checkEventBuilds(builds: readonly DraftBuild[], events: readonly DraftE
  */
 export function parseDraft(raw: unknown): Draft {
   if (!isObject(raw)) throw new DraftError("черновик должен быть объектом");
+
   const { id, startedAt, events } = raw;
+
   if (typeof id !== "string" || typeof startedAt !== "string") {
     throw new DraftError("у черновика должны быть id и startedAt");
   }
+
   const builds = parseBuilds(raw);
+
   checkBuildIds(builds);
   checkRunsAreUnique(builds);
+
   if (!Array.isArray(events)) throw new DraftError("у черновика нет events");
+
   const parsedEvents = events.map(parseDraftEvent);
+
   checkEventBuilds(builds, parsedEvents);
+
   return { id, startedAt, builds, events: parsedEvents };
 }
 
@@ -462,6 +499,7 @@ function buildMark(earlier: { build?: string }): { build?: string } {
 function carryOverPrompt(earlier: DraftPrompt, fresh: DraftPrompt): DraftPrompt {
   // Старые транскрипты Claude Code удаляет: найденная раньше модель не должна пропасть.
   const model = fresh.model ?? earlier.model;
+
   return {
     ...fresh,
     goal: earlier.goal,
@@ -485,7 +523,9 @@ function carryOverIntervention(
 
 function carryOverEvent(event: DraftEvent, edited: readonly EditableDraftEvent[]): DraftEvent {
   if (!isEditable(event)) return event;
+
   const earlier = edited.find((candidate) => sameSaid(candidate, event));
+
   if (earlier === undefined) return event;
   // sameSaid проверил, что типы совпадают, а сузить пару через него компилятор не может.
   if (event.type === "draft_prompt" && earlier.type === "draft_prompt") {
@@ -497,6 +537,7 @@ function carryOverEvent(event: DraftEvent, edited: readonly EditableDraftEvent[]
   if (event.type === "draft_intervention" && earlier.type === "draft_intervention") {
     return carryOverIntervention(earlier, event);
   }
+
   return event;
 }
 
@@ -504,6 +545,7 @@ function carryOverEvent(event: DraftEvent, edited: readonly EditableDraftEvent[]
 // сборки редактор завёл сам и их шапку заполняет тоже он.
 function carryOverBuilds(previous: Draft, next: Draft): DraftBuild[] {
   const fresh = next.builds[0];
+
   return previous.builds.map((build) =>
     fresh?.id === build.id
       ? {
@@ -519,8 +561,9 @@ function carryOverBuilds(previous: Draft, next: Draft): DraftBuild[] {
 /**
  * Переносит редактуру из прошлого черновика той же сессии в пересобранный: сборки с их
  * заголовками, проектами, версиями завода и запусками, чистовые промпты, пометки «склеен»,
- * реплики, вмешательства и сборки у промптов, реплик и вмешательств. Пустые проект и версия harness у сборки с `id` первой
- * сборки пересобранного черновика берутся из журнала. Новые промпты и реплики остаются пустыми.
+ * реплики, вмешательства и сборки у промптов, реплик и вмешательств. Пустые проект и версия
+ * harness у сборки с `id` первой сборки пересобранного черновика берутся из журнала. Новые
+ * промпты и реплики остаются пустыми.
  * @param {Draft} previous Прошлый черновик с уже сделанной редактурой.
  * @param {Draft} next Черновик, только что собранный из журнала.
  * @returns {Draft} Пересобранный черновик с перенесённой редактурой.
@@ -528,6 +571,7 @@ function carryOverBuilds(previous: Draft, next: Draft): DraftBuild[] {
 export function carryOverEdits(previous: Draft, next: Draft): Draft {
   const edited = editedEventsOf(previous);
   const events = next.events.map((event) => carryOverEvent(event, edited));
+
   return { ...next, builds: carryOverBuilds(previous, next), events };
 }
 
@@ -540,8 +584,10 @@ export function carryOverEdits(previous: Draft, next: Draft): Draft {
  */
 export function unfilledHeader(draft: Draft): string[] {
   const fields = Object.keys(HEADER_FIELD_NAMES) as (keyof typeof HEADER_FIELD_NAMES)[];
+
   return draft.builds.flatMap((build) => {
     const names = fields.filter((field) => build[field] === "").map((f) => HEADER_FIELD_NAMES[f]);
+
     return names.length === 0 ? [] : [`сборка ${build.id}: ${names.join(", ")}`];
   });
 }
@@ -556,6 +602,7 @@ export function unfilledHeader(draft: Draft): string[] {
  */
 export function orphanedEdits(previous: Draft, next: Draft): EditableDraftEvent[] {
   const nextEvents = editableEventsOf(next);
+
   return editedEventsOf(previous).filter(
     (event) => !nextEvents.some((candidate) => sameSaid(event, candidate)),
   );
@@ -568,9 +615,9 @@ export function orphanedEdits(previous: Draft, next: Draft): EditableDraftEvent[
  * @returns {string[]} Запуски из `runs` сборок, для которых в событиях нет окна `draft_run`.
  */
 export function orphanedRuns(draft: Draft): string[] {
-  const known = new Set(
-    draft.events.flatMap((event) => (event.type === "draft_run" ? [event.run] : [])),
-  );
+  const runs = draft.events.flatMap((event) => (event.type === "draft_run" ? [event.run] : []));
+  const known = new Set(runs);
+
   return draft.builds.flatMap((build) => build.runs).filter((run) => !known.has(run));
 }
 
@@ -584,9 +631,12 @@ export function orphanedRuns(draft: Draft): string[] {
  */
 export function reroutedMessages(previous: Draft, next: Draft): DraftMessage[] {
   const earlier = previous.events.filter((event) => event.type === "draft_message");
+
   return next.events.flatMap((event) => {
     if (event.type !== "draft_message" || event.line === "") return [];
+
     const was = earlier.find((candidate) => sameSaid(candidate, event));
+
     return was !== undefined && (was.from !== event.from || was.to !== event.to) ? [event] : [];
   });
 }
@@ -596,6 +646,7 @@ function toPublishedPrompt(
   t: number,
 ): SessionEvent {
   const { goal, requirements, model } = prompt;
+
   return { t, type: "prompt", goal, requirements, ...(model === undefined ? {} : { model }) };
 }
 
@@ -604,6 +655,7 @@ function toPublishedIntervention(
   t: number,
 ): SessionEvent {
   const { reason, line, text } = intervention;
+
   return { t, type: "intervention", reason, line, text };
 }
 
@@ -612,6 +664,7 @@ function toPublishedMessage(
   t: number,
 ): SessionEvent {
   const { from, to, line, text } = message;
+
   return { t, type: "message", from, to, line, text };
 }
 
@@ -625,6 +678,7 @@ function toPublishedEvents(
   const published: SessionEvent[] = [];
   let hasPrompt = false;
   let currentStage: Stage | undefined;
+
   events.forEach((event, index) => {
     switch (event.type) {
       case "draft_prompt":
@@ -634,23 +688,29 @@ function toPublishedEvents(
         } else if (!hasPrompt) {
           throw new DraftError(`событие #${index}: склеенному промпту нет предыдущего промпта`);
         }
+
         return;
       case "prompt":
         hasPrompt = true;
         published.push(toPublishedPrompt(event, at(event.t)));
+
         return;
       case "draft_message":
       case "message":
         published.push(toPublishedMessage(event, at(event.t)));
+
         return;
       case "draft_intervention":
       case "intervention":
         published.push(toPublishedIntervention(event, at(event.t)));
+
         return;
       case "stage_enter":
         if (event.stage === currentStage) return;
+
         currentStage = event.stage;
         published.push({ t: at(event.t), type: "stage_enter", stage: event.stage });
+
         return;
       case "stage_fail":
         published.push({
@@ -659,6 +719,7 @@ function toPublishedEvents(
           stage: event.stage,
           reason: event.reason,
         });
+
         return;
       case "draft_run":
       case "draft_check":
@@ -670,6 +731,7 @@ function toPublishedEvents(
         return event satisfies never;
     }
   });
+
   return published;
 }
 
@@ -704,19 +766,34 @@ function checksPassed(events: readonly DraftEvent[]): boolean {
 
 function totalTokens(events: readonly DraftEvent[]): number | undefined {
   const usages = events.filter((event) => event.type === "usage");
+
   return usages.length === 0 ? undefined : usages.reduce((sum, { tokens }) => sum + tokens, 0);
 }
 
 function buildOf(draft: Draft, buildId: string): DraftBuild {
   const build = draft.builds.find(({ id }) => id === buildId);
+
   if (build === undefined) throw new DraftError(`в черновике нет сборки ${buildId}`);
+
   return build;
+}
+
+function checkNoLeaks({ data }: SessionRecord, buildId: string): void {
+  const texts = [data.title, data.harness, data.workflow, ...data.events.flatMap(textsOf)];
+  const leaks = texts.flatMap((text) => findLeaks(text).map((kind) => `${kind} в «${text}»`));
+
+  if (leaks.length > 0) {
+    throw new DraftError(
+      `в тексте для публикации сборки ${buildId} есть то, что нельзя показывать: ${leaks.join("; ")}`,
+    );
+  }
 }
 
 /**
  * Превращает одну сборку отредактированного черновика в запись для сайта: только события
  * этой сборки, время от её первого события и без долгих пауз, без исходных текстов промптов
- * и реплик, без исходных текстов вмешательств, без пометок `project`, без склеенных промптов и служебных событий черновика.
+ * и реплик, без исходных текстов вмешательств, без пометок `project`, без склеенных промптов
+ * и служебных событий черновика.
  * @param {Draft} draft Черновик с заполненными заголовком, проектом, версией harness,
  *   чистовыми промптами и репликами публикуемой сборки.
  * @param {string} buildId Идентификатор публикуемой сборки.
@@ -731,7 +808,9 @@ export function publishBuild(draft: Draft, buildId: string): SessionRecord {
   const owners = eventBuilds(draft);
   const events = draft.events.filter((_event, index) => owners[index] === buildId);
   const timeline = buildTimeline(events);
+
   if (timeline === undefined) throw new DraftError(`в сборке ${buildId} нет событий`);
+
   const tokens = totalTokens(events);
   const usage: SessionEvent[] =
     tokens === undefined ? [] : [{ t: timeline.end, type: "usage", tokens }];
@@ -756,18 +835,13 @@ export function publishBuild(draft: Draft, buildId: string): SessionRecord {
       events: published,
     },
   });
+
   if (record.type !== "session") {
     throw new DraftError(`сборка ${buildId} опубликовалась не сессией`);
   }
 
-  const { data } = record;
-  const texts = [data.title, data.harness, data.workflow, ...data.events.flatMap(textsOf)];
-  const leaks = texts.flatMap((text) => findLeaks(text).map((kind) => `${kind} в «${text}»`));
-  if (leaks.length > 0) {
-    throw new DraftError(
-      `в тексте для публикации сборки ${buildId} есть то, что нельзя показывать: ${leaks.join("; ")}`,
-    );
-  }
+  checkNoLeaks(record, buildId);
+
   return record;
 }
 

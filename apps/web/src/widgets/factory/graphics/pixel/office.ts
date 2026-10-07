@@ -41,9 +41,11 @@ export const DESK_ART: SpriteArt = [
 export function drawOffice(plan: ForemanPlan, palette: Palette): Container {
   const desk = new Sprite(textureOf(paintArt(DESK_ART, paletteInks(palette))));
   const { width, height } = artSize(DESK_ART);
+
   desk.position.set(
     Math.round(plan.desk.x * PIXELS_PER_UNIT) - Math.floor(width / 2),
     Math.round(plan.desk.y * PIXELS_PER_UNIT) - Math.floor(height / 2),
   );
+
   return new Container({ children: [desk] });
 }

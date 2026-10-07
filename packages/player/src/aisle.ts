@@ -28,27 +28,35 @@ interface Segment {
 function segmentsOf(aisle: Aisle): Segment[] {
   const segments: Segment[] = [];
   let offset = 0;
+
   for (const [index, to] of aisle.entries()) {
     const from = aisle[index - 1];
+
     if (from === undefined) continue;
+
     const length = distance(from, to);
+
     segments.push({ from, to, length, offset });
     offset += length;
   }
+
   return segments;
 }
 
 // Доля отрезка, ближайшая к точке; за концами прижимается к концу, у вырожденного отрезка — 0.
 function shareNearest(segment: Segment, point: Point): number {
   if (segment.length === 0) return 0;
+
   const { from, to } = segment;
   const dot = (point.x - from.x) * (to.x - from.x) + (point.y - from.y) * (to.y - from.y);
+
   return Math.min(1, Math.max(0, dot / (segment.length * segment.length)));
 }
 
 function stopOn(segment: Segment, point: Point): AisleStop {
   const share = shareNearest(segment, point);
   const { from, to } = segment;
+
   return {
     point: { x: from.x + (to.x - from.x) * share, y: from.y + (to.y - from.y) * share },
     along: segment.offset + segment.length * share,
@@ -65,14 +73,17 @@ function stopOn(segment: Segment, point: Point): AisleStop {
 export function aisleStop(aisle: Aisle, point: Point): AisleStop {
   let nearest: AisleStop | undefined;
   let nearestDistance = Number.POSITIVE_INFINITY;
+
   for (const segment of segmentsOf(aisle)) {
     const stop = stopOn(segment, point);
     const gap = distance(stop.point, point);
+
     if (gap < nearestDistance - EPSILON) {
       nearest = stop;
       nearestDistance = gap;
     }
   }
+
   // Проход из двух точек всегда даёт хотя бы один отрезок.
   return nearest ?? { point: aisle[0], along: 0 };
 }
@@ -87,9 +98,14 @@ export function aisleStop(aisle: Aisle, point: Point): AisleStop {
 export function aisleWalk(aisle: Aisle, from: AisleStop, to: AisleStop): Point[] {
   const low = Math.min(from.along, to.along);
   const high = Math.max(from.along, to.along);
-  const corners = segmentsOf(aisle)
-    .map((segment) => ({ point: segment.to, along: segment.offset + segment.length }))
-    .filter((corner) => corner.along > low + EPSILON && corner.along < high - EPSILON)
-    .map((corner) => corner.point);
+  const vertices = segmentsOf(aisle).map((segment) => ({
+    point: segment.to,
+    along: segment.offset + segment.length,
+  }));
+  const passed = vertices.filter(
+    (vertex) => vertex.along > low + EPSILON && vertex.along < high - EPSILON,
+  );
+  const corners = passed.map((vertex) => vertex.point);
+
   return from.along <= to.along ? corners : corners.toReversed();
 }

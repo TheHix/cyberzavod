@@ -107,6 +107,14 @@ const ACTOR_POSE_IN_PLACE: Readonly<Record<ActorPose, boolean>> = {
   talkB: true,
 };
 
+function inkedCellsOf(art: SpriteArt): { column: number; row: number }[] {
+  const cells = art.flatMap((line, row) =>
+    [...line].map((letter, column) => ({ column, row, letter })),
+  );
+
+  return cells.filter(({ letter }) => ART_LEGEND[letter] !== null);
+}
+
 // Видимая фигура человека на месте по всем сторонам и позам, в том числе с поднятыми руками.
 // Бок рисуется вправо, а влево зеркалится, поэтому по горизонтали берётся больший из двух краёв.
 // Шаг (на пиксель ниже), деталь в руках и тень не считаются: тень — затемнение пола.
@@ -114,30 +122,27 @@ function figureBoxOf(arts: readonly SpriteArt[]): FigureBox {
   const sizes = arts.map(artSize);
   const centerX = (sizes[0]?.width ?? 0) / 2;
   const centerY = (sizes[0]?.height ?? 0) / 2;
-  let [left, top, right, bottom] = [Infinity, Infinity, -Infinity, -Infinity];
-  for (const art of arts) {
-    for (const [row, line] of art.entries()) {
-      for (const [column, letter] of [...line].entries()) {
-        if (ART_LEGEND[letter] === null) continue;
-        left = Math.min(left, column);
-        right = Math.max(right, column + 1);
-        top = Math.min(top, row);
-        bottom = Math.max(bottom, row + 1);
-      }
-    }
-  }
+  const cells = arts.flatMap(inkedCellsOf);
+  const columns = cells.map(({ column }) => column);
+  const rows = cells.map(({ row }) => row);
+  const left = Math.min(...columns);
+  const right = Math.max(...columns) + 1;
+  const top = Math.min(...rows);
+  const bottom = Math.max(...rows) + 1;
+
   const halfWidth = Math.max(centerX - left, right - centerX);
+
   return { left: -halfWidth, top: top - centerY, right: halfWidth, bottom: bottom - centerY };
 }
 
+const IN_PLACE_ARTS: SpriteArt[] = Object.values(ACTOR_ART).flatMap((poses) => {
+  const inPlace = Object.entries(poses).filter(([pose]) => ACTOR_POSE_IN_PLACE[pose as ActorPose]);
+
+  return inPlace.map(([, art]) => art);
+});
+
 /** Где человек занимает место вокруг своей точки плана: по ней таблички обходят фигуру. */
-export const ACTOR_FIGURE: FigureBox = figureBoxOf(
-  Object.values(ACTOR_ART).flatMap((poses) =>
-    Object.entries(poses)
-      .filter(([pose]) => ACTOR_POSE_IN_PLACE[pose as ActorPose])
-      .map(([, art]) => art),
-  ),
-);
+export const ACTOR_FIGURE: FigureBox = figureBoxOf(IN_PLACE_ARTS);
 
 /**
  * Лежит ли деталь в руках над несущим, когда он смотрит в эту сторону. Вниз ящик перед грудью
@@ -196,14 +201,14 @@ function foremanInks(palette: Palette): Inks {
 
 function bakePoses(inks: Inks): PoseTextures {
   const bake = (art: SpriteArt) => textureOf(paintArt(art, inks));
-  const bakeFacing = (poses: Readonly<Record<ActorPose, SpriteArt>>) =>
-    Object.fromEntries(Object.entries(poses).map(([pose, art]) => [pose, bake(art)])) as Record<
-      ActorPose,
-      Texture
-    >;
-  return Object.fromEntries(
-    Object.entries(ACTOR_ART).map(([facing, poses]) => [facing, bakeFacing(poses)]),
-  ) as PoseTextures;
+  const bakeFacing = (poses: Readonly<Record<ActorPose, SpriteArt>>) => {
+    const textures = Object.entries(poses).map(([pose, art]) => [pose, bake(art)]);
+
+    return Object.fromEntries(textures) as Record<ActorPose, Texture>;
+  };
+  const facings = Object.entries(ACTOR_ART).map(([facing, poses]) => [facing, bakeFacing(poses)]);
+
+  return Object.fromEntries(facings) as PoseTextures;
 }
 
 /**
@@ -214,9 +219,13 @@ function bakePoses(inks: Inks): PoseTextures {
  */
 export function bakeActorTextures(palette: Palette): ActorTextures {
   const inks = paletteInks(palette);
-  const workers = Object.fromEntries(
-    STAGES.map((stage) => [stage, bakePoses(uniformInks(palette, palette.stations[stage]))]),
-  ) as Record<Stage, PoseTextures>;
+  const workerEntries = STAGES.map((stage) => {
+    const workerInks = uniformInks(palette, palette.stations[stage]);
+
+    return [stage, bakePoses(workerInks)];
+  });
+  const workers = Object.fromEntries(workerEntries) as Record<Stage, PoseTextures>;
+
   return {
     workers,
     foreman: bakePoses(foremanInks(palette)),
@@ -243,22 +252,27 @@ export function destroyActorTextures(textures: ActorTextures): void {
     textures.crate,
     textures.glow,
   ];
+
   for (const texture of all) texture.destroy(true);
 }
 
 // Опора — целый пиксель в центре рисунка, а не доля `anchor`: место остаётся на сетке пикселей.
 function centered(texture: Texture): Sprite {
   const sprite = new Sprite(texture);
+
   sprite.pivot.set(texture.width / 2, texture.height / 2);
+
   return sprite;
 }
 
 function createActor(textures: PoseTextures, shadow: Texture): ActorSprites {
   const shadowSprite = new Sprite(shadow);
+
   shadowSprite.pivot.set(shadow.width / 2, 0);
   shadowSprite.position.set(0, SHADOW_TOP);
   shadowSprite.alpha = SHADOW_ALPHA;
   const body = centered(textures.down.stand);
+
   return { root: new Container({ children: [shadowSprite, body] }), body, textures };
 }
 
@@ -269,6 +283,7 @@ function layerOf(position: Point): number {
 
 function placeActor(sprites: ActorSprites, position: Point, frame: ActorFrame): void {
   const layer = layerOf(position);
+
   sprites.root.position.set(Math.round(position.x * PIXELS_PER_UNIT), layer);
   sprites.root.zIndex = layer;
   sprites.body.texture = sprites.textures[frame.facing][frame.pose];
@@ -321,6 +336,7 @@ export function placeForeman(sprites: ActorSprites, foreman: ForemanFrame): void
 export function createCrate(textures: ActorTextures, palette: Palette): CrateSprites {
   const glow = centered(textures.glow);
   const crate = centered(textures.crate);
+
   return {
     root: new Container({ children: [glow, crate] }),
     crate,
@@ -339,7 +355,9 @@ export function createCrate(textures: ActorTextures, palette: Palette): CrateSpr
  */
 export function crateLayerOf(part: PartFrame, holder: WorkerFrame | undefined): number {
   if (!part.carried || holder === undefined) return layerOf(part.position);
+
   const front = CARRIED_IN_FRONT[facingOf(holder.heading).facing];
+
   return layerOf(holder.position) + (front ? CARRIED_LAYER_STEP : -CARRIED_LAYER_STEP);
 }
 
@@ -352,12 +370,14 @@ export function crateLayerOf(part: PartFrame, holder: WorkerFrame | undefined): 
 export function placeCrate(sprites: CrateSprites, scene: Scene): void {
   const { part } = scene;
   const holder = scene.workers.find((worker) => worker.station === part.holder);
+
   sprites.root.position.set(
     Math.round(part.position.x * PIXELS_PER_UNIT),
     Math.round(part.position.y * PIXELS_PER_UNIT),
   );
   sprites.root.zIndex = crateLayerOf(part, holder);
   const glow = sprites.glowColors[part.status];
+
   sprites.glow.visible = glow !== null && glowLit(scene.time);
   if (glow !== null) sprites.glow.tint = glow;
 }

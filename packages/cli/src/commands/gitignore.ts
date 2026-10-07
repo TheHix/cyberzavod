@@ -1,20 +1,12 @@
 // Рабочие файлы адаптеров (сырые журналы сессий и черновики) несут исходные тексты промптов:
 // в git проекта они не идут.
 
-import { appendFile, readFile } from "node:fs/promises";
+import { appendFile } from "node:fs/promises";
 import path from "node:path";
-import { CAPTURE_DIRECTORY, isNotFound } from "@cyberzavod/storage";
+import { CAPTURE_DIRECTORY } from "@cyberzavod/storage";
+import { readOptionalText } from "../files.ts";
 
 const GITIGNORE = ".gitignore";
-
-async function readOptional(file: string): Promise<string | undefined> {
-  try {
-    return await readFile(file, "utf8");
-  } catch (err) {
-    if (isNotFound(err)) return undefined;
-    throw err;
-  }
-}
 
 /**
  * Дописывает в `.gitignore` проекта рабочие файлы адаптеров, если журнал лежит в проекте.
@@ -24,12 +16,18 @@ async function readOptional(file: string): Promise<string | undefined> {
  */
 export async function ignoreCapture(root: string, journal: string): Promise<string | undefined> {
   const relative = path.posix.normalize(journal);
+
   if (relative.startsWith("..") || path.isAbsolute(journal)) return undefined;
+
   const entry = `/${relative}/${CAPTURE_DIRECTORY}/`;
   const file = path.join(root, GITIGNORE);
-  const current = await readOptional(file);
+  const current = await readOptionalText(file);
+
   if (current?.split(/\r?\n/).includes(entry) === true) return undefined;
+
   const separator = current === undefined || current.endsWith("\n") ? "" : "\n";
+
   await appendFile(file, `${separator}${entry}\n`);
+
   return entry;
 }

@@ -24,6 +24,7 @@ const NGINX_CONFIG = fileURLToPath(new URL("../nginx.conf", import.meta.url));
 function builtSite(): BuiltSite {
   if (!existsSync(DIST)) throw new Error("нет dist/: сначала нужна сборка `astro build`");
   if (config.site === undefined) throw new Error("в astro.config.ts не задан site");
+
   return readBuiltSite(DIST, config.site);
 }
 
@@ -93,6 +94,7 @@ describe("notFoundFilesOf", () => {
     const pages = files.map((file) => {
       const pageUrl = pageUrlOf(file) ?? file;
       const html = site.pages.get(pageUrl);
+
       return {
         file,
         locale: localeOfPage(pageUrl),
@@ -100,7 +102,10 @@ describe("notFoundFilesOf", () => {
       };
     });
 
-    expect(pages.map(({ locale }) => locale).sort()).toEqual([...LOCALES].sort());
-    expect(pages.filter(({ indexed }) => indexed !== false)).toEqual([]);
+    const locales = pages.map(({ locale }) => locale).sort();
+    const indexedPages = pages.filter(({ indexed }) => indexed !== false);
+
+    expect(locales).toEqual([...LOCALES].sort());
+    expect(indexedPages).toEqual([]);
   });
 });

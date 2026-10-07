@@ -40,10 +40,12 @@ async function makeRepo(
 ): Promise<void> {
   await mkdir(path.join(repo, "apps"), { recursive: true });
   await writeFile(path.join(repo, "apps/main.ts"), "ok\n");
+
   if (config !== NO_CONFIG) {
     await mkdir(path.join(repo, path.dirname(PROJECT_CONFIG_FILE)), { recursive: true });
     await writeFile(path.join(repo, PROJECT_CONFIG_FILE), config);
   }
+
   git("init", "-q");
   git("add", "-A");
   git("commit", "-qm", "init");
@@ -55,7 +57,9 @@ function context(): HookContext {
 
 async function stopTimes(times: number): Promise<HookOutcome | undefined> {
   let outcome: HookOutcome | undefined;
+
   for (let attempt = 0; attempt < times; attempt += 1) outcome = await gateStop(context());
+
   return outcome;
 }
 

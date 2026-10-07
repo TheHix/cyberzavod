@@ -99,9 +99,11 @@ export function lastStartedIndex<T>(
   let low = 0;
   let high = items.length - 1;
   let found = -1;
+
   while (low <= high) {
     const middle = (low + high) >> 1;
     const item = items[middle];
+
     if (item !== undefined && startOf(item) <= time) {
       found = middle;
       low = middle + 1;
@@ -109,13 +111,23 @@ export function lastStartedIndex<T>(
       high = middle - 1;
     }
   }
+
   return found;
+}
+
+// Куда смотрит действующий: к направлению действия он поворачивается за `turnMs` с его начала.
+function headingAt(move: WorkerMove | ForemanMove, turnMs: number, time: number): number {
+  const turn = progressOf(move.start, move.start + turnMs, time);
+
+  return turn === 1 ? move.heading : turned(move.turnFrom, move.heading, turn);
 }
 
 function workerAt(script: FactoryScript, station: Stage, time: number): WorkerFrame {
   const moves = script.workers[station];
   const plan = script.layout.stations[station];
-  const move: WorkerMove | undefined = moves[lastStartedIndex(moves, time, (m) => m.start)];
+  const index = lastStartedIndex(moves, time, (m) => m.start);
+  const move: WorkerMove | undefined = moves[index];
+
   if (move === undefined || time >= move.end) {
     // Между действиями рабочий стоит у своего станка: каждое действие кончается там.
     return {
@@ -127,11 +139,11 @@ function workerAt(script: FactoryScript, station: Stage, time: number): WorkerFr
       carrying: false,
     };
   }
-  const turn = progressOf(move.start, move.start + script.pacing.turnMs, time);
+
   return {
     station,
     position: pointBetween(move.from, move.to, progressOf(move.start, move.end, time)),
-    heading: turn === 1 ? move.heading : turned(move.turnFrom, move.heading, turn),
+    heading: headingAt(move, script.pacing.turnMs, time),
     activity: move.activity,
     elapsed: time - move.since,
     carrying: move.carrying,
@@ -140,10 +152,13 @@ function workerAt(script: FactoryScript, station: Stage, time: number): WorkerFr
 
 function placeOf(script: FactoryScript, workers: readonly WorkerFrame[], place: PartPlace) {
   const holder = workers.find((worker) => worker.station === place.station);
+
   if (place.on === "machine" || holder === undefined) {
     return script.layout.stations[place.station].machine;
   }
+
   const { position, heading } = holder;
+
   return {
     x: position.x + Math.cos(heading) * CARRY_DISTANCE,
     y: position.y + Math.sin(heading) * CARRY_DISTANCE,
@@ -151,9 +166,12 @@ function placeOf(script: FactoryScript, workers: readonly WorkerFrame[], place: 
 }
 
 function partAt(script: FactoryScript, workers: readonly WorkerFrame[], time: number): PartFrame {
-  const move = script.part[lastStartedIndex(script.part, time, (m) => m.start)];
+  const index = lastStartedIndex(script.part, time, (m) => m.start);
+  const move = script.part[index];
+
   if (move === undefined) {
     const station = STAGES[0];
+
     return {
       position: script.layout.stations[station].machine,
       holder: station,
@@ -161,8 +179,10 @@ function partAt(script: FactoryScript, workers: readonly WorkerFrame[], time: nu
       status: "ok",
     };
   }
+
   const from = placeOf(script, workers, move.from);
   const to = placeOf(script, workers, move.to);
+
   return {
     position: pointBetween(from, to, progressOf(move.start, move.end, time)),
     holder: move.to.station,
@@ -171,28 +191,24 @@ function partAt(script: FactoryScript, workers: readonly WorkerFrame[], time: nu
   };
 }
 
-function promptAt(script: FactoryScript, time: number): PromptFrame | null {
-  const cue = script.prompts[lastStartedIndex(script.prompts, time, (c) => c.start)];
-  if (cue === undefined || time >= cue.end) return null;
-  return { cue, elapsed: time - cue.start };
-}
+// Пузырь, который висит в этот момент: промпт, вмешательство или реплика; `null` — никакой.
+function visibleCueAt<Cue extends { readonly start: number; readonly end: number }>(
+  cues: readonly Cue[],
+  time: number,
+): { readonly cue: Cue; readonly elapsed: number } | null {
+  const index = lastStartedIndex(cues, time, (c) => c.start);
+  const cue = cues[index];
 
-function interventionAt(script: FactoryScript, time: number): InterventionFrame | null {
-  const cue = script.interventions[lastStartedIndex(script.interventions, time, (c) => c.start)];
   if (cue === undefined || time >= cue.end) return null;
-  return { cue, elapsed: time - cue.start };
-}
 
-function messageAt(script: FactoryScript, time: number): MessageFrame | null {
-  const cue = script.messages[lastStartedIndex(script.messages, time, (c) => c.start)];
-  if (cue === undefined || time >= cue.end) return null;
   return { cue, elapsed: time - cue.start };
 }
 
 function foremanAt(script: FactoryScript, time: number): ForemanFrame {
   const { post, facing } = script.layout.foreman;
-  const move: ForemanMove | undefined =
-    script.foreman[lastStartedIndex(script.foreman, time, (m) => m.start)];
+  const index = lastStartedIndex(script.foreman, time, (m) => m.start);
+  const move: ForemanMove | undefined = script.foreman[index];
+
   if (move === undefined) {
     return { position: post, heading: facing, activity: "idle", elapsed: time };
   }
@@ -205,10 +221,10 @@ function foremanAt(script: FactoryScript, time: number): ForemanFrame {
       elapsed: time - move.end,
     };
   }
-  const turn = progressOf(move.start, move.start + script.pacing.turnMs, time);
+
   return {
     position: pointBetween(move.from, move.to, progressOf(move.start, move.end, time)),
-    heading: turn === 1 ? move.heading : turned(move.turnFrom, move.heading, turn),
+    heading: headingAt(move, script.pacing.turnMs, time),
     activity: move.activity,
     elapsed: time - move.since,
   };
@@ -217,10 +233,15 @@ function foremanAt(script: FactoryScript, time: number): ForemanFrame {
 // Время записи между отметками идёт равномерно; пока рабочий бежит, запись стоит.
 function recordingTimeAt(script: FactoryScript, index: number, time: number): number {
   const mark = script.marks[index];
+
   if (mark === undefined) return 0;
+
   const next = script.marks[index + 1];
+
   if (next === undefined || next.at === mark.at) return mark.recordingTime;
+
   const progress = Math.min(1, (time - mark.at) / (next.at - mark.at));
+
   return mark.recordingTime + (next.recordingTime - mark.recordingTime) * progress;
 }
 
@@ -235,14 +256,15 @@ export function sceneAt(script: FactoryScript, time: number): Scene {
   const workers = STAGES.map((station) => workerAt(script, station, clamped));
   const markIndex = lastStartedIndex(script.marks, clamped, (m) => m.at);
   const mark = script.marks[markIndex];
+
   return {
     time: clamped,
     recordingTime: recordingTimeAt(script, markIndex, clamped),
     workers,
     part: partAt(script, workers, clamped),
-    prompt: promptAt(script, clamped),
-    intervention: interventionAt(script, clamped),
-    message: messageAt(script, clamped),
+    prompt: visibleCueAt(script.prompts, clamped),
+    intervention: visibleCueAt(script.interventions, clamped),
+    message: visibleCueAt(script.messages, clamped),
     foreman: foremanAt(script, clamped),
     counts: {
       tokens: mark?.tokens ?? 0,

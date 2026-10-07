@@ -86,6 +86,7 @@ describe("plaqueArt", () => {
     const shortRow = art.at(-4) ?? "";
     const before = shortRow.indexOf("k", 1);
     const after = shortRow.length - 1 - shortRow.lastIndexOf("k", shortRow.length - 2);
+
     expect(Math.abs(before - after)).toBeLessThanOrEqual(1);
   });
 

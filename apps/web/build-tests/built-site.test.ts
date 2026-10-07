@@ -47,6 +47,7 @@ function pageHtml(pageUrl: string, options: PageOptions = {}): string {
     options.noindex === true
       ? ['<meta name="robots" content="noindex">']
       : [`<link rel="canonical" href="${canonical}">`, ...alternates];
+
   return [
     `<!DOCTYPE html><html lang="${options.lang ?? localeOf(pageUrl)}"><head>`,
     ...head,
@@ -63,19 +64,24 @@ function validSite(overrides: Readonly<Record<string, string>> = {}): BuiltSite 
   const pageUrls = LOCALES.flatMap((locale) =>
     PAGE_PATHS.map((path) => localizedPath(locale, path)),
   );
-  const pages = new Map(pageUrls.map((pageUrl) => [pageUrl, pageHtml(pageUrl)] as const));
+  const pageEntries = pageUrls.map((pageUrl) => [pageUrl, pageHtml(pageUrl)] as const);
+  const pages = new Map(pageEntries);
+
   for (const [pageUrl, html] of Object.entries(overrides)) pages.set(pageUrl, html);
-  const files = new Set([
-    "/_astro/app.css",
-    ...[...pages.keys()].map((pageUrl) => `${pageUrl}index.html`),
-  ]);
-  const sitemap = `<urlset>${pageUrls.map((pageUrl) => `<url><loc>${ORIGIN}${pageUrl}</loc></url>`).join("")}</urlset>`;
+
+  const pageFiles = [...pages.keys()].map((pageUrl) => `${pageUrl}index.html`);
+  const files = new Set(["/_astro/app.css", ...pageFiles]);
+  const locations = pageUrls.map((pageUrl) => `<url><loc>${ORIGIN}${pageUrl}</loc></url>`);
+  const sitemap = `<urlset>${locations.join("")}</urlset>`;
+
   return { origin: ORIGIN, pages, files, sitemap };
 }
 
 function withoutPage(site: BuiltSite, pageUrl: string): BuiltSite {
   const pages = new Map(site.pages);
+
   pages.delete(pageUrl);
+
   return { ...site, pages };
 }
 

@@ -16,11 +16,13 @@ const TEMPLATE_DIRECTORIES = [
 
 async function readTemplates(): Promise<Record<string, string>> {
   const templates: Record<string, string> = {};
+
   for (const directory of TEMPLATE_DIRECTORIES) {
     for (const name of await readdir(directory)) {
       templates[name] = await readFile(path.join(directory, name), "utf8");
     }
   }
+
   return templates;
 }
 

@@ -31,6 +31,7 @@ function rectAround(
 
 function overlap(a: Rect, b: Rect): boolean {
   const epsilon = 1e-9;
+
   return (
     a.left < b.right - epsilon &&
     b.left < a.right - epsilon &&
@@ -53,6 +54,7 @@ function furnitureOf(layout: FactoryLayout): Rect[] {
     width: deskSize.width / PIXELS_PER_UNIT,
     height: deskSize.height / PIXELS_PER_UNIT,
   };
+
   return [
     ...STAGES.map((stage) => rectAround(layout.stations[stage].machine, machine)),
     rectAround(layout.foreman.desk, desk),
@@ -68,6 +70,7 @@ function figureRectsOf(layout: FactoryLayout): Rect[] {
     layout.foreman.door,
   ];
   const { left, top, right, bottom } = ACTOR_FIGURE;
+
   return points.map((point) => ({
     left: point.x + left / PIXELS_PER_UNIT,
     top: point.y + top / PIXELS_PER_UNIT,
@@ -100,7 +103,9 @@ const NARROWER_THAN_PLAQUE = 0.9;
 // от одной фигуры упирает её в соседнюю, и она мечется между ними.
 function rowOfFiguresOnPlaque(layout: FactoryLayout, stage: Stage, locale: Locale): FactoryLayout {
   const plaque = plaquePlacements(layout, locale)[STAGES.indexOf(stage)];
+
   if (plaque === undefined) throw new Error(`у этапа ${stage} нет таблички`);
+
   const figureWidth = (ACTOR_FIGURE.right - ACTOR_FIGURE.left) / PIXELS_PER_UNIT;
   const spacing = figureWidth + plaque.size.width * NARROWER_THAN_PLAQUE;
   const middle = Math.floor(STAGES.length / 2);
@@ -113,6 +118,7 @@ function rowOfFiguresOnPlaque(layout: FactoryLayout, stage: Stage, locale: Local
       },
     ]),
   ) as FactoryLayout["stations"];
+
   return { ...layout, stations };
 }
 
@@ -163,6 +169,7 @@ describe("plaquePlacements", () => {
       for (const [index, stage] of STAGES.entries()) {
         const { machine, post } = layout.stations[stage];
         const plaqueY = placements[index]?.center.y ?? NaN;
+
         expect(Math.sign(plaqueY - machine.y)).toBe(-Math.sign(post.y - machine.y));
       }
     },

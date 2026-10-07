@@ -12,7 +12,9 @@ import type { DecisionRecord, ProjectConfig, SessionRecord } from "@cyberzavod/c
  */
 export async function temporaryDirectory(): Promise<string> {
   const directory = await mkdtemp(path.join(tmpdir(), "cyberzavod-storage-"));
+
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
+
   return directory;
 }
 

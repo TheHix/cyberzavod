@@ -41,6 +41,7 @@ function validScript(): FactoryScript {
       ],
     },
   };
+
   return buildScript(recording);
 }
 
@@ -176,6 +177,7 @@ function scriptWithIntervention(): FactoryScript {
       ],
     },
   };
+
   return buildScript(recording);
 }
 

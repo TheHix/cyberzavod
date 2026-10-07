@@ -52,6 +52,7 @@ export function Button(
   props: ButtonLook & JSX.ButtonHTMLAttributes<HTMLButtonElement>,
 ): JSX.Element {
   const [look, rest] = splitProps(props, LOOK_KEYS);
+
   return <ButtonRoot type="button" {...rest} class={buttonClass(look)} />;
 }
 
@@ -64,5 +65,6 @@ export function ButtonLink(
   props: ButtonLook & JSX.AnchorHTMLAttributes<HTMLAnchorElement>,
 ): JSX.Element {
   const [look, rest] = splitProps(props, LOOK_KEYS);
+
   return <a {...rest} class={buttonClass(look)} />;
 }

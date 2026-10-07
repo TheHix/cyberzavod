@@ -9,17 +9,21 @@ import type { Mark } from "./script.ts";
 function isAnchor(mark: Mark, lastAnchor: Mark | undefined): boolean {
   if (lastAnchor === undefined) return true;
   if (mark.at > lastAnchor.at) return true;
+
   return mark.at === lastAnchor.at && mark.recordingTime === lastAnchor.recordingTime;
 }
 
 function anchorIndexesOf(marks: readonly Mark[]): number[] {
   const indexes: number[] = [];
   let lastAnchor: Mark | undefined;
+
   for (const [index, mark] of marks.entries()) {
     if (!isAnchor(mark, lastAnchor)) continue;
+
     indexes.push(index);
     lastAnchor = mark;
   }
+
   return indexes;
 }
 
@@ -27,9 +31,11 @@ function anchorIndexesOf(marks: readonly Mark[]): number[] {
 // или при том же времени записи — на опорной слева.
 function placedBetween(mark: Mark, left: Mark, right: Mark | undefined): number {
   if (right === undefined || right.recordingTime === left.recordingTime) return left.at;
+
   const share =
     (mark.recordingTime - left.recordingTime) / (right.recordingTime - left.recordingTime);
   const placed = left.at + (right.at - left.at) * share;
+
   return Math.min(right.at, Math.max(left.at, placed));
 }
 
@@ -45,6 +51,7 @@ export function alignMarks(marks: readonly Mark[]): Mark[] {
   const aligned: Mark[] = [];
   let nextAnchor = 0;
   let left: Mark | undefined;
+
   for (const [index, mark] of marks.entries()) {
     if (anchors[nextAnchor] === index) {
       nextAnchor += 1;
@@ -55,9 +62,12 @@ export function alignMarks(marks: readonly Mark[]): Mark[] {
     if (left === undefined) {
       throw new Error(`у отметки ${index} нет опорной слева: первая отметка всегда опорная`);
     }
+
     const rightIndex = anchors[nextAnchor];
     const right = rightIndex === undefined ? undefined : marks[rightIndex];
+
     aligned.push({ ...mark, at: placedBetween(mark, left, right) });
   }
+
   return aligned;
 }

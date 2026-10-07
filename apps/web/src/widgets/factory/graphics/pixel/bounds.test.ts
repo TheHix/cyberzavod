@@ -29,6 +29,7 @@ function contains(bounds: PlanBounds, rect: PlanBounds): boolean {
 
 function unitsOf(rect: PlanBounds | undefined): PlanBounds {
   const { x = NaN, y = NaN, width = NaN, height = NaN } = rect ?? {};
+
   return {
     x: x / PIXELS_PER_UNIT,
     y: y / PIXELS_PER_UNIT,
@@ -56,6 +57,7 @@ function spotRect(center: { x: number; y: number }): PlanBounds {
 // Что обязано попасть в кадр: станки и стол, места рабочих и мастера, дверь.
 function neededRects(layout: FactoryLayout): PlanBounds[] {
   const stations = STAGES.map((stage) => layout.stations[stage]);
+
   return [
     ...stations.map((station) => machineRect(station.machine)),
     ...stations.map((station) => spotRect(station.post)),
@@ -156,6 +158,7 @@ describe("fitPixelPlan", () => {
       const { scale } = fitPixelPlan(bounds, field, resolution);
 
       const multiplier = (scale * resolution) / PIXELS_PER_UNIT;
+
       expect(multiplier).toBeCloseTo(Math.round(multiplier));
       expect(Math.round(multiplier)).toBeGreaterThanOrEqual(1);
     },
@@ -167,6 +170,7 @@ describe("fitPixelPlan", () => {
     const { scale, offset } = fitPixelPlan(bounds, field, resolution);
 
     const half = 0.5 / resolution;
+
     expect(offset.x + bounds.x * scale).toBeGreaterThanOrEqual(field.x - half);
     expect(offset.y + bounds.y * scale).toBeGreaterThanOrEqual(field.y - half);
     expect(offset.x + (bounds.x + bounds.width) * scale).toBeLessThanOrEqual(
@@ -196,6 +200,7 @@ describe("fitPixelPlan", () => {
 
     const left = offset.x + bounds.x * scale - field.x;
     const right = field.x + field.width - (offset.x + (bounds.x + bounds.width) * scale);
+
     expect(Math.abs(left - right)).toBeLessThanOrEqual(1);
   });
 

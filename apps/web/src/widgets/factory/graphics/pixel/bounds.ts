@@ -63,6 +63,7 @@ export function planBounds(layout: FactoryLayout, locale: Locale): PlanBounds {
   const top = Math.min(...rects.map((rect) => rect.y));
   const right = Math.max(...rects.map((rect) => rect.x + rect.width));
   const bottom = Math.max(...rects.map((rect) => rect.y + rect.height));
+
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
@@ -79,6 +80,7 @@ export function fitPixelPlan(bounds: PlanBounds, field: Frame, resolution: numbe
   const multiplier = Math.max(1, Math.floor((fitting * resolution) / PIXELS_PER_UNIT));
   const scale = (multiplier * PIXELS_PER_UNIT) / resolution;
   const snap = (value: number) => Math.round(value * resolution) / resolution;
+
   return {
     scale,
     offset: {

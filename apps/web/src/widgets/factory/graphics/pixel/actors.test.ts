@@ -15,7 +15,9 @@ function bakedTextures(): { textures: ActorTextures; sources: TextureSource[] } 
   const sources: TextureSource[] = [];
   const texture = () => {
     const source = new TextureSource();
+
     sources.push(source);
+
     return new Texture({ source });
   };
   const poses = (facing: Facing) =>
@@ -30,6 +32,7 @@ function bakedTextures(): { textures: ActorTextures; sources: TextureSource[] } 
   const workers = Object.fromEntries(
     STAGES.map((stage) => [stage, facings()]),
   ) as ActorTextures["workers"];
+
   return {
     textures: {
       workers,

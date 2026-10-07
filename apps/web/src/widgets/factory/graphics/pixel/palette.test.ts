@@ -34,6 +34,7 @@ function tokens(overrides: Record<string, string> = {}): TokenSource {
   const values = Object.fromEntries(
     names.map((name, index) => [name, `#0000${index.toString(16).padStart(2, "0")}`]),
   );
+
   return { getPropertyValue: (name) => overrides[name] ?? values[name] ?? "" };
 }
 

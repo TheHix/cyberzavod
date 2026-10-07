@@ -47,14 +47,18 @@ export function isSameSpeech(current: Speech | null, candidate: Speech): boolean
  */
 export function connectScene(scene: JournalScene): () => void {
   connection?.unsubscribe();
+
   const own: Connection = {
     scene,
     unsubscribe: scene.$speech.subscribe((speech) => $currentSpeech.set(speech)),
   };
+
   connection = own;
+
   return () => {
     own.unsubscribe();
     if (connection !== own) return;
+
     connection = null;
     $currentSpeech.set(null);
   };

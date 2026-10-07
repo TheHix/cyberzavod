@@ -20,6 +20,7 @@ async function connectProject(): Promise<void> {
     workflow: "default",
     journal: ".cyberzavod/journal",
   };
+
   await mkdir(path.join(root, path.dirname(PROJECT_CONFIG_FILE)), { recursive: true });
   await writeFile(path.join(root, PROJECT_CONFIG_FILE), JSON.stringify(config));
 }
@@ -34,6 +35,7 @@ function promptContext(prompt: string): HookContext {
 
 async function recordedEvents(): Promise<unknown[]> {
   const lines = (await readFile(path.join(root, RAW_LOG), "utf8")).trim().split("\n");
+
   return lines.map((line) => JSON.parse(line) as unknown);
 }
 

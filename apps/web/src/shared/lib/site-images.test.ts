@@ -39,6 +39,7 @@ describe("touchIconPng", () => {
     const png = await touchIconPng("en");
 
     const { format, width, height } = await sharp(png).metadata();
+
     expect({ format, width, height }).toEqual({
       format: "png",
       width: TOUCH_ICON_SIZE,
@@ -52,6 +53,7 @@ describe("previewImagePng", () => {
     const png = await previewImagePng("ru");
 
     const { format, width, height } = await sharp(png).metadata();
+
     expect({ format, width, height }).toEqual({ format: "png", ...PREVIEW_IMAGE_SIZE });
   });
 });
