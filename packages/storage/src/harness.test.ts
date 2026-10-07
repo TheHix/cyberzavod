@@ -28,7 +28,7 @@ describe("loadHarness", () => {
       principles: harness.principles.map(({ name }) => name),
       stages: Object.keys(harness.stages),
     }).toEqual({
-      principles: ["architecture", "change-scope", "engineering", "safety"],
+      principles: ["architecture", "change-scope", "engineering", "readability", "safety"],
       stages: [...STAGES],
     });
   });

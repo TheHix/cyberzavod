@@ -1,6 +1,6 @@
 {
   "name": "cyberzavod",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Local-first, model-agnostic development harness for AI coding agents: process, checks and a journal of sessions in your repository.",
   "license": "MIT",
   "author": {
