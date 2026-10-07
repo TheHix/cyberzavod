@@ -57,6 +57,7 @@ describe("buildScript", () => {
     const route = script.workers.planning
       .filter((move) => move.activity === "walk" && move.carrying)
       .map((move) => move.to);
+
     expect(route).toEqual([
       { x: 0, y: 2 },
       { x: 10, y: 2 },
@@ -80,6 +81,7 @@ describe("buildScript", () => {
     const route = script.workers.planning
       .filter((move) => move.activity === "walk" && move.carrying)
       .map((move) => move.to);
+
     expect(route).toEqual([
       { x: 0, y: 2 },
       { x: 0, y: 3 },
@@ -133,6 +135,7 @@ describe("buildScript", () => {
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
     const defects = script.part.filter((move) => move.status === "defect");
+
     expect(defects.map((move) => move.start)).toEqual([33_000, 44_800, 58_000, 58_100]);
   });
 
@@ -176,6 +179,7 @@ describe("buildScript", () => {
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
     const moves = Object.values(script.workers).map((track) => track.length);
+
     expect({ moves, finishAt: script.finishAt }).toEqual({
       moves: [1, 0, 0, 0, 0],
       finishAt: 1_000,
@@ -237,6 +241,7 @@ describe("buildScript", () => {
     const workTimes = [...script.workers.planning, ...script.workers.implementation]
       .filter((move) => move.activity === "work")
       .map((move) => move.end - move.start);
+
     expect(workTimes).toEqual([1_600, 8_000]);
   });
 });
@@ -304,6 +309,7 @@ describe("buildScript: мастер", () => {
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
     const toPost = headingTo(specPost, LINE_LAYOUT.stations.planning.post);
+
     expect(
       talkingAt(script).map(({ activity, start, end, to, heading }) => [
         activity,
@@ -324,6 +330,7 @@ describe("buildScript: мастер", () => {
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
     const walk = script.foreman.filter((move) => move.start >= 29_500).map((move) => move.to);
+
     expect(walk).toEqual([{ x: 3, y: 2 }, { x: 22, y: 2 }, { x: 22, y: 6 }, post, post]);
   });
 
@@ -368,6 +375,7 @@ describe("buildScript: мастер", () => {
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
     const afterFirst = script.foreman.filter((move) => move.start >= 28_100);
+
     expect(afterFirst.slice(0, 4).map(({ activity, start, to }) => [activity, start, to])).toEqual([
       ["walk", 28_100, { x: 3, y: 2 }],
       ["walk", 30_100, { x: 13, y: 2 }],
@@ -382,6 +390,7 @@ describe("buildScript: мастер", () => {
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
     const turnAtDesk = script.foreman.findIndex((move) => move.activity === "idle");
+
     expect(script.foreman[turnAtDesk + 1]).toMatchObject({
       activity: "walk",
       from: post,
@@ -409,8 +418,10 @@ describe("buildScript: реплики", () => {
     const bubbles = [...script.prompts, ...script.messages].sort((a, b) => a.start - b.start);
     const overlaps = bubbles.filter((bubble, index) => {
       const previous = bubbles[index - 1];
+
       return previous !== undefined && bubble.start < previous.end;
     });
+
     expect({ count: bubbles.length, overlaps }).toEqual({ count: 6, overlaps: [] });
   });
 
@@ -441,6 +452,7 @@ describe("buildScript: реплики", () => {
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
     const [work, handoff] = script.workers.planning;
+
     expect([work?.activity, work?.end, handoff?.activity, handoff?.start]).toEqual([
       "work",
       29_500,
@@ -507,6 +519,7 @@ describe("buildScript: реплики", () => {
         move.to.on === "hands",
     )?.start;
     const [early, , exchange] = script.messages;
+
     expect({
       earlyBeforeLift: (early?.end ?? Infinity) <= (liftStart ?? 0),
       exchangeAfterLift: (exchange?.start ?? 0) > (liftStart ?? Infinity),
@@ -524,6 +537,7 @@ describe("buildScript: обмен при передаче", () => {
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
     const exchange = script.messages.filter(({ index }) => index === 2 || index === 3);
+
     expect(exchange.map(({ start, end, speaker }) => [start, end, speaker])).toEqual([
       [88_350, 89_350, "implementation"],
       [89_350, 90_350, "verification"],
@@ -537,6 +551,7 @@ describe("buildScript: обмен при передаче", () => {
 
     const giver = script.workers.implementation.find((move) => move.start === 88_350);
     const taker = script.workers.verification.find((move) => move.end === 90_450);
+
     expect({ giver, taker }).toEqual({
       giver: expect.objectContaining({
         activity: "handoff",
@@ -559,6 +574,7 @@ describe("buildScript: обмен при передаче", () => {
         move.from.station === "implementation" &&
         move.to.on === "hands",
     );
+
     expect(handover).toEqual(
       expect.objectContaining({
         start: 90_350,
@@ -577,6 +593,7 @@ describe("buildScript: обмен при передаче", () => {
     const exchangeMoves = talkingAt(script).filter(
       (move) => move.start >= 88_350 && move.start < 90_350,
     );
+
     expect(exchangeMoves).toEqual([]);
   });
 
@@ -597,6 +614,7 @@ describe("buildScript: обмен при передаче", () => {
       (move) => move.from.on === "hands" && move.to.station === "implementation",
     );
     const lastExchange = script.messages.at(-1);
+
     expect({
       handover: handover?.start,
       lastExchangeEnd: lastExchange?.end,
@@ -630,11 +648,14 @@ function isSamePoint(a: Point, b: Point): boolean {
 // Идущие отрезки, подряд и с одним началом пути, — это одна ходьба.
 function walksOf(moves: readonly (Walk & { readonly activity: string })[]): Walk[][] {
   const walks: Walk[][] = [];
+
   for (const move of moves.filter(({ activity }) => activity === "walk")) {
     const walk = walks.at(-1);
+
     if (walk?.[0]?.since === move.since) walk.push(move);
     else walks.push([move]);
   }
+
   return walks;
 }
 
@@ -663,6 +684,7 @@ describe.each(
     const offAisle = [...workerWalks, ...foremanWalks].filter(
       (move) => move.activity === "walk" && !isOnAisle(move.from) && !isOnAisle(move.to),
     );
+
     expect(offAisle).toEqual([]);
   });
 
@@ -678,6 +700,7 @@ describe.each(
           !isSamePoint(previous.to, next.from) ||
           Math.abs(previous.end - next.start) > SAME_POINT_TOLERANCE,
       );
+
     expect(breaks).toEqual([]);
   });
 
@@ -686,8 +709,10 @@ describe.each(
 
     let jump = 0;
     let previous = sceneAt(script, 0).part.position;
+
     for (let time = FRAME_STEP_MS; time <= script.duration; time += FRAME_STEP_MS) {
       const { position } = sceneAt(script, time).part;
+
       jump = Math.max(jump, distance(previous, position));
       previous = position;
     }
@@ -703,6 +728,7 @@ describe("buildScript: отметки", () => {
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
     const mark = script.marks.find((candidate) => candidate.recordingTime === 500);
+
     expect(mark).toMatchObject({ at: script.prompts[0]?.start, prompts: 1 });
   });
 
@@ -714,11 +740,13 @@ describe("buildScript: отметки", () => {
 
         const steps = script.marks.slice(1).map((mark, index) => {
           const previous = script.marks[index];
+
           return [
             mark.at - (previous?.at ?? 0),
             mark.recordingTime - (previous?.recordingTime ?? 0),
           ];
         });
+
         expect(steps.filter((step) => step.some((delta) => delta < 0))).toEqual([]);
       },
     );
@@ -742,6 +770,7 @@ describe("buildScript: отметки", () => {
             event.type === "prompt" || event.type === "intervention" || event.type === "message",
         )
         .map((event) => `${event.type} ${event.t}`);
+
       expect(onStage).toEqual(recorded);
     });
   });
@@ -771,6 +800,7 @@ describe("buildScript: планы", () => {
     const route = script.workers.planning
       .filter((move) => move.activity === "walk" && move.carrying)
       .map((move) => move.to);
+
     expect(route).toEqual([{ x: 0, y: 2 }, corner, { x: 20, y: 12 }, { x: 21, y: 12 }]);
   });
 });
@@ -821,6 +851,7 @@ describe("buildScript: вмешательства", () => {
     const standing = script.workers.review.filter(
       (move) => move.start < (cue?.end ?? 0) && move.end > pausedAt,
     );
+
     expect({ standing, pausedBeforeBubble: pausedAt <= (cue?.start ?? 0) }).toEqual({
       standing: [],
       pausedBeforeBubble: true,
@@ -834,6 +865,7 @@ describe("buildScript: вмешательства", () => {
 
     const cue = script.interventions[0];
     const resumed = reviewWork(script).filter((move) => move.start >= (cue?.end ?? 0));
+
     expect(resumed).toHaveLength(1);
   });
 
@@ -856,6 +888,7 @@ describe("buildScript: вмешательства", () => {
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
     const cue = script.interventions[0];
+
     expect(script.messages[0]?.start).toBeGreaterThanOrEqual(cue?.end ?? Infinity);
   });
 
@@ -887,6 +920,7 @@ describe("buildScript: вмешательства", () => {
     const script = buildScript(recording, LINE_LAYOUT, pacing);
 
     const cue = script.interventions[0];
+
     expect((cue?.end ?? 0) - (cue?.start ?? 0)).toBe(2_500);
   });
 
@@ -898,6 +932,7 @@ describe("buildScript: вмешательства", () => {
     const works = STAGES.map(
       (stage) => script.workers[stage].filter((move) => move.activity === "work").length,
     );
+
     expect(works).toEqual([1, 2, 0, 1, 0]);
   });
 });

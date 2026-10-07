@@ -25,6 +25,7 @@ const AISLE = 2;
  */
 export function stationAt(x: number, y = 0): StationPlan {
   const toMachine = y > AISLE ? 1 : -1;
+
   return {
     machine: { x, y: y + toMachine },
     post: { x, y },
@@ -90,6 +91,7 @@ export function reworkRecording(ok = true): SessionRecord {
     { t: 7_000, type: "usage", tokens: 1_200 },
     { t: 8_000, type: "build_end", ok },
   ];
+
   return {
     version: 1,
     type: "session",
@@ -140,6 +142,7 @@ export function chatRecording(): SessionRecord {
     messageAt(5_000, "verification", "foreman"),
     { t: 8_000, type: "build_end", ok: true },
   ];
+
   return withEvents(reworkRecording(), events);
 }
 
@@ -158,6 +161,7 @@ export function defectExchangeRecording(): SessionRecord {
     { t: 2_000, type: "stage_enter", stage: "implementation" },
     { t: 3_000, type: "build_end", ok: true },
   ];
+
   return withEvents(reworkRecording(), events);
 }
 
@@ -177,6 +181,7 @@ export function earlyExchangeRecording(): SessionRecord {
     { t: 1_000, type: "stage_enter", stage: "verification" },
     { t: 2_000, type: "build_end", ok: true },
   ];
+
   return withEvents(reworkRecording(), events);
 }
 
@@ -201,6 +206,7 @@ export function interventionRecording(): SessionRecord {
     messageAt(6_000, "review", "foreman"),
     { t: 10_000, type: "build_end", ok: true },
   ];
+
   return withEvents(reworkRecording(), events);
 }
 

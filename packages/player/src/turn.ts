@@ -10,6 +10,7 @@
  */
 export function progressOf(start: number, end: number, time: number): number {
   if (end <= start) return 1;
+
   return Math.min(1, Math.max(0, (time - start) / (end - start)));
 }
 
@@ -22,5 +23,6 @@ export function progressOf(start: number, end: number, time: number): number {
  */
 export function turned(from: number, to: number, progress: number): number {
   const delta = Math.atan2(Math.sin(to - from), Math.cos(to - from));
+
   return from + delta * progress;
 }

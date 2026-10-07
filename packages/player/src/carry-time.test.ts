@@ -11,6 +11,7 @@ const BEFORE_FIRST_MARK_MS = 500;
 
 function scriptsOfChat() {
   const recording = chatRecording();
+
   return {
     wide: buildScript(recording, WIDE_LAYOUT, DEFAULT_PACING),
     portrait: buildScript(recording, PORTRAIT_LAYOUT, DEFAULT_PACING),
@@ -23,6 +24,7 @@ describe("carryTime", () => {
 
     const carried = wide.marks.map((mark) => {
       const time = carryTime(wide, portrait, mark.at);
+
       return [sceneAt(portrait, time).recordingTime, sceneAt(wide, mark.at).recordingTime];
     });
 
@@ -35,6 +37,7 @@ describe("carryTime", () => {
     const carried = wide.marks.slice(1).map((mark, index) => {
       const previous = wide.marks[index]?.at ?? 0;
       const time = (previous + mark.at) / 2;
+
       return [
         sceneAt(portrait, carryTime(wide, portrait, time)).recordingTime,
         sceneAt(wide, time).recordingTime,

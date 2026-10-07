@@ -260,8 +260,10 @@ describe("sceneAt: мастер и реплики", () => {
     const step = 50;
 
     const together: number[] = [];
+
     for (let time = 0; time <= script.duration; time += step) {
       const scene = sceneAt(script, time);
+
       if (scene.prompt !== null && scene.message !== null) together.push(time);
     }
 
@@ -290,9 +292,12 @@ describe.each(SPEECH_RECORDINGS)("sceneAt: время записи, запись
 
     const goingBack: number[] = [];
     let previous = 0;
+
     for (let time = 0; time <= script.duration; time += FRAME_STEP_MS) {
       const { recordingTime } = sceneAt(script, time);
+
       if (recordingTime < previous) goingBack.push(time);
+
       previous = recordingTime;
     }
 
