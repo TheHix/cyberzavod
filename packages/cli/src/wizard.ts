@@ -1,7 +1,7 @@
 // Мастер `init`: показывает найденное в проекте и спрашивает то, что не вывести из файлов, —
 // идентификатор, процесс, модели этапов, журнал и проверки. Ответ по умолчанию — найденное.
 
-import { createInterface } from "node:readline/promises";
+import { createInterface } from "node:readline";
 import path from "node:path";
 import {
   DEFAULT_MODEL,
@@ -43,19 +43,41 @@ export function defaultsPrompter(): Prompter {
   return { ask: (_question, fallback) => Promise.resolve(fallback), close: () => undefined };
 }
 
+/** Потоки, через которые мастер говорит с человеком. */
+export interface TerminalStreams {
+  /** Откуда читать ответы. */
+  input: NodeJS.ReadableStream;
+  /** Куда писать вопросы. */
+  output: NodeJS.WritableStream;
+}
+
 /**
- * Спрашивает человека в терминале.
- * @returns {Prompter} Мастер на stdin и stdout.
+ * Спрашивает человека в терминале. Ответы читаются построчно из буфера: строка из pipe,
+ * пришедшая раньше вопроса, не теряется. Когда ввод заканчивается — закрыт сразу, как
+ * в облаке и CI, или ответы кончились раньше вопросов, — на остальные вопросы берётся
+ * ответ по умолчанию.
+ * @param {TerminalStreams} streams Ввод и вывод мастера.
+ * @returns {Prompter} Мастер на заданных потоках.
  */
-export function terminalPrompter(): Prompter {
-  const terminal = createInterface({ input: process.stdin, output: process.stdout });
+export function terminalPrompter(streams: TerminalStreams): Prompter {
+  const terminal = createInterface({ input: streams.input });
+  const lines = terminal[Symbol.asyncIterator]();
 
   return {
     ask: async (question, fallback) => {
-      const answer = await terminal.question(`${question} [${fallback}]: `);
-      const trimmed = answer.trim();
+      streams.output.write(`${question} [${fallback}]: `);
+      const line = await lines.next();
 
-      return trimmed === "" ? fallback : trimmed;
+      // Без ввода терминал не перевёл строку за человека: следующий вопрос ушёл бы в эту же.
+      if (line.done === true) {
+        streams.output.write("\n");
+
+        return fallback;
+      }
+
+      const answer = line.value.trim();
+
+      return answer === "" ? fallback : answer;
     },
     close: () => {
       terminal.close();
