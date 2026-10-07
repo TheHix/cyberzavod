@@ -28,7 +28,7 @@ export function PlaybackControls(): JSX.Element {
   const status = useStoreValue(model.$status);
   const playback = useStoreValue(model.$playback);
   const recordingTime = useStoreValue(model.$recordingTime);
-  const disabled = () => status() !== "ready";
+  const isReady = () => status() === "ready";
 
   return (
     <div class={styles.controls}>
@@ -36,7 +36,7 @@ export function PlaybackControls(): JSX.Element {
         variant="primary"
         size="large"
         layout="round"
-        disabled={disabled()}
+        disabled={!isReady()}
         aria-label={
           playback().playing ? UI_TEXT.playback.pause[locale] : UI_TEXT.playback.play[locale]
         }
@@ -52,7 +52,7 @@ export function PlaybackControls(): JSX.Element {
           value={playback().position}
           max={playback().duration}
           step={SCRUB_STEP_MS}
-          disabled={disabled()}
+          disabled={!isReady()}
           valueText={() => formatClock(recordingTime())}
           onChange={(position) => model.seek(position)}
         />
@@ -69,9 +69,10 @@ export function PlaybackControls(): JSX.Element {
           label={UI_TEXT.playback.speedLabel[locale]}
           options={SPEED_OPTIONS}
           value={`${playback().speed}`}
-          disabled={disabled()}
+          disabled={!isReady()}
           onChange={(value) => {
             const speed = speedFrom(value);
+
             if (speed !== undefined) model.setSpeed(speed);
           }}
         />

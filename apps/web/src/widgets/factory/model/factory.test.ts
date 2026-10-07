@@ -70,6 +70,7 @@ describe("createFactoryModel", () => {
 
   it("сдвигает сцену на прошедшее время", () => {
     const model = createFactoryModel(recordingWithPrompt());
+
     model.start(true);
 
     model.advance(500);
@@ -105,6 +106,7 @@ describe("createFactoryModel", () => {
 
   it("ставит сцену на паузу, когда раскрывают уточнения промпта", () => {
     const model = createFactoryModel(recordingWithPrompt());
+
     model.start(true);
     model.seek(duringPrompt(model, 0));
 
@@ -118,6 +120,7 @@ describe("createFactoryModel", () => {
 
   it("закрывает уточнения, когда промпт сменился", () => {
     const model = createFactoryModel(recordingWithPrompt());
+
     model.seek(duringPrompt(model, 0));
     model.togglePromptDetails();
 
@@ -128,6 +131,7 @@ describe("createFactoryModel", () => {
 
   it("держит уточнения открытыми, пока висит тот же промпт", () => {
     const model = createFactoryModel(recordingWithPrompt());
+
     model.start(false);
     model.seek(duringPrompt(model, 0));
     model.togglePromptDetails();
@@ -160,6 +164,7 @@ describe("createFactoryModel", () => {
 // у места передачи.
 function recordingWithMessages(): SessionRecord {
   const base = recordingWithPrompt();
+
   return {
     ...base,
     data: {
@@ -244,6 +249,7 @@ describe("createFactoryModel: реплики", () => {
     model.seek(duringMessage(model, 2));
 
     const giver = model.$scene.get().workers.find((worker) => worker.station === "implementation");
+
     expect(model.$messagePosition.get()).toEqual(giver?.position);
     expect(model.$messagePosition.get()).not.toEqual(
       model.$script.get().layout.stations.implementation.post,
@@ -262,6 +268,7 @@ describe("createFactoryModel: реплики", () => {
 // Вмешательства на тех же минутах: решение у станка постановки, потом у станка кода.
 function recordingWithInterventions(): SessionRecord {
   const base = recordingWithPrompt();
+
   return {
     ...base,
     data: {
@@ -358,6 +365,7 @@ describe("createFactoryModel: вмешательства", () => {
     "перемотка к вмешательству не меняет «идёт или пауза» (идёт: %s)",
     (playing) => {
       const model = createFactoryModel(briefOf(recordingWithInterventions()));
+
       model.start(playing);
 
       model.seekToSpeech({ kind: "intervention", index: 0 });
@@ -395,6 +403,7 @@ describe("createFactoryModel: журнал", () => {
 
   it.each([true, false])("не меняет «идёт или пауза» (идёт: %s)", (playing) => {
     const model = createFactoryModel(recordingWithMessages());
+
     model.start(playing);
 
     model.seekToSpeech({ kind: "message", index: 2 });
@@ -404,6 +413,7 @@ describe("createFactoryModel: журнал", () => {
 
   it("пропускает неизвестную речь", () => {
     const model = createFactoryModel(recordingWithMessages());
+
     model.seek(500);
 
     model.seekToSpeech({ kind: "message", index: 9 });
@@ -413,8 +423,10 @@ describe("createFactoryModel: журнал", () => {
 
   it("не уведомляет слушателя, пока сцена внутри одной речи", () => {
     const model = createFactoryModel(recordingWithMessages());
+
     model.seekToSpeech({ kind: "message", index: 0 });
     const listener = vi.fn();
+
     model.$speech.listen(listener);
 
     model.seek(duringMessage(model, 0) + 10);
@@ -425,8 +437,10 @@ describe("createFactoryModel: журнал", () => {
 
   it("уведомляет слушателя, когда начинается следующая речь", () => {
     const model = createFactoryModel(recordingWithMessages());
+
     model.seekToSpeech({ kind: "message", index: 0 });
     const listener = vi.fn();
+
     model.$speech.listen(listener);
 
     model.seekToSpeech({ kind: "message", index: 1 });
@@ -442,6 +456,7 @@ function speechTimes(recording: SessionRecord): { speech: Speech; t: number }[] 
   const prompts = recording.data.events.filter((event) => event.type === "prompt");
   const messages = recording.data.events.filter((event) => event.type === "message");
   const interventions = recording.data.events.filter((event) => event.type === "intervention");
+
   return [
     ...prompts.map((event, index) => ({ speech: { kind: "prompt", index } as const, t: event.t })),
     ...messages.map((event, index) => ({
@@ -458,9 +473,11 @@ function speechTimes(recording: SessionRecord): { speech: Speech; t: number }[] 
 // Речи, у которых после перемотки время записи не равно времени события.
 function mismatchedSpeech(recording: SessionRecord, layout: FactoryLayout): unknown[] {
   const model = createFactoryModel(briefOf(recording), layout);
+
   return speechTimes(recording).flatMap(({ speech, t }) => {
     model.seekToSpeech(speech);
     const shown = model.$recordingTime.get();
+
     return shown === t ? [] : [{ speech, t, shown }];
   });
 }
@@ -521,6 +538,7 @@ describe("createFactoryModel: план", () => {
 
   it("сохраняет время записи, «идёт или пауза» и скорость", () => {
     const model = createFactoryModel(recordingWithMessages());
+
     model.start(true);
     model.setSpeed(2);
     model.seek(duringMessage(model, 2) + 700);
@@ -529,12 +547,14 @@ describe("createFactoryModel: план", () => {
     model.setLayout(PORTRAIT_LAYOUT);
 
     const { playing, speed } = model.$playback.get();
+
     expect(model.$recordingTime.get()).toBeCloseTo(recordingTime, 6);
     expect({ playing, speed }).toEqual({ playing: true, speed: 2 });
   });
 
   it("сохраняет паузу", () => {
     const model = createFactoryModel(recordingWithMessages());
+
     model.start(false);
     model.seek(duringMessage(model, 1));
 
@@ -545,6 +565,7 @@ describe("createFactoryModel: план", () => {
 
   it("не меняет сцену, когда план тот же", () => {
     const model = createFactoryModel(recordingWithMessages(), PORTRAIT_LAYOUT);
+
     model.seek(duringMessage(model, 1));
     const scene = model.$scene.get();
 
@@ -555,6 +576,7 @@ describe("createFactoryModel: план", () => {
 
   it("ставит seekToSpeech на начало речи в новом сценарии", () => {
     const model = createFactoryModel(recordingWithMessages());
+
     model.setLayout(PORTRAIT_LAYOUT);
 
     model.seekToSpeech({ kind: "message", index: 2 });
@@ -564,9 +586,11 @@ describe("createFactoryModel: план", () => {
 
   it("отдаёт подписчикам сцены один кадр при смене плана", () => {
     const model = createFactoryModel(recordingWithMessages());
+
     model.seek(duringMessage(model, 2) + 700);
     const expectedRecordingTime = model.$recordingTime.get();
     const recordingTimes: number[] = [];
+
     model.$scene.listen((scene) => recordingTimes.push(scene.recordingTime));
 
     model.setLayout(PORTRAIT_LAYOUT);
@@ -576,6 +600,7 @@ describe("createFactoryModel: план", () => {
 
   it("не закрывает уточнения того же промпта, когда сценарий построен заново", () => {
     const model = createFactoryModel(recordingWithPrompt());
+
     model.seek(duringPrompt(model, 0));
     model.togglePromptDetails();
 

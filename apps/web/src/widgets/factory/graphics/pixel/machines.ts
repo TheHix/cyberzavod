@@ -4,7 +4,7 @@
 // на месте, горящая появляется, пока станок держит деталь. Остальное в кадре не меняется.
 
 import type { Stage } from "@cyberzavod/core";
-import type { StationPlan } from "@cyberzavod/player";
+import type { Point, StationPlan } from "@cyberzavod/player";
 import { Container, Sprite } from "pixi.js";
 import {
   artSize,
@@ -271,13 +271,13 @@ export const MACHINE_WORK_ART: Readonly<Record<Stage, MachineWorkArt>> = {
   },
 };
 
+const MACHINE_SIZES = Object.values(MACHINE_ART).map(artSize);
+
 /** Размер самого большого станка: от него считается отступ табличек и границы цеха. */
-export const MACHINE_SIZE: ArtSize = Object.values(MACHINE_ART)
-  .map(artSize)
-  .reduce((largest, size) => ({
-    width: Math.max(largest.width, size.width),
-    height: Math.max(largest.height, size.height),
-  }));
+export const MACHINE_SIZE: ArtSize = MACHINE_SIZES.reduce((largest, size) => ({
+  width: Math.max(largest.width, size.width),
+  height: Math.max(largest.height, size.height),
+}));
 
 /** Подвижные части станка в кадре: накладки работы и горящая лампа. */
 export interface MachineSprites {
@@ -296,8 +296,23 @@ function bodyInks(palette: Palette, color: number): Inks {
 
 function spriteOf(art: SpriteArt, inks: Inks, x: number, y: number): Sprite {
   const sprite = new Sprite(textureOf(paintArt(art, inks)));
+
   sprite.position.set(x, y);
+
   return sprite;
+}
+
+function workSpritesOf(stage: Stage, inks: Inks, machineCorner: Point): Record<WorkBeat, Sprite> {
+  const { at, frames } = MACHINE_WORK_ART[stage];
+  const entries = Object.entries(frames).map(([beat, frame]) => {
+    const sprite = spriteOf(frame, inks, machineCorner.x + at.x, machineCorner.y + at.y);
+
+    sprite.visible = false;
+
+    return [beat, sprite];
+  });
+
+  return Object.fromEntries(entries) as Record<WorkBeat, Sprite>;
 }
 
 /**
@@ -320,15 +335,9 @@ export function drawMachine(
   const lampX = left + LAMP_AT.x;
   const lampY = top + LAMP_AT.y;
   const lampOn = spriteOf(LAMP_ON_ART, inks, lampX, lampY);
+
   lampOn.visible = false;
-  const { at, frames } = MACHINE_WORK_ART[stage];
-  const work = Object.fromEntries(
-    Object.entries(frames).map(([beat, frame]) => {
-      const sprite = spriteOf(frame, inks, left + at.x, top + at.y);
-      sprite.visible = false;
-      return [beat, sprite];
-    }),
-  ) as Record<WorkBeat, Sprite>;
+  const work = workSpritesOf(stage, inks, { x: left, y: top });
   // Накладки лежат на корпусе и под лампами: лампа остаётся видна поверх любого кадра работы.
   const root = new Container({
     children: [
@@ -338,10 +347,12 @@ export function drawMachine(
       lampOn,
     ],
   });
+
   root.position.set(
     Math.round(plan.machine.x * PIXELS_PER_UNIT),
     Math.round(plan.machine.y * PIXELS_PER_UNIT),
   );
+
   return { root, sprites: { work, lampOn } };
 }
 

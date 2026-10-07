@@ -30,6 +30,7 @@ function inks() {
 
 function pixelAt(image: ReturnType<typeof blankImage>, column: number, row: number) {
   const at = (row * image.width + column) * 4;
+
   return [...image.pixels.slice(at, at + 4)];
 }
 
@@ -71,6 +72,7 @@ function holesInside(art: SpriteArt): string[] {
     `0:${height - 1}`,
     `${width - 1}:${height - 1}`,
   ]);
+
   return art.flatMap((line, row) =>
     [...line]
       .map((letter, column) => ({ letter, at: `${column}:${row}` }))
@@ -184,6 +186,7 @@ describe("MACHINE_WORK_ART", () => {
 
     expect(at.x).toBeGreaterThanOrEqual(0);
     expect(at.y).toBeGreaterThanOrEqual(0);
+
     for (const { width, height } of Object.values(frames).map(artSize)) {
       expect(at.x + width).toBeLessThanOrEqual(machine.width);
       expect(at.y + height).toBeLessThanOrEqual(machine.height);
@@ -272,6 +275,7 @@ describe("fillRect", () => {
 describe("clearPixel", () => {
   it("делает закрашенный пиксель прозрачным", () => {
     const image = blankImage(1, 1);
+
     fillRect(image, 0, 0, 1, 1, 0xffffff);
 
     clearPixel(image, 0, 0);

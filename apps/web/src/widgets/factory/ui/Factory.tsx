@@ -48,8 +48,10 @@ async function launchFactory(
   locale: Locale,
 ): Promise<LaunchedFactory> {
   const graphics = await loadFactoryGraphics(locale);
+
   try {
     const mounted = model.$layout.get();
+
     await graphics.mount(host, mounted);
     // Пока холст встраивался, форма поля могла сменить план: графика его ещё не знала.
     // Вписывает его `fitToScreen` сразу после запуска.
@@ -59,8 +61,10 @@ async function launchFactory(
     graphics.destroy();
     throw err;
   }
+
   const stopRendering = model.$scene.subscribe((scene) => graphics.render(scene));
   const stopClock = startFrameClock(model, host);
+
   return {
     graphics,
     stop: () => {
@@ -75,6 +79,7 @@ async function launchFactory(
 function fieldWithin(host: HTMLElement, field: HTMLElement): Frame {
   const outer = host.getBoundingClientRect();
   const inner = field.getBoundingClientRect();
+
   return {
     x: inner.left - outer.left,
     y: inner.top - outer.top,
@@ -108,10 +113,13 @@ export function Factory(props: Props): JSX.Element {
   let fieldElement!: HTMLDivElement;
 
   // У скрытого поля нет формы: план остаётся прежним. Холст на всё окно, его размер — экран.
-  const layoutForField = (frame: Frame) =>
-    frame.width > 0 && frame.height > 0
-      ? layoutFor(frame, { width: canvasHost.clientWidth, height: canvasHost.clientHeight })
-      : model.$layout.get();
+  const layoutForField = (frame: Frame) => {
+    const hasArea = frame.width > 0 && frame.height > 0;
+
+    if (!hasArea) return model.$layout.get();
+
+    return layoutFor(frame, { width: canvasHost.clientWidth, height: canvasHost.clientHeight });
+  };
 
   // Сначала графика подстраивается под размер, потом размер видят компоненты: иначе
   // пузырь на паузе встал бы по старому масштабу. Форма поля и экрана может потребовать другой план:
@@ -120,10 +128,12 @@ export function Factory(props: Props): JSX.Element {
   const fitToScreen = () => {
     const frame = fieldWithin(canvasHost, fieldElement);
     const layout = layoutForField(frame);
+
     if (layout !== model.$layout.get()) {
       graphics()?.setLayout(layout);
       model.setLayout(layout);
     }
+
     graphics()?.resize(canvasHost.clientWidth, canvasHost.clientHeight, frame);
     graphics()?.render(model.$scene.get());
     setField(frame);
@@ -134,22 +144,25 @@ export function Factory(props: Props): JSX.Element {
     model.setLayout(layoutForField(fieldWithin(canvasHost, fieldElement)));
     onCleanup(connectScene(model));
     let stop: (() => void) | undefined;
-    let disposed = false;
+    let isDisposed = false;
     const resizeObserver = new ResizeObserver(fitToScreen);
+
     resizeObserver.observe(canvasHost);
     resizeObserver.observe(fieldElement);
     onCleanup(() => {
-      disposed = true;
+      isDisposed = true;
       resizeObserver.disconnect();
       stop?.();
     });
 
     launchFactory(model, canvasHost, locale).then(
       (launched) => {
-        if (disposed) {
+        if (isDisposed) {
           launched.stop();
+
           return;
         }
+
         stop = launched.stop;
         setGraphics(launched.graphics);
         fitToScreen();

@@ -34,6 +34,7 @@ export function speechTimeline(script: FactoryScript): readonly SpeechMark[] {
       speech: { kind: "message", index: cue.index },
     })),
   ];
+
   return marks.sort((earlier, later) => earlier.start - later.start);
 }
 
@@ -45,6 +46,7 @@ export function speechTimeline(script: FactoryScript): readonly SpeechMark[] {
  */
 export function speechAt(timeline: readonly SpeechMark[], time: number): Speech | null {
   const started = timeline.findLast((mark) => mark.start <= time);
+
   return started?.speech ?? null;
 }
 

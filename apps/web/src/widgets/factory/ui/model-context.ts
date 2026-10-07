@@ -13,6 +13,8 @@ export const FactoryModelProvider = FactoryModelContext.Provider;
  */
 export function useFactoryModel(): FactoryModel {
   const model = useContext(FactoryModelContext);
+
   if (model === undefined) throw new Error("компонент цеха стоит вне FactoryModelProvider");
+
   return model;
 }

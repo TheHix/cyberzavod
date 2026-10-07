@@ -6,6 +6,7 @@ import { testPalette } from "./test-palette.ts";
 function pixelAt(image: PixelImage, column: number, row: number): { color: number; alpha: number } {
   const at = (row * image.width + column) * 4;
   const [red = 0, green = 0, blue = 0, alpha = 0] = image.pixels.slice(at, at + 4);
+
   return { color: (red << 16) | (green << 8) | blue, alpha };
 }
 
@@ -56,6 +57,7 @@ describe("laneTileImage", () => {
     const image = laneTileImage("horizontal", floor);
 
     const middle = LANE_HALF_WIDTH;
+
     expect(pixelAt(image, 3, 0).color).toBe(floor.grout);
     expect(pixelAt(image, 3, image.height - 1).color).toBe(floor.grout);
     expect(pixelAt(image, 3, 3).color).toBe(floor.lane);

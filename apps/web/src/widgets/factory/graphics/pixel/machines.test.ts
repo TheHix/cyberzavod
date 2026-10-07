@@ -12,6 +12,7 @@ function machineSprites(lampOn = true): MachineSprites {
     WorkBeat,
     Sprite
   >;
+
   return { work, lampOn: new Sprite({ visible: lampOn }) };
 }
 

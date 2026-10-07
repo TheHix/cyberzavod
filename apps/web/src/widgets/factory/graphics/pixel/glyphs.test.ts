@@ -41,6 +41,7 @@ describe("plaqueImage", () => {
     const image = plaqueImage("Код", palette);
 
     const rowOf = (row: number, column: number) => (row * image.width + column) * 4;
+
     expect(image.pixels[rowOf(0, 0) + 3]).toBe(0);
     expect(image.pixels[rowOf(0, 1) + 2]).toBe(palette.ink);
     expect(image.pixels[rowOf(1, 1) + 2]).toBe(palette.paper);

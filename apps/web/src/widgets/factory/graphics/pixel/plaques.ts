@@ -31,6 +31,7 @@ const PLAQUE_GAP = 1;
 
 function placementOf(text: string, center: Point): PlaquePlacement {
   const { width, height } = plaqueSize(text);
+
   return {
     text,
     center,
@@ -42,6 +43,7 @@ function placementOf(text: string, center: Point): PlaquePlacement {
 // и половина таблички.
 function offsetOf(text: string): number {
   const plaqueHeight = plaqueSize(text).height;
+
   return (MACHINE_SIZE.height + plaqueHeight) / 2 / PIXELS_PER_UNIT + PLAQUE_GAP / PIXELS_PER_UNIT;
 }
 
@@ -49,6 +51,7 @@ function offsetOf(text: string): number {
 function stationPlacement(stage: Stage, plan: StationPlan, locale: Locale): PlaquePlacement {
   const text = STAGE_LABELS[stage][locale];
   const awayFromWorker = Math.sign(plan.machine.y - plan.post.y) || -1;
+
   return placementOf(text, {
     x: plan.machine.x,
     y: plan.machine.y + awayFromWorker * offsetOf(text),
@@ -60,6 +63,7 @@ function stationPlacement(stage: Stage, plan: StationPlan, locale: Locale): Plaq
 function foremanPlacement(plan: ForemanPlan, locale: Locale): PlaquePlacement {
   const awayFromDesk = Math.sign(plan.post.y - plan.desk.y) || 1;
   const text = FOREMAN_LABEL[locale];
+
   return placementOf(text, {
     x: plan.desk.x,
     y: plan.post.y + awayFromDesk * offsetOf(text),
@@ -69,6 +73,7 @@ function foremanPlacement(plan: ForemanPlan, locale: Locale): PlaquePlacement {
 // Люди стоят у рабочих мест, у мест мастера возле станков, за столом и у двери кабинета.
 function figurePoints(layout: FactoryLayout): Point[] {
   const stations = STAGES.map((stage) => layout.stations[stage]);
+
   return [
     ...stations.map(({ post }) => post),
     ...stations.map(({ foremanPost }) => foremanPost),
@@ -80,6 +85,7 @@ function figurePoints(layout: FactoryLayout): Point[] {
 // Прямоугольник стоящего человека в единицах плана.
 function figureRect(point: Point): PlanBounds {
   const { left, top, right, bottom } = ACTOR_FIGURE;
+
   return {
     x: point.x + left / PIXELS_PER_UNIT,
     y: point.y + top / PIXELS_PER_UNIT,
@@ -102,15 +108,22 @@ function overlaps(a: PlanBounds, b: PlanBounds): boolean {
 function clearOf(placement: PlaquePlacement, figures: readonly PlanBounds[]): PlaquePlacement {
   const gap = PLAQUE_GAP / PIXELS_PER_UNIT;
   let center = placement.center;
+
   for (let pass = 0; pass <= figures.length; pass++) {
     const moved = { ...placement, center };
     const rect = rectOf(moved);
     const blocking = figures.find((figure) => overlaps(rect, figure));
+
     if (blocking === undefined) return moved;
+
     const left = blocking.x - gap - (rect.x + rect.width);
     const right = blocking.x + blocking.width + gap - rect.x;
-    center = { x: center.x + (-left <= right ? left : right), y: center.y };
+
+    const shift = -left <= right ? left : right;
+
+    center = { x: center.x + shift, y: center.y };
   }
+
   throw new Error(`табличка «${placement.text}» не помещается между фигурами`);
 }
 
@@ -124,6 +137,7 @@ function clearOf(placement: PlaquePlacement, figures: readonly PlanBounds[]): Pl
  */
 export function plaquePlacements(layout: FactoryLayout, locale: Locale): PlaquePlacement[] {
   const figures = figurePoints(layout).map(figureRect);
+
   return [
     ...STAGES.map((stage) => stationPlacement(stage, layout.stations[stage], locale)),
     foremanPlacement(layout.foreman, locale),
@@ -153,11 +167,14 @@ export function plaqueRect({ center, size }: PlaquePlacement): PlanBounds {
  */
 export function drawPlaques(layout: FactoryLayout, palette: Palette, locale: Locale): Container {
   const plaques = new Container();
+
   for (const placement of plaquePlacements(layout, locale)) {
     const plaque = new Sprite(textureOf(plaqueImage(placement.text, palette)));
     const { x, y } = plaqueRect(placement);
+
     plaque.position.set(x, y);
     plaques.addChild(plaque);
   }
+
   return plaques;
 }

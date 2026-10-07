@@ -37,5 +37,6 @@ export function testPalette(): Palette {
   const values = new Map(
     TOKEN_NAMES.map((name, index) => [name, `#0000${(index + 1).toString(16).padStart(2, "0")}`]),
   );
+
   return readPalette({ getPropertyValue: (name) => values.get(name) ?? "" });
 }

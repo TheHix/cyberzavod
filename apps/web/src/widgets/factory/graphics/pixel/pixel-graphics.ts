@@ -91,18 +91,21 @@ export class PixelGraphics implements FactoryGraphics {
     });
     this.#mounted = true;
     const { canvas } = this.#renderer;
+
     canvas.setAttribute("aria-hidden", "true");
     canvas.style.imageRendering = "pixelated";
     container.append(canvas);
 
     // Краски — из токенов оформления, как у интерфейса.
     const palette = readPalette(getComputedStyle(container));
+
     this.#palette = palette;
     this.#drawPlan(layout);
     this.#world.addChild(this.#actors);
     this.#addActors(palette);
     this.#stage.addChild(this.#world);
     const { clientWidth: width, clientHeight: height } = container;
+
     this.resize(width, height, { x: 0, y: 0, width, height });
   }
 
@@ -113,6 +116,7 @@ export class PixelGraphics implements FactoryGraphics {
    */
   setLayout(layout: FactoryLayout): void {
     if (!this.#mounted) return;
+
     this.#plan?.destroy({ children: true, texture: true, textureSource: true });
     this.#machines.clear();
     this.#drawPlan(layout);
@@ -123,19 +127,12 @@ export class PixelGraphics implements FactoryGraphics {
    * @param {Scene} scene Кадр цеха.
    */
   render(scene: Scene): void {
-    for (const worker of scene.workers) {
-      const sprites = this.#workers.get(worker.station);
-      if (sprites !== undefined) placeWorker(sprites, worker);
-      const machine = this.#machines.get(worker.station);
-      if (machine !== undefined) showMachineWork(machine, machineWorkOf(worker));
-    }
+    this.#placeWorkers(scene);
+
     if (this.#foreman !== undefined) placeForeman(this.#foreman, scene.foreman);
     if (this.#crate !== undefined) placeCrate(this.#crate, scene);
-    const lit = lampLit(scene.time);
-    for (const [stage, machine] of this.#machines) {
-      const working = scene.part.holder === stage && !scene.part.carried && !scene.finished;
-      machine.lampOn.visible = working && lit;
-    }
+
+    this.#lightLamps(scene);
     this.#renderer.render(this.#stage);
   }
 
@@ -147,10 +144,13 @@ export class PixelGraphics implements FactoryGraphics {
    */
   resize(width: number, height: number, frame: Frame): void {
     const bounds = this.#bounds;
+
     if (!this.#mounted || bounds === undefined) return;
+
     this.#renderer.resize(width, height);
     // Вписывается нарисованный цех, а не план с пустыми краями: так он крупнее.
     const fit = fitPixelPlan(bounds, frame, this.#renderer.resolution);
+
     this.#scale = fit.scale;
     this.#offset = fit.offset;
     this.#world.scale.set(this.#scale / PIXELS_PER_UNIT);
@@ -166,14 +166,40 @@ export class PixelGraphics implements FactoryGraphics {
     return { x: this.#offset.x + point.x * this.#scale, y: this.#offset.y + point.y * this.#scale };
   }
 
+  #placeWorkers(scene: Scene): void {
+    for (const worker of scene.workers) {
+      const sprites = this.#workers.get(worker.station);
+
+      if (sprites !== undefined) placeWorker(sprites, worker);
+
+      const machine = this.#machines.get(worker.station);
+
+      if (machine !== undefined) showMachineWork(machine, machineWorkOf(worker));
+    }
+  }
+
+  #lightLamps(scene: Scene): void {
+    const isBlinkLit = lampLit(scene.time);
+
+    for (const [stage, machine] of this.#machines) {
+      const isWorking = scene.part.holder === stage && !scene.part.carried && !scene.finished;
+
+      machine.lampOn.visible = isWorking && isBlinkLit;
+    }
+  }
+
   #addActors(palette: Palette): void {
     const textures = bakeActorTextures(palette);
+
     this.#actorTextures = textures;
+
     for (const stage of STAGES) {
       const worker = createWorker(stage, textures);
+
       this.#actors.addChild(worker.root);
       this.#workers.set(stage, worker);
     }
+
     this.#foreman = createForeman(textures);
     this.#actors.addChild(this.#foreman.root);
     this.#crate = createCrate(textures, palette);
@@ -183,15 +209,21 @@ export class PixelGraphics implements FactoryGraphics {
   // План рисуется под рабочими, мастером и деталью: он первый в мире.
   #drawPlan(layout: FactoryLayout): void {
     const palette = this.#palette;
+
     if (palette === undefined) return;
+
     this.#bounds = planBounds(layout, this.#locale);
     const plan = new Container();
+
     plan.addChild(drawFloor(layout, palette));
+
     for (const stage of STAGES) {
       const machine = drawMachine(stage, layout.stations[stage], palette);
+
       plan.addChild(machine.root);
       this.#machines.set(stage, machine.sprites);
     }
+
     plan.addChild(drawOffice(layout.foreman, palette));
     plan.addChild(drawPlaques(layout, palette, this.#locale));
     this.#world.addChildAt(plan, 0);
@@ -204,11 +236,13 @@ export class PixelGraphics implements FactoryGraphics {
    */
   destroy(): void {
     if (!this.#mounted) return;
+
     this.#plan?.destroy({ children: true, texture: true, textureSource: true });
     // Текстуры действующих лиц принадлежат не спрайтам, а `#actorTextures`: на спрайтах висит
     // лишь по одному кадру, остальные освобождаются отдельно.
     this.#stage.destroy({ children: true });
     if (this.#actorTextures !== undefined) destroyActorTextures(this.#actorTextures);
+
     this.#renderer.destroy({ removeView: true });
     this.#mounted = false;
   }

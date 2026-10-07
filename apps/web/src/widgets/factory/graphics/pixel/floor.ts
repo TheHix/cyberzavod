@@ -20,11 +20,13 @@ type LaneDirection = "horizontal" | "vertical";
 const FLOOR_REACH = 200 * PIXELS_PER_UNIT;
 const FLOOR_TILE = PIXELS_PER_UNIT;
 const SEAM = 1;
+
 /** Полуширина полосы прохода, пиксели рисунка. */
 export const LANE_HALF_WIDTH = 9;
 // Штрих разметки: длина, период и толщина по оси прохода.
 const DASH = { length: 8, period: 16, thickness: 2 } as const;
 const LANE_EDGE = 1;
+
 /** Половина ширины площадки станка, пиксели рисунка. */
 export const PAD_HALF_WIDTH = 25;
 /** Насколько площадка выступает за мебель и место рабочего по вертикали, пиксели рисунка. */
@@ -39,7 +41,9 @@ const PAD_FRAME_SHADE = -0.3;
  */
 export function floorTileImage(floor: Palette["floor"]): PixelImage {
   const image = blankImage(FLOOR_TILE * 2, FLOOR_TILE * 2);
+
   fillRect(image, 0, 0, image.width, image.height, floor.grout);
+
   for (const [column, row] of [
     [0, 0],
     [1, 0],
@@ -47,6 +51,7 @@ export function floorTileImage(floor: Palette["floor"]): PixelImage {
     [1, 1],
   ] as const) {
     const color = (column + row) % 2 === 0 ? floor.tile : floor.tileAlt;
+
     fillRect(
       image,
       column * FLOOR_TILE + SEAM,
@@ -56,6 +61,7 @@ export function floorTileImage(floor: Palette["floor"]): PixelImage {
       color,
     );
   }
+
   return image;
 }
 
@@ -68,16 +74,18 @@ export function floorTileImage(floor: Palette["floor"]): PixelImage {
 export function laneTileImage(direction: LaneDirection, floor: Palette["floor"]): PixelImage {
   const across = LANE_HALF_WIDTH * 2;
   const along = DASH.period;
-  const horizontal = direction === "horizontal";
-  const image = blankImage(horizontal ? along : across, horizontal ? across : along);
+  const isHorizontal = direction === "horizontal";
+  const image = blankImage(isHorizontal ? along : across, isHorizontal ? across : along);
   const rect = (x: number, y: number, alongSize: number, acrossSize: number, color: number) => {
-    if (horizontal) fillRect(image, x, y, alongSize, acrossSize, color);
+    if (isHorizontal) fillRect(image, x, y, alongSize, acrossSize, color);
     else fillRect(image, y, x, acrossSize, alongSize, color);
   };
+
   rect(0, 0, along, across, floor.lane);
   rect(0, 0, along, LANE_EDGE, floor.grout);
   rect(0, across - LANE_EDGE, along, LANE_EDGE, floor.grout);
   rect(0, (across - DASH.thickness) / 2, DASH.length, DASH.thickness, floor.mark);
+
   return image;
 }
 
@@ -90,6 +98,7 @@ export function laneTileImage(direction: LaneDirection, floor: Palette["floor"])
  */
 export function padImage(width: number, height: number, palette: Palette): PixelImage {
   const image = blankImage(width, height);
+
   fillRect(image, 0, 0, width, height, shade(palette.floor.pad, PAD_FRAME_SHADE));
   fillRect(
     image,
@@ -99,6 +108,7 @@ export function padImage(width: number, height: number, palette: Palette): Pixel
     height - 2 * PAD_FRAME,
     palette.floor.pad,
   );
+
   for (const [x, y] of [
     [0, 0],
     [width - 1, 0],
@@ -107,6 +117,7 @@ export function padImage(width: number, height: number, palette: Palette): Pixel
   ] as const) {
     clearPixel(image, x, y);
   }
+
   return image;
 }
 
@@ -121,9 +132,11 @@ export function padRects(layout: FactoryLayout): PlanBounds[] {
     ...STAGES.map((stage) => layout.stations[stage]).map(({ machine, post }) => [machine, post]),
     [layout.foreman.desk, layout.foreman.post],
   ] as const;
+
   return pairs.map(([furniture, post]) => {
     const top = Math.round(Math.min(furniture.y, post.y) * PIXELS_PER_UNIT) - PAD_MARGIN;
     const bottom = Math.round(Math.max(furniture.y, post.y) * PIXELS_PER_UNIT) + PAD_MARGIN;
+
     return {
       x: Math.round(furniture.x * PIXELS_PER_UNIT) - PAD_HALF_WIDTH,
       y: top,
@@ -139,34 +152,43 @@ function inPixels(aisle: Aisle): Aisle {
     x: Math.round(point.x * PIXELS_PER_UNIT),
     y: Math.round(point.y * PIXELS_PER_UNIT),
   });
+
   return [scaled(first), scaled(second), ...rest.map(scaled)];
 }
 
 function tilingOf(texture: Texture, { x, y, width, height }: PlanBounds): TilingSprite {
   const tiles = new TilingSprite({ texture, width, height });
+
   tiles.position.set(x, y);
+
   return tiles;
 }
 
 function drawLane(aisle: Aisle, floor: Palette["floor"]): Container {
   const textures = new Map<LaneDirection, Texture>();
   const lane = new Container();
+
   for (const rect of laneRects(inPixels(aisle), FLOOR_REACH, LANE_HALF_WIDTH)) {
     const direction = rect.width >= rect.height ? "horizontal" : "vertical";
     const texture = textures.get(direction) ?? textureOf(laneTileImage(direction, floor));
+
     textures.set(direction, texture);
     lane.addChild(tilingOf(texture, rect));
   }
+
   return lane;
 }
 
 function drawPads(layout: FactoryLayout, palette: Palette): Container {
   const pads = new Container();
+
   for (const { x, y, width, height } of padRects(layout)) {
     const pad = new Sprite(textureOf(padImage(width, height, palette)));
+
     pad.position.set(x, y);
     pads.addChild(pad);
   }
+
   return pads;
 }
 
@@ -184,6 +206,7 @@ export function drawFloor(layout: FactoryLayout, palette: Palette): Container {
     width: FLOOR_REACH * 2,
     height: FLOOR_REACH * 2,
   });
+
   return new Container({
     children: [tiles, drawLane(layout.aisle, palette.floor), drawPads(layout, palette)],
   });

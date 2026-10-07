@@ -36,9 +36,11 @@ function fakeBrowser() {
     removeEventListener: vi.fn(),
   };
   const now = vi.spyOn(performance, "now").mockReturnValue(0);
+
   vi.stubGlobal("document", document);
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
     frames.set(nextId, callback);
+
     return nextId++;
   });
   vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.delete(id));
@@ -57,11 +59,14 @@ function fakeBrowser() {
     document.visibilityState = state;
     for (const listener of visibilityListeners) listener();
   };
+
   return {
     pendingFrames: () => frames.size,
     runFrame(time: number) {
       const [first] = frames;
+
       if (first === undefined) throw new Error("кадр не запрошен");
+
       frames.delete(first[0]);
       first[1](time);
     },
@@ -76,7 +81,9 @@ const container = {} as HTMLElement;
 
 function playingModel() {
   const model = createFactoryModel(recording());
+
   model.start(true);
+
   return model;
 }
 
@@ -89,6 +96,7 @@ describe("startFrameClock", () => {
   it("двигает сцену на время между кадрами", () => {
     const browser = fakeBrowser();
     const model = playingModel();
+
     startFrameClock(model, container);
 
     browser.runFrame(16);
@@ -99,6 +107,7 @@ describe("startFrameClock", () => {
   it("ограничивает шаг после долгого разрыва между кадрами — сцена не прыгает", () => {
     const browser = fakeBrowser();
     const model = playingModel();
+
     startFrameClock(model, container);
     browser.runFrame(16);
 
@@ -110,6 +119,7 @@ describe("startFrameClock", () => {
   it("не просит кадры на паузе и начинает при пуске", () => {
     const browser = fakeBrowser();
     const model = createFactoryModel(recording());
+
     model.start(false);
     startFrameClock(model, container);
     const beforeStart = browser.pendingFrames();
@@ -122,6 +132,7 @@ describe("startFrameClock", () => {
   it("оставляет один цикл кадров, если между кадрами поставили паузу и снова пустили", () => {
     const browser = fakeBrowser();
     const model = playingModel();
+
     startFrameClock(model, container);
     model.toggle();
 
@@ -133,6 +144,7 @@ describe("startFrameClock", () => {
   it("стоит, пока цех не на экране, и по возвращении не догоняет пропущенное время", () => {
     const browser = fakeBrowser();
     const model = playingModel();
+
     startFrameClock(model, container);
     browser.setOnScreen(false);
     browser.runFrame(16);
@@ -150,6 +162,7 @@ describe("startFrameClock", () => {
   it("стоит в фоновой вкладке и продолжает, когда на неё вернулись", () => {
     const browser = fakeBrowser();
     const model = playingModel();
+
     startFrameClock(model, container);
     browser.hideTab();
     browser.runFrame(16);
