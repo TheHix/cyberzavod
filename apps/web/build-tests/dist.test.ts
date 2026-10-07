@@ -1,17 +1,24 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import config from "../astro.config.ts";
 import {
   brokenLinks,
   foreignLocaleLinks,
+  isIndexed,
+  localeOfPage,
   missingAlternates,
+  pageUrlOf,
   pagesMissingFromSitemap,
   readBuiltSite,
+  unindexedPagesInSitemap,
   type BuiltSite,
 } from "./built-site.ts";
+import { notFoundFilesOf } from "./nginx.ts";
+import { LOCALES } from "../src/shared/i18n/locale.ts";
 
 const DIST = fileURLToPath(new URL("../dist", import.meta.url));
+const NGINX_CONFIG = fileURLToPath(new URL("../nginx.conf", import.meta.url));
 
 // Тесты идут после `astro build`: без сборки проверять нечего, и это ошибка, а не пропуск.
 function builtSite(): BuiltSite {
@@ -65,5 +72,35 @@ describe("pagesMissingFromSitemap", () => {
     const missing = pagesMissingFromSitemap(site);
 
     expect(missing).toEqual([]);
+  });
+});
+
+describe("unindexedPagesInSitemap", () => {
+  it("не находит в карте сайта страниц с noindex", () => {
+    const site = builtSite();
+
+    const listed = unindexedPagesInSitemap(site);
+
+    expect(listed).toEqual([]);
+  });
+});
+
+describe("notFoundFilesOf", () => {
+  it("находит в dist/ страницу «не найдено» с noindex на каждом языке для nginx", () => {
+    const site = builtSite();
+    const files = notFoundFilesOf(readFileSync(NGINX_CONFIG, "utf8"));
+
+    const pages = files.map((file) => {
+      const pageUrl = pageUrlOf(file) ?? file;
+      const html = site.pages.get(pageUrl);
+      return {
+        file,
+        locale: localeOfPage(pageUrl),
+        indexed: html === undefined ? "нет страницы" : isIndexed(html),
+      };
+    });
+
+    expect(pages.map(({ locale }) => locale).sort()).toEqual([...LOCALES].sort());
+    expect(pages.filter(({ indexed }) => indexed !== false)).toEqual([]);
   });
 });

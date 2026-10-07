@@ -120,6 +120,17 @@ export const UI_TEXT = {
     minute: { en: "min", ru: "мин" },
     second: { en: "s", ru: "с" },
   },
+  /** Страница «не найдено». */
+  notFound: {
+    title: { en: "Page not found", ru: "Страница не найдена" },
+    label: { en: "404", ru: "404" },
+    heading: { en: "There is no such machine on this floor", ru: "Такого станка в цехе нет" },
+    text: {
+      en: "The page may have moved or the address has a typo. The floor is still running — head back to it.",
+      ru: "Возможно, страница переехала или в адресе опечатка. Цех работает как прежде — возвращайтесь в него.",
+    },
+    toFloor: { en: "Back to the floor", ru: "Вернуться в цех" },
+  },
   /** Запись сборки: она не переводится, язык оригинала подписан. */
   recording: {
     language: {

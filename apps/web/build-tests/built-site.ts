@@ -32,7 +32,12 @@ function urlOfFile(relativePath: string): string {
   return `/${relativePath.split("\\").join("/")}`;
 }
 
-function pageUrlOf(fileUrl: string): string | undefined {
+/**
+ * Адрес страницы по адресу её файла: `index.html` каталога — сам каталог, другой HTML — как есть.
+ * @param {string} fileUrl Адрес файла от корня сайта: `/ru/404/index.html`, `/404.html`.
+ * @returns {string | undefined} Адрес страницы: `/ru/404/`, `/404.html`; `undefined`, если это не HTML.
+ */
+export function pageUrlOf(fileUrl: string): string | undefined {
   if (fileUrl.endsWith(`/${PAGE_FILE}`)) return fileUrl.slice(0, -PAGE_FILE.length);
   return fileUrl.endsWith(HTML_EXTENSION) ? fileUrl : undefined;
 }
@@ -69,6 +74,20 @@ function tagsOf(html: string, name: string): Tag[] {
         quoted ?? single ?? bare ?? "",
       ]),
     ),
+  );
+}
+
+/**
+ * Проверяет, открыта ли страница поисковикам: страница с `<meta name="robots" content="noindex">`
+ * (например, «не найдено») не входит в карту сайта и не имеет своего адреса для `canonical`.
+ * @param {string} html Разметка страницы.
+ * @returns {boolean} `true`, если у страницы нет `noindex`.
+ */
+export function isIndexed(html: string): boolean {
+  return !tagsOf(html, "meta").some(
+    (tag) =>
+      tag["name"] === "robots" &&
+      (tag["content"] ?? "").split(",").some((directive) => directive.trim() === "noindex"),
   );
 }
 
@@ -128,6 +147,7 @@ function missingAlternatesOf(site: BuiltSite, pageUrl: string, html: string): st
   if (root?.["lang"] !== locale) {
     problems.push(`${pageUrl}: <html lang="${root?.["lang"] ?? ""}"> вместо «${locale}»`);
   }
+  if (!isIndexed(html)) return problems;
   const links = tagsOf(html, "link");
   const canonical = links.find((tag) => tag["rel"] === "canonical");
   if (canonical?.["href"] !== `${site.origin}${pageUrl}`) {
@@ -160,7 +180,8 @@ function missingAlternatesOf(site: BuiltSite, pageUrl: string, html: string): st
 /**
  * Находит страницы без правильной языковой разметки: `<html lang>`, `canonical` на саму себя
  * и `hreflang` на каждый язык и `x-default`, ведущие на существующие страницы. Страница без
- * версии на другом языке тоже попадает сюда: её `hreflang` ведёт в пустоту.
+ * версии на другом языке тоже попадает сюда: её `hreflang` ведёт в пустоту. У страницы
+ * с `noindex` проверяется только `<html lang>`: своего адреса у неё нет.
  * @param {BuiltSite} site Собранный сайт.
  * @returns {string[]} Описания недостающей или неверной разметки; пусто, если всё на месте.
  */
@@ -185,16 +206,34 @@ export function foreignLocaleLinks(site: BuiltSite): string[] {
     });
 }
 
-/**
- * Находит страницы, которых нет в карте сайта.
- * @param {BuiltSite} site Собранный сайт.
- * @returns {string[]} Адреса страниц вне карты сайта; пусто, если в ней есть все страницы.
- */
-export function pagesMissingFromSitemap(site: BuiltSite): string[] {
-  const listed = new Set(
+function sitemapPaths(site: BuiltSite): Set<string> {
+  return new Set(
     [...site.sitemap.matchAll(SITEMAP_LOCATION)].map(
       ([, location = ""]) => new URL(location).pathname,
     ),
   );
-  return [...site.pages.keys()].filter((pageUrl) => !listed.has(pageUrl));
+}
+
+/**
+ * Находит открытые поисковикам страницы, которых нет в карте сайта.
+ * @param {BuiltSite} site Собранный сайт.
+ * @returns {string[]} Адреса страниц вне карты сайта; пусто, если в ней есть все страницы.
+ */
+export function pagesMissingFromSitemap(site: BuiltSite): string[] {
+  const listed = sitemapPaths(site);
+  return [...site.pages]
+    .filter(([pageUrl, html]) => isIndexed(html) && !listed.has(pageUrl))
+    .map(([pageUrl]) => pageUrl);
+}
+
+/**
+ * Находит в карте сайта страницы с `noindex`: поисковику незачем идти туда, где его не ждут.
+ * @param {BuiltSite} site Собранный сайт.
+ * @returns {string[]} Адреса закрытых страниц в карте сайта; пусто, если их там нет.
+ */
+export function unindexedPagesInSitemap(site: BuiltSite): string[] {
+  const listed = sitemapPaths(site);
+  return [...site.pages]
+    .filter(([pageUrl, html]) => !isIndexed(html) && listed.has(pageUrl))
+    .map(([pageUrl]) => pageUrl);
 }

@@ -1,0 +1,24 @@
+---
+import type { GetStaticPaths } from "astro";
+import GameLayout from "@/app/layouts/GameLayout.astro";
+import { LOCALES, type Locale } from "@/shared/i18n/locale.ts";
+import { localeParam } from "@/shared/i18n/path.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
+import { NotFound } from "@/widgets/not-found";
+
+export const getStaticPaths = (() =>
+  LOCALES.map((locale) => ({
+    params: { lang: localeParam(locale) },
+    props: { locale },
+  }))) satisfies GetStaticPaths;
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<GameLayout locale={locale} title={UI_TEXT.notFound.title[locale]} notFound>
+  <NotFound locale={locale} />
+</GameLayout>

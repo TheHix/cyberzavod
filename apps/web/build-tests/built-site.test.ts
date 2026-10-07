@@ -7,6 +7,7 @@ import {
   localeOfPage,
   missingAlternates,
   pagesMissingFromSitemap,
+  unindexedPagesInSitemap,
   type BuiltSite,
 } from "./built-site.ts";
 
@@ -22,6 +23,8 @@ interface PageOptions {
   readonly withoutHreflang?: readonly string[];
   /** Дополнительная разметка в теле страницы. */
   readonly body?: string;
+  /** Страница закрыта от поисковиков, как «не найдено»: вместо canonical и hreflang — noindex. */
+  readonly noindex?: boolean;
 }
 
 // Страницы теста — всегда адреса одного из языков.
@@ -40,10 +43,13 @@ function pageHtml(pageUrl: string, options: PageOptions = {}): string {
       ([hreflang, path]) => `<link rel="alternate" hreflang="${hreflang}" href="${ORIGIN}${path}">`,
     );
   const canonical = options.canonical ?? `${ORIGIN}${pageUrl}`;
+  const head =
+    options.noindex === true
+      ? ['<meta name="robots" content="noindex">']
+      : [`<link rel="canonical" href="${canonical}">`, ...alternates];
   return [
     `<!DOCTYPE html><html lang="${options.lang ?? localeOf(pageUrl)}"><head>`,
-    `<link rel="canonical" href="${canonical}">`,
-    ...alternates,
+    ...head,
     `<link rel="stylesheet" href="/_astro/app.css"></head><body>`,
     `<a href="${localizedPath(localeOf(pageUrl), "/")}">home</a>`,
     options.body ?? "",
@@ -178,6 +184,22 @@ describe("missingAlternates", () => {
     expect(problems).toEqual(['/: нет hreflang="x-default"']);
   });
 
+  it("не требует canonical и hreflang у страницы с noindex", () => {
+    const site = validSite({ "/404.html": pageHtml("/404.html", { noindex: true }) });
+
+    const problems = missingAlternates(site);
+
+    expect(problems).toEqual([]);
+  });
+
+  it("проверяет <html lang> у страницы с noindex", () => {
+    const site = validSite({ "/ru/404/": pageHtml("/ru/404/", { noindex: true, lang: "en" }) });
+
+    const problems = missingAlternates(site);
+
+    expect(problems).toEqual(['/ru/404/: <html lang="en"> вместо «ru»']);
+  });
+
   it("находит hreflang на страницу, которой нет: у страницы нет версии на другом языке", () => {
     const site = withoutPage(validSite(), "/ru/recordings/a/");
 
@@ -245,5 +267,33 @@ describe("pagesMissingFromSitemap", () => {
     const missing = pagesMissingFromSitemap(withoutOne);
 
     expect(missing).toEqual(["/ru/"]);
+  });
+});
+
+describe("pagesMissingFromSitemap: noindex", () => {
+  it("не требует в карте сайта страницу с noindex", () => {
+    const site = validSite({ "/404.html": pageHtml("/404.html", { noindex: true }) });
+
+    const missing = pagesMissingFromSitemap(site);
+
+    expect(missing).toEqual([]);
+  });
+});
+
+describe("unindexedPagesInSitemap", () => {
+  it("не находит ничего, если страниц с noindex в карте сайта нет", () => {
+    const site = validSite({ "/404.html": pageHtml("/404.html", { noindex: true }) });
+
+    const listed = unindexedPagesInSitemap(site);
+
+    expect(listed).toEqual([]);
+  });
+
+  it("находит страницу с noindex в карте сайта", () => {
+    const site = validSite({ "/ru/": pageHtml("/ru/", { noindex: true }) });
+
+    const listed = unindexedPagesInSitemap(site);
+
+    expect(listed).toEqual(["/ru/"]);
   });
 });
