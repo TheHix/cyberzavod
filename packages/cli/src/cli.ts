@@ -16,7 +16,7 @@ import { JournalError, ProjectFileError } from "@cyberzavod/storage";
 import { initProject } from "./commands/init.ts";
 import { recordDecision, recordNote } from "./commands/journal.ts";
 import { printStatus } from "./commands/status.ts";
-import { syncProject } from "./commands/sync.ts";
+import { checkProject, syncProject } from "./commands/sync.ts";
 import { CommandError } from "./errors.ts";
 import { readInstallation } from "./installation/installation.ts";
 import { defaultsPrompter, terminalPrompter } from "./wizard.ts";
@@ -38,12 +38,15 @@ interface Command {
 
 async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
+
   for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+
   return Buffer.concat(chunks).toString("utf8");
 }
 
 function requiredText(value: string | undefined, what: string): string {
   if (value === undefined || value.trim() === "") throw new CommandError(`нужен ${what}`);
+
   return value;
 }
 
@@ -54,11 +57,13 @@ const COMMANDS: Readonly<Record<string, Command>> = {
     run: async ({ args, directory }) => {
       const { values } = parseArgs({ args, options: { yes: { type: "boolean", short: "y" } } });
       const prompter = values.yes === true ? defaultsPrompter() : terminalPrompter();
+
       try {
         await initProject(directory, prompter, await readInstallation());
       } finally {
         prompter.close();
       }
+
       return SUCCESS;
     },
   },
@@ -70,8 +75,17 @@ const COMMANDS: Readonly<Record<string, Command>> = {
         args,
         options: { check: { type: "boolean" }, force: { type: "boolean" } },
       });
-      const options = { check: values.check === true, force: values.force === true };
-      return (await syncProject(directory, options, await readInstallation())) ? SUCCESS : FAILURE;
+      const installation = await readInstallation();
+
+      if (values.check === true) {
+        const isUpToDate = await checkProject(directory, installation);
+
+        return isUpToDate ? SUCCESS : FAILURE;
+      }
+
+      await syncProject(directory, { force: values.force === true }, installation);
+
+      return SUCCESS;
     },
   },
   status: {
@@ -79,6 +93,7 @@ const COMMANDS: Readonly<Record<string, Command>> = {
     summary: "проект, процесс, агенты этапов, проверки и журнал",
     run: async ({ directory }) => {
       await printStatus(directory, await readInstallation());
+
       return SUCCESS;
     },
   },
@@ -91,11 +106,11 @@ const COMMANDS: Readonly<Record<string, Command>> = {
         allowPositionals: true,
         options: { why: { type: "string" } },
       });
-      await recordDecision(
-        directory,
-        requiredText(positionals.join(" "), "текст решения"),
-        values.why ?? "",
-      );
+
+      const title = requiredText(positionals.join(" "), "текст решения");
+
+      await recordDecision(directory, title, values.why ?? "");
+
       return SUCCESS;
     },
   },
@@ -104,7 +119,11 @@ const COMMANDS: Readonly<Record<string, Command>> = {
     summary: "записать заметку в журнал",
     run: async ({ args, directory }) => {
       const { positionals } = parseArgs({ args, allowPositionals: true });
-      await recordNote(directory, requiredText(positionals.join(" "), "текст заметки"));
+
+      const text = requiredText(positionals.join(" "), "текст заметки");
+
+      await recordNote(directory, text);
+
       return SUCCESS;
     },
   },
@@ -114,10 +133,12 @@ const COMMANDS: Readonly<Record<string, Command>> = {
     run: async ({ args, directory }) => {
       const { positionals } = parseArgs({ args, allowPositionals: true });
       const [rawPath] = positionals;
+
       await draftSession({
         projectDirectory: directory,
         ...(rawPath === undefined ? {} : { rawPath }),
       });
+
       return SUCCESS;
     },
   },
@@ -134,6 +155,7 @@ const COMMANDS: Readonly<Record<string, Command>> = {
         ...(values.draft === undefined ? {} : { draftPath: values.draft }),
         ...(values.build === undefined ? {} : { buildId: values.build }),
       });
+
       return published ? SUCCESS : FAILURE;
     },
   },
@@ -143,14 +165,19 @@ const COMMANDS: Readonly<Record<string, Command>> = {
     run: async ({ args, directory }) => {
       const { positionals } = parseArgs({ args, allowPositionals: true });
       const [name = ""] = positionals;
+
       if (!isHookName(name)) throw new CommandError(`нет хука ${name}`);
+
+      const payload = await readStdin();
       const outcome = await runHook(name, {
-        payload: await readStdin(),
+        payload,
         projectDirectory: process.env.CLAUDE_PROJECT_DIR || directory,
         tmpDir: tmpdir(),
       });
+
       process.stdout.write(outcome.stdout);
       process.stderr.write(outcome.stderr);
+
       return outcome.exitCode;
     },
   },
@@ -164,6 +191,7 @@ export function usage(): string {
   const lines = Object.values(COMMANDS).map(
     (command) => `  cyberzavod ${command.usage}\n      ${command.summary}`,
   );
+
   return `Cyberzavod — процесс разработки с ИИ-агентами, локально.\n\n${lines.join("\n")}`;
 }
 
@@ -174,7 +202,9 @@ const ARGUMENT_ERROR_PREFIX = "ERR_PARSE_ARGS";
 // сообщает ошибкой с кодом ERR_PARSE_ARGS_*.
 function isExpected(err: unknown): err is Error {
   if (EXPECTED_ERRORS.some((kind) => err instanceof kind)) return true;
+
   const code = err instanceof Error && "code" in err ? err.code : undefined;
+
   return typeof code === "string" && code.startsWith(ARGUMENT_ERROR_PREFIX);
 }
 
@@ -187,15 +217,22 @@ function isExpected(err: unknown): err is Error {
 export async function runCli(argv: string[], directory: string): Promise<number> {
   const [name, ...args] = argv;
   const command = name === undefined ? undefined : COMMANDS[name];
+
   if (command === undefined) {
+    const isHelpRequest = name === undefined || name === "help" || name === "--help";
+
     console.log(usage());
-    return name === undefined || name === "help" || name === "--help" ? SUCCESS : FAILURE;
+
+    return isHelpRequest ? SUCCESS : FAILURE;
   }
+
   try {
     return await command.run({ args, directory });
   } catch (err) {
     if (!isExpected(err)) throw err;
+
     console.error(`cyberzavod ${name}: ${err.message}`);
+
     return FAILURE;
   }
 }

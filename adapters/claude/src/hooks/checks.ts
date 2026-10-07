@@ -27,7 +27,9 @@ const COMMAND_SEPARATOR = " && ";
  */
 export function checksOf(config: ProjectConfig): ProjectChecks | undefined {
   const { commands, paths } = config.verification;
+
   if (commands.length === 0) return undefined;
+
   return {
     command: commands.join(COMMAND_SEPARATOR),
     paths: paths.length === 0 ? [WHOLE_REPOSITORY] : paths,
@@ -44,6 +46,7 @@ export function checksOf(config: ProjectConfig): ProjectChecks | undefined {
  */
 export function runChecks(checks: ProjectChecks, root: string, outputFile: string): ChecksRun {
   const output = openSync(outputFile, "w");
+
   try {
     const result = spawnSync(checks.command, {
       cwd: root,
@@ -51,9 +54,11 @@ export function runChecks(checks: ProjectChecks, root: string, outputFile: strin
       stdio: ["ignore", output, output],
     });
     const printed = readFileSync(outputFile, "utf8");
+
     if (result.error !== undefined) {
       return { passed: false, output: `${printed}${result.error.message}\n` };
     }
+
     return { passed: result.status === 0, output: printed };
   } finally {
     closeSync(output);

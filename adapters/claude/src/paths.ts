@@ -27,6 +27,7 @@ export interface CaptureDirectories {
  */
 export function captureDirectories(journal: string): CaptureDirectories {
   const capture = path.join(journal, CAPTURE_DIRECTORY, "claude");
+
   return { raw: path.join(capture, "raw"), drafts: path.join(capture, "drafts") };
 }
 
@@ -45,9 +46,13 @@ export interface LocatedProject {
  */
 export async function locateProject(directory: string): Promise<LocatedProject | undefined> {
   const root = await findProjectRoot(directory);
+
   if (root === undefined) return undefined;
+
   const config = await readProjectConfig(root);
+
   if (config === undefined) return undefined;
+
   return { root, config, journal: journalDirectory(root, config) };
 }
 
@@ -59,9 +64,11 @@ export async function locateProject(directory: string): Promise<LocatedProject |
  */
 export async function requireProject(directory: string): Promise<LocatedProject> {
   const project = await locateProject(directory);
+
   if (project === undefined) {
     throw new Error(`${directory} не в проекте Cyberzavod: сначала cyberzavod init`);
   }
+
   return project;
 }
 
@@ -76,7 +83,9 @@ export async function findProjectId(directory: string): Promise<string | undefin
     return (await locateProject(directory))?.config.projectId;
   } catch (err) {
     if (!(err instanceof ProjectFileError)) throw err;
+
     console.warn(`конфиг проекта не прочитан: ${err.message}`);
+
     return undefined;
   }
 }
@@ -87,8 +96,15 @@ async function filesIn(dir: string): Promise<string[]> {
     return await readdir(dir);
   } catch (err) {
     if (isNotFound(err)) return [];
+
     throw err;
   }
+}
+
+async function modifiedAt(file: string): Promise<number> {
+  const { mtimeMs } = await stat(file);
+
+  return mtimeMs;
 }
 
 /**
@@ -100,8 +116,9 @@ async function filesIn(dir: string): Promise<string[]> {
 export async function newestFile(dir: string, extension: string): Promise<string | undefined> {
   const names = (await filesIn(dir)).filter((name) => name.endsWith(extension));
   const withTimes = await Promise.all(
-    names.map(async (name) => ({ name, mtime: (await stat(path.join(dir, name))).mtimeMs })),
+    names.map(async (name) => ({ name, mtime: await modifiedAt(path.join(dir, name)) })),
   );
   const [newest] = withTimes.sort((a, b) => b.mtime - a.mtime);
+
   return newest === undefined ? undefined : path.join(dir, newest.name);
 }

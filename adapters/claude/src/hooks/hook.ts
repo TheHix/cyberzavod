@@ -28,9 +28,8 @@ const UNKNOWN_SESSION = "unknown";
  */
 export function sessionIdOf(payload: string): string {
   const parsed: unknown = JSON.parse(payload);
-  const sessionId =
-    typeof parsed === "object" && parsed !== null && "session_id" in parsed
-      ? parsed.session_id
-      : undefined;
+  const hasSessionId = typeof parsed === "object" && parsed !== null && "session_id" in parsed;
+  const sessionId = hasSessionId ? parsed.session_id : undefined;
+
   return typeof sessionId === "string" && sessionId !== "" ? sessionId : UNKNOWN_SESSION;
 }

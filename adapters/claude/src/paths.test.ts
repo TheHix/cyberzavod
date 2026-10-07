@@ -37,6 +37,7 @@ describe("findProjectId", () => {
   it("поднимается из подкаталога до конфига", async () => {
     await writeConfig(root, configOf("lab"));
     const nested = path.join(root, "src", "state");
+
     await mkdir(nested, { recursive: true });
 
     const id = await findProjectId(nested);
@@ -47,6 +48,7 @@ describe("findProjectId", () => {
   it("берёт ближайший конфиг", async () => {
     await writeConfig(root, configOf("outer"));
     const inner = path.join(root, "inner");
+
     await writeConfig(inner, configOf("inner"));
 
     const id = await findProjectId(inner);

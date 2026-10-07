@@ -190,8 +190,10 @@ describe("eventBuilds", () => {
     const owned = draft.events.flatMap((event, index) => {
       if (event.type === "draft_run") return [[event.run, builds[index]]];
       if (event.type === "usage" && !("run" in event)) return [[event.tokens, builds[index]]];
+
       return [];
     });
+
     expect(owned).toEqual([
       [10, FIRST_BUILD_ID],
       [5, FIRST_BUILD_ID],

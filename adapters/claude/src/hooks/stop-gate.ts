@@ -44,6 +44,7 @@ async function readConfig(root: string): Promise<ConfigReading> {
     return { config: await readProjectConfig(root) };
   } catch (err) {
     if (err instanceof ProjectFileError) return { broken: err };
+
     throw err;
   }
 }
@@ -53,6 +54,7 @@ async function readState(file: string): Promise<string | undefined> {
     return await readFile(file, "utf8");
   } catch (err) {
     if (isNotFound(err)) return undefined;
+
     throw err;
   }
 }
@@ -61,7 +63,9 @@ async function readState(file: string): Promise<string | undefined> {
 // при любых незакоммиченных правках в каталогах с кодом.
 async function codeChangedThisTurn(session: StopSession, checks: ProjectChecks): Promise<boolean> {
   const turnStart = await readState(session.statePath("turn-start"));
+
   if (turnStart === undefined) return hasUncommittedChanges(session.root, checks.paths);
+
   return turnStart !== codeFingerprint(session.root, checks.paths);
 }
 
@@ -69,9 +73,12 @@ async function codeChangedThisTurn(session: StopSession, checks: ProjectChecks):
 // вызывающий превращает в отпуск агента.
 async function countedBlock(counter: string): Promise<number | undefined> {
   try {
-    const blocks = Number.parseInt((await readState(counter)) ?? "0", 10);
+    const stored = await readState(counter);
+    const blocks = Number.parseInt(stored ?? "0", 10);
     const next = (Number.isNaN(blocks) ? 0 : blocks) + 1;
+
     await writeFile(counter, String(next));
+
     return next;
   } catch {
     return undefined;
@@ -81,6 +88,7 @@ async function countedBlock(counter: string): Promise<number | undefined> {
 async function written(file: string, text: string): Promise<boolean> {
   try {
     await writeFile(file, text);
+
     return true;
   } catch {
     return false;
@@ -88,13 +96,16 @@ async function written(file: string, text: string): Promise<boolean> {
 }
 
 function tailOf(output: string): string {
-  return output.trimEnd().split("\n").slice(-OUTPUT_TAIL_LINES).join("\n");
+  const lines = output.trimEnd().split("\n");
+
+  return lines.slice(-OUTPUT_TAIL_LINES).join("\n");
 }
 
 // Отметка нужна хуку записи: следующий промпт человека — вызов хуком остановки.
 async function callHuman(session: StopSession, blocks: number): Promise<StopVerdict> {
   const message = `Проверки красные после ${MAX_BLOCKS} попыток исправить — агент остановлен, нужен человек.`;
   const marked = await written(session.statePath("human-call"), String(blocks));
+
   return {
     kind: "release-with-message",
     message: marked ? message : `${message} Отметка для записи не сохранена.`,
@@ -108,6 +119,7 @@ async function verdictOnRedChecks(
 ): Promise<StopVerdict> {
   const counter = session.statePath("stop-blocks");
   const blocks = await countedBlock(counter);
+
   if (blocks === undefined) {
     return {
       kind: "release-with-message",
@@ -115,6 +127,7 @@ async function verdictOnRedChecks(
     };
   }
   if (blocks > MAX_BLOCKS) return callHuman(session, blocks);
+
   return {
     kind: "block",
     message: `${checks.command} не проходит — закончить работу нельзя (попытка ${blocks} из ${MAX_BLOCKS}). Исправь:\n${tailOf(output)}\n`,
@@ -130,21 +143,27 @@ async function codeChangedOrGitMissing(
     return await codeChangedThisTurn(session, checks);
   } catch (err) {
     if (err instanceof GitError) return err;
+
     throw err;
   }
 }
 
 async function verdictOf(session: StopSession): Promise<StopVerdict> {
   const reading = await readConfig(session.root);
+
   if ("broken" in reading) {
     return {
       kind: "release-with-message",
       message: `Конфиг ${PROJECT_CONFIG_FILE} не читается — проверки пропущены, агент отпущен. ${reading.broken.message}`,
     };
   }
+
   const checks = reading.config === undefined ? undefined : checksOf(reading.config);
+
   if (checks === undefined) return RELEASE;
+
   const changed = await codeChangedOrGitMissing(session, checks);
+
   if (changed instanceof GitError) {
     return {
       kind: "release-with-message",
@@ -152,8 +171,11 @@ async function verdictOf(session: StopSession): Promise<StopVerdict> {
     };
   }
   if (!changed) return RELEASE;
+
   const run = runChecks(checks, session.root, session.statePath("checks-output"));
+
   if (run.passed) return RELEASE;
+
   return verdictOnRedChecks(session, checks, run.output);
 }
 
@@ -172,9 +194,11 @@ async function outcomeOf(session: StopSession, verdict: StopVerdict): Promise<Ho
   switch (verdict.kind) {
     case "release":
       await endTurn(session);
+
       return SILENT_EXIT;
     case "release-with-message":
       await endTurn(session);
+
       return {
         exitCode: RELEASE_EXIT_CODE,
         stdout: `${JSON.stringify({ systemMessage: verdict.message })}\n`,
@@ -196,5 +220,6 @@ export async function gateStop(context: HookContext): Promise<HookOutcome> {
     root: context.projectDirectory,
     statePath: (name) => hookStatePath(context.tmpDir, sessionId, name),
   };
+
   return outcomeOf(session, await verdictOf(session));
 }

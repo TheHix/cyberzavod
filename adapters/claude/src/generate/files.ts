@@ -63,6 +63,7 @@ function rootEntrypoint(project: ClaudeProject): string {
     commands.length === 0
       ? "Проверки проекта не заданы: впиши их в `verification.commands` файла `.cyberzavod/project.json`."
       : `Проверки проекта (\`verification.commands\` в \`.cyberzavod/project.json\`) должны быть зелёными перед коммитом:\n\n${commands.join("\n")}`;
+
   return [
     GENERATED_COMMENT,
     "# Как работать в этом проекте",
@@ -98,55 +99,64 @@ function agentFile(guide: StageGuide, role: StageRole, model: string): Generated
     guide.body,
     "",
   ].join("\n");
+
   return { path: `.claude/agents/${role.name}.md`, content };
 }
 
 function roleAgents(project: ClaudeProject): GeneratedFile[] {
-  return stageGuidesOf(project).flatMap((guide) =>
-    guide.role === undefined
-      ? []
-      : [
-          agentFile(
-            guide,
-            guide.role,
-            claudeModelOf(guide.stage, project.config.agents[guide.stage]),
-          ),
-        ],
-  );
+  return stageGuidesOf(project).flatMap((guide) => {
+    if (guide.role === undefined) return [];
+
+    const model = claudeModelOf(guide.stage, project.config.agents[guide.stage]);
+
+    return [agentFile(guide, guide.role, model)];
+  });
 }
 
 function stageRow(guide: StageGuide, project: ClaudeProject): string {
   if (guide.role === undefined) return `| ${guide.title} | ведущий сам | — |`;
+
   const model = claudeModelOf(guide.stage, project.config.agents[guide.stage]);
+
   return `| ${guide.title} | \`${guide.role.name}\` | ${model} |`;
+}
+
+function featureFrontmatter(project: ClaudeProject, guides: readonly StageGuide[]): string {
+  const route = guides.map(({ title }) => title.toLowerCase()).join(", ");
+
+  return [
+    "---",
+    "name: feature",
+    `description: Проводит задачу через процесс ${project.workflow.name} — ${route}; у каждой роли своя модель. Запуск — /feature <задача>.`,
+    "argument-hint: <задача>",
+    "disable-model-invocation: true",
+    "---",
+    GENERATED_COMMENT,
+  ].join("\n");
+}
+
+function stageTable(project: ClaudeProject, guides: readonly StageGuide[]): string {
+  return [
+    "| Этап | Роль | Модель |",
+    "| --- | --- | --- |",
+    ...guides.map((guide) => stageRow(guide, project)),
+  ].join("\n");
 }
 
 function featureSkill(project: ClaudeProject): GeneratedFile {
   const guides = stageGuidesOf(project);
-  const route = guides.map(({ title }) => title.toLowerCase()).join(", ");
   const ownStages = guides
     .filter((guide) => guide.role === undefined)
     .map((guide) => `## Этап «${guide.title}»\n\n${guide.body}`);
   const content = [
-    [
-      "---",
-      "name: feature",
-      `description: Проводит задачу через процесс ${project.workflow.name} — ${route}; у каждой роли своя модель. Запуск — /feature <задача>.`,
-      "argument-hint: <задача>",
-      "disable-model-invocation: true",
-      "---",
-      GENERATED_COMMENT,
-    ].join("\n"),
+    featureFrontmatter(project, guides),
     "# Задача через процесс",
-    [
-      "| Этап | Роль | Модель |",
-      "| --- | --- | --- |",
-      ...guides.map((g) => stageRow(g, project)),
-    ].join("\n"),
+    stageTable(project, guides),
     project.harness.conductor,
     `Более сильная модель для второй доработки — \`${ESCALATION_MODEL}\`: передай \`model: "${ESCALATION_MODEL}"\` в вызове агента.`,
     ...ownStages,
   ].join("\n\n");
+
   return { path: ".claude/skills/feature/SKILL.md", content: `${content}\n` };
 }
 
@@ -164,11 +174,14 @@ export function renderTemplate(template: string, project: ClaudeProject): string
     raw: project.capture.raw,
     drafts: project.capture.drafts,
   };
+
   return template.replace(/\{\{(\w+)\}\}/g, (placeholder, name: string) => {
     const value = values[name];
+
     if (value === undefined) {
       throw new GenerateError(`в шаблоне неизвестная подстановка ${placeholder}`);
     }
+
     return value;
   });
 }

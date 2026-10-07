@@ -21,7 +21,9 @@ function scriptedPrompter(answers: Record<string, string>): Prompter {
   return {
     ask: (question, fallback) => {
       const key = Object.keys(answers).find((start) => question.startsWith(start));
-      return Promise.resolve(key === undefined ? fallback : (answers[key] ?? fallback));
+      const answer = key === undefined ? undefined : answers[key];
+
+      return Promise.resolve(answer ?? fallback);
     },
     close: () => undefined,
   };
@@ -74,8 +76,9 @@ describe("askProjectConfig", () => {
   it("отклоняет процесс, которого нет в harness", async () => {
     const { harness } = await readInstallation();
 
-    const act = () =>
-      askProjectConfig(detected(), harness, scriptedPrompter({ Процесс: "waterfall" }));
+    const prompter = scriptedPrompter({ Процесс: "waterfall" });
+
+    const act = () => askProjectConfig(detected(), harness, prompter);
 
     await expect(act).rejects.toThrow(/процесса waterfall нет/);
   });

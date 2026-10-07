@@ -45,21 +45,38 @@ import {
 import { isNotFound } from "@cyberzavod/storage";
 import { captureDirectories, findProjectId, newestFile, requireProject } from "../paths.ts";
 
+type TranscriptRead =
+  { status: "read"; text: string } | { status: "missing" } | { status: "failed" };
+
+// Непрочитанный транскрипт — предупреждение, а не ошибка; отсутствующий считает вызывающий.
+async function readTranscript(transcriptPath: string): Promise<TranscriptRead> {
+  try {
+    return { status: "read", text: await readFile(transcriptPath, "utf8") };
+  } catch (err) {
+    if (isNotFound(err)) return { status: "missing" };
+
+    console.warn(`транскрипт ${transcriptPath} не прочитан: ${String(err)}`);
+
+    return { status: "failed" };
+  }
+}
+
 // Транскрипты читаются по одному: непрочитанный — предупреждение, а не ошибка, черновик полезен
 // и без счётчика токенов. Транскрипты служебных сабагентов Claude Code не сохраняет — о них
 // одна строка, а не по строке на каждый.
 async function readTranscripts(paths: Iterable<string>): Promise<Map<string, string>> {
   const transcripts = new Map<string, string>();
   let missing = 0;
+
   for (const transcriptPath of paths) {
-    try {
-      transcripts.set(transcriptPath, await readFile(transcriptPath, "utf8"));
-    } catch (err) {
-      if (isNotFound(err)) missing++;
-      else console.warn(`транскрипт ${transcriptPath} не прочитан: ${String(err)}`);
-    }
+    const read = await readTranscript(transcriptPath);
+
+    if (read.status === "read") transcripts.set(transcriptPath, read.text);
+    else if (read.status === "missing") missing++;
   }
+
   if (missing > 0) console.warn(`транскриптов не найдено: ${missing}, их токены не посчитаны`);
+
   return transcripts;
 }
 
@@ -67,16 +84,20 @@ async function readTranscripts(paths: Iterable<string>): Promise<Map<string, str
 async function tokensOfRuns(paths: ReadonlyMap<string, string>): Promise<Map<string, number>> {
   const transcripts = await readTranscripts(paths.values());
   const tokens = new Map<string, number>();
+
   for (const [agentId, transcriptPath] of paths) {
     const transcript = transcripts.get(transcriptPath);
+
     if (transcript !== undefined) tokens.set(agentId, countTokens(transcript));
   }
+
   return tokens;
 }
 
 // Токены основной сессии по сообщениям: так их можно разложить по сборкам.
 async function usagesOfSession(paths: string[]): Promise<TokenUsage[]> {
   const transcripts = await readTranscripts(paths);
+
   return [...transcripts.values()].flatMap(tokenUsages);
 }
 
@@ -93,9 +114,12 @@ async function textsFromSessionTranscript(
   transcriptPath: string | undefined,
 ): Promise<SessionTexts> {
   const none: SessionTexts = { replies: [], answers: [], assignments: [] };
+
   if (transcriptPath === undefined) return none;
+
   try {
     const transcript = await readFile(transcriptPath, "utf8");
+
     return {
       replies: modelReplies(transcript),
       answers: assistantTexts(transcript),
@@ -105,6 +129,7 @@ async function textsFromSessionTranscript(
     console.warn(
       `транскрипт сессии не прочитан, моделей промптов и реплик сессии не будет: ${String(err)}`,
     );
+
     return none;
   }
 }
@@ -113,15 +138,16 @@ async function textsFromSessionTranscript(
 async function reportsFromStationTranscripts(paths: string[]): Promise<AgentReport[]> {
   const reports: AgentReport[] = [];
   let missing = 0;
+
   for (const transcriptPath of paths) {
-    try {
-      reports.push(...agentReports(await readFile(transcriptPath, "utf8")));
-    } catch (err) {
-      if (isNotFound(err)) missing++;
-      else console.warn(`транскрипт ${transcriptPath} не прочитан: ${String(err)}`);
-    }
+    const read = await readTranscript(transcriptPath);
+
+    if (read.status === "read") reports.push(...agentReports(read.text));
+    else if (read.status === "missing") missing++;
   }
+
   if (missing > 0) console.warn(`транскриптов станций не найдено: ${missing}, их отчётов не будет`);
+
   return reports;
 }
 
@@ -129,10 +155,13 @@ async function reportsFromStationTranscripts(paths: string[]): Promise<AgentRepo
 // и для старых журналов, где пути уже лежат в командах, а хук остаётся лёгким.
 async function projectsOfDirectories(directories: string[]): Promise<Map<string, string>> {
   const projects = new Map<string, string>();
+
   for (const directory of directories) {
     const id = await findProjectId(directory);
+
     if (id !== undefined) projects.set(directory, id);
   }
+
   return projects;
 }
 
@@ -154,12 +183,15 @@ function titleOf(edit: EditableDraftEvent): string {
 // Битый прошлый черновик не перезаписывается молча: в нём может быть несохранённая редактура.
 async function readEarlierDraft(draftPath: string, shown: string): Promise<Draft | undefined> {
   let earlier: string;
+
   try {
     earlier = await readFile(draftPath, "utf8");
   } catch (err) {
     if (isNotFound(err)) return undefined;
+
     throw err;
   }
+
   try {
     return parseDraft(JSON.parse(earlier));
   } catch (err) {
@@ -171,9 +203,11 @@ async function readEarlierDraft(draftPath: string, shown: string): Promise<Draft
 
 function withEarlierEdits(fresh: Draft, previous: Draft | undefined): Draft {
   if (previous === undefined) return fresh;
+
   for (const edit of orphanedEdits(previous, fresh)) {
     console.warn(`редактура «${titleOf(edit)}» не перенесена: такого события в журнале нет`);
   }
+
   return carryOverEdits(previous, fresh);
 }
 
@@ -193,6 +227,7 @@ function awaitsEditing(event: DraftEvent): event is EditableDraftEvent {
 
 function describeWaiting(event: EditableDraftEvent): string {
   const said = event.said.replace(/\s+/g, " ");
+
   switch (event.type) {
     case "draft_prompt":
       return said;
@@ -213,6 +248,7 @@ const MAX_ASSIGNMENT_LINE = 100;
 function clockOf(t: number): string {
   const seconds = Math.floor(t / MS_PER_SECOND);
   const minutes = Math.floor(seconds / SECONDS_PER_MINUTE);
+
   return `${minutes}:${String(seconds % SECONDS_PER_MINUTE).padStart(2, "0")}`;
 }
 
@@ -222,8 +258,11 @@ function assignmentLineOf(draft: Draft, run: DraftRun): string {
     (event) =>
       event.type === "draft_message" && event.run === run.run && event.source === "assignment",
   );
+
   if (assignment?.type !== "draft_message") return "задание не найдено";
+
   const line = assignment.said.split("\n").find((text) => text.trim() !== "") ?? "";
+
   return line.trim().slice(0, MAX_ASSIGNMENT_LINE);
 }
 
@@ -251,51 +290,83 @@ interface DraftReport {
   shownPath: string;
 }
 
-// Сводка для редактора: что в черновике и что ещё ждёт редактуры.
-function reportDraft({ draft, previous, rawEvents, projectsByDirectory, shownPath }: DraftReport) {
+function printCounts(draft: Draft): void {
   const prompts = draft.events.filter((event) => event.type === "draft_prompt");
   const messages = draft.events.filter((event) => event.type === "draft_message");
   const interventions = draft.events.filter((event) => event.type === "draft_intervention");
-  const waiting = draft.events.filter(awaitsEditing);
-  const owners = eventBuilds(draft);
-  console.log(`черновик: ${shownPath}`);
+
   console.log(
     `промптов: ${prompts.length}, реплик: ${messages.length}, вмешательств: ${interventions.length}`,
   );
+}
+
+function printBuilds(draft: Draft): void {
+  const owners = eventBuilds(draft);
+
   for (const build of draft.builds) {
     const eventCount = owners.filter((owner) => owner === build.id).length;
+
     console.log(
       `сборка ${build.id}: проект ${build.project || "—"}, harness ${build.harness || "—"}, процесс ${build.workflow || "—"}, ` +
         `запусков: ${build.runs.length}, событий: ${eventCount}`,
     );
   }
+
   for (const line of unfilledHeader(draft)) console.log(`  не заполнено: ${line}`);
+}
+
+function warnAboutProjects(draft: Draft, rawEvents: RawEvent[], projects: Map<string, string>) {
   for (const project of projectsWithoutBuild(draft)) {
     console.warn(`команды проекта ${project} без сборки: достанутся сборке по времени`);
   }
-  for (const directory of directoriesOutsideProjects(rawEvents, projectsByDirectory)) {
+
+  for (const directory of directoriesOutsideProjects(rawEvents, projects)) {
     console.warn(
       `каталог ${directory} не принадлежит проекту Cyberzavod: его этапы и проверки не попали в черновик`,
     );
   }
+}
+
+function printWaiting(draft: Draft): void {
+  const waiting = draft.events.filter(awaitsEditing);
+
   console.log(`ждут редактуры: ${waiting.length}`);
   for (const event of waiting) console.log(`  • ${describeWaiting(event)}`);
+}
 
+function printUnassignedRuns(draft: Draft): void {
   const unassigned = unassignedRuns(draft);
-  if (unassigned.length > 0) {
-    console.log(`запуски станций без сборки (достанутся первой): ${unassigned.length}`);
-    for (const run of unassigned) {
-      console.log(`  • ${run.agent} ${run.run} ${clockOf(run.t)}: ${assignmentLineOf(draft, run)}`);
-    }
+
+  if (unassigned.length === 0) return;
+
+  console.log(`запуски станций без сборки (достанутся первой): ${unassigned.length}`);
+
+  for (const run of unassigned) {
+    console.log(`  • ${run.agent} ${run.run} ${clockOf(run.t)}: ${assignmentLineOf(draft, run)}`);
   }
+}
+
+function warnAboutEarlierDraft(draft: Draft, previous: Draft | undefined): void {
   for (const run of orphanedRuns(draft)) {
     console.warn(`запуск ${run} указан в сборке, но в журнале его нет`);
   }
+
   for (const message of previous === undefined ? [] : reroutedMessages(previous, draft)) {
     console.warn(
       `у реплики «${message.line}» поменялся маршрут: ${message.from} → ${message.to}, перечитайте строку`,
     );
   }
+}
+
+// Сводка для редактора: что в черновике и что ещё ждёт редактуры.
+function reportDraft({ draft, previous, rawEvents, projectsByDirectory, shownPath }: DraftReport) {
+  console.log(`черновик: ${shownPath}`);
+  printCounts(draft);
+  printBuilds(draft);
+  warnAboutProjects(draft, rawEvents, projectsByDirectory);
+  printWaiting(draft);
+  printUnassignedRuns(draft);
+  warnAboutEarlierDraft(draft, previous);
 }
 
 /** Что собрать в черновик: проект и, если нужно, конкретный сырой журнал. */
@@ -317,9 +388,11 @@ export async function draftSession(options: DraftSessionOptions): Promise<string
   const directories = captureDirectories(project.journal);
   const shown = (file: string) => path.relative(project.root, file) || ".";
   const rawPath = options.rawPath ?? (await newestFile(directories.raw, ".jsonl"));
+
   if (rawPath === undefined) {
     throw new Error(`журналов сессий ещё нет: хуки пишут их в ${shown(directories.raw)}`);
   }
+
   const rawEvents = parseRawLog(await readFile(rawPath, "utf8"));
   const projectsByDirectory = await projectsOfDirectories(toolDirectories(rawEvents));
   const fresh = await freshDraftOf(rawPath, rawEvents, projectsByDirectory);
@@ -331,5 +404,6 @@ export async function draftSession(options: DraftSessionOptions): Promise<string
   await writeFile(draftPath, `${JSON.stringify(draft, null, 2)}\n`);
 
   reportDraft({ draft, previous, rawEvents, projectsByDirectory, shownPath: shown(draftPath) });
+
   return draftPath;
 }

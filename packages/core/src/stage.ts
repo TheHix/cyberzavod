@@ -40,15 +40,23 @@ export class WorkflowError extends Error {}
  */
 export function parseWorkflow(raw: unknown): Workflow {
   if (!isObject(raw)) throw new WorkflowError("процесс должен быть объектом");
+
   const { name, stages } = raw;
+
   if (!isLine(name)) throw new WorkflowError("name должно быть непустой строкой");
   if (!Array.isArray(stages) || stages.length === 0) {
     throw new WorkflowError("stages должны быть непустым списком");
   }
+
   const unknownStage = stages.find((stage) => !isStage(stage));
+
   if (unknownStage !== undefined) {
     throw new WorkflowError(`неизвестный этап ${String(unknownStage)}`);
   }
-  if (new Set(stages).size !== stages.length) throw new WorkflowError("этапы повторяются");
+
+  const hasDuplicates = new Set(stages).size !== stages.length;
+
+  if (hasDuplicates) throw new WorkflowError("этапы повторяются");
+
   return { name, stages: stages as Stage[] };
 }

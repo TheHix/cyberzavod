@@ -55,39 +55,51 @@ function isLines(value: unknown): value is string[] {
 function parseAgents(raw: unknown): Partial<Record<Stage, AgentConfig>> {
   if (raw === undefined) return {};
   if (!isObject(raw)) throw new ProjectConfigError("agents должны быть объектом");
+
   const agents: Partial<Record<Stage, AgentConfig>> = {};
+
   for (const [stage, agent] of Object.entries(raw)) {
     if (!isStage(stage)) throw new ProjectConfigError(`agents: неизвестный этап ${stage}`);
+
     try {
       agents[stage] = parseAgentConfig(agent);
     } catch (err) {
       throw new ProjectConfigError(`agents.${stage}: ${(err as Error).message}`, { cause: err });
     }
   }
+
   return agents;
 }
 
 function parseVerification(raw: unknown): VerificationConfig {
   if (raw === undefined) return { commands: [], paths: [] };
   if (!isObject(raw)) throw new ProjectConfigError("verification должна быть объектом");
+
   const { commands = [], paths = [] } = raw;
+
   if (!isLines(commands)) {
     throw new ProjectConfigError("verification.commands должны быть списком строк");
   }
   if (!isLines(paths)) throw new ProjectConfigError("verification.paths должны быть списком строк");
+
   return { commands: [...commands], paths: [...paths] };
 }
 
 function parseStack(raw: unknown): StackInfo | undefined {
   if (raw === undefined) return undefined;
   if (!isObject(raw)) throw new ProjectConfigError("stack должен быть объектом");
+
   const { languages = [], frameworks = [], packageManager } = raw;
+
   if (!isLines(languages) || !isLines(frameworks)) {
     throw new ProjectConfigError("stack.languages и stack.frameworks должны быть списками строк");
   }
+
   const stack: StackInfo = { languages: [...languages], frameworks: [...frameworks] };
+
   if (packageManager === undefined) return stack;
   if (!isLine(packageManager)) throw new ProjectConfigError("stack.packageManager — строка");
+
   return { ...stack, packageManager };
 }
 
@@ -99,13 +111,16 @@ function parseStack(raw: unknown): StackInfo | undefined {
  */
 export function parseProjectConfig(raw: unknown): ProjectConfig {
   if (!isObject(raw)) throw new ProjectConfigError("конфиг проекта должен быть объектом");
+
   const { projectId, harness, workflow, journal } = raw;
+
   if (!isRecordId(projectId)) {
     throw new ProjectConfigError("projectId должен состоять из букв, цифр, «_» и «-»");
   }
   if (!isHarnessVersion(harness)) throw new ProjectConfigError("harness должна быть строкой");
   if (!isLine(workflow)) throw new ProjectConfigError("workflow должен быть непустой строкой");
   if (!isLine(journal)) throw new ProjectConfigError("journal должен быть путём к каталогу");
+
   const config: ProjectConfig = {
     projectId,
     harness,
@@ -115,5 +130,6 @@ export function parseProjectConfig(raw: unknown): ProjectConfig {
     verification: parseVerification(raw.verification),
   };
   const stack = parseStack(raw.stack);
+
   return stack === undefined ? config : { ...config, stack };
 }

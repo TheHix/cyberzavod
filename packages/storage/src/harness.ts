@@ -19,11 +19,16 @@ import {
 export async function readHarnessFiles(directory: string): Promise<HarnessFiles> {
   const entries = await readdir(directory, { recursive: true, withFileTypes: true });
   const files: Record<string, string> = {};
-  for (const entry of entries.filter((candidate) => candidate.isFile())) {
+
+  const fileEntries = entries.filter((candidate) => candidate.isFile());
+
+  for (const entry of fileEntries) {
     const file = path.join(entry.parentPath, entry.name);
     const name = path.relative(directory, file).split(path.sep).join("/");
+
     files[name] = await readFile(file, "utf8");
   }
+
   return files;
 }
 
@@ -34,7 +39,9 @@ export async function readHarnessFiles(directory: string): Promise<HarnessFiles>
  * @throws {HarnessError} Если файл этапа или процесса не прошёл проверку.
  */
 export async function loadHarness(directory: string): Promise<Harness> {
-  return parseHarness(await readHarnessFiles(directory));
+  const files = await readHarnessFiles(directory);
+
+  return parseHarness(files);
 }
 
 /**
@@ -46,9 +53,12 @@ export async function loadHarness(directory: string): Promise<Harness> {
  */
 export function workflowOf(harness: Harness, name: string): Workflow {
   const workflow = harness.workflows.find((candidate) => candidate.name === name);
+
   if (workflow === undefined) {
     const known = harness.workflows.map((candidate) => candidate.name).join(", ");
+
     throw new HarnessError(`процесса ${name} нет в harness; есть: ${known}`);
   }
+
   return workflow;
 }

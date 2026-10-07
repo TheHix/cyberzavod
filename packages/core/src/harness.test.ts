@@ -85,6 +85,7 @@ function harnessFiles(): Record<string, string> {
       stageFile(`title: Этап ${stage}\ndescription: Делает ${stage}.`),
     ]),
   );
+
   return {
     ...stages,
     "principles/safety.md": "## Безопасность\n",
@@ -118,6 +119,7 @@ describe("parseHarness", () => {
 
   it("отклоняет harness без файла этапа", () => {
     const files = harnessFiles();
+
     delete files["stages/review.md"];
 
     const act = () => parseHarness(files);

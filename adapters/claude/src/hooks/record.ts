@@ -32,6 +32,7 @@ async function withStopGateMark(
   tmpDir: string,
 ): Promise<RawEvent> {
   if (event.kind !== "prompt" || !isHumanPrompt(event.text)) return event;
+
   return (await claimHumanCallMarker(sessionId, tmpDir)) ? markAfterStopGate(event) : event;
 }
 
@@ -45,22 +46,33 @@ async function withStopGateMark(
 export async function recordEvent(context: HookContext): Promise<HookOutcome> {
   const payload: unknown = JSON.parse(context.payload);
   const hookEvent = fromHookPayload(payload, Date.now());
+
   if (hookEvent === null) return SILENT_EXIT;
+
   let project: LocatedProject | undefined;
+
   try {
     project = await locateProject(context.projectDirectory);
   } catch (err) {
     if (!(err instanceof ProjectFileError)) throw err;
+
     return { ...SILENT_EXIT, stderr: `сессия не записана: ${err.message}\n` };
   }
+
   if (project === undefined) return SILENT_EXIT;
+
   const sessionId = (payload as { session_id?: unknown }).session_id;
+
   if (!isSafeSessionId(sessionId)) {
     throw new RecordHookError(`недопустимый session_id: ${String(sessionId)}`);
   }
-  const event = await withStopGateMark(withProject(hookEvent, project), sessionId, context.tmpDir);
+
+  const stampedEvent = withProject(hookEvent, project);
+  const event = await withStopGateMark(stampedEvent, sessionId, context.tmpDir);
   const { raw } = captureDirectories(project.journal);
+
   await mkdir(raw, { recursive: true });
   await appendFile(path.join(raw, `${sessionId}.jsonl`), `${JSON.stringify(event)}\n`);
+
   return SILENT_EXIT;
 }

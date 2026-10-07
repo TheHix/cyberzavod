@@ -21,9 +21,11 @@ function gitOutput(root: string, args: string[]): string {
     encoding: "utf8",
     maxBuffer: GIT_OUTPUT_LIMIT_BYTES,
   });
+
   if (result.error !== undefined) {
     throw new GitError(`git ${args.join(" ")}: ${result.error.message}`, { cause: result.error });
   }
+
   return result.stdout;
 }
 
@@ -36,6 +38,7 @@ function untrackedFiles(root: string, paths: string[]): string[] {
     "--",
     ...paths,
   ]);
+
   return listed.split(NUL).filter((file) => file !== "");
 }
 
@@ -49,12 +52,15 @@ function untrackedFiles(root: string, paths: string[]): string[] {
  */
 export function codeFingerprint(root: string, paths: string[]): string {
   const hash = createHash(FINGERPRINT_ALGORITHM);
+
   hash.update(gitOutput(root, ["rev-parse", "HEAD"]));
   hash.update(gitOutput(root, ["diff", "HEAD", "--", ...paths]));
+
   for (const file of untrackedFiles(root, paths)) {
     hash.update(`${file}${NUL}`);
     hash.update(readFileSync(path.join(root, file)));
   }
+
   return hash.digest("hex");
 }
 

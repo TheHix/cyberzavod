@@ -96,6 +96,7 @@ function isPayload(value: unknown): value is HookPayload {
 
 function stringField(payload: HookPayload, key: string): string | undefined {
   const value = payload[key];
+
   return typeof value === "string" ? value : undefined;
 }
 
@@ -104,6 +105,7 @@ function stringField(payload: HookPayload, key: string): string | undefined {
 function toolEvent(payload: HookPayload, ts: number, ok: boolean): RawEvent {
   const input = isPayload(payload.tool_input) ? payload.tool_input : {};
   const command = stringField(input, "command");
+
   return withOptional<Extract<RawEvent, { kind: "tool" }>>(
     {
       ts,
@@ -126,12 +128,16 @@ function toolEvent(payload: HookPayload, ts: number, ok: boolean): RawEvent {
 function answersOf(payload: HookPayload): [string, string][] {
   for (const source of [payload.tool_response, payload.tool_input]) {
     const answers = isPayload(source) ? source.answers : undefined;
+
     if (!isPayload(answers)) continue;
+
     const pairs = Object.entries(answers).filter(
       (pair): pair is [string, string] => typeof pair[1] === "string" && pair[1].trim() !== "",
     );
+
     if (pairs.length > 0) return pairs;
   }
+
   return [];
 }
 
@@ -139,22 +145,29 @@ function answersOf(payload: HookPayload): [string, string][] {
 // (отказ, отмена, незнакомый формат) остаётся вызов инструмента.
 function questionAnswerEvent(payload: HookPayload, ts: number): RawEvent | undefined {
   if (stringField(payload, "tool_name") !== QUESTION_TOOL) return undefined;
+
   const answers = answersOf(payload);
+
   if (answers.length === 0) return undefined;
+
   const text = answers.map(([question, answer]) => `${question}${ANSWER_SEPARATOR}${answer}`);
+
   return withOptional<Extract<RawEvent, { kind: "question_answer" }>>(
     { ts, kind: "question_answer", text: text.join("\n") },
     { agentId: stringField(payload, "agent_id") },
   );
 }
 
+function withoutVerdictMarkup(line: string): string {
+  return line.replace(VERDICT_MARKUP, "").trim().replace(TRAILING_PUNCTUATION, "");
+}
+
 // Из ответа сабагента в журнал идёт только первая строка: станции пайплайна начинают
 // с неё вердикт, а остальной отчёт для записи не нужен.
 function verdictOf(reply: string | undefined): string | undefined {
-  const firstLine = reply
-    ?.split("\n")
-    .map((line) => line.replace(VERDICT_MARKUP, "").trim().replace(TRAILING_PUNCTUATION, ""))
-    .find((line) => line !== "" && !line.startsWith(HARNESS_NOTE_START));
+  const lines = reply?.split("\n").map(withoutVerdictMarkup);
+  const firstLine = lines?.find((line) => line !== "" && !line.startsWith(HARNESS_NOTE_START));
+
   return firstLine !== undefined && firstLine.length <= MAX_VERDICT_LENGTH ? firstLine : undefined;
 }
 
@@ -167,6 +180,7 @@ function agentName(payload: HookPayload): string {
 // Partial<T> — опечатка в имени поля не скомпилируется.
 function withOptional<T extends object>(event: T, fields: Partial<T>): T {
   const present = Object.entries(fields).filter(([, value]) => value !== undefined);
+
   return { ...event, ...Object.fromEntries(present) };
 }
 
@@ -174,9 +188,12 @@ function withOptional<T extends object>(event: T, fields: Partial<T>): T {
 // идут только id агента и вердикт.
 function subagentReport(text: string, ts: number): RawEvent | undefined {
   const agentId = SUBAGENT_REPORT.exec(text)?.[1];
+
   if (agentId === undefined) return undefined;
+
   const reportStart = text.indexOf(REPORT_START);
   const report = reportStart === -1 ? undefined : text.slice(reportStart + REPORT_START.length);
+
   return withOptional<Extract<RawEvent, { kind: "subagent_report" }>>(
     { ts, kind: "subagent_report", agentId },
     { verdict: verdictOf(report) },
@@ -195,11 +212,15 @@ export function fromHookPayload(payload: unknown, ts: number): RawEvent | null {
   switch (stringField(payload, "hook_event_name")) {
     case "SessionStart":
       return { ts, kind: "session_start" };
+
     case "UserPromptSubmit": {
       const text = stringField(payload, "prompt");
+
       if (text === undefined) return null;
+
       return subagentReport(text, ts) ?? { ts, kind: "prompt", text };
     }
+
     case "PostToolUse":
       return questionAnswerEvent(payload, ts) ?? toolEvent(payload, ts, true);
     case "PostToolUseFailure":
@@ -261,14 +282,23 @@ export function isSafeSessionId(value: unknown): value is string {
   return typeof value === "string" && SESSION_ID_PATTERN.test(value);
 }
 
+// Начало сессии несёт проект, версию harness и процесс только вместе, а без маркера проекта — ни один.
+function isUnstamped(value: HookPayload): boolean {
+  return value.project === undefined && value.harness === undefined && value.workflow === undefined;
+}
+
+function isStamped(value: HookPayload): boolean {
+  return (
+    typeof value.project === "string" &&
+    typeof value.harness === "string" &&
+    typeof value.workflow === "string"
+  );
+}
+
 // Проверка обязательных полей каждого вида события. Тип требует запись для каждого вида:
 // новый вид в RawEvent не скомпилируется, пока здесь не опишут его проверку.
 const RAW_EVENT_SHAPES: Record<RawEvent["kind"], (value: HookPayload) => boolean> = {
-  session_start: (value) =>
-    (value.project === undefined && value.harness === undefined && value.workflow === undefined) ||
-    (typeof value.project === "string" &&
-      typeof value.harness === "string" &&
-      typeof value.workflow === "string"),
+  session_start: (value) => isUnstamped(value) || isStamped(value),
   prompt: (value) =>
     typeof value.text === "string" &&
     (value.afterStopGate === undefined || value.afterStopGate === true),
@@ -288,6 +318,7 @@ function isRawEvent(value: unknown): value is RawEvent {
   if (!isPayload(value) || typeof value.ts !== "number" || typeof value.kind !== "string") {
     return false;
   }
+
   return isRawEventKind(value.kind) && RAW_EVENT_SHAPES[value.kind](value);
 }
 
@@ -300,16 +331,22 @@ function isRawEvent(value: unknown): value is RawEvent {
  */
 export function parseRawLog(content: string): RawEvent[] {
   const events: RawEvent[] = [];
+
   content.split("\n").forEach((line, index) => {
     if (line.trim() === "") return;
+
     let value: unknown;
+
     try {
       value = JSON.parse(line);
     } catch {
       return;
     }
+
     if (!isRawEvent(value)) throw new RawLogError(`строка ${index + 1}: не событие журнала`);
+
     events.push(value);
   });
+
   return events;
 }

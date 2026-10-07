@@ -57,6 +57,7 @@ function stagesOf(events: DraftEvent[]): string[] {
   return events.flatMap((event) => {
     if (event.type === "stage_enter") return [event.stage];
     if (event.type === "stage_fail") return [`fail:${event.stage}`];
+
     return [];
   });
 }
@@ -1278,9 +1279,11 @@ function edit(ts: number, file: string, cwd?: string): RawEvent {
 function projectMarksOf(draft: Draft): string[] {
   return draft.events.flatMap((event) => {
     const project = "project" in event && event.project !== undefined ? event.project : "—";
+
     if (event.type === "stage_enter") return [`${event.stage} ${project}`];
     if (event.type === "stage_fail") return [`fail:${event.stage} ${project}`];
     if (event.type === "draft_check") return [`check ${project}`];
+
     return [];
   });
 }
@@ -1959,6 +1962,7 @@ describe("routeMessages", () => {
 
   it("сохраняет строку, текст, запуск и сборку реплики", () => {
     const draft = routedDraft([], ["b1"]);
+
     draft.events.push({
       ...say(1_000, "planning", "report", "a1"),
       line: "Держи",

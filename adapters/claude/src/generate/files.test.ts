@@ -4,6 +4,7 @@ import { claudeFiles, GENERATED_MARK, renderTemplate, type ClaudeProject } from 
 
 function guide(stage: StageGuide["stage"], title: string, role?: string): StageGuide {
   const base = { stage, title, description: `${title}.`, body: `Текст этапа ${title}.` };
+
   return role === undefined ? base : { ...base, role: { name: role, access: "read" } };
 }
 
@@ -43,7 +44,9 @@ function claudeProject(): ClaudeProject {
 
 function fileOf(project: ClaudeProject, filePath: string): string {
   const file = claudeFiles(project).find(({ path }) => path === filePath);
+
   if (file === undefined) throw new Error(`нет файла ${filePath}`);
+
   return file.content;
 }
 

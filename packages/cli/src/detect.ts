@@ -2,9 +2,10 @@
 // Найденное — справка для мастера `init` и подсказка команд проверки, а не ограничение:
 // стек может смениться, и `sync` найдёт его заново.
 
-import { access, readFile } from "node:fs/promises";
+import { access } from "node:fs/promises";
 import path from "node:path";
-import { isNotFound } from "@cyberzavod/storage";
+import type { StackInfo } from "@cyberzavod/core";
+import { readOptionalText } from "./files.ts";
 
 /** Найденное в каталоге проекта. */
 export interface DetectedProject {
@@ -89,21 +90,13 @@ async function exists(file: string): Promise<boolean> {
   );
 }
 
-async function readOptional(file: string): Promise<string | undefined> {
-  try {
-    return await readFile(file, "utf8");
-  } catch (err) {
-    if (isNotFound(err)) return undefined;
-    throw err;
-  }
-}
-
 function keysOf(value: unknown): string[] {
   return typeof value === "object" && value !== null ? Object.keys(value) : [];
 }
 
 function parseManifest(text: string): PackageManifest {
   const raw = JSON.parse(text) as Record<string, unknown>;
+
   return {
     ...(typeof raw.name === "string" ? { name: raw.name } : {}),
     ...(typeof raw.packageManager === "string" ? { packageManager: raw.packageManager } : {}),
@@ -113,23 +106,33 @@ function parseManifest(text: string): PackageManifest {
 }
 
 async function readManifest(root: string): Promise<PackageManifest | undefined> {
-  const text = await readOptional(path.join(root, "package.json"));
+  const text = await readOptionalText(path.join(root, "package.json"));
+
   return text === undefined ? undefined : parseManifest(text);
 }
 
 async function makeTargets(root: string): Promise<string[]> {
-  const makefile = await readOptional(path.join(root, "Makefile"));
+  const makefile = await readOptionalText(path.join(root, "Makefile"));
+
   if (makefile === undefined) return [];
+
   return [...makefile.matchAll(MAKE_TARGET)].map((match) => match[1] ?? "");
 }
 
+async function languageOf(
+  root: string,
+  marker: (typeof LANGUAGE_MARKERS)[number],
+): Promise<string | undefined> {
+  const isMarked = await exists(path.join(root, marker.file));
+
+  return isMarked ? marker.language : undefined;
+}
+
 async function languagesOf(root: string): Promise<string[]> {
-  const found = await Promise.all(
-    LANGUAGE_MARKERS.map(async ({ file, language }) =>
-      (await exists(path.join(root, file))) ? language : undefined,
-    ),
-  );
-  return [...new Set(found.filter((language) => language !== undefined))];
+  const found = await Promise.all(LANGUAGE_MARKERS.map((marker) => languageOf(root, marker)));
+  const languages = found.filter((language) => language !== undefined);
+
+  return [...new Set(languages)];
 }
 
 async function packageManagerOf(
@@ -137,27 +140,38 @@ async function packageManagerOf(
   manifest: PackageManifest | undefined,
 ): Promise<string | undefined> {
   const declared = manifest?.packageManager?.split("@")[0];
+
   if (declared !== undefined && declared !== "") return declared;
+
   for (const { file, packageManager } of LOCKFILES) {
     if (await exists(path.join(root, file))) return packageManager;
   }
+
   return manifest === undefined ? undefined : "npm";
 }
 
-function verificationOf(
-  manifest: PackageManifest | undefined,
-  packageManager: string | undefined,
-  targets: string[],
-  languages: string[],
-): string[] {
+function verificationOf({
+  manifest,
+  packageManager,
+  targets,
+  languages,
+}: {
+  manifest: PackageManifest | undefined;
+  packageManager: string | undefined;
+  targets: string[];
+  languages: string[];
+}): string[] {
   if (targets.includes(MAKE_CHECK_TARGET)) return [`make ${MAKE_CHECK_TARGET}`];
+
   const runner = packageManager ?? "npm";
   const scripts = manifest?.scripts ?? [];
   const packageScripts = scripts.includes(PACKAGE_CHECK_SCRIPT)
     ? [PACKAGE_CHECK_SCRIPT]
     : PACKAGE_VERIFICATION_SCRIPTS.filter((script) => scripts.includes(script));
   const languageCommands = languages.flatMap((language) => LANGUAGE_VERIFICATION[language] ?? []);
-  return [...packageScripts.map((script) => `${runner} run ${script}`), ...languageCommands];
+  const packageCommands = packageScripts.map((script) => `${runner} run ${script}`);
+
+  return [...packageCommands, ...languageCommands];
 }
 
 /**
@@ -175,15 +189,31 @@ export async function detectProject(root: string): Promise<DetectedProject> {
   const frameworks = Object.entries(FRAMEWORK_DEPENDENCIES)
     .filter(([dependency]) => dependencies.includes(dependency))
     .map(([, framework]) => framework);
+  const hasGit = await exists(path.join(root, ".git"));
+  const makeScripts = targets.map((target) => `make ${target}`);
+
   return {
     name: manifest?.name ?? path.basename(root),
     languages,
     frameworks,
     ...(packageManager === undefined ? {} : { packageManager }),
-    git: await exists(path.join(root, ".git")),
-    scripts: [...(manifest?.scripts ?? []), ...targets.map((target) => `make ${target}`)],
-    verification: verificationOf(manifest, packageManager, targets, languages),
+    git: hasGit,
+    scripts: [...(manifest?.scripts ?? []), ...makeScripts],
+    verification: verificationOf({ manifest, packageManager, targets, languages }),
   };
+}
+
+/**
+ * Выбирает из найденного справочный стек, который кладётся в конфиг проекта.
+ * @param {DetectedProject} detected Найденное в проекте.
+ * @returns {StackInfo} Языки, фреймворки и менеджер пакетов, если он найден.
+ */
+export function stackOf(detected: DetectedProject): StackInfo {
+  const { languages, frameworks, packageManager } = detected;
+
+  if (packageManager === undefined) return { languages, frameworks };
+
+  return { languages, frameworks, packageManager };
 }
 
 /**
@@ -192,9 +222,8 @@ export async function detectProject(root: string): Promise<DetectedProject> {
  * @returns {string} Идентификатор, например `acme-shop`; `project`, если от имени ничего не осталось.
  */
 export function projectIdOf(name: string): string {
-  const id = name
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  const dashed = name.toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
+  const id = dashed.replace(/^-+|-+$/g, "");
+
   return id === "" ? "project" : id;
 }

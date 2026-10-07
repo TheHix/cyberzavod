@@ -11,6 +11,7 @@ const BUILT_TOOL = "// собранный cyberzavod\n";
 
 vi.mock("./installation/assets.ts", async (importOriginal) => {
   const original = await importOriginal<typeof import("./installation/assets.ts")>();
+
   return {
     readAssets: async () => ({ ...(await original.readAssets()), tool: BUILT_TOOL }),
   };
@@ -57,15 +58,16 @@ describe("runCli", () => {
   it("init --yes пишет конфиг, AGENTS.md и тонкий CLAUDE.md", async () => {
     const code = await runCli(["init", "--yes"], root);
 
-    const config = parseProjectConfig(
-      JSON.parse(await readFile(path.join(root, PROJECT_CONFIG_FILE), "utf8")),
-    );
+    const configText = await readFile(path.join(root, PROJECT_CONFIG_FILE), "utf8");
+    const config = parseProjectConfig(JSON.parse(configText));
+    const rules = await readFile(path.join(root, "AGENTS.md"), "utf8");
     const entrypoint = await readFile(path.join(root, "CLAUDE.md"), "utf8");
+
     expect({
       code,
       projectId: config.projectId,
       commands: config.verification.commands,
-      rules: (await readFile(path.join(root, "AGENTS.md"), "utf8")).includes("`npm run test`"),
+      rules: rules.includes("`npm run test`"),
       imports: entrypoint.includes("@AGENTS.md"),
     }).toEqual({
       code: 0,
@@ -79,10 +81,13 @@ describe("runCli", () => {
   it("init кладёт в проект собранный CLI и прячет от git сырые журналы", async () => {
     await runCli(["init", "--yes"], root);
 
-    expect({
-      tool: await readFile(path.join(root, TOOL_FILE), "utf8"),
-      gitignore: await readFile(path.join(root, ".gitignore"), "utf8"),
-    }).toEqual({ tool: BUILT_TOOL, gitignore: "/.cyberzavod/journal/capture/\n" });
+    const tool = await readFile(path.join(root, TOOL_FILE), "utf8");
+    const gitignore = await readFile(path.join(root, ".gitignore"), "utf8");
+
+    expect({ tool, gitignore }).toEqual({
+      tool: BUILT_TOOL,
+      gitignore: "/.cyberzavod/journal/capture/\n",
+    });
   });
 
   it("переносит написанный человеком CLAUDE.md в AGENTS.md", async () => {
@@ -90,7 +95,9 @@ describe("runCli", () => {
 
     await runCli(["init", "--yes"], root);
 
-    expect(await readFile(path.join(root, "AGENTS.md"), "utf8")).toBe("# Мои правила\n");
+    const rules = await readFile(path.join(root, "AGENTS.md"), "utf8");
+
+    expect(rules).toBe("# Мои правила\n");
   });
 
   it("второй init отказывает", async () => {
@@ -104,6 +111,7 @@ describe("runCli", () => {
   it("sync --check после init не находит расхождений, а после правки — находит", async () => {
     await initialized();
     const clean = await runCli(["sync", "--check"], root);
+
     await writeFile(path.join(root, ".claude/agents/coder.md"), "правка\n");
 
     const stale = await runCli(["sync", "--check"], root);
@@ -117,7 +125,9 @@ describe("runCli", () => {
 
     await runCli(["sync"], root);
 
-    expect(await runCli(["sync", "--check"], root)).toBe(0);
+    const code = await runCli(["sync", "--check"], root);
+
+    expect(code).toBe(0);
   });
 
   it("decision и note пишут записи в журнал проекта", async () => {
@@ -128,11 +138,14 @@ describe("runCli", () => {
       await runCli(["note", "Первая заметка"], root),
     ];
 
-    expect({
-      codes,
-      decisions: (await journalFiles("decisions")).length,
-      notes: (await journalFiles("notes")).length,
-    }).toEqual({ codes: [0, 0], decisions: 1, notes: 1 });
+    const decisions = await journalFiles("decisions");
+    const notes = await journalFiles("notes");
+
+    expect({ codes, decisions: decisions.length, notes: notes.length }).toEqual({
+      codes: [0, 0],
+      decisions: 1,
+      notes: 1,
+    });
   });
 
   it("decision без текста выходит с ошибкой", async () => {

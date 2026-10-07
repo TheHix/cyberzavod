@@ -79,6 +79,7 @@ function editedDraft(): Draft {
 
 function uneditedDraft(): Draft {
   const draft = editedDraft();
+
   return {
     ...draft,
     builds: draft.builds.map((build) => ({ ...build, title: "" })),
@@ -90,7 +91,9 @@ function uneditedDraft(): Draft {
 
 function buildOf(draft: Draft, index: number): DraftBuild {
   const build = draft.builds[index];
+
   if (build === undefined) throw new Error(`в черновике нет сборки #${index}`);
+
   return build;
 }
 
@@ -121,6 +124,7 @@ describe("parseDraft", () => {
   it("ждёт редактуры языка у черновика, собранного до поля language", () => {
     const raw: Record<string, unknown> = JSON.parse(JSON.stringify(uneditedDraft()));
     const builds = raw.builds as Record<string, unknown>[];
+
     delete builds[0]?.language;
 
     const draft = parseDraft(raw);
@@ -409,8 +413,10 @@ describe("carryOverEdits", () => {
 
   it("переносит заполненные редактором проект и версию harness первой сборки", () => {
     const previous = editedDraft();
+
     previous.builds = [{ ...buildOf(previous, 0), project: "demo", harness: "0.2.0" }];
     const next = uneditedDraft();
+
     next.builds = [{ ...buildOf(next, 0), project: "cyberzavod", harness: "0.1.0" }];
 
     const draft = carryOverEdits(previous, next);
@@ -420,8 +426,10 @@ describe("carryOverEdits", () => {
 
   it("берёт проект и версию harness первой сборки из журнала, если редактор их не заполнил", () => {
     const previous = editedDraft();
+
     previous.builds = [{ ...buildOf(previous, 0), project: "", harness: "" }];
     const next = uneditedDraft();
+
     next.builds = [{ ...buildOf(next, 0), project: "cyberzavod", harness: "0.1.0" }];
 
     const draft = carryOverEdits(previous, next);
@@ -431,8 +439,10 @@ describe("carryOverEdits", () => {
 
   it("не подставляет проект журнала в сборку, которую завёл редактор", () => {
     const previous = interleavedDraft();
+
     previous.builds = previous.builds.map((build) => ({ ...build, project: "", harness: "" }));
     const next = uneditedDraft();
+
     next.builds = [
       { ...buildOf(next, 0), id: FIRST_BUILD_ID, project: "cyberzavod", harness: "0.1.0" },
     ];
@@ -619,6 +629,7 @@ describe("orphanedEdits", () => {
 
   it("находит и редактуру, где заполнены только требования", () => {
     const previous = uneditedDraft();
+
     previous.events[0] = {
       t: 1_000,
       type: "draft_prompt",
@@ -673,6 +684,7 @@ describe("orphanedEdits", () => {
 describe("orphanedRuns", () => {
   it("находит запуски из сборок, которых нет среди окон запусков журнала", () => {
     const draft = interleavedDraft();
+
     buildOf(draft, 1).runs.push("опечатка");
 
     const runs = orphanedRuns(draft);
@@ -737,6 +749,7 @@ describe("publishBuild", () => {
 
   it("публикует вмешательство без исходного текста", () => {
     const draft = editedDraft();
+
     draft.events.push(intervention({ t: 2_500, reason: "question" }));
 
     const recording = publishOnly(draft);
@@ -754,6 +767,7 @@ describe("publishBuild", () => {
 
   it("отклоняет вмешательство с пустой строкой", () => {
     const draft = editedDraft();
+
     draft.events.push(intervention({ t: 2_500, line: "" }));
 
     const act = () => publishOnly(draft);
@@ -764,6 +778,7 @@ describe("publishBuild", () => {
 
   it("не публикует адрес сервера в тексте вмешательства", () => {
     const draft = editedDraft();
+
     draft.events.push(intervention({ t: 2_500, text: "Зайди на 203.0.113.7" }));
 
     const act = () => publishOnly(draft);
@@ -773,6 +788,7 @@ describe("publishBuild", () => {
 
   it("не публикует черновик без чистовой версии промпта", () => {
     const draft = uneditedDraft();
+
     buildOf(draft, 0).title = "Счётчик токенов";
 
     const act = () => publishOnly(draft);
@@ -798,6 +814,7 @@ describe("publishBuild", () => {
     "не публикует сборку с пустым полем %s",
     (field) => {
       const draft = editedDraft();
+
       buildOf(draft, 0)[field] = "";
 
       const act = () => publishOnly(draft);
@@ -809,6 +826,7 @@ describe("publishBuild", () => {
 
   it("проверяет на утечки версию harness", () => {
     const draft = editedDraft();
+
     buildOf(draft, 0).harness = "сервер 203.0.113.7";
 
     const act = () => publishOnly(draft);
@@ -818,6 +836,7 @@ describe("publishBuild", () => {
 
   it("не публикует сборку без заголовка", () => {
     const draft = editedDraft();
+
     buildOf(draft, 0).title = "";
 
     const act = () => publishOnly(draft);
@@ -827,6 +846,7 @@ describe("publishBuild", () => {
 
   it("проверяет на утечки и причину возврата на доработку", () => {
     const draft = editedDraft();
+
     draft.events[1] = {
       t: 2_000,
       type: "stage_fail",
@@ -841,6 +861,7 @@ describe("publishBuild", () => {
 
   it("проверяет на утечки и модель промпта", () => {
     const draft = editedDraft();
+
     draft.events[0] = {
       t: 1_000,
       type: "draft_prompt",
@@ -857,6 +878,7 @@ describe("publishBuild", () => {
 
   it("не публикует адрес сервера, попавший в чистовую версию", () => {
     const draft = editedDraft();
+
     draft.events[0] = {
       t: 1_000,
       type: "draft_prompt",
@@ -872,6 +894,7 @@ describe("publishBuild", () => {
 
   it("публикует реплику без исходного текста, source и запуска", () => {
     const draft = editedDraft();
+
     draft.events.splice(
       1,
       0,
@@ -897,6 +920,7 @@ describe("publishBuild", () => {
 
   it("не публикует черновик с непроставленной репликой", () => {
     const draft = editedDraft();
+
     draft.events.splice(1, 0, messageDraft());
 
     const act = () => publishOnly(draft);
@@ -906,6 +930,7 @@ describe("publishBuild", () => {
 
   it("пропускает склеенные промпты", () => {
     const draft = editedDraft();
+
     draft.events.splice(1, 0, {
       t: 1_800,
       type: "draft_prompt",
@@ -922,6 +947,7 @@ describe("publishBuild", () => {
 
   it("не публикует склеенный первый промпт", () => {
     const draft = editedDraft();
+
     draft.events.splice(0, 0, {
       t: 500,
       type: "draft_prompt",
@@ -938,6 +964,7 @@ describe("publishBuild", () => {
 
   it("не публикует промпт, склеенный первым в сборке, даже если в другой сборке промпты есть", () => {
     const draft = interleavedDraft();
+
     draft.events = draft.events.map((event) =>
       event.type === "draft_prompt" && event.build === SECOND_BUILD_ID
         ? { ...event, joined: true }
@@ -954,6 +981,7 @@ describe("publishBuild", () => {
     ["тексте", { line: "Зайти", text: "Зайди на 203.0.113.7" }],
   ])("не публикует адрес сервера в %s реплики", (_name, patch) => {
     const draft = editedDraft();
+
     draft.events.splice(1, 0, messageDraft(patch));
 
     const act = () => publishOnly(draft);
@@ -963,6 +991,7 @@ describe("publishBuild", () => {
 
   it("не повторяет этап, на котором сборка уже стоит", () => {
     const draft = editedDraft();
+
     draft.events.push(
       { t: 2_500, type: "stage_enter", stage: "implementation", run: "a2" },
       { t: 3_000, type: "stage_enter", stage: "verification" },
@@ -974,11 +1003,13 @@ describe("publishBuild", () => {
     const stages = recording.data.events.flatMap((event) =>
       event.type === "stage_enter" ? [event.stage] : [],
     );
+
     expect(stages).toEqual(["implementation", "verification", "implementation"]);
   });
 
   it("ставит build_start в нуль и отбрасывает старые начало и конец черновика", () => {
     const draft = editedDraft();
+
     draft.events = [
       { t: 0, type: "build_start" },
       ...draft.events,
@@ -997,6 +1028,7 @@ describe("publishBuild", () => {
 
   it("не оставляет в записи пометок project у событий", () => {
     const draft = editedDraft();
+
     draft.events.push(
       { t: 3_000, type: "stage_enter", stage: "verification", project: "cyberzavod" },
       { t: 3_000, type: "draft_check", ok: false, project: "cyberzavod" },
@@ -1028,6 +1060,7 @@ describe("publishBuild", () => {
     const recording = publishBuild(draft, FIRST_BUILD_ID);
 
     const marks = ["draft_", "run", "said", "source", 'build":'];
+
     expect(
       marks.filter((mark) => JSON.stringify(recording.data.events).includes(`"${mark}`)),
     ).toEqual([]);
@@ -1035,6 +1068,7 @@ describe("publishBuild", () => {
 
   it("не публикует сборку из неизвестной сборки и сборку без событий", () => {
     const draft = editedDraft();
+
     draft.builds.push({
       id: "empty",
       project: "p",
@@ -1095,9 +1129,11 @@ describe("publishDraft: несколько сборок", () => {
         if (event.type === "prompt") return [event.goal];
         if (event.type === "stage_enter") return [event.stage];
         if (event.type === "stage_fail") return [`fail:${event.stage}`];
+
         return [];
       }),
     );
+
     expect(summary).toEqual([
       ["Добавь счётчик токенов", "planning", "implementation", "verification", "fail:verification"],
       ["Сделай движок финансов", "implementation", "verification"],
@@ -1112,6 +1148,7 @@ describe("publishDraft: несколько сборок", () => {
     const lastEventBeforeWaiting = 31_000;
     const waiting = 200_000 - lastEventBeforeWaiting;
     const ends = recordings.map((recording) => recording.data.events.at(-1)?.t);
+
     expect(ends).toEqual([250_000 - (waiting - IDLE_GAP_MS), 58_000]);
   });
 
@@ -1123,6 +1160,7 @@ describe("publishDraft: несколько сборок", () => {
     const tokens = recordings.map((recording) =>
       recording.data.events.flatMap((event) => (event.type === "usage" ? [event.tokens] : [])),
     );
+
     expect(tokens).toEqual([[822], [370]]);
   });
 
@@ -1135,6 +1173,7 @@ describe("publishDraft: несколько сборок", () => {
     const inRecordings = recordings
       .flatMap((recording) => recording.data.events)
       .reduce((sum, event) => sum + (event.type === "usage" ? event.tokens : 0), 0);
+
     expect(inRecordings).toBe(inDraft);
   });
 
@@ -1155,6 +1194,7 @@ describe("publishDraft: несколько сборок", () => {
     const recordings = publishDraft(draft);
 
     const outcomes = recordings.map((recording) => recording.data.events.at(-1));
+
     expect(outcomes).toEqual([
       { t: expect.any(Number), type: "build_end", ok: false },
       { t: expect.any(Number), type: "build_end", ok: true },
@@ -1163,6 +1203,7 @@ describe("publishDraft: несколько сборок", () => {
 
   it("публикует вторую сборку, даже если первая не заполнена", () => {
     const draft = interleavedDraft();
+
     buildOf(draft, 0).title = "";
 
     const recording = publishBuild(draft, SECOND_BUILD_ID);
@@ -1172,6 +1213,7 @@ describe("publishDraft: несколько сборок", () => {
 
   it("не публикует ничего, если не готова хоть одна сборка", () => {
     const draft = interleavedDraft();
+
     buildOf(draft, 0).title = "";
 
     const act = () => publishDraft(draft);
@@ -1181,6 +1223,7 @@ describe("publishDraft: несколько сборок", () => {
 
   it("ищет утечки в каждой записи отдельно", () => {
     const draft = interleavedDraft();
+
     draft.events = draft.events.map((event) =>
       event.type === "draft_message" && event.run === "b2"
         ? { ...event, text: "Зайди на 203.0.113.7" }
@@ -1214,6 +1257,7 @@ describe("unfilledHeader", () => {
 
   it("называет все пустые поля сборки по порядку шапки", () => {
     const draft = editedDraft();
+
     draft.builds = [{ ...buildOf(draft, 0), title: "", language: "", project: "", harness: "" }];
 
     const names = unfilledHeader(draft);
@@ -1223,6 +1267,7 @@ describe("unfilledHeader", () => {
 
   it("называет пустые поля по каждой сборке и пропускает заполненные", () => {
     const draft = interleavedDraft();
+
     draft.builds[1] = { ...buildOf(draft, 1), title: "", project: "" };
 
     const names = unfilledHeader(draft);

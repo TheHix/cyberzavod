@@ -138,6 +138,7 @@ interface EntryPatch {
 
 function assistantEntry(patch: EntryPatch, content: unknown[]): string {
   const { uuid, second, messageId = uuid, model = "claude-opus-5-5", agentId } = patch;
+
   return JSON.stringify({
     type: "assistant",
     uuid,
@@ -149,6 +150,7 @@ function assistantEntry(patch: EntryPatch, content: unknown[]): string {
 
 function userEntry(patch: Pick<EntryPatch, "uuid" | "second" | "agentId">, content: unknown) {
   const { uuid, second, agentId } = patch;
+
   return JSON.stringify({
     type: "user",
     uuid,

@@ -18,16 +18,17 @@ describe("loadHarness", () => {
   it("читает harness репозитория: процесс по умолчанию идёт по всем этапам по порядку", async () => {
     const harness = await loadHarness(REPOSITORY_HARNESS);
 
-    expect(workflowOf(harness, "default").stages).toEqual([...STAGES]);
+    const workflow = workflowOf(harness, "default");
+
+    expect(workflow.stages).toEqual([...STAGES]);
   });
 
   it("читает принципы по имени файла и этап для каждого из STAGES", async () => {
     const harness = await loadHarness(REPOSITORY_HARNESS);
+    const principles = harness.principles.map(({ name }) => name);
+    const stages = Object.keys(harness.stages);
 
-    expect({
-      principles: harness.principles.map(({ name }) => name),
-      stages: Object.keys(harness.stages),
-    }).toEqual({
+    expect({ principles, stages }).toEqual({
       principles: ["architecture", "change-scope", "engineering", "readability", "safety"],
       stages: [...STAGES],
     });

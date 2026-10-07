@@ -1,11 +1,10 @@
 // `cyberzavod init`: подключает проект в текущем каталоге — мастер, конфиг, AGENTS.md
 // и файлы агента. Проект остаётся на своём месте: Cyberzavod его не клонирует и не переносит.
 
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { syncClaude } from "@cyberzavod/adapter-claude";
 import {
-  isNotFound,
   PROJECT_CONFIG_FILE,
   readProjectConfig,
   TOOL_FILE,
@@ -13,28 +12,21 @@ import {
 } from "@cyberzavod/storage";
 import { detectProject } from "../detect.ts";
 import { CommandError } from "../errors.ts";
+import { readOptionalText } from "../files.ts";
 import { HARNESS_VERSION, toolOf, type Installation } from "../installation/installation.ts";
 import { askProjectConfig, describeDetected, type Prompter } from "../wizard.ts";
 import { ignoreCapture } from "./gitignore.ts";
-import { syncToolFile } from "./tool-file.ts";
+import { updateToolFile } from "./tool-file.ts";
 
 const RULES_FILE = "AGENTS.md";
 const LEGACY_ENTRYPOINT = "CLAUDE.md";
-
-async function readOptional(file: string): Promise<string | undefined> {
-  try {
-    return await readFile(file, "utf8");
-  } catch (err) {
-    if (isNotFound(err)) return undefined;
-    throw err;
-  }
-}
 
 function starterRules(template: string, name: string, commands: string[]): string {
   const verification =
     commands.length === 0
       ? "  - пока не заданы"
       : commands.map((command) => `  - \`${command}\``).join("\n");
+
   return template.replace("{{name}}", name).replace("{{verification}}", verification);
 }
 
@@ -47,14 +39,38 @@ async function ensureRules(
   commands: string[],
 ): Promise<string> {
   const rules = path.join(root, RULES_FILE);
-  if ((await readOptional(rules)) !== undefined) return `${RULES_FILE} уже есть — оставлен`;
+  const hasRules = (await readOptionalText(rules)) !== undefined;
+
+  if (hasRules) return `${RULES_FILE} уже есть — оставлен`;
+
   const legacy = path.join(root, LEGACY_ENTRYPOINT);
-  if ((await readOptional(legacy)) !== undefined) {
+  const hasLegacyEntrypoint = (await readOptionalText(legacy)) !== undefined;
+
+  if (hasLegacyEntrypoint) {
     await rename(legacy, rules);
+
     return `${LEGACY_ENTRYPOINT} перенесён в ${RULES_FILE}: правила проекта теперь там`;
   }
+
   await writeFile(rules, starterRules(template, name, commands));
+
   return `${RULES_FILE} — заготовка правил проекта, заполните её`;
+}
+
+function printCreated(rules: string, files: string[], ignored: string | undefined): void {
+  console.log(`\nСоздано:\n  ${PROJECT_CONFIG_FILE}\n  ${TOOL_FILE}\n  ${rules}`);
+
+  for (const file of files) console.log(`  ${file}`);
+
+  if (ignored !== undefined) console.log(`  .gitignore: ${ignored}`);
+}
+
+function printNextSteps(journal: string): void {
+  console.log(
+    `\nЖурнал проекта: ${journal}\n` +
+      "Закоммитьте .cyberzavod/, AGENTS.md, CLAUDE.md и .claude/: хуки запускают CLI из проекта.\n" +
+      "Дальше: допишите правила в AGENTS.md и запускайте задачи через /feature в Claude Code.",
+  );
 }
 
 /**
@@ -70,36 +86,38 @@ export async function initProject(
   prompter: Prompter,
   installation: Installation,
 ): Promise<void> {
-  if ((await readProjectConfig(root)) !== undefined) {
+  const isConnected = (await readProjectConfig(root)) !== undefined;
+
+  if (isConnected) {
     throw new CommandError(`${PROJECT_CONFIG_FILE} уже есть: проект подключён, используйте sync`);
   }
+
   const tool = toolOf(installation);
   const detected = await detectProject(root);
+
   for (const line of describeDetected(root, detected)) console.log(line);
+
   const answers = await askProjectConfig(detected, installation.harness, prompter);
   const { projectId, ...rest } = answers;
   const config = { projectId, harness: HARNESS_VERSION, ...rest };
 
   await writeProjectConfig(root, config);
+
   const rules = await ensureRules(
     root,
     installation.rulesTemplate,
     detected.name,
     config.verification.commands,
   );
-  await syncToolFile(root, tool, false);
+
+  await updateToolFile(root, tool);
+
   const ignored = await ignoreCapture(root, config.journal);
   const report = await syncClaude({
     projectDirectory: root,
     installation: { harness: installation.harness, templates: installation.claudeTemplates },
   });
 
-  console.log(`\nСоздано:\n  ${PROJECT_CONFIG_FILE}\n  ${TOOL_FILE}\n  ${rules}`);
-  for (const file of report.changed) console.log(`  ${file}`);
-  if (ignored !== undefined) console.log(`  .gitignore: ${ignored}`);
-  console.log(
-    `\nЖурнал проекта: ${config.journal}\n` +
-      "Закоммитьте .cyberzavod/, AGENTS.md, CLAUDE.md и .claude/: хуки запускают CLI из проекта.\n" +
-      "Дальше: допишите правила в AGENTS.md и запускайте задачи через /feature в Claude Code.",
-  );
+  printCreated(rules, report.changed, ignored);
+  printNextSteps(config.journal);
 }
