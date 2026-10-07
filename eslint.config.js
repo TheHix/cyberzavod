@@ -10,9 +10,24 @@ import jsdoc from "eslint-plugin-jsdoc";
 import vitest from "@vitest/eslint-plugin";
 import prettier from "eslint-config-prettier";
 import globals from "globals";
+import stylistic from "@stylistic/eslint-plugin";
 
 // Тестовые файлы: для них — правила Vitest, для остального кода — обязательный JSDoc.
 const TEST_FILES = ["**/*.{test,spec}.{ts,tsx}"];
+
+// Вложенность блоков в функции — не глубже двух уровней: глубже — ранний выход или функция.
+const MAX_BLOCK_DEPTH = 2;
+
+// Пустая строка разделяет смысловые блоки: объявления — от действий, многострочный блок —
+// от соседей, ранний выход — от основного пути, итог — от того, что к нему привело.
+/** @type {{ blankLine: "always" | "any" | "never", prev: string | string[], next: string | string[] }[]} */
+const PADDING_LINES = [
+  { blankLine: "always", prev: ["const", "let"], next: "*" },
+  { blankLine: "always", prev: "*", next: ["multiline-block-like", "multiline-const", "return"] },
+  { blankLine: "always", prev: ["multiline-block-like", "multiline-const", "if"], next: "*" },
+  { blankLine: "any", prev: ["const", "let"], next: ["const", "let"] },
+  { blankLine: "any", prev: "if", next: "if" },
+];
 
 export default defineConfig(
   {
@@ -78,8 +93,17 @@ export default defineConfig(
   },
   prettier,
   {
-    // После eslint-config-prettier: он выключает curly, а тело условия на отдельной строке
-    // без скобок легко сломать при правке.
-    rules: { curly: ["error", "multi-line"] },
+    plugins: { "@stylistic": stylistic },
+    rules: {
+      // После eslint-config-prettier: он выключает curly, а тело условия на отдельной строке
+      // без скобок легко сломать при правке.
+      curly: ["error", "multi-line"],
+      // Принцип «Читаемость кода»: то, что проверяется автоматически.
+      "no-nested-ternary": "error",
+      "max-depth": ["error", MAX_BLOCK_DEPTH],
+      "prefer-const": "error",
+      "no-param-reassign": "error",
+      "@stylistic/padding-line-between-statements": ["error", ...PADDING_LINES],
+    },
   },
 );
