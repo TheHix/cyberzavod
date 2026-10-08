@@ -45,6 +45,28 @@ describe("parseProject", () => {
     expect(Object.keys(project).sort()).toEqual(["description", "id", "name"]);
   });
 
+  it("возвращает стек по порядку", () => {
+    const raw = { ...validProject(), stack: ["TypeScript", "Vite"] };
+
+    const project = parseProject(raw, LANGUAGES);
+
+    expect(project.stack).toEqual(["TypeScript", "Vite"]);
+  });
+
+  it.each([
+    ["не список", "TypeScript"],
+    ["пустой список", []],
+    ["пустая строка", ["TypeScript", ""]],
+    ["перевод строки", ["Type\nScript"]],
+    ["больше шести", ["a", "b", "c", "d", "e", "f", "g"]],
+  ])("отклоняет стек: %s", (_case, stack) => {
+    const raw = { ...validProject(), stack };
+
+    const act = () => parseProject(raw, LANGUAGES);
+
+    expect(act).toThrow(/stack/);
+  });
+
   it("отклоняет не объект", () => {
     const act = () => parseProject("cyberzavod", LANGUAGES);
 
