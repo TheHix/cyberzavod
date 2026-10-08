@@ -42,11 +42,11 @@ export async function waitForAccessToken(options: DeviceFlowOptions): Promise<st
         intervalSeconds += SLOW_DOWN_STEP_SECONDS;
         break;
       case "expired":
-        throw new CommandError("код входа истёк: запустите cyberzavod login заново");
+        throw new CommandError((messages) => messages.errors.loginCodeExpired);
       case "denied":
-        throw new CommandError("вход отклонён на странице GitHub");
+        throw new CommandError((messages) => messages.errors.loginDenied);
     }
   }
 
-  throw new CommandError("код входа истёк: запустите cyberzavod login заново");
+  throw new CommandError((messages) => messages.errors.loginCodeExpired);
 }

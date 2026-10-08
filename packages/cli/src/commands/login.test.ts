@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { CLI_MESSAGES } from "../messages/catalog.ts";
 import { ApiError } from "../sharing/api.ts";
 import {
   fakeApi,
@@ -13,6 +14,7 @@ import { login, logout } from "./login.ts";
 
 describe("login", () => {
   const printed = captureOutput();
+  const messages = CLI_MESSAGES.ru;
 
   it("показывает код, сохраняет токен и называет логин", async () => {
     const credentials = memoryCredentials();
@@ -21,7 +23,7 @@ describe("login", () => {
       api: fakeApi({ me: vi.fn(async () => author({ login: "alice" })) }),
     });
 
-    await login(sharing);
+    await login(sharing, messages);
 
     expect({ token: await credentials.read(), output: printed() }).toMatchObject({
       token: SECRET_TOKEN,
@@ -32,7 +34,7 @@ describe("login", () => {
   });
 
   it("не печатает токен", async () => {
-    await login(fakeSharing({ credentials: memoryCredentials() }));
+    await login(fakeSharing({ credentials: memoryCredentials() }), messages);
 
     expect(printed()).not.toContain(SECRET_TOKEN);
   });
@@ -45,7 +47,7 @@ describe("login", () => {
     const credentials = memoryCredentials();
     const sharing = fakeSharing({ credentials, github: fakeGithub({ pollAccessToken }) });
 
-    await login(sharing);
+    await login(sharing, messages);
 
     expect(await credentials.read()).toBe(SECRET_TOKEN);
   });
@@ -57,9 +59,9 @@ describe("login", () => {
       github: fakeGithub({ pollAccessToken: vi.fn(async () => ({ status: "denied" as const })) }),
     });
 
-    const act = () => login(sharing);
+    const act = () => login(sharing, messages);
 
-    await expect(act()).rejects.toThrow(/отклонён/);
+    await expect(act()).rejects.toThrow(/denied/);
     expect(await credentials.read()).toBeUndefined();
   });
 
@@ -71,7 +73,7 @@ describe("login", () => {
       api: fakeApi({ me: vi.fn(async () => Promise.reject(rejecting)) }),
     });
 
-    const act = () => login(sharing);
+    const act = () => login(sharing, messages);
 
     await expect(act()).rejects.toThrow(rejecting);
     expect(await credentials.read()).toBeUndefined();
@@ -83,7 +85,7 @@ describe("login", () => {
       api: fakeApi({ githubClientId: vi.fn(async () => Promise.reject(unavailable)) }),
     });
 
-    const act = () => login(sharing);
+    const act = () => login(sharing, messages);
 
     await expect(act()).rejects.toThrow("Вход недоступен");
   });
@@ -91,11 +93,12 @@ describe("login", () => {
 
 describe("logout", () => {
   const printed = captureOutput();
+  const messages = CLI_MESSAGES.ru;
 
   it("удаляет сохранённый токен", async () => {
     const credentials = memoryCredentials(SECRET_TOKEN);
 
-    await logout(fakeSharing({ credentials }));
+    await logout(fakeSharing({ credentials }), messages);
 
     expect({ token: await credentials.read(), output: printed() }).toEqual({
       token: undefined,
@@ -104,7 +107,7 @@ describe("logout", () => {
   });
 
   it("без входа сообщает, что выходить не из чего", async () => {
-    await logout(fakeSharing({ credentials: memoryCredentials() }));
+    await logout(fakeSharing({ credentials: memoryCredentials() }), messages);
 
     expect(printed()).toBe("входа и не было");
   });

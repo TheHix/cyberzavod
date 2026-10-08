@@ -7,12 +7,18 @@ import type { ProjectConfig } from "@cyberzavod/core";
 import { PROJECT_CONFIG_FILE, TOOL_FILE, writeProjectConfig } from "@cyberzavod/storage";
 import { detectProject, stackOf } from "../detect.ts";
 import { HARNESS_VERSION, toolOf, type Installation } from "../installation/installation.ts";
+import type { CliMessages } from "../messages/cli-messages.ts";
 import { requireProjectAt } from "./project.ts";
 import { isToolFileOutdated, updateToolFile } from "./tool-file.ts";
 
-/** Настройки записи: перезаписывать ли файлы, написанные человеком. */
+/** Что нужно синхронизации: перезаписывать ли файлы человека, версия Cyberzavod и тексты. */
 export interface SyncCommandOptions {
+  /** Перезаписать файлы, которые написал человек, а не генератор. */
   force: boolean;
+  /** Запущенная версия Cyberzavod. */
+  installation: Installation;
+  /** Сообщения на выбранном языке. */
+  messages: CliMessages;
 }
 
 async function refreshedConfig(root: string, config: ProjectConfig): Promise<ProjectConfig> {
@@ -29,16 +35,16 @@ function printFiles(title: string, files: readonly string[]): void {
   console.log(`${title}:\n${lines.join("\n")}`);
 }
 
-function printWrittenReport(report: SyncReport): void {
-  printFiles("записаны", report.changed);
-  printFiles("удалены", report.removed);
-  printFiles("написаны человеком", report.conflicts);
+function printWrittenReport(report: SyncReport, messages: CliMessages): void {
+  printFiles(messages.sync.written, report.changed);
+  printFiles(messages.sync.removed, report.removed);
+  printFiles(messages.sync.writtenByHuman, report.conflicts);
 }
 
-function printOutdatedReport(report: SyncReport): void {
-  printFiles("устарели", report.changed);
-  printFiles("лишние", report.removed);
-  printFiles("написаны человеком", report.conflicts);
+function printOutdatedReport(report: SyncReport, messages: CliMessages): void {
+  printFiles(messages.sync.outdated, report.changed);
+  printFiles(messages.sync.extra, report.removed);
+  printFiles(messages.sync.writtenByHuman, report.conflicts);
 }
 
 function claudeInstallationOf(installation: Installation): ClaudeInstallation {
@@ -57,12 +63,14 @@ function isClean(report: SyncReport): boolean {
  * Проверяет, что файлы агента и собранный CLI в проекте актуальны, ничего не записывая.
  * @param {string} directory Каталог внутри проекта.
  * @param {Installation} installation Запущенная версия Cyberzavod.
+ * @param {CliMessages} messages Сообщения на выбранном языке.
  * @returns {Promise<boolean>} true, если синхронизировать нечего.
  * @throws {Error} Если проекта нет, CLI запущен из исходников или файлы агента не собрать.
  */
 export async function checkProject(
   directory: string,
   installation: Installation,
+  messages: CliMessages,
 ): Promise<boolean> {
   const project = await requireProjectAt(directory);
   const tool = toolOf(installation);
@@ -77,15 +85,19 @@ export async function checkProject(
 
   if (isHarnessOutdated) {
     console.log(
-      `${PROJECT_CONFIG_FILE}: harness ${project.config.harness}, а CLI — ${HARNESS_VERSION}`,
+      messages.sync.harnessMismatch({
+        file: PROJECT_CONFIG_FILE,
+        configVersion: project.config.harness,
+        cliVersion: HARNESS_VERSION,
+      }),
     );
   }
 
-  printOutdatedReport(report);
+  printOutdatedReport(report, messages);
 
   const isUpToDate = isClean(report) && !isHarnessOutdated;
 
-  if (!isUpToDate) console.log("Файлы агента устарели: запустите cyberzavod sync");
+  if (!isUpToDate) console.log(messages.sync.filesOutdated);
 
   return isUpToDate;
 }
@@ -93,16 +105,12 @@ export async function checkProject(
 /**
  * Синхронизирует проект с harness: обновляет конфиг, собранный CLI и файлы агента.
  * @param {string} directory Каталог внутри проекта.
- * @param {SyncCommandOptions} options Перезаписать ли файлы человека.
- * @param {Installation} installation Запущенная версия Cyberzavod.
+ * @param {SyncCommandOptions} options Перезаписать ли файлы человека, версия, сообщения.
  * @returns {Promise<void>} Готово, когда всё записано.
  * @throws {Error} Если проекта нет, CLI запущен из исходников или файлы агента не собрать.
  */
-export async function syncProject(
-  directory: string,
-  options: SyncCommandOptions,
-  installation: Installation,
-): Promise<void> {
+export async function syncProject(directory: string, options: SyncCommandOptions): Promise<void> {
+  const { force, installation, messages } = options;
   const project = await requireProjectAt(directory);
   const tool = toolOf(installation);
   const config = await refreshedConfig(project.root, project.config);
@@ -113,8 +121,8 @@ export async function syncProject(
   const report = await syncClaude({
     projectDirectory: project.root,
     installation: claudeInstallationOf(installation),
-    force: options.force,
+    force,
   });
 
-  printWrittenReport(withTool(report, isToolChanged));
+  printWrittenReport(withTool(report, isToolChanged), messages);
 }

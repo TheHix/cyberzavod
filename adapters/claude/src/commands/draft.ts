@@ -43,19 +43,24 @@ import {
   type TranscriptText,
 } from "../capture/transcript.ts";
 import { isNotFound } from "@cyberzavod/storage";
+import { ClaudeError } from "../errors.ts";
+import type { ClaudeMessages } from "../messages/claude-messages.ts";
 import { captureDirectories, findProjectId, newestFile, requireProject } from "../paths.ts";
 
 type TranscriptRead =
   { status: "read"; text: string } | { status: "missing" } | { status: "failed" };
 
 // Непрочитанный транскрипт — предупреждение, а не ошибка; отсутствующий считает вызывающий.
-async function readTranscript(transcriptPath: string): Promise<TranscriptRead> {
+async function readTranscript(
+  transcriptPath: string,
+  messages: ClaudeMessages,
+): Promise<TranscriptRead> {
   try {
     return { status: "read", text: await readFile(transcriptPath, "utf8") };
   } catch (err) {
     if (isNotFound(err)) return { status: "missing" };
 
-    console.warn(`транскрипт ${transcriptPath} не прочитан: ${String(err)}`);
+    console.warn(messages.draft.transcriptNotRead({ file: transcriptPath, reason: String(err) }));
 
     return { status: "failed" };
   }
@@ -64,25 +69,31 @@ async function readTranscript(transcriptPath: string): Promise<TranscriptRead> {
 // Транскрипты читаются по одному: непрочитанный — предупреждение, а не ошибка, черновик полезен
 // и без счётчика токенов. Транскрипты служебных сабагентов Claude Code не сохраняет — о них
 // одна строка, а не по строке на каждый.
-async function readTranscripts(paths: Iterable<string>): Promise<Map<string, string>> {
+async function readTranscripts(
+  paths: Iterable<string>,
+  messages: ClaudeMessages,
+): Promise<Map<string, string>> {
   const transcripts = new Map<string, string>();
   let missing = 0;
 
   for (const transcriptPath of paths) {
-    const read = await readTranscript(transcriptPath);
+    const read = await readTranscript(transcriptPath, messages);
 
     if (read.status === "read") transcripts.set(transcriptPath, read.text);
     else if (read.status === "missing") missing++;
   }
 
-  if (missing > 0) console.warn(`транскриптов не найдено: ${missing}, их токены не посчитаны`);
+  if (missing > 0) console.warn(messages.draft.transcriptsMissing(missing));
 
   return transcripts;
 }
 
 // Токены каждого запуска сабагента по его транскрипту.
-async function tokensOfRuns(paths: ReadonlyMap<string, string>): Promise<Map<string, number>> {
-  const transcripts = await readTranscripts(paths.values());
+async function tokensOfRuns(
+  paths: ReadonlyMap<string, string>,
+  messages: ClaudeMessages,
+): Promise<Map<string, number>> {
+  const transcripts = await readTranscripts(paths.values(), messages);
   const tokens = new Map<string, number>();
 
   for (const [agentId, transcriptPath] of paths) {
@@ -95,8 +106,8 @@ async function tokensOfRuns(paths: ReadonlyMap<string, string>): Promise<Map<str
 }
 
 // Токены основной сессии по сообщениям: так их можно разложить по сборкам.
-async function usagesOfSession(paths: string[]): Promise<TokenUsage[]> {
-  const transcripts = await readTranscripts(paths);
+async function usagesOfSession(paths: string[], messages: ClaudeMessages): Promise<TokenUsage[]> {
+  const transcripts = await readTranscripts(paths, messages);
 
   return [...transcripts.values()].flatMap(tokenUsages);
 }
@@ -112,6 +123,7 @@ interface SessionTexts {
 // сессии не будет вовсе.
 async function textsFromSessionTranscript(
   transcriptPath: string | undefined,
+  messages: ClaudeMessages,
 ): Promise<SessionTexts> {
   const none: SessionTexts = { replies: [], answers: [], assignments: [] };
 
@@ -126,38 +138,42 @@ async function textsFromSessionTranscript(
       assignments: agentAssignments(transcript),
     };
   } catch (err) {
-    console.warn(
-      `транскрипт сессии не прочитан, моделей промптов и реплик сессии не будет: ${String(err)}`,
-    );
+    console.warn(messages.draft.sessionTranscriptNotRead(String(err)));
 
     return none;
   }
 }
 
 // Отчёты станций лежат в их транскриптах. Транскрипты, которых уже нет, — одно предупреждение.
-async function reportsFromStationTranscripts(paths: string[]): Promise<AgentReport[]> {
+async function reportsFromStationTranscripts(
+  paths: string[],
+  messages: ClaudeMessages,
+): Promise<AgentReport[]> {
   const reports: AgentReport[] = [];
   let missing = 0;
 
   for (const transcriptPath of paths) {
-    const read = await readTranscript(transcriptPath);
+    const read = await readTranscript(transcriptPath, messages);
 
     if (read.status === "read") reports.push(...agentReports(read.text));
     else if (read.status === "missing") missing++;
   }
 
-  if (missing > 0) console.warn(`транскриптов станций не найдено: ${missing}, их отчётов не будет`);
+  if (missing > 0) console.warn(messages.draft.stationTranscriptsMissing(missing));
 
   return reports;
 }
 
 // Проект каждого каталога, где шли команды. Проект ищется здесь, а не в хуке: так он находится
 // и для старых журналов, где пути уже лежат в командах, а хук остаётся лёгким.
-async function projectsOfDirectories(directories: string[]): Promise<Map<string, string>> {
+async function projectsOfDirectories(
+  directories: string[],
+  messages: ClaudeMessages,
+): Promise<Map<string, string>> {
   const projects = new Map<string, string>();
 
   for (const directory of directories) {
-    const id = await findProjectId(directory);
+    const id = await findProjectId(directory, messages);
 
     if (id !== undefined) projects.set(directory, id);
   }
@@ -167,14 +183,14 @@ async function projectsOfDirectories(directories: string[]): Promise<Map<string,
 
 // Как назвать правку в предупреждении: у промпта — цель, у реплики — строка, у вмешательства —
 // причина и строка.
-function titleOf(edit: EditableDraftEvent): string {
+function titleOf(edit: EditableDraftEvent, messages: ClaudeMessages): string {
   switch (edit.type) {
     case "draft_prompt":
       return edit.goal;
     case "draft_message":
       return edit.line;
     case "draft_intervention":
-      return `вмешательство (${edit.reason}): ${edit.line}`;
+      return messages.draft.intervention({ reason: edit.reason, text: edit.line });
     default:
       return edit satisfies never;
   }
@@ -195,17 +211,21 @@ async function readEarlierDraft(draftPath: string, shown: string): Promise<Draft
   try {
     return parseDraft(JSON.parse(earlier));
   } catch (err) {
-    throw new Error(`прошлый черновик ${shown} не разобран — исправьте или удалите его`, {
+    throw new ClaudeError((messages) => messages.errors.earlierDraftNotParsed(shown), {
       cause: err,
     });
   }
 }
 
-function withEarlierEdits(fresh: Draft, previous: Draft | undefined): Draft {
+function withEarlierEdits(
+  fresh: Draft,
+  previous: Draft | undefined,
+  messages: ClaudeMessages,
+): Draft {
   if (previous === undefined) return fresh;
 
   for (const edit of orphanedEdits(previous, fresh)) {
-    console.warn(`редактура «${titleOf(edit)}» не перенесена: такого события в журнале нет`);
+    console.warn(messages.draft.editNotCarried(titleOf(edit, messages)));
   }
 
   return carryOverEdits(previous, fresh);
@@ -225,7 +245,7 @@ function awaitsEditing(event: DraftEvent): event is EditableDraftEvent {
   }
 }
 
-function describeWaiting(event: EditableDraftEvent): string {
+function describeWaiting(event: EditableDraftEvent, messages: ClaudeMessages): string {
   const said = event.said.replace(/\s+/g, " ");
 
   switch (event.type) {
@@ -234,12 +254,13 @@ function describeWaiting(event: EditableDraftEvent): string {
     case "draft_message":
       return `${event.from} → ${event.to} (${event.source}): ${said}`;
     case "draft_intervention":
-      return `вмешательство (${event.reason}): ${said}`;
+      return messages.draft.intervention({ reason: event.reason, text: said });
     default:
       return event satisfies never;
   }
 }
 
+const EMPTY_VALUE = "—";
 const MS_PER_SECOND = 1000;
 const SECONDS_PER_MINUTE = 60;
 const MAX_ASSIGNMENT_LINE = 100;
@@ -253,34 +274,41 @@ function clockOf(t: number): string {
 }
 
 // По первой строке задания редактор узнаёт, к какой задаче относится запуск.
-function assignmentLineOf(draft: Draft, run: DraftRun): string {
+function assignmentLineOf(draft: Draft, run: DraftRun, messages: ClaudeMessages): string {
   const assignment = draft.events.find(
     (event) =>
       event.type === "draft_message" && event.run === run.run && event.source === "assignment",
   );
 
-  if (assignment?.type !== "draft_message") return "задание не найдено";
+  if (assignment?.type !== "draft_message") return messages.draft.assignmentNotFound;
 
   const line = assignment.said.split("\n").find((text) => text.trim() !== "") ?? "";
 
   return line.trim().slice(0, MAX_ASSIGNMENT_LINE);
 }
 
+interface RawSession {
+  rawPath: string;
+  rawEvents: RawEvent[];
+  projectsByDirectory: Map<string, string>;
+  messages: ClaudeMessages;
+}
+
 // Черновик только из журнала и транскриптов, ещё без редактуры прошлого черновика.
-async function freshDraftOf(
-  rawPath: string,
-  rawEvents: RawEvent[],
-  projectsByDirectory: Map<string, string>,
-): Promise<Draft> {
+async function freshDraftOf(session: RawSession): Promise<Draft> {
+  const { rawPath, rawEvents, projectsByDirectory, messages } = session;
+
   return toDraft(rawEvents, {
     sessionId: path.basename(rawPath, ".jsonl"),
-    runTokens: await tokensOfRuns(runTranscriptPaths(rawEvents)),
-    sessionUsages: await usagesOfSession(sessionTranscriptPaths(rawEvents)),
-    ...(await textsFromSessionTranscript(sessionTranscriptPath(rawEvents))),
-    reports: await reportsFromStationTranscripts(stationTranscriptPaths(rawEvents)),
+    runTokens: await tokensOfRuns(runTranscriptPaths(rawEvents), messages),
+    sessionUsages: await usagesOfSession(sessionTranscriptPaths(rawEvents), messages),
+    ...(await textsFromSessionTranscript(sessionTranscriptPath(rawEvents), messages)),
+    reports: await reportsFromStationTranscripts(stationTranscriptPaths(rawEvents), messages),
     projectsByDirectory,
   });
 }
+
+type ProjectsReport = Pick<DraftReport, "draft" | "rawEvents" | "projectsByDirectory" | "messages">;
 
 interface DraftReport {
   draft: Draft;
@@ -288,85 +316,111 @@ interface DraftReport {
   rawEvents: RawEvent[];
   projectsByDirectory: Map<string, string>;
   shownPath: string;
+  messages: ClaudeMessages;
 }
 
-function printCounts(draft: Draft): void {
+function printCounts(draft: Draft, messages: ClaudeMessages): void {
   const prompts = draft.events.filter((event) => event.type === "draft_prompt");
-  const messages = draft.events.filter((event) => event.type === "draft_message");
+  const replies = draft.events.filter((event) => event.type === "draft_message");
   const interventions = draft.events.filter((event) => event.type === "draft_intervention");
 
   console.log(
-    `промптов: ${prompts.length}, реплик: ${messages.length}, вмешательств: ${interventions.length}`,
+    messages.draft.counts({
+      prompts: prompts.length,
+      messages: replies.length,
+      interventions: interventions.length,
+    }),
   );
 }
 
-function printBuilds(draft: Draft): void {
+function printBuilds(draft: Draft, messages: ClaudeMessages): void {
   const owners = eventBuilds(draft);
 
   for (const build of draft.builds) {
     const eventCount = owners.filter((owner) => owner === build.id).length;
 
     console.log(
-      `сборка ${build.id}: проект ${build.project || "—"}, harness ${build.harness || "—"}, процесс ${build.workflow || "—"}, ` +
-        `запусков: ${build.runs.length}, событий: ${eventCount}`,
+      messages.draft.build({
+        id: build.id,
+        project: build.project || EMPTY_VALUE,
+        harness: build.harness || EMPTY_VALUE,
+        workflow: build.workflow || EMPTY_VALUE,
+        runs: build.runs.length,
+        events: eventCount,
+      }),
     );
   }
 
-  for (const line of unfilledHeader(draft)) console.log(`  не заполнено: ${line}`);
+  for (const { buildId, fields } of unfilledHeader(draft)) {
+    const names = fields.map((field) => messages.headerFields[field]).join(", ");
+
+    console.log(`  ${messages.draft.unfilledHeader({ buildId, fields: names })}`);
+  }
 }
 
-function warnAboutProjects(draft: Draft, rawEvents: RawEvent[], projects: Map<string, string>) {
+function warnAboutProjects(report: ProjectsReport) {
+  const { draft, rawEvents, projectsByDirectory, messages } = report;
+
   for (const project of projectsWithoutBuild(draft)) {
-    console.warn(`команды проекта ${project} без сборки: достанутся сборке по времени`);
+    console.warn(messages.draft.projectWithoutBuild(project));
   }
 
-  for (const directory of directoriesOutsideProjects(rawEvents, projects)) {
-    console.warn(
-      `каталог ${directory} не принадлежит проекту Cyberzavod: его этапы и проверки не попали в черновик`,
-    );
+  for (const directory of directoriesOutsideProjects(rawEvents, projectsByDirectory)) {
+    console.warn(messages.draft.directoryOutsideProject(directory));
   }
 }
 
-function printWaiting(draft: Draft): void {
+function printWaiting(draft: Draft, messages: ClaudeMessages): void {
   const waiting = draft.events.filter(awaitsEditing);
 
-  console.log(`ждут редактуры: ${waiting.length}`);
-  for (const event of waiting) console.log(`  • ${describeWaiting(event)}`);
+  console.log(messages.draft.waiting(waiting.length));
+  for (const event of waiting) console.log(`  • ${describeWaiting(event, messages)}`);
 }
 
-function printUnassignedRuns(draft: Draft): void {
+function printUnassignedRuns(draft: Draft, messages: ClaudeMessages): void {
   const unassigned = unassignedRuns(draft);
 
   if (unassigned.length === 0) return;
 
-  console.log(`запуски станций без сборки (достанутся первой): ${unassigned.length}`);
+  console.log(messages.draft.unassignedRuns(unassigned.length));
 
   for (const run of unassigned) {
-    console.log(`  • ${run.agent} ${run.run} ${clockOf(run.t)}: ${assignmentLineOf(draft, run)}`);
+    const line = messages.draft.unassignedRun({
+      agent: run.agent,
+      run: run.run,
+      clock: clockOf(run.t),
+      line: assignmentLineOf(draft, run, messages),
+    });
+
+    console.log(`  • ${line}`);
   }
 }
 
-function warnAboutEarlierDraft(draft: Draft, previous: Draft | undefined): void {
+function warnAboutEarlierDraft(
+  draft: Draft,
+  previous: Draft | undefined,
+  messages: ClaudeMessages,
+): void {
   for (const run of orphanedRuns(draft)) {
-    console.warn(`запуск ${run} указан в сборке, но в журнале его нет`);
+    console.warn(messages.draft.orphanedRun(run));
   }
 
   for (const message of previous === undefined ? [] : reroutedMessages(previous, draft)) {
-    console.warn(
-      `у реплики «${message.line}» поменялся маршрут: ${message.from} → ${message.to}, перечитайте строку`,
-    );
+    console.warn(messages.draft.reroutedMessage(message));
   }
 }
 
 // Сводка для редактора: что в черновике и что ещё ждёт редактуры.
-function reportDraft({ draft, previous, rawEvents, projectsByDirectory, shownPath }: DraftReport) {
-  console.log(`черновик: ${shownPath}`);
-  printCounts(draft);
-  printBuilds(draft);
-  warnAboutProjects(draft, rawEvents, projectsByDirectory);
-  printWaiting(draft);
-  printUnassignedRuns(draft);
-  warnAboutEarlierDraft(draft, previous);
+function reportDraft(report: DraftReport) {
+  const { draft, previous, rawEvents, projectsByDirectory, shownPath, messages } = report;
+
+  console.log(messages.draft.draftFile(shownPath));
+  printCounts(draft, messages);
+  printBuilds(draft, messages);
+  warnAboutProjects({ draft, rawEvents, projectsByDirectory, messages });
+  printWaiting(draft, messages);
+  printUnassignedRuns(draft, messages);
+  warnAboutEarlierDraft(draft, previous, messages);
 }
 
 /** Что собрать в черновик: проект и, если нужно, конкретный сырой журнал. */
@@ -375,35 +429,45 @@ export interface DraftSessionOptions {
   projectDirectory: string;
   /** Сырой журнал сессии; без него берётся самый свежий. */
   rawPath?: string;
+  /** Сообщения на выбранном языке. */
+  messages: ClaudeMessages;
 }
 
 /**
  * Собирает черновик записи из сырого журнала сессии и печатает, что ещё ждёт редактуры.
  * @param {DraftSessionOptions} options Проект и сырой журнал.
  * @returns {Promise<string>} Путь записанного черновика.
- * @throws {Error} Если проекта нет, журналов ещё нет или прошлый черновик битый.
+ * @throws {ClaudeError} Если проекта нет, журналов ещё нет или прошлый черновик битый.
  */
 export async function draftSession(options: DraftSessionOptions): Promise<string> {
+  const { messages } = options;
   const project = await requireProject(options.projectDirectory);
   const directories = captureDirectories(project.journal);
   const shown = (file: string) => path.relative(project.root, file) || ".";
   const rawPath = options.rawPath ?? (await newestFile(directories.raw, ".jsonl"));
 
   if (rawPath === undefined) {
-    throw new Error(`журналов сессий ещё нет: хуки пишут их в ${shown(directories.raw)}`);
+    throw new ClaudeError((m) => m.errors.noRawLogs(shown(directories.raw)));
   }
 
   const rawEvents = parseRawLog(await readFile(rawPath, "utf8"));
-  const projectsByDirectory = await projectsOfDirectories(toolDirectories(rawEvents));
-  const fresh = await freshDraftOf(rawPath, rawEvents, projectsByDirectory);
+  const projectsByDirectory = await projectsOfDirectories(toolDirectories(rawEvents), messages);
+  const fresh = await freshDraftOf({ rawPath, rawEvents, projectsByDirectory, messages });
   const draftPath = path.join(directories.drafts, `${fresh.id}.json`);
   const previous = await readEarlierDraft(draftPath, shown(draftPath));
-  const draft = routeMessages(withEarlierEdits(fresh, previous));
+  const draft = routeMessages(withEarlierEdits(fresh, previous, messages));
 
   await mkdir(directories.drafts, { recursive: true });
   await writeFile(draftPath, `${JSON.stringify(draft, null, 2)}\n`);
 
-  reportDraft({ draft, previous, rawEvents, projectsByDirectory, shownPath: shown(draftPath) });
+  reportDraft({
+    draft,
+    previous,
+    rawEvents,
+    projectsByDirectory,
+    shownPath: shown(draftPath),
+    messages,
+  });
 
   return draftPath;
 }

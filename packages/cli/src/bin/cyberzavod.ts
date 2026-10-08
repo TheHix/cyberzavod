@@ -4,4 +4,8 @@
 
 import { runCli } from "../cli.ts";
 
-process.exitCode = await runCli(process.argv.slice(2), process.env.INIT_CWD ?? process.cwd());
+process.exitCode = await runCli(
+  process.argv.slice(2),
+  process.env.INIT_CWD ?? process.cwd(),
+  process.env,
+);

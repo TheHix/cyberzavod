@@ -9,6 +9,7 @@ import {
   TEST_SITE_URL,
   captureOutput,
 } from "../sharing/fixtures.ts";
+import { CLI_MESSAGES } from "../messages/catalog.ts";
 import { galleryAccessOf, showGallery } from "./gallery.ts";
 
 describe("galleryAccessOf", () => {
@@ -25,12 +26,13 @@ describe("galleryAccessOf", () => {
   it("оба флага сразу — ошибка", () => {
     const act = () => galleryAccessOf(true, true);
 
-    expect(act).toThrow(/вместе не работают/);
+    expect(act).toThrow(/cannot be combined/);
   });
 });
 
 describe("showGallery", () => {
   const printed = captureOutput();
+  const messages = CLI_MESSAGES.ru;
 
   it("закрытая галерея: записи со ссылками, лимит и подсказка открыть", async () => {
     const api = fakeApi({
@@ -39,7 +41,7 @@ describe("showGallery", () => {
       ),
     });
 
-    await showGallery(fakeSharing({ api }), "keep");
+    await showGallery(fakeSharing({ api }), "keep", messages);
 
     expect(printed()).toContain("закрыта");
     expect(printed()).toContain("Записи: 1 из 5");
@@ -52,7 +54,7 @@ describe("showGallery", () => {
   it("--public открывает галерею и показывает ссылку и бейдж", async () => {
     const api = fakeApi({ me: vi.fn(async () => author({ galleryPublic: true })) });
 
-    await showGallery(fakeSharing({ api }), "public");
+    await showGallery(fakeSharing({ api }), "public", messages);
 
     expect(api.setGalleryPublic).toHaveBeenCalledWith(SECRET_TOKEN, true);
     expect(printed()).toContain("открыта");
@@ -65,14 +67,14 @@ describe("showGallery", () => {
   it("--private закрывает галерею и не показывает бейдж", async () => {
     const api = fakeApi();
 
-    await showGallery(fakeSharing({ api }), "private");
+    await showGallery(fakeSharing({ api }), "private", messages);
 
     expect(api.setGalleryPublic).toHaveBeenCalledWith(SECRET_TOKEN, false);
     expect(printed()).not.toContain("/api/badges/");
   });
 
   it("не печатает токен", async () => {
-    await showGallery(fakeSharing(), "keep");
+    await showGallery(fakeSharing(), "keep", messages);
 
     expect(printed()).not.toContain(SECRET_TOKEN);
   });
@@ -80,8 +82,8 @@ describe("showGallery", () => {
   it("без входа просит войти", async () => {
     const sharing = fakeSharing({ credentials: memoryCredentials() });
 
-    const act = () => showGallery(sharing, "keep");
+    const act = () => showGallery(sharing, "keep", messages);
 
-    await expect(act()).rejects.toThrow(/нет входа/);
+    await expect(act()).rejects.toThrow(/not signed in/);
   });
 });

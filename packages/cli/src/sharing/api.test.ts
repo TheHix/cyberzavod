@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { ApiError, HttpCyberzavodApi } from "./api.ts";
+import { CommandError } from "../errors.ts";
+import { CLI_MESSAGES } from "../messages/catalog.ts";
+import { HttpCyberzavodApi } from "./api.ts";
 import { author, SECRET_TOKEN, summary } from "./fixtures.ts";
 import type { FetchFunction } from "./http.ts";
 
@@ -66,20 +68,44 @@ describe("HttpCyberzavodApi.me", () => {
     });
   });
 
-  it("ответ без полей — ошибка сервера, а не undefined в командах", async () => {
+  it("ответ без полей — неожиданный ответ, а не undefined в командах", async () => {
     const api = new HttpCyberzavodApi(BASE_URL, answering(200, { login: "alice" }));
 
     const act = () => api.me(SECRET_TOKEN);
 
-    await expect(act()).rejects.toThrow(ApiError);
+    await expect(act()).rejects.toThrow(CommandError);
+    await expect(act()).rejects.toThrow(
+      "the server returned an unexpected response: no valid field galleryPublic",
+    );
   });
 
-  it("ответ не по формату контракта ошибки — просто статус", async () => {
+  it("запись автора без поля — называет поле записи", async () => {
+    const body = { ...author(), recordings: [{ ...summary(), slug: 1 }] };
+    const api = new HttpCyberzavodApi(BASE_URL, answering(200, body));
+
+    const act = () => api.me(SECRET_TOKEN);
+
+    await expect(act()).rejects.toThrow("no valid field recordings[].slug");
+  });
+
+  it("502 без тела — ошибка команды со статусом, а не ошибка сервера", async () => {
     const api = new HttpCyberzavodApi(BASE_URL, answering(502));
 
     const act = () => api.me(SECRET_TOKEN);
 
-    await expect(act()).rejects.toThrow("сервер ответил 502");
+    await expect(act()).rejects.toThrow(CommandError);
+    await expect(act()).rejects.toThrow("the server answered 502");
+  });
+
+  it("ошибка без тела печатается на языке сообщений", async () => {
+    const api = new HttpCyberzavodApi(BASE_URL, answering(502));
+
+    const error = await api.me(SECRET_TOKEN).then(
+      () => undefined,
+      (err: unknown) => err,
+    );
+
+    expect((error as CommandError).describe(CLI_MESSAGES.ru)).toBe("сервер ответил 502");
   });
 });
 

@@ -179,7 +179,7 @@ export function renderTemplate(template: string, project: ClaudeProject): string
     const value = values[name];
 
     if (value === undefined) {
-      throw new GenerateError(`в шаблоне неизвестная подстановка ${placeholder}`);
+      throw new GenerateError((messages) => messages.errors.unknownPlaceholder(placeholder));
     }
 
     return value;

@@ -13,6 +13,8 @@ import {
   readProjectConfig,
 } from "@cyberzavod/storage";
 import type { ProjectConfig } from "@cyberzavod/core";
+import { ClaudeError } from "./errors.ts";
+import type { ClaudeMessages } from "./messages/claude-messages.ts";
 
 /** Каталоги адаптера в журнале проекта: сырые журналы сессий и черновики записей. */
 export interface CaptureDirectories {
@@ -60,13 +62,14 @@ export async function locateProject(directory: string): Promise<LocatedProject |
  * Находит проект каталога для команды, которой без проекта делать нечего.
  * @param {string} directory Каталог внутри проекта.
  * @returns {Promise<LocatedProject>} Проект.
- * @throws {Error} Если маркера нет на всём пути вверх или конфиг битый.
+ * @throws {ClaudeError} Если маркера нет на всём пути вверх.
+ * @throws {ProjectFileError} Если конфиг проекта битый.
  */
 export async function requireProject(directory: string): Promise<LocatedProject> {
   const project = await locateProject(directory);
 
   if (project === undefined) {
-    throw new Error(`${directory} не в проекте Cyberzavod: сначала cyberzavod init`);
+    throw new ClaudeError((messages) => messages.errors.projectNotFound(directory));
   }
 
   return project;
@@ -76,15 +79,19 @@ export async function requireProject(directory: string): Promise<LocatedProject>
  * Находит проект каталога: поднимается от него вверх до первого маркера. Нет маркера на всём
  * пути — каталог не принадлежит проекту, битый конфиг — предупреждение.
  * @param {string} directory Абсолютный путь каталога; может уже не существовать.
+ * @param {ClaudeMessages} messages Сообщения на выбранном языке.
  * @returns {Promise<string | undefined>} `projectId` или undefined, если проекта нет.
  */
-export async function findProjectId(directory: string): Promise<string | undefined> {
+export async function findProjectId(
+  directory: string,
+  messages: ClaudeMessages,
+): Promise<string | undefined> {
   try {
     return (await locateProject(directory))?.config.projectId;
   } catch (err) {
     if (!(err instanceof ProjectFileError)) throw err;
 
-    console.warn(`конфиг проекта не прочитан: ${err.message}`);
+    console.warn(messages.draft.configNotRead(err.message));
 
     return undefined;
   }

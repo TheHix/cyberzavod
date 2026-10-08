@@ -2,7 +2,7 @@
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { isRecordId, parseRecord, RecordError, type SessionRecord } from "@cyberzavod/core";
+import { isRecordId, parseRecord, type JournalRecord, type SessionRecord } from "@cyberzavod/core";
 import { isNotFound, RECORD_COLLECTIONS } from "@cyberzavod/storage";
 import { CommandError } from "../errors.ts";
 import {
@@ -13,14 +13,13 @@ import {
   type UploadedRecording,
 } from "../sharing/api.ts";
 import { withToken } from "../sharing/authorization.ts";
+import type { CliMessages } from "../messages/cli-messages.ts";
 import { recordingLink } from "../sharing/links.ts";
 import type { Sharing } from "../sharing/services.ts";
 import { requireProjectAt, type ProjectAt } from "./project.ts";
 
 function requireRecordId(id: string): void {
-  if (!isRecordId(id)) {
-    throw new CommandError(`${id} не похож на id записи: только буквы, цифры, «_» и «-»`);
-  }
+  if (!isRecordId(id)) throw new CommandError((messages) => messages.errors.invalidRecordId(id));
 }
 
 async function readRecordText(project: ProjectAt, id: string): Promise<string> {
@@ -33,7 +32,7 @@ async function readRecordText(project: ProjectAt, id: string): Promise<string> {
 
     const shown = path.relative(project.root, file);
 
-    throw new CommandError(`в журнале нет записи ${id}: файла ${shown} не существует`, {
+    throw new CommandError((messages) => messages.errors.recordMissing({ id, file: shown }), {
       cause: err,
     });
   }
@@ -41,16 +40,26 @@ async function readRecordText(project: ProjectAt, id: string): Promise<string> {
 
 // Формат записи проверяет ядро: сервер смотрит только на конверт, второго описания формата нет.
 function parseSession(text: string, id: string): SessionRecord {
+  const record = parseKnownRecord(text, id);
+
+  if (record.type !== "session") {
+    throw new CommandError((messages) =>
+      messages.errors.recordNotSession({ id, type: record.type }),
+    );
+  }
+
+  return record;
+}
+
+function parseKnownRecord(text: string, id: string): JournalRecord {
   try {
-    const record = parseRecord(JSON.parse(text));
-
-    if (record.type !== "session") throw new RecordError(`тип ${record.type}, нужна сессия`);
-
-    return record;
+    return parseRecord(JSON.parse(text));
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
 
-    throw new CommandError(`запись ${id} не прошла проверку: ${reason}`, { cause: err });
+    throw new CommandError((messages) => messages.errors.recordInvalid({ id, reason }), {
+      cause: err,
+    });
   }
 }
 
@@ -58,20 +67,20 @@ function recordingLines(recordings: Me["recordings"]): string[] {
   return recordings.map((recording) => `  ${recording.id}  ${recording.title}`);
 }
 
-async function limitReachedError(
-  sharing: Sharing,
-  token: string,
-  serverMessage: string,
-): Promise<CommandError> {
+async function limitReachedError(sharing: Sharing, token: string): Promise<CommandError> {
   const me = await sharing.api.me(token);
-  const lines = [
-    serverMessage,
-    `Записи в галерее (${me.recordings.length} из ${me.limit}):`,
-    ...recordingLines(me.recordings),
-    "Освободите место командой cyberzavod unshare <id>",
-  ];
+  const { recordings, limit } = me;
 
-  return new CommandError(lines.join("\n"));
+  return new CommandError((messages) => {
+    const lines = [
+      messages.errors.limitReached,
+      messages.share.galleryRecordings({ count: recordings.length, limit }),
+      ...recordingLines(recordings),
+      messages.share.freeUpSpace,
+    ];
+
+    return lines.join("\n");
+  });
 }
 
 async function upload(
@@ -85,15 +94,24 @@ async function upload(
   } catch (err) {
     if (!isApiError(err, LIMIT_REACHED_CODE)) throw err;
 
-    throw await limitReachedError(sharing, token, err.message);
+    throw await limitReachedError(sharing, token);
   }
+}
+
+/** Что отправить: проект, запись и язык сообщений. */
+export interface ShareRecordingOptions {
+  /** Каталог внутри проекта. */
+  directory: string;
+  /** Идентификатор записи сессии. */
+  id: string;
+  /** Сообщения на выбранном языке. */
+  messages: CliMessages;
 }
 
 /**
  * Отправляет запись сессии из журнала проекта в личную галерею автора.
  * @param {Sharing} sharing Зависимости команд публикации.
- * @param {string} directory Каталог внутри проекта.
- * @param {string} id Идентификатор записи сессии.
+ * @param {ShareRecordingOptions} options Каталог проекта, идентификатор записи и сообщения.
  * @returns {Promise<void>} Готово, когда запись отправлена и ссылка напечатана.
  * @throws {CommandError} Если id некорректен, записи нет или она не прошла проверку, нет входа
  *   или достигнут лимит записей.
@@ -101,9 +119,10 @@ async function upload(
  */
 export async function shareRecording(
   sharing: Sharing,
-  directory: string,
-  id: string,
+  options: ShareRecordingOptions,
 ): Promise<void> {
+  const { directory, id, messages } = options;
+
   requireRecordId(id);
 
   const project = await requireProjectAt(directory);
@@ -114,14 +133,15 @@ export async function shareRecording(
     uploaded: await upload(sharing, token, id, record),
     me: await sharing.api.me(token),
   }));
-  const verb = uploaded.isNew ? "отправлена" : "заменена";
+  const outcome = uploaded.isNew ? messages.share.sent(id) : messages.share.replaced(id);
+  const link = recordingLink(sharing.siteUrl, uploaded.recording.slug);
 
-  console.log(`запись ${id} ${verb}`);
-  console.log(`ссылка: ${recordingLink(sharing.siteUrl, uploaded.recording.slug)}`);
+  console.log(outcome);
+  console.log(messages.share.link(link));
 
   if (!me.galleryPublic) {
-    console.log("галерея закрыта: запись видна только по этой ссылке");
-    console.log("открыть галерею: cyberzavod gallery --public");
+    console.log(messages.share.galleryClosed);
+    console.log(messages.share.openGalleryHint);
   }
 }
 
@@ -129,13 +149,18 @@ export async function shareRecording(
  * Удаляет запись из галереи автора.
  * @param {Sharing} sharing Зависимости команд публикации.
  * @param {string} id Идентификатор записи.
+ * @param {CliMessages} messages Сообщения на выбранном языке.
  * @returns {Promise<void>} Готово, когда сервер удалил запись.
  * @throws {CommandError} Если id некорректен или нет входа.
  * @throws {ApiError} Если такой записи в галерее нет.
  */
-export async function unshareRecording(sharing: Sharing, id: string): Promise<void> {
+export async function unshareRecording(
+  sharing: Sharing,
+  id: string,
+  messages: CliMessages,
+): Promise<void> {
   requireRecordId(id);
 
   await withToken(sharing, (token) => sharing.api.deleteRecording(token, id));
-  console.log(`запись ${id} удалена из галереи`);
+  console.log(messages.share.removed(id));
 }

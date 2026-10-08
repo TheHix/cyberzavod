@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
+import { CLAUDE_MESSAGES } from "../messages/catalog.ts";
 import type { HookContext } from "./hook.ts";
 import { recordEvent } from "./record.ts";
 import { hookStatePath } from "./state.ts";
@@ -30,6 +31,7 @@ function promptContext(prompt: string): HookContext {
     payload: JSON.stringify({ hook_event_name: "UserPromptSubmit", session_id: SESSION, prompt }),
     projectDirectory: root,
     tmpDir: workspace,
+    messages: CLAUDE_MESSAGES.en,
   };
 }
 
@@ -81,7 +83,7 @@ describe("recordEvent", () => {
 
     const outcome = await recordEvent(promptContext("Сделай задачу"));
 
-    expect(outcome.stderr).toContain("сессия не записана");
+    expect(outcome.stderr).toContain("session not recorded");
   });
 
   it("отклоняет session_id, который не годится для имени файла", async () => {

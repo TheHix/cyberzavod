@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
+import { CLAUDE_MESSAGES } from "../messages/catalog.ts";
+import type { ClaudeMessages } from "../messages/claude-messages.ts";
 import type { HookContext, HookOutcome } from "./hook.ts";
 import { gateStop } from "./stop-gate.ts";
 import { startTurn } from "./turn-start.ts";
@@ -51,8 +53,13 @@ async function makeRepo(
   git("commit", "-qm", "init");
 }
 
-function context(): HookContext {
-  return { payload: JSON.stringify({ session_id: SESSION }), projectDirectory: repo, tmpDir };
+function context(messages: ClaudeMessages = CLAUDE_MESSAGES.en): HookContext {
+  return {
+    payload: JSON.stringify({ session_id: SESSION }),
+    projectDirectory: repo,
+    tmpDir,
+    messages,
+  };
 }
 
 async function stopTimes(times: number): Promise<HookOutcome | undefined> {
@@ -94,10 +101,20 @@ describe("gateStop", () => {
 
     const outcome = await gateStop(context());
 
-    expect({ code: outcome.exitCode, attempt: outcome.stderr.includes("попытка 1 из 3") }).toEqual({
+    expect({ code: outcome.exitCode, attempt: outcome.stderr.includes("attempt 1 of 3") }).toEqual({
       code: BLOCKED,
       attempt: true,
     });
+  });
+
+  it("говорит с агентом на языке сообщений хука", async () => {
+    await makeRepo();
+    await startTurn(context());
+    await breakCode();
+
+    const outcome = await gateStop(context(CLAUDE_MESSAGES.ru));
+
+    expect(outcome.stderr).toContain("не проходит — закончить работу нельзя (попытка 1 из 3)");
   });
 
   it("показывает агенту вывод проверок", async () => {
@@ -119,7 +136,7 @@ describe("gateStop", () => {
 
     expect({
       code: outcome?.exitCode,
-      message: outcome?.stdout.includes("нужен человек"),
+      message: outcome?.stdout.includes("a human is needed"),
       marker: existsSync(stateFile("human-call")),
     }).toEqual({ code: RELEASED, message: true, marker: true });
   });
@@ -132,7 +149,7 @@ describe("gateStop", () => {
 
     const outcome = await stopTimes(4);
 
-    expect(outcome?.stdout).toContain("Отметка для записи не сохранена");
+    expect(outcome?.stdout).toContain("The marker for the recording was not saved.");
   });
 
   it("не оставляет отметку, пока агента ещё возвращают к работе", async () => {
@@ -169,7 +186,7 @@ describe("gateStop", () => {
 
     const outcome = await gateStop(context());
 
-    expect({ code: outcome.exitCode, attempt: outcome.stderr.includes("попытка 1 из 3") }).toEqual({
+    expect({ code: outcome.exitCode, attempt: outcome.stderr.includes("attempt 1 of 3") }).toEqual({
       code: BLOCKED,
       attempt: true,
     });
@@ -225,10 +242,12 @@ describe("gateStop", () => {
 
     const outcome = await gateStop(context());
 
-    expect({ code: outcome.exitCode, message: outcome.stdout.includes("счётчик") }).toEqual({
-      code: RELEASED,
-      message: true,
-    });
+    expect({ code: outcome.exitCode, message: outcome.stdout.includes("attempt counter") }).toEqual(
+      {
+        code: RELEASED,
+        message: true,
+      },
+    );
   });
 
   it("запускает все команды из конфига по порядку и называет их в отказе", async () => {
@@ -242,7 +261,7 @@ describe("gateStop", () => {
       code: outcome.exitCode,
       first: existsSync(path.join(repo, "first-ran")),
       second: existsSync(path.join(repo, "second-ran")),
-      named: outcome.stderr.startsWith("touch first-ran && touch second-ran && exit 1 не проходит"),
+      named: outcome.stderr.startsWith("touch first-ran && touch second-ran && exit 1 fails"),
     }).toEqual({ code: BLOCKED, first: true, second: true, named: true });
   });
 

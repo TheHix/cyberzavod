@@ -2,6 +2,7 @@
 // умолчанию для каждого этапа и какие инструменты даёт роли по её доступу.
 
 import { DEFAULT_MODEL, type AgentConfig, type Stage, type StageAccess } from "@cyberzavod/core";
+import { ClaudeError } from "../errors.ts";
 
 /** Провайдер моделей Claude. */
 export const CLAUDE_PROVIDER = "anthropic";
@@ -35,7 +36,7 @@ const ROLE_TOOLS: Readonly<Record<StageAccess, string>> = {
 };
 
 /** Ошибка генерации файлов Claude Code: конфиг просит то, чего адаптер не умеет. */
-export class GenerateError extends Error {}
+export class GenerateError extends ClaudeError {}
 
 /**
  * Модель Claude для этапа.
@@ -52,9 +53,12 @@ export function claudeModelOf(stage: Stage, agent: AgentConfig | undefined): str
   } = agent ?? {};
 
   if (provider !== CLAUDE_PROVIDER || name !== CLAUDE_AGENT) {
-    throw new GenerateError(
-      `этап ${stage}: ${provider}/${name} не поддерживается, пока есть только адаптер ` +
-        `${CLAUDE_PROVIDER}/${CLAUDE_AGENT}`,
+    throw new GenerateError((messages) =>
+      messages.errors.unsupportedAgent({
+        stage,
+        requested: `${provider}/${name}`,
+        supported: `${CLAUDE_PROVIDER}/${CLAUDE_AGENT}`,
+      }),
     );
   }
 

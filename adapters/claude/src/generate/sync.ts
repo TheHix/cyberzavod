@@ -126,20 +126,28 @@ async function claudeProjectOf(
   };
 }
 
+function parseJson(text: string, file: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    const reason = (err as Error).message;
+
+    throw new GenerateError((messages) => messages.errors.settingsNotParsed({ file, reason }), {
+      cause: err,
+    });
+  }
+}
+
 function parseSettings(text: string | undefined, file: string): Settings {
   if (text === undefined) return {};
 
-  try {
-    const parsed: unknown = JSON.parse(text);
+  const parsed = parseJson(text, file);
 
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      throw new GenerateError("настройки должны быть объектом");
-    }
-
-    return parsed as Settings;
-  } catch (err) {
-    throw new GenerateError(`${file} не разобран: ${(err as Error).message}`, { cause: err });
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new GenerateError((messages) => messages.errors.settingsNotObject(file));
   }
+
+  return parsed as Settings;
 }
 
 function settingsText(settings: Settings): string {
@@ -251,9 +259,9 @@ export async function syncClaude(options: SyncOptions): Promise<SyncReport> {
 
   if (options.check === true) return report;
   if (conflicts.length > 0) {
-    throw new GenerateError(
-      `эти файлы написаны не генератором, перенесите их содержимое в AGENTS.md или запустите с --force: ${conflicts.join(", ")}`,
-    );
+    const files = conflicts.join(", ");
+
+    throw new GenerateError((messages) => messages.errors.fileConflicts(files));
   }
 
   await writeFiles(project.root, files, changed);

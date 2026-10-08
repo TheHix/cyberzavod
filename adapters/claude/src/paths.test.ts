@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
+import { CLAUDE_MESSAGES } from "./messages/catalog.ts";
 import { findProjectId } from "./paths.ts";
 
 let root: string;
@@ -29,7 +30,7 @@ describe("findProjectId", () => {
   it("находит id проекта в самом каталоге", async () => {
     await writeConfig(root, configOf("lab"));
 
-    const id = await findProjectId(root);
+    const id = await findProjectId(root, CLAUDE_MESSAGES.en);
 
     expect(id).toBe("lab");
   });
@@ -40,7 +41,7 @@ describe("findProjectId", () => {
 
     await mkdir(nested, { recursive: true });
 
-    const id = await findProjectId(nested);
+    const id = await findProjectId(nested, CLAUDE_MESSAGES.en);
 
     expect(id).toBe("lab");
   });
@@ -51,7 +52,7 @@ describe("findProjectId", () => {
 
     await writeConfig(inner, configOf("inner"));
 
-    const id = await findProjectId(inner);
+    const id = await findProjectId(inner, CLAUDE_MESSAGES.en);
 
     expect(id).toBe("inner");
   });
@@ -59,7 +60,7 @@ describe("findProjectId", () => {
   it("находит конфиг, когда каталога уже нет", async () => {
     await writeConfig(root, configOf("lab"));
 
-    const id = await findProjectId(path.join(root, "removed", "deeper"));
+    const id = await findProjectId(path.join(root, "removed", "deeper"), CLAUDE_MESSAGES.en);
 
     expect(id).toBe("lab");
   });
@@ -68,13 +69,13 @@ describe("findProjectId", () => {
     await writeConfig(root, configOf("lab"));
     await writeFile(path.join(root, "file.txt"), "");
 
-    const id = await findProjectId(path.join(root, "file.txt", "inside"));
+    const id = await findProjectId(path.join(root, "file.txt", "inside"), CLAUDE_MESSAGES.en);
 
     expect(id).toBe("lab");
   });
 
   it("возвращает undefined, когда конфига нет на всём пути", async () => {
-    const id = await findProjectId(root);
+    const id = await findProjectId(root, CLAUDE_MESSAGES.en);
 
     expect(id).toBeUndefined();
   });
@@ -83,7 +84,7 @@ describe("findProjectId", () => {
     await writeConfig(root, "{ не json");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
-    const id = await findProjectId(root);
+    const id = await findProjectId(root, CLAUDE_MESSAGES.en);
 
     expect([id, warn.mock.calls.length]).toEqual([undefined, 1]);
   });

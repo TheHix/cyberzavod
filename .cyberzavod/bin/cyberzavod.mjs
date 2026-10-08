@@ -528,29 +528,208 @@ function parseProjectConfig(raw) {
   return stack === void 0 ? config : { ...config, stack };
 }
 
+// ../core/src/interface-language.ts
+var INTERFACE_LANGUAGES = ["en", "ru"];
+var DEFAULT_INTERFACE_LANGUAGE = "en";
+function isInterfaceLanguage(value) {
+  return INTERFACE_LANGUAGES.includes(value);
+}
+
+// ../../adapters/claude/src/messages/en.ts
+var en = {
+  stop: {
+    configUnreadable: ({ file, reason }) => `The config ${file} cannot be read \u2014 checks were skipped, the agent is released. ${reason}`,
+    gitUnavailable: (reason) => `The stop hook could not run git \u2014 checks were skipped, the agent is released. ${reason}`,
+    counterNotSaved: (file) => `The stop hook could not write the attempt counter (${file}) \u2014 checks are red, the agent is released without retries.`,
+    checksFailing: ({ command, attempt, maxAttempts, output }) => `${command} fails \u2014 you cannot finish yet (attempt ${attempt} of ${maxAttempts}). Fix:
+${output}
+`,
+    humanCalled: (maxAttempts) => `Checks are still red after ${maxAttempts} attempts to fix them \u2014 the agent is stopped, a human is needed.`,
+    markerNotSaved: "The marker for the recording was not saved."
+  },
+  record: {
+    sessionNotRecorded: (reason) => `session not recorded: ${reason}`,
+    markerNotClaimed: ({ file, reason }) => `marker ${file} was not claimed: ${reason}`
+  },
+  draft: {
+    configNotRead: (reason) => `project config not read: ${reason}`,
+    transcriptNotRead: ({ file, reason }) => `transcript ${file} not read: ${reason}`,
+    transcriptsMissing: (count) => `transcripts not found: ${count}, their tokens are not counted`,
+    sessionTranscriptNotRead: (reason) => `session transcript not read, there will be no prompt models or session messages: ${reason}`,
+    stationTranscriptsMissing: (count) => `station transcripts not found: ${count}, their reports will be missing`,
+    intervention: ({ reason, text }) => `intervention (${reason}): ${text}`,
+    editNotCarried: (title) => `edit \u201C${title}\u201D was not carried over: no such event in the log`,
+    assignmentNotFound: "assignment not found",
+    draftFile: (file) => `draft: ${file}`,
+    counts: ({ prompts, messages, interventions }) => `prompts: ${prompts}, messages: ${messages}, interventions: ${interventions}`,
+    build: ({ id, project, harness: harness2, workflow, runs, events }) => `build ${id}: project ${project}, harness ${harness2}, workflow ${workflow}, runs: ${runs}, events: ${events}`,
+    unfilledHeader: ({ buildId, fields }) => `not filled in: build ${buildId}: ${fields}`,
+    projectWithoutBuild: (project) => `commands of project ${project} have no build: they go to the build by time`,
+    directoryOutsideProject: (directory) => `directory ${directory} does not belong to a Cyberzavod project: its stages and checks are not in the draft`,
+    waiting: (count) => `awaiting editing: ${count}`,
+    unassignedRuns: (count) => `station runs without a build (they go to the first): ${count}`,
+    unassignedRun: ({ agent, run, clock, line }) => `${agent} ${run} ${clock}: ${line}`,
+    orphanedRun: (run) => `run ${run} is listed in a build, but it is not in the log`,
+    reroutedMessage: ({ line, from, to }) => `the route of message \u201C${line}\u201D changed: ${from} \u2192 ${to}, reread the line`
+  },
+  publish: {
+    published: (file) => `published: ${file}`,
+    notReady: ({ file, problems }) => `${file} is not ready to publish:
+${problems}`,
+    buildProblem: ({ buildId, reason }) => `build ${buildId}: ${reason}`
+  },
+  errors: {
+    unsupportedAgent: ({ stage, requested, supported }) => `stage ${stage}: ${requested} is not supported, only the ${supported} adapter exists so far`,
+    fileConflicts: (files) => `these files were not written by the generator, move their content to AGENTS.md or run with --force: ${files}`,
+    settingsNotObject: (file) => `${file} cannot be parsed: the settings must be an object`,
+    settingsNotParsed: ({ file, reason }) => `${file} cannot be parsed: ${reason}`,
+    unknownPlaceholder: (placeholder) => `the template has an unknown placeholder ${placeholder}`,
+    projectNotFound: (directory) => `${directory} is not in a Cyberzavod project: run cyberzavod init first`,
+    noDrafts: "no drafts yet: run cyberzavod draft first",
+    noRawLogs: (directory) => `no session logs yet: the hooks write them to ${directory}`,
+    earlierDraftNotParsed: (file) => `the earlier draft ${file} cannot be parsed \u2014 fix or delete it`,
+    noBuild: (buildId) => `the draft has no build ${buildId}`,
+    buildHasNoEvents: (buildId) => `build ${buildId} has no events`,
+    leaksFound: ({ buildId, leaks }) => `the text to publish for build ${buildId} contains something that must not be shown: ${leaks}`,
+    leakIn: ({ kind, text }) => `${kind} in \u201C${text}\u201D`
+  },
+  leakKinds: {
+    "ip-address": "IP address",
+    "ipv6-address": "IPv6 address",
+    email: "email or an address like user@host",
+    "server-login": "server login",
+    token: "token",
+    "url-password": "password in a URL",
+    "private-key": "private key",
+    "user-path": "path with a user name"
+  },
+  headerFields: {
+    title: "title",
+    language: "language",
+    project: "project",
+    harness: "harness version",
+    workflow: "workflow"
+  }
+};
+
+// ../../adapters/claude/src/messages/ru.ts
+var ru = {
+  stop: {
+    configUnreadable: ({ file, reason }) => `\u041A\u043E\u043D\u0444\u0438\u0433 ${file} \u043D\u0435 \u0447\u0438\u0442\u0430\u0435\u0442\u0441\u044F \u2014 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438 \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u044B, \u0430\u0433\u0435\u043D\u0442 \u043E\u0442\u043F\u0443\u0449\u0435\u043D. ${reason}`,
+    gitUnavailable: (reason) => `\u0425\u0443\u043A \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0438 \u043D\u0435 \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u043B git \u2014 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438 \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u044B, \u0430\u0433\u0435\u043D\u0442 \u043E\u0442\u043F\u0443\u0449\u0435\u043D. ${reason}`,
+    counterNotSaved: (file) => `\u0425\u0443\u043A \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0438 \u043D\u0435 \u0441\u043C\u043E\u0433 \u0437\u0430\u043F\u0438\u0441\u0430\u0442\u044C \u0441\u0447\u0451\u0442\u0447\u0438\u043A \u043F\u043E\u043F\u044B\u0442\u043E\u043A (${file}) \u2014 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438 \u043A\u0440\u0430\u0441\u043D\u044B\u0435, \u0430\u0433\u0435\u043D\u0442 \u043E\u0442\u043F\u0443\u0449\u0435\u043D \u0431\u0435\u0437 \u043F\u043E\u0432\u0442\u043E\u0440\u043E\u0432.`,
+    checksFailing: ({ command, attempt, maxAttempts, output }) => `${command} \u043D\u0435 \u043F\u0440\u043E\u0445\u043E\u0434\u0438\u0442 \u2014 \u0437\u0430\u043A\u043E\u043D\u0447\u0438\u0442\u044C \u0440\u0430\u0431\u043E\u0442\u0443 \u043D\u0435\u043B\u044C\u0437\u044F (\u043F\u043E\u043F\u044B\u0442\u043A\u0430 ${attempt} \u0438\u0437 ${maxAttempts}). \u0418\u0441\u043F\u0440\u0430\u0432\u044C:
+${output}
+`,
+    humanCalled: (maxAttempts) => `\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0438 \u043A\u0440\u0430\u0441\u043D\u044B\u0435 \u043F\u043E\u0441\u043B\u0435 ${maxAttempts} \u043F\u043E\u043F\u044B\u0442\u043E\u043A \u0438\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u2014 \u0430\u0433\u0435\u043D\u0442 \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D, \u043D\u0443\u0436\u0435\u043D \u0447\u0435\u043B\u043E\u0432\u0435\u043A.`,
+    markerNotSaved: "\u041E\u0442\u043C\u0435\u0442\u043A\u0430 \u0434\u043B\u044F \u0437\u0430\u043F\u0438\u0441\u0438 \u043D\u0435 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0430."
+  },
+  record: {
+    sessionNotRecorded: (reason) => `\u0441\u0435\u0441\u0441\u0438\u044F \u043D\u0435 \u0437\u0430\u043F\u0438\u0441\u0430\u043D\u0430: ${reason}`,
+    markerNotClaimed: ({ file, reason }) => `\u043E\u0442\u043C\u0435\u0442\u043A\u0430 ${file} \u043D\u0435 \u0437\u0430\u0431\u0440\u0430\u043D\u0430: ${reason}`
+  },
+  draft: {
+    configNotRead: (reason) => `\u043A\u043E\u043D\u0444\u0438\u0433 \u043F\u0440\u043E\u0435\u043A\u0442\u0430 \u043D\u0435 \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u043D: ${reason}`,
+    transcriptNotRead: ({ file, reason }) => `\u0442\u0440\u0430\u043D\u0441\u043A\u0440\u0438\u043F\u0442 ${file} \u043D\u0435 \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u043D: ${reason}`,
+    transcriptsMissing: (count) => `\u0442\u0440\u0430\u043D\u0441\u043A\u0440\u0438\u043F\u0442\u043E\u0432 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E: ${count}, \u0438\u0445 \u0442\u043E\u043A\u0435\u043D\u044B \u043D\u0435 \u043F\u043E\u0441\u0447\u0438\u0442\u0430\u043D\u044B`,
+    sessionTranscriptNotRead: (reason) => `\u0442\u0440\u0430\u043D\u0441\u043A\u0440\u0438\u043F\u0442 \u0441\u0435\u0441\u0441\u0438\u0438 \u043D\u0435 \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u043D, \u043C\u043E\u0434\u0435\u043B\u0435\u0439 \u043F\u0440\u043E\u043C\u043F\u0442\u043E\u0432 \u0438 \u0440\u0435\u043F\u043B\u0438\u043A \u0441\u0435\u0441\u0441\u0438\u0438 \u043D\u0435 \u0431\u0443\u0434\u0435\u0442: ${reason}`,
+    stationTranscriptsMissing: (count) => `\u0442\u0440\u0430\u043D\u0441\u043A\u0440\u0438\u043F\u0442\u043E\u0432 \u0441\u0442\u0430\u043D\u0446\u0438\u0439 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E: ${count}, \u0438\u0445 \u043E\u0442\u0447\u0451\u0442\u043E\u0432 \u043D\u0435 \u0431\u0443\u0434\u0435\u0442`,
+    intervention: ({ reason, text }) => `\u0432\u043C\u0435\u0448\u0430\u0442\u0435\u043B\u044C\u0441\u0442\u0432\u043E (${reason}): ${text}`,
+    editNotCarried: (title) => `\u0440\u0435\u0434\u0430\u043A\u0442\u0443\u0440\u0430 \xAB${title}\xBB \u043D\u0435 \u043F\u0435\u0440\u0435\u043D\u0435\u0441\u0435\u043D\u0430: \u0442\u0430\u043A\u043E\u0433\u043E \u0441\u043E\u0431\u044B\u0442\u0438\u044F \u0432 \u0436\u0443\u0440\u043D\u0430\u043B\u0435 \u043D\u0435\u0442`,
+    assignmentNotFound: "\u0437\u0430\u0434\u0430\u043D\u0438\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E",
+    draftFile: (file) => `\u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A: ${file}`,
+    counts: ({ prompts, messages, interventions }) => `\u043F\u0440\u043E\u043C\u043F\u0442\u043E\u0432: ${prompts}, \u0440\u0435\u043F\u043B\u0438\u043A: ${messages}, \u0432\u043C\u0435\u0448\u0430\u0442\u0435\u043B\u044C\u0441\u0442\u0432: ${interventions}`,
+    build: ({ id, project, harness: harness2, workflow, runs, events }) => `\u0441\u0431\u043E\u0440\u043A\u0430 ${id}: \u043F\u0440\u043E\u0435\u043A\u0442 ${project}, harness ${harness2}, \u043F\u0440\u043E\u0446\u0435\u0441\u0441 ${workflow}, \u0437\u0430\u043F\u0443\u0441\u043A\u043E\u0432: ${runs}, \u0441\u043E\u0431\u044B\u0442\u0438\u0439: ${events}`,
+    unfilledHeader: ({ buildId, fields }) => `\u043D\u0435 \u0437\u0430\u043F\u043E\u043B\u043D\u0435\u043D\u043E: \u0441\u0431\u043E\u0440\u043A\u0430 ${buildId}: ${fields}`,
+    projectWithoutBuild: (project) => `\u043A\u043E\u043C\u0430\u043D\u0434\u044B \u043F\u0440\u043E\u0435\u043A\u0442\u0430 ${project} \u0431\u0435\u0437 \u0441\u0431\u043E\u0440\u043A\u0438: \u0434\u043E\u0441\u0442\u0430\u043D\u0443\u0442\u0441\u044F \u0441\u0431\u043E\u0440\u043A\u0435 \u043F\u043E \u0432\u0440\u0435\u043C\u0435\u043D\u0438`,
+    directoryOutsideProject: (directory) => `\u043A\u0430\u0442\u0430\u043B\u043E\u0433 ${directory} \u043D\u0435 \u043F\u0440\u0438\u043D\u0430\u0434\u043B\u0435\u0436\u0438\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u0443 Cyberzavod: \u0435\u0433\u043E \u044D\u0442\u0430\u043F\u044B \u0438 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438 \u043D\u0435 \u043F\u043E\u043F\u0430\u043B\u0438 \u0432 \u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A`,
+    waiting: (count) => `\u0436\u0434\u0443\u0442 \u0440\u0435\u0434\u0430\u043A\u0442\u0443\u0440\u044B: ${count}`,
+    unassignedRuns: (count) => `\u0437\u0430\u043F\u0443\u0441\u043A\u0438 \u0441\u0442\u0430\u043D\u0446\u0438\u0439 \u0431\u0435\u0437 \u0441\u0431\u043E\u0440\u043A\u0438 (\u0434\u043E\u0441\u0442\u0430\u043D\u0443\u0442\u0441\u044F \u043F\u0435\u0440\u0432\u043E\u0439): ${count}`,
+    unassignedRun: ({ agent, run, clock, line }) => `${agent} ${run} ${clock}: ${line}`,
+    orphanedRun: (run) => `\u0437\u0430\u043F\u0443\u0441\u043A ${run} \u0443\u043A\u0430\u0437\u0430\u043D \u0432 \u0441\u0431\u043E\u0440\u043A\u0435, \u043D\u043E \u0432 \u0436\u0443\u0440\u043D\u0430\u043B\u0435 \u0435\u0433\u043E \u043D\u0435\u0442`,
+    reroutedMessage: ({ line, from, to }) => `\u0443 \u0440\u0435\u043F\u043B\u0438\u043A\u0438 \xAB${line}\xBB \u043F\u043E\u043C\u0435\u043D\u044F\u043B\u0441\u044F \u043C\u0430\u0440\u0448\u0440\u0443\u0442: ${from} \u2192 ${to}, \u043F\u0435\u0440\u0435\u0447\u0438\u0442\u0430\u0439\u0442\u0435 \u0441\u0442\u0440\u043E\u043A\u0443`
+  },
+  publish: {
+    published: (file) => `\u043E\u043F\u0443\u0431\u043B\u0438\u043A\u043E\u0432\u0430\u043D\u043E: ${file}`,
+    notReady: ({ file, problems }) => `${file} \u043D\u0435 \u0433\u043E\u0442\u043E\u0432 \u043A \u043F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u0438:
+${problems}`,
+    buildProblem: ({ buildId, reason }) => `\u0441\u0431\u043E\u0440\u043A\u0430 ${buildId}: ${reason}`
+  },
+  errors: {
+    unsupportedAgent: ({ stage, requested, supported }) => `\u044D\u0442\u0430\u043F ${stage}: ${requested} \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F, \u043F\u043E\u043A\u0430 \u0435\u0441\u0442\u044C \u0442\u043E\u043B\u044C\u043A\u043E \u0430\u0434\u0430\u043F\u0442\u0435\u0440 ${supported}`,
+    fileConflicts: (files) => `\u044D\u0442\u0438 \u0444\u0430\u0439\u043B\u044B \u043D\u0430\u043F\u0438\u0441\u0430\u043D\u044B \u043D\u0435 \u0433\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u043E\u043C, \u043F\u0435\u0440\u0435\u043D\u0435\u0441\u0438\u0442\u0435 \u0438\u0445 \u0441\u043E\u0434\u0435\u0440\u0436\u0438\u043C\u043E\u0435 \u0432 AGENTS.md \u0438\u043B\u0438 \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u0441 --force: ${files}`,
+    settingsNotObject: (file) => `${file} \u043D\u0435 \u0440\u0430\u0437\u043E\u0431\u0440\u0430\u043D: \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0434\u043E\u043B\u0436\u043D\u044B \u0431\u044B\u0442\u044C \u043E\u0431\u044A\u0435\u043A\u0442\u043E\u043C`,
+    settingsNotParsed: ({ file, reason }) => `${file} \u043D\u0435 \u0440\u0430\u0437\u043E\u0431\u0440\u0430\u043D: ${reason}`,
+    unknownPlaceholder: (placeholder) => `\u0432 \u0448\u0430\u0431\u043B\u043E\u043D\u0435 \u043D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043F\u043E\u0434\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0430 ${placeholder}`,
+    projectNotFound: (directory) => `${directory} \u043D\u0435 \u0432 \u043F\u0440\u043E\u0435\u043A\u0442\u0435 Cyberzavod: \u0441\u043D\u0430\u0447\u0430\u043B\u0430 cyberzavod init`,
+    noDrafts: "\u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A\u043E\u0432 \u0435\u0449\u0451 \u043D\u0435\u0442: \u0441\u043D\u0430\u0447\u0430\u043B\u0430 cyberzavod draft",
+    noRawLogs: (directory) => `\u0436\u0443\u0440\u043D\u0430\u043B\u043E\u0432 \u0441\u0435\u0441\u0441\u0438\u0439 \u0435\u0449\u0451 \u043D\u0435\u0442: \u0445\u0443\u043A\u0438 \u043F\u0438\u0448\u0443\u0442 \u0438\u0445 \u0432 ${directory}`,
+    earlierDraftNotParsed: (file) => `\u043F\u0440\u043E\u0448\u043B\u044B\u0439 \u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A ${file} \u043D\u0435 \u0440\u0430\u0437\u043E\u0431\u0440\u0430\u043D \u2014 \u0438\u0441\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043B\u0438 \u0443\u0434\u0430\u043B\u0438\u0442\u0435 \u0435\u0433\u043E`,
+    noBuild: (buildId) => `\u0432 \u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A\u0435 \u043D\u0435\u0442 \u0441\u0431\u043E\u0440\u043A\u0438 ${buildId}`,
+    buildHasNoEvents: (buildId) => `\u0432 \u0441\u0431\u043E\u0440\u043A\u0435 ${buildId} \u043D\u0435\u0442 \u0441\u043E\u0431\u044B\u0442\u0438\u0439`,
+    leaksFound: ({ buildId, leaks }) => `\u0432 \u0442\u0435\u043A\u0441\u0442\u0435 \u0434\u043B\u044F \u043F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u0438 \u0441\u0431\u043E\u0440\u043A\u0438 ${buildId} \u0435\u0441\u0442\u044C \u0442\u043E, \u0447\u0442\u043E \u043D\u0435\u043B\u044C\u0437\u044F \u043F\u043E\u043A\u0430\u0437\u044B\u0432\u0430\u0442\u044C: ${leaks}`,
+    leakIn: ({ kind, text }) => `${kind} \u0432 \xAB${text}\xBB`
+  },
+  leakKinds: {
+    "ip-address": "IP-\u0430\u0434\u0440\u0435\u0441",
+    "ipv6-address": "IPv6-\u0430\u0434\u0440\u0435\u0441",
+    email: "\u043F\u043E\u0447\u0442\u0430 \u0438\u043B\u0438 \u0430\u0434\u0440\u0435\u0441 \u0432\u0438\u0434\u0430 user@host",
+    "server-login": "\u0432\u0445\u043E\u0434 \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440",
+    token: "\u0442\u043E\u043A\u0435\u043D",
+    "url-password": "\u043F\u0430\u0440\u043E\u043B\u044C \u0432 \u0430\u0434\u0440\u0435\u0441\u0435",
+    "private-key": "\u0437\u0430\u043A\u0440\u044B\u0442\u044B\u0439 \u043A\u043B\u044E\u0447",
+    "user-path": "\u043F\u0443\u0442\u044C \u0441 \u0438\u043C\u0435\u043D\u0435\u043C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F"
+  },
+  headerFields: {
+    title: "\u0437\u0430\u0433\u043E\u043B\u043E\u0432\u043E\u043A",
+    language: "\u044F\u0437\u044B\u043A",
+    project: "\u043F\u0440\u043E\u0435\u043A\u0442",
+    harness: "\u0432\u0435\u0440\u0441\u0438\u044F harness",
+    workflow: "\u043F\u0440\u043E\u0446\u0435\u0441\u0441"
+  }
+};
+
+// ../../adapters/claude/src/messages/catalog.ts
+var CLAUDE_MESSAGES = { en, ru };
+
+// ../../adapters/claude/src/errors.ts
+var ClaudeError = class extends Error {
+  describe;
+  /**
+   * Ошибка с текстом на любом языке интерфейса.
+   * @param {LocalizedText<ClaudeMessages>} describe Текст ошибки по набору сообщений.
+   * @param {ErrorOptions} [options] Причина ошибки.
+   */
+  constructor(describe, options) {
+    super(describe(CLAUDE_MESSAGES[DEFAULT_INTERFACE_LANGUAGE]), options);
+    this.describe = describe;
+  }
+};
+
 // ../../adapters/claude/src/capture/leaks.ts
 var LEAK_PATTERNS = [
   // Локальные 127.x и 0.0.0.0 не выдают ничего о серверах — пропускаем.
-  { kind: "IP-\u0430\u0434\u0440\u0435\u0441", pattern: /\b(?!127\.|0\.0\.0\.0\b)\d{1,3}(?:\.\d{1,3}){3}\b/ },
+  { kind: "ip-address", pattern: /\b(?!127\.|0\.0\.0\.0\b)\d{1,3}(?:\.\d{1,3}){3}\b/ },
   // Пустые группы — сокращённая запись `2001:db8::1`.
-  { kind: "IPv6-\u0430\u0434\u0440\u0435\u0441", pattern: /\b(?:[\da-f]{0,4}:){3,7}[\da-f]{1,4}\b/i },
+  { kind: "ipv6-address", pattern: /\b(?:[\da-f]{0,4}:){3,7}[\da-f]{1,4}\b/i },
   // Домен верхнего уровня из букв: `vite@8.3.2` и `action@v4.6.0` — версии, а не адреса.
-  { kind: "\u043F\u043E\u0447\u0442\u0430 \u0438\u043B\u0438 \u0430\u0434\u0440\u0435\u0441 \u0432\u0438\u0434\u0430 user@host", pattern: /[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}\b/i },
+  { kind: "email", pattern: /[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}\b/i },
   {
-    kind: "\u0432\u0445\u043E\u0434 \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440",
+    kind: "server-login",
     pattern: /\b(?:root|admin|deploy|ubuntu|debian)@[\w.-]+/
   },
   {
-    kind: "\u0442\u043E\u043A\u0435\u043D",
+    kind: "token",
     pattern: /\b(?:gh[pousr]_|github_pat_|sk-|sk_live_|xox[abp]-|AKIA|AIza)[\w-]{8,}/
   },
   // У npm-токена ровно 36 знаков после префикса: `npm_config_store_dir` — переменная, не токен.
-  { kind: "\u0442\u043E\u043A\u0435\u043D", pattern: /\bnpm_[A-Za-z0-9]{36}\b/ },
-  { kind: "\u043F\u0430\u0440\u043E\u043B\u044C \u0432 \u0430\u0434\u0440\u0435\u0441\u0435", pattern: /\b[a-z][\w+.-]*:\/\/[^\s/:@]+:[^\s/@]+@/i },
-  { kind: "JWT", pattern: /\beyJ[\w-]{8,}\.[\w-]{8,}\./ },
-  { kind: "\u0437\u0430\u043A\u0440\u044B\u0442\u044B\u0439 \u043A\u043B\u044E\u0447", pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----/ },
+  { kind: "token", pattern: /\bnpm_[A-Za-z0-9]{36}\b/ },
+  { kind: "url-password", pattern: /\b[a-z][\w+.-]*:\/\/[^\s/:@]+:[^\s/@]+@/i },
+  // JWT: две base64url-части с точкой — тоже токен.
+  { kind: "token", pattern: /\beyJ[\w-]{8,}\.[\w-]{8,}\./ },
+  { kind: "private-key", pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----/ },
   // Путь в начале слова, а не часть адреса вроде `example.com/home/docs`.
-  { kind: "\u043F\u0443\u0442\u044C \u0441 \u0438\u043C\u0435\u043D\u0435\u043C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F", pattern: /(?<![\w.])\/(?:Users|home)\/[\w.-]+/ }
+  { kind: "user-path", pattern: /(?<![\w.])\/(?:Users|home)\/[\w.-]+/ }
 ];
 function findLeaks(text) {
   const kinds = LEAK_PATTERNS.filter(({ pattern }) => pattern.test(text)).map(({ kind }) => kind);
@@ -567,13 +746,13 @@ function isMessageSource(value) {
 }
 var DraftError = class extends Error {
 };
-var HEADER_FIELD_NAMES = {
-  title: "\u0437\u0430\u0433\u043E\u043B\u043E\u0432\u043E\u043A",
-  language: "\u044F\u0437\u044B\u043A",
-  project: "\u043F\u0440\u043E\u0435\u043A\u0442",
-  harness: "\u0432\u0435\u0440\u0441\u0438\u044F harness",
-  workflow: "\u043F\u0440\u043E\u0446\u0435\u0441\u0441"
-};
+var HEADER_FIELDS = [
+  "title",
+  "language",
+  "project",
+  "harness",
+  "workflow"
+];
 var CLAUDE_SOURCE = { type: "agent", provider: "anthropic", agent: "claude" };
 function isObject2(value) {
   return typeof value === "object" && value !== null;
@@ -852,10 +1031,9 @@ function carryOverEdits(previous, next) {
   return { ...next, builds: carryOverBuilds(previous, next), events };
 }
 function unfilledHeader(draft) {
-  const fields = Object.keys(HEADER_FIELD_NAMES);
   return draft.builds.flatMap((build) => {
-    const names = fields.filter((field2) => build[field2] === "").map((f) => HEADER_FIELD_NAMES[f]);
-    return names.length === 0 ? [] : [`\u0441\u0431\u043E\u0440\u043A\u0430 ${build.id}: ${names.join(", ")}`];
+    const fields = HEADER_FIELDS.filter((field2) => build[field2] === "");
+    return fields.length === 0 ? [] : [{ buildId: build.id, fields }];
   });
 }
 function orphanedEdits(previous, next) {
@@ -976,19 +1154,23 @@ function buildOf(draft, buildId) {
 }
 function checkNoLeaks({ data }, buildId) {
   const texts = [data.title, data.harness, data.workflow, ...data.events.flatMap(textsOf)];
-  const leaks = texts.flatMap((text) => findLeaks(text).map((kind) => `${kind} \u0432 \xAB${text}\xBB`));
-  if (leaks.length > 0) {
-    throw new DraftError(
-      `\u0432 \u0442\u0435\u043A\u0441\u0442\u0435 \u0434\u043B\u044F \u043F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u0438 \u0441\u0431\u043E\u0440\u043A\u0438 ${buildId} \u0435\u0441\u0442\u044C \u0442\u043E, \u0447\u0442\u043E \u043D\u0435\u043B\u044C\u0437\u044F \u043F\u043E\u043A\u0430\u0437\u044B\u0432\u0430\u0442\u044C: ${leaks.join("; ")}`
+  const leaks = texts.flatMap((text) => findLeaks(text).map((kind) => ({ kind, text })));
+  if (leaks.length === 0) return;
+  throw new ClaudeError((messages) => {
+    const described = leaks.map(
+      ({ kind, text }) => messages.errors.leakIn({ kind: messages.leakKinds[kind], text })
     );
-  }
+    return messages.errors.leaksFound({ buildId, leaks: described.join("; ") });
+  });
 }
 function publishBuild(draft, buildId) {
   const build = buildOf(draft, buildId);
   const owners = eventBuilds(draft);
   const events = draft.events.filter((_event, index) => owners[index] === buildId);
   const timeline = buildTimeline(events);
-  if (timeline === void 0) throw new DraftError(`\u0432 \u0441\u0431\u043E\u0440\u043A\u0435 ${buildId} \u043D\u0435\u0442 \u0441\u043E\u0431\u044B\u0442\u0438\u0439`);
+  if (timeline === void 0) {
+    throw new ClaudeError((messages) => messages.errors.buildHasNoEvents(buildId));
+  }
   const tokens = totalTokens(events);
   const usage2 = tokens === void 0 ? [] : [{ t: timeline.end, type: "usage", tokens }];
   const published = [
@@ -2245,16 +2427,16 @@ async function locateProject(directory) {
 async function requireProject(directory) {
   const project = await locateProject(directory);
   if (project === void 0) {
-    throw new Error(`${directory} \u043D\u0435 \u0432 \u043F\u0440\u043E\u0435\u043A\u0442\u0435 Cyberzavod: \u0441\u043D\u0430\u0447\u0430\u043B\u0430 cyberzavod init`);
+    throw new ClaudeError((messages) => messages.errors.projectNotFound(directory));
   }
   return project;
 }
-async function findProjectId(directory) {
+async function findProjectId(directory, messages) {
   try {
     return (await locateProject(directory))?.config.projectId;
   } catch (err) {
     if (!(err instanceof ProjectFileError)) throw err;
-    console.warn(`\u043A\u043E\u043D\u0444\u0438\u0433 \u043F\u0440\u043E\u0435\u043A\u0442\u0430 \u043D\u0435 \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u043D: ${err.message}`);
+    console.warn(messages.draft.configNotRead(err.message));
     return void 0;
   }
 }
@@ -2280,28 +2462,28 @@ async function newestFile(dir, extension) {
 }
 
 // ../../adapters/claude/src/commands/draft.ts
-async function readTranscript(transcriptPath) {
+async function readTranscript(transcriptPath, messages) {
   try {
     return { status: "read", text: await readFile3(transcriptPath, "utf8") };
   } catch (err) {
     if (isNotFound(err)) return { status: "missing" };
-    console.warn(`\u0442\u0440\u0430\u043D\u0441\u043A\u0440\u0438\u043F\u0442 ${transcriptPath} \u043D\u0435 \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u043D: ${String(err)}`);
+    console.warn(messages.draft.transcriptNotRead({ file: transcriptPath, reason: String(err) }));
     return { status: "failed" };
   }
 }
-async function readTranscripts(paths) {
+async function readTranscripts(paths, messages) {
   const transcripts = /* @__PURE__ */ new Map();
   let missing = 0;
   for (const transcriptPath of paths) {
-    const read = await readTranscript(transcriptPath);
+    const read = await readTranscript(transcriptPath, messages);
     if (read.status === "read") transcripts.set(transcriptPath, read.text);
     else if (read.status === "missing") missing++;
   }
-  if (missing > 0) console.warn(`\u0442\u0440\u0430\u043D\u0441\u043A\u0440\u0438\u043F\u0442\u043E\u0432 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E: ${missing}, \u0438\u0445 \u0442\u043E\u043A\u0435\u043D\u044B \u043D\u0435 \u043F\u043E\u0441\u0447\u0438\u0442\u0430\u043D\u044B`);
+  if (missing > 0) console.warn(messages.draft.transcriptsMissing(missing));
   return transcripts;
 }
-async function tokensOfRuns(paths) {
-  const transcripts = await readTranscripts(paths.values());
+async function tokensOfRuns(paths, messages) {
+  const transcripts = await readTranscripts(paths.values(), messages);
   const tokens = /* @__PURE__ */ new Map();
   for (const [agentId, transcriptPath] of paths) {
     const transcript = transcripts.get(transcriptPath);
@@ -2309,11 +2491,11 @@ async function tokensOfRuns(paths) {
   }
   return tokens;
 }
-async function usagesOfSession(paths) {
-  const transcripts = await readTranscripts(paths);
+async function usagesOfSession(paths, messages) {
+  const transcripts = await readTranscripts(paths, messages);
   return [...transcripts.values()].flatMap(tokenUsages);
 }
-async function textsFromSessionTranscript(transcriptPath) {
+async function textsFromSessionTranscript(transcriptPath, messages) {
   const none = { replies: [], answers: [], assignments: [] };
   if (transcriptPath === void 0) return none;
   try {
@@ -2324,39 +2506,37 @@ async function textsFromSessionTranscript(transcriptPath) {
       assignments: agentAssignments(transcript)
     };
   } catch (err) {
-    console.warn(
-      `\u0442\u0440\u0430\u043D\u0441\u043A\u0440\u0438\u043F\u0442 \u0441\u0435\u0441\u0441\u0438\u0438 \u043D\u0435 \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u043D, \u043C\u043E\u0434\u0435\u043B\u0435\u0439 \u043F\u0440\u043E\u043C\u043F\u0442\u043E\u0432 \u0438 \u0440\u0435\u043F\u043B\u0438\u043A \u0441\u0435\u0441\u0441\u0438\u0438 \u043D\u0435 \u0431\u0443\u0434\u0435\u0442: ${String(err)}`
-    );
+    console.warn(messages.draft.sessionTranscriptNotRead(String(err)));
     return none;
   }
 }
-async function reportsFromStationTranscripts(paths) {
+async function reportsFromStationTranscripts(paths, messages) {
   const reports = [];
   let missing = 0;
   for (const transcriptPath of paths) {
-    const read = await readTranscript(transcriptPath);
+    const read = await readTranscript(transcriptPath, messages);
     if (read.status === "read") reports.push(...agentReports(read.text));
     else if (read.status === "missing") missing++;
   }
-  if (missing > 0) console.warn(`\u0442\u0440\u0430\u043D\u0441\u043A\u0440\u0438\u043F\u0442\u043E\u0432 \u0441\u0442\u0430\u043D\u0446\u0438\u0439 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E: ${missing}, \u0438\u0445 \u043E\u0442\u0447\u0451\u0442\u043E\u0432 \u043D\u0435 \u0431\u0443\u0434\u0435\u0442`);
+  if (missing > 0) console.warn(messages.draft.stationTranscriptsMissing(missing));
   return reports;
 }
-async function projectsOfDirectories(directories) {
+async function projectsOfDirectories(directories, messages) {
   const projects = /* @__PURE__ */ new Map();
   for (const directory of directories) {
-    const id = await findProjectId(directory);
+    const id = await findProjectId(directory, messages);
     if (id !== void 0) projects.set(directory, id);
   }
   return projects;
 }
-function titleOf(edit) {
+function titleOf(edit, messages) {
   switch (edit.type) {
     case "draft_prompt":
       return edit.goal;
     case "draft_message":
       return edit.line;
     case "draft_intervention":
-      return `\u0432\u043C\u0435\u0448\u0430\u0442\u0435\u043B\u044C\u0441\u0442\u0432\u043E (${edit.reason}): ${edit.line}`;
+      return messages.draft.intervention({ reason: edit.reason, text: edit.line });
     default:
       return edit;
   }
@@ -2372,15 +2552,15 @@ async function readEarlierDraft(draftPath, shown) {
   try {
     return parseDraft(JSON.parse(earlier));
   } catch (err) {
-    throw new Error(`\u043F\u0440\u043E\u0448\u043B\u044B\u0439 \u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A ${shown} \u043D\u0435 \u0440\u0430\u0437\u043E\u0431\u0440\u0430\u043D \u2014 \u0438\u0441\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u0438\u043B\u0438 \u0443\u0434\u0430\u043B\u0438\u0442\u0435 \u0435\u0433\u043E`, {
+    throw new ClaudeError((messages) => messages.errors.earlierDraftNotParsed(shown), {
       cause: err
     });
   }
 }
-function withEarlierEdits(fresh, previous) {
+function withEarlierEdits(fresh, previous, messages) {
   if (previous === void 0) return fresh;
   for (const edit of orphanedEdits(previous, fresh)) {
-    console.warn(`\u0440\u0435\u0434\u0430\u043A\u0442\u0443\u0440\u0430 \xAB${titleOf(edit)}\xBB \u043D\u0435 \u043F\u0435\u0440\u0435\u043D\u0435\u0441\u0435\u043D\u0430: \u0442\u0430\u043A\u043E\u0433\u043E \u0441\u043E\u0431\u044B\u0442\u0438\u044F \u0432 \u0436\u0443\u0440\u043D\u0430\u043B\u0435 \u043D\u0435\u0442`);
+    console.warn(messages.draft.editNotCarried(titleOf(edit, messages)));
   }
   return carryOverEdits(previous, fresh);
 }
@@ -2395,7 +2575,7 @@ function awaitsEditing(event) {
       return false;
   }
 }
-function describeWaiting(event) {
+function describeWaiting(event, messages) {
   const said = event.said.replace(/\s+/g, " ");
   switch (event.type) {
     case "draft_prompt":
@@ -2403,11 +2583,12 @@ function describeWaiting(event) {
     case "draft_message":
       return `${event.from} \u2192 ${event.to} (${event.source}): ${said}`;
     case "draft_intervention":
-      return `\u0432\u043C\u0435\u0448\u0430\u0442\u0435\u043B\u044C\u0441\u0442\u0432\u043E (${event.reason}): ${said}`;
+      return messages.draft.intervention({ reason: event.reason, text: said });
     default:
       return event;
   }
 }
+var EMPTY_VALUE = "\u2014";
 var MS_PER_SECOND = 1e3;
 var SECONDS_PER_MINUTE = 60;
 var MAX_ASSIGNMENT_LINE = 100;
@@ -2416,102 +2597,129 @@ function clockOf(t) {
   const minutes = Math.floor(seconds2 / SECONDS_PER_MINUTE);
   return `${minutes}:${String(seconds2 % SECONDS_PER_MINUTE).padStart(2, "0")}`;
 }
-function assignmentLineOf(draft, run) {
+function assignmentLineOf(draft, run, messages) {
   const assignment = draft.events.find(
     (event) => event.type === "draft_message" && event.run === run.run && event.source === "assignment"
   );
-  if (assignment?.type !== "draft_message") return "\u0437\u0430\u0434\u0430\u043D\u0438\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E";
+  if (assignment?.type !== "draft_message") return messages.draft.assignmentNotFound;
   const line = assignment.said.split("\n").find((text) => text.trim() !== "") ?? "";
   return line.trim().slice(0, MAX_ASSIGNMENT_LINE);
 }
-async function freshDraftOf(rawPath, rawEvents, projectsByDirectory) {
+async function freshDraftOf(session) {
+  const { rawPath, rawEvents, projectsByDirectory, messages } = session;
   return toDraft(rawEvents, {
     sessionId: path5.basename(rawPath, ".jsonl"),
-    runTokens: await tokensOfRuns(runTranscriptPaths(rawEvents)),
-    sessionUsages: await usagesOfSession(sessionTranscriptPaths(rawEvents)),
-    ...await textsFromSessionTranscript(sessionTranscriptPath(rawEvents)),
-    reports: await reportsFromStationTranscripts(stationTranscriptPaths(rawEvents)),
+    runTokens: await tokensOfRuns(runTranscriptPaths(rawEvents), messages),
+    sessionUsages: await usagesOfSession(sessionTranscriptPaths(rawEvents), messages),
+    ...await textsFromSessionTranscript(sessionTranscriptPath(rawEvents), messages),
+    reports: await reportsFromStationTranscripts(stationTranscriptPaths(rawEvents), messages),
     projectsByDirectory
   });
 }
-function printCounts(draft) {
+function printCounts(draft, messages) {
   const prompts = draft.events.filter((event) => event.type === "draft_prompt");
-  const messages = draft.events.filter((event) => event.type === "draft_message");
+  const replies = draft.events.filter((event) => event.type === "draft_message");
   const interventions = draft.events.filter((event) => event.type === "draft_intervention");
   console.log(
-    `\u043F\u0440\u043E\u043C\u043F\u0442\u043E\u0432: ${prompts.length}, \u0440\u0435\u043F\u043B\u0438\u043A: ${messages.length}, \u0432\u043C\u0435\u0448\u0430\u0442\u0435\u043B\u044C\u0441\u0442\u0432: ${interventions.length}`
+    messages.draft.counts({
+      prompts: prompts.length,
+      messages: replies.length,
+      interventions: interventions.length
+    })
   );
 }
-function printBuilds(draft) {
+function printBuilds(draft, messages) {
   const owners = eventBuilds(draft);
   for (const build of draft.builds) {
     const eventCount = owners.filter((owner) => owner === build.id).length;
     console.log(
-      `\u0441\u0431\u043E\u0440\u043A\u0430 ${build.id}: \u043F\u0440\u043E\u0435\u043A\u0442 ${build.project || "\u2014"}, harness ${build.harness || "\u2014"}, \u043F\u0440\u043E\u0446\u0435\u0441\u0441 ${build.workflow || "\u2014"}, \u0437\u0430\u043F\u0443\u0441\u043A\u043E\u0432: ${build.runs.length}, \u0441\u043E\u0431\u044B\u0442\u0438\u0439: ${eventCount}`
+      messages.draft.build({
+        id: build.id,
+        project: build.project || EMPTY_VALUE,
+        harness: build.harness || EMPTY_VALUE,
+        workflow: build.workflow || EMPTY_VALUE,
+        runs: build.runs.length,
+        events: eventCount
+      })
     );
   }
-  for (const line of unfilledHeader(draft)) console.log(`  \u043D\u0435 \u0437\u0430\u043F\u043E\u043B\u043D\u0435\u043D\u043E: ${line}`);
+  for (const { buildId, fields } of unfilledHeader(draft)) {
+    const names = fields.map((field2) => messages.headerFields[field2]).join(", ");
+    console.log(`  ${messages.draft.unfilledHeader({ buildId, fields: names })}`);
+  }
 }
-function warnAboutProjects(draft, rawEvents, projects) {
+function warnAboutProjects(report) {
+  const { draft, rawEvents, projectsByDirectory, messages } = report;
   for (const project of projectsWithoutBuild(draft)) {
-    console.warn(`\u043A\u043E\u043C\u0430\u043D\u0434\u044B \u043F\u0440\u043E\u0435\u043A\u0442\u0430 ${project} \u0431\u0435\u0437 \u0441\u0431\u043E\u0440\u043A\u0438: \u0434\u043E\u0441\u0442\u0430\u043D\u0443\u0442\u0441\u044F \u0441\u0431\u043E\u0440\u043A\u0435 \u043F\u043E \u0432\u0440\u0435\u043C\u0435\u043D\u0438`);
+    console.warn(messages.draft.projectWithoutBuild(project));
   }
-  for (const directory of directoriesOutsideProjects(rawEvents, projects)) {
-    console.warn(
-      `\u043A\u0430\u0442\u0430\u043B\u043E\u0433 ${directory} \u043D\u0435 \u043F\u0440\u0438\u043D\u0430\u0434\u043B\u0435\u0436\u0438\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u0443 Cyberzavod: \u0435\u0433\u043E \u044D\u0442\u0430\u043F\u044B \u0438 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438 \u043D\u0435 \u043F\u043E\u043F\u0430\u043B\u0438 \u0432 \u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A`
-    );
+  for (const directory of directoriesOutsideProjects(rawEvents, projectsByDirectory)) {
+    console.warn(messages.draft.directoryOutsideProject(directory));
   }
 }
-function printWaiting(draft) {
+function printWaiting(draft, messages) {
   const waiting = draft.events.filter(awaitsEditing);
-  console.log(`\u0436\u0434\u0443\u0442 \u0440\u0435\u0434\u0430\u043A\u0442\u0443\u0440\u044B: ${waiting.length}`);
-  for (const event of waiting) console.log(`  \u2022 ${describeWaiting(event)}`);
+  console.log(messages.draft.waiting(waiting.length));
+  for (const event of waiting) console.log(`  \u2022 ${describeWaiting(event, messages)}`);
 }
-function printUnassignedRuns(draft) {
+function printUnassignedRuns(draft, messages) {
   const unassigned = unassignedRuns(draft);
   if (unassigned.length === 0) return;
-  console.log(`\u0437\u0430\u043F\u0443\u0441\u043A\u0438 \u0441\u0442\u0430\u043D\u0446\u0438\u0439 \u0431\u0435\u0437 \u0441\u0431\u043E\u0440\u043A\u0438 (\u0434\u043E\u0441\u0442\u0430\u043D\u0443\u0442\u0441\u044F \u043F\u0435\u0440\u0432\u043E\u0439): ${unassigned.length}`);
+  console.log(messages.draft.unassignedRuns(unassigned.length));
   for (const run of unassigned) {
-    console.log(`  \u2022 ${run.agent} ${run.run} ${clockOf(run.t)}: ${assignmentLineOf(draft, run)}`);
+    const line = messages.draft.unassignedRun({
+      agent: run.agent,
+      run: run.run,
+      clock: clockOf(run.t),
+      line: assignmentLineOf(draft, run, messages)
+    });
+    console.log(`  \u2022 ${line}`);
   }
 }
-function warnAboutEarlierDraft(draft, previous) {
+function warnAboutEarlierDraft(draft, previous, messages) {
   for (const run of orphanedRuns(draft)) {
-    console.warn(`\u0437\u0430\u043F\u0443\u0441\u043A ${run} \u0443\u043A\u0430\u0437\u0430\u043D \u0432 \u0441\u0431\u043E\u0440\u043A\u0435, \u043D\u043E \u0432 \u0436\u0443\u0440\u043D\u0430\u043B\u0435 \u0435\u0433\u043E \u043D\u0435\u0442`);
+    console.warn(messages.draft.orphanedRun(run));
   }
   for (const message of previous === void 0 ? [] : reroutedMessages(previous, draft)) {
-    console.warn(
-      `\u0443 \u0440\u0435\u043F\u043B\u0438\u043A\u0438 \xAB${message.line}\xBB \u043F\u043E\u043C\u0435\u043D\u044F\u043B\u0441\u044F \u043C\u0430\u0440\u0448\u0440\u0443\u0442: ${message.from} \u2192 ${message.to}, \u043F\u0435\u0440\u0435\u0447\u0438\u0442\u0430\u0439\u0442\u0435 \u0441\u0442\u0440\u043E\u043A\u0443`
-    );
+    console.warn(messages.draft.reroutedMessage(message));
   }
 }
-function reportDraft({ draft, previous, rawEvents, projectsByDirectory, shownPath }) {
-  console.log(`\u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A: ${shownPath}`);
-  printCounts(draft);
-  printBuilds(draft);
-  warnAboutProjects(draft, rawEvents, projectsByDirectory);
-  printWaiting(draft);
-  printUnassignedRuns(draft);
-  warnAboutEarlierDraft(draft, previous);
+function reportDraft(report) {
+  const { draft, previous, rawEvents, projectsByDirectory, shownPath, messages } = report;
+  console.log(messages.draft.draftFile(shownPath));
+  printCounts(draft, messages);
+  printBuilds(draft, messages);
+  warnAboutProjects({ draft, rawEvents, projectsByDirectory, messages });
+  printWaiting(draft, messages);
+  printUnassignedRuns(draft, messages);
+  warnAboutEarlierDraft(draft, previous, messages);
 }
 async function draftSession(options) {
+  const { messages } = options;
   const project = await requireProject(options.projectDirectory);
   const directories = captureDirectories(project.journal);
   const shown = (file) => path5.relative(project.root, file) || ".";
   const rawPath = options.rawPath ?? await newestFile(directories.raw, ".jsonl");
   if (rawPath === void 0) {
-    throw new Error(`\u0436\u0443\u0440\u043D\u0430\u043B\u043E\u0432 \u0441\u0435\u0441\u0441\u0438\u0439 \u0435\u0449\u0451 \u043D\u0435\u0442: \u0445\u0443\u043A\u0438 \u043F\u0438\u0448\u0443\u0442 \u0438\u0445 \u0432 ${shown(directories.raw)}`);
+    throw new ClaudeError((m) => m.errors.noRawLogs(shown(directories.raw)));
   }
   const rawEvents = parseRawLog(await readFile3(rawPath, "utf8"));
-  const projectsByDirectory = await projectsOfDirectories(toolDirectories(rawEvents));
-  const fresh = await freshDraftOf(rawPath, rawEvents, projectsByDirectory);
+  const projectsByDirectory = await projectsOfDirectories(toolDirectories(rawEvents), messages);
+  const fresh = await freshDraftOf({ rawPath, rawEvents, projectsByDirectory, messages });
   const draftPath = path5.join(directories.drafts, `${fresh.id}.json`);
   const previous = await readEarlierDraft(draftPath, shown(draftPath));
-  const draft = routeMessages(withEarlierEdits(fresh, previous));
+  const draft = routeMessages(withEarlierEdits(fresh, previous, messages));
   await mkdir3(directories.drafts, { recursive: true });
   await writeFile3(draftPath, `${JSON.stringify(draft, null, 2)}
 `);
-  reportDraft({ draft, previous, rawEvents, projectsByDirectory, shownPath: shown(draftPath) });
+  reportDraft({
+    draft,
+    previous,
+    rawEvents,
+    projectsByDirectory,
+    shownPath: shown(draftPath),
+    messages
+  });
   return draftPath;
 }
 
@@ -2519,23 +2727,28 @@ async function draftSession(options) {
 import { readFile as readFile4 } from "node:fs/promises";
 import path6 from "node:path";
 function isPublishProblem(err) {
-  return err instanceof DraftError || err instanceof RecordError;
+  return err instanceof DraftError || err instanceof RecordError || err instanceof ClaudeError;
 }
-function publishBuildOrProblem(draft, buildId) {
+function problemText(err, messages) {
+  return err instanceof ClaudeError ? err.describe(messages) : err.message;
+}
+function publishBuildOrProblem(draft, buildId, messages) {
   try {
     return publishBuild(draft, buildId);
   } catch (err) {
     if (!isPublishProblem(err)) throw err;
-    return `\u0441\u0431\u043E\u0440\u043A\u0430 ${buildId}: ${err.message}`;
+    return messages.publish.buildProblem({ buildId, reason: problemText(err, messages) });
   }
 }
-function publishSelected(draft, buildId) {
+function publishSelected(draft, buildId, messages) {
   const selected = draft.builds.filter(({ id }) => buildId === void 0 || id === buildId);
-  if (selected.length === 0) throw new DraftError(`\u0432 \u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A\u0435 \u043D\u0435\u0442 \u0441\u0431\u043E\u0440\u043A\u0438 ${buildId}`);
+  if (selected.length === 0) {
+    throw new ClaudeError((m) => m.errors.noBuild(buildId ?? ""));
+  }
   const records = [];
   const problems = [];
   for (const build of selected) {
-    const published = publishBuildOrProblem(draft, build.id);
+    const published = publishBuildOrProblem(draft, build.id, messages);
     if (typeof published === "string") problems.push(published);
     else records.push(published);
   }
@@ -2543,26 +2756,31 @@ function publishSelected(draft, buildId) {
   return records;
 }
 async function publishSessions(options) {
+  const { messages } = options;
   const project = await requireProject(options.projectDirectory);
   const shown = (file) => path6.relative(project.root, file) || ".";
   const draftPath = options.draftPath ?? await newestFile(captureDirectories(project.journal).drafts, ".json");
-  if (draftPath === void 0) throw new Error("\u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A\u043E\u0432 \u0435\u0449\u0451 \u043D\u0435\u0442: \u0441\u043D\u0430\u0447\u0430\u043B\u0430 cyberzavod draft");
+  if (draftPath === void 0) throw new ClaudeError((m) => m.errors.noDrafts);
   const store = new DirectoryRecordStore(project.journal);
   try {
     const draftJson = JSON.parse(await readFile4(draftPath, "utf8"));
     const draft = parseDraft(draftJson);
-    for (const record of publishSelected(draft, options.buildId)) {
+    for (const record of publishSelected(draft, options.buildId, messages)) {
       await store.write(record);
-      console.log(`\u043E\u043F\u0443\u0431\u043B\u0438\u043A\u043E\u0432\u0430\u043D\u043E: ${shown(store.pathOf(record))}`);
+      console.log(messages.publish.published(shown(store.pathOf(record))));
     }
     return true;
   } catch (err) {
     if (!isPublishProblem(err)) throw err;
-    console.error(`${shown(draftPath)} \u043D\u0435 \u0433\u043E\u0442\u043E\u0432 \u043A \u043F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u0438:
-${err.message}`);
+    const problems = problemText(err, messages);
+    console.error(messages.publish.notReady({ file: shown(draftPath), problems }));
     return false;
   }
 }
+
+// ../../adapters/claude/src/generate/sync.ts
+import { mkdir as mkdir4, readdir as readdir3, readFile as readFile5, rm, writeFile as writeFile4 } from "node:fs/promises";
+import path7 from "node:path";
 
 // ../../adapters/claude/src/generate/claude.ts
 var CLAUDE_PROVIDER = "anthropic";
@@ -2586,7 +2804,7 @@ var ROLE_TOOLS = {
   read: "Read, Grep, Glob, Bash",
   write: "Read, Edit, Write, Grep, Glob, Bash"
 };
-var GenerateError = class extends Error {
+var GenerateError = class extends ClaudeError {
 };
 function claudeModelOf(stage, agent) {
   const {
@@ -2596,7 +2814,11 @@ function claudeModelOf(stage, agent) {
   } = agent ?? {};
   if (provider !== CLAUDE_PROVIDER || name !== CLAUDE_AGENT) {
     throw new GenerateError(
-      `\u044D\u0442\u0430\u043F ${stage}: ${provider}/${name} \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F, \u043F\u043E\u043A\u0430 \u0435\u0441\u0442\u044C \u0442\u043E\u043B\u044C\u043A\u043E \u0430\u0434\u0430\u043F\u0442\u0435\u0440 ${CLAUDE_PROVIDER}/${CLAUDE_AGENT}`
+      (messages) => messages.errors.unsupportedAgent({
+        stage,
+        requested: `${provider}/${name}`,
+        supported: `${CLAUDE_PROVIDER}/${CLAUDE_AGENT}`
+      })
     );
   }
   return model === DEFAULT_MODEL ? DEFAULT_MODELS[stage] : model;
@@ -2607,10 +2829,6 @@ function claudeEffortOf(stage) {
 function claudeToolsOf(access2) {
   return ROLE_TOOLS[access2];
 }
-
-// ../../adapters/claude/src/generate/sync.ts
-import { mkdir as mkdir4, readdir as readdir3, readFile as readFile5, rm, writeFile as writeFile4 } from "node:fs/promises";
-import path7 from "node:path";
 
 // ../../adapters/claude/src/generate/files.ts
 var GENERATED_MARK = "\u0421\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u043E\u0432\u0430\u043D\u043E `cyberzavod sync`";
@@ -2724,7 +2942,7 @@ function renderTemplate(template2, project) {
   return template2.replace(/\{\{(\w+)\}\}/g, (placeholder, name) => {
     const value = values[name];
     if (value === void 0) {
-      throw new GenerateError(`\u0432 \u0448\u0430\u0431\u043B\u043E\u043D\u0435 \u043D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043F\u043E\u0434\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0430 ${placeholder}`);
+      throw new GenerateError((messages) => messages.errors.unknownPlaceholder(placeholder));
     }
     return value;
   });
@@ -2901,17 +3119,23 @@ async function claudeProjectOf(project, installation) {
     templates: templates2
   };
 }
+function parseJson(text, file) {
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    const reason = err.message;
+    throw new GenerateError((messages) => messages.errors.settingsNotParsed({ file, reason }), {
+      cause: err
+    });
+  }
+}
 function parseSettings(text, file) {
   if (text === void 0) return {};
-  try {
-    const parsed = JSON.parse(text);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      throw new GenerateError("\u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0434\u043E\u043B\u0436\u043D\u044B \u0431\u044B\u0442\u044C \u043E\u0431\u044A\u0435\u043A\u0442\u043E\u043C");
-    }
-    return parsed;
-  } catch (err) {
-    throw new GenerateError(`${file} \u043D\u0435 \u0440\u0430\u0437\u043E\u0431\u0440\u0430\u043D: ${err.message}`, { cause: err });
+  const parsed = parseJson(text, file);
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new GenerateError((messages) => messages.errors.settingsNotObject(file));
   }
+  return parsed;
 }
 function settingsText(settings) {
   return `${JSON.stringify(settings, null, 2)}
@@ -2990,9 +3214,8 @@ async function syncClaude(options) {
   const report = { changed, removed, conflicts };
   if (options.check === true) return report;
   if (conflicts.length > 0) {
-    throw new GenerateError(
-      `\u044D\u0442\u0438 \u0444\u0430\u0439\u043B\u044B \u043D\u0430\u043F\u0438\u0441\u0430\u043D\u044B \u043D\u0435 \u0433\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u043E\u043C, \u043F\u0435\u0440\u0435\u043D\u0435\u0441\u0438\u0442\u0435 \u0438\u0445 \u0441\u043E\u0434\u0435\u0440\u0436\u0438\u043C\u043E\u0435 \u0432 AGENTS.md \u0438\u043B\u0438 \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u0441 --force: ${conflicts.join(", ")}`
-    );
+    const files2 = conflicts.join(", ");
+    throw new GenerateError((messages) => messages.errors.fileConflicts(files2));
   }
   await writeFiles(project.root, files, changed);
   for (const filePath of removed) await rm(fileAt(project.root, filePath));
@@ -3023,13 +3246,15 @@ function hookStatePath(tmpDir, sessionId, name) {
   const safeSession = sessionId.replace(UNSAFE_SESSION_CHARACTERS, "") || UNKNOWN_SESSION2;
   return path8.join(tmpDir, `${STATE_PREFIX}-${name}-${safeSession}`);
 }
-async function claimHumanCallMarker(sessionId, tmpDir) {
+async function claimHumanCallMarker(sessionId, tmpDir, messages) {
   const markerPath = hookStatePath(tmpDir, sessionId, "human-call");
   try {
     await unlink(markerPath);
     return true;
   } catch (err) {
-    if (!isNotFound(err)) console.warn(`\u043E\u0442\u043C\u0435\u0442\u043A\u0430 ${markerPath} \u043D\u0435 \u0437\u0430\u0431\u0440\u0430\u043D\u0430: ${String(err)}`);
+    if (!isNotFound(err)) {
+      console.warn(messages.record.markerNotClaimed({ file: markerPath, reason: String(err) }));
+    }
     return false;
   }
 }
@@ -3040,9 +3265,10 @@ var RecordHookError = class extends Error {
 function withProject(event, project) {
   return event.kind === "session_start" ? stampProject(event, project.config) : event;
 }
-async function withStopGateMark(event, sessionId, tmpDir) {
+async function withStopGateMark(event, sessionId, context) {
   if (event.kind !== "prompt" || !isHumanPrompt(event.text)) return event;
-  return await claimHumanCallMarker(sessionId, tmpDir) ? markAfterStopGate(event) : event;
+  const isClaimed = await claimHumanCallMarker(sessionId, context.tmpDir, context.messages);
+  return isClaimed ? markAfterStopGate(event) : event;
 }
 async function recordEvent(context) {
   const payload = JSON.parse(context.payload);
@@ -3053,7 +3279,8 @@ async function recordEvent(context) {
     project = await locateProject(context.projectDirectory);
   } catch (err) {
     if (!(err instanceof ProjectFileError)) throw err;
-    return { ...SILENT_EXIT, stderr: `\u0441\u0435\u0441\u0441\u0438\u044F \u043D\u0435 \u0437\u0430\u043F\u0438\u0441\u0430\u043D\u0430: ${err.message}
+    const reason = context.messages.record.sessionNotRecorded(err.message);
+    return { ...SILENT_EXIT, stderr: `${reason}
 ` };
   }
   if (project === void 0) return SILENT_EXIT;
@@ -3062,7 +3289,7 @@ async function recordEvent(context) {
     throw new RecordHookError(`\u043D\u0435\u0434\u043E\u043F\u0443\u0441\u0442\u0438\u043C\u044B\u0439 session_id: ${String(sessionId)}`);
   }
   const stampedEvent = withProject(hookEvent, project);
-  const event = await withStopGateMark(stampedEvent, sessionId, context.tmpDir);
+  const event = await withStopGateMark(stampedEvent, sessionId, context);
   const { raw } = captureDirectories(project.journal);
   await mkdir5(raw, { recursive: true });
   await appendFile(path9.join(raw, `${sessionId}.jsonl`), `${JSON.stringify(event)}
@@ -3203,28 +3430,30 @@ function tailOf(output) {
   return lines.slice(-OUTPUT_TAIL_LINES).join("\n");
 }
 async function callHuman(session, blocks) {
-  const message = `\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0438 \u043A\u0440\u0430\u0441\u043D\u044B\u0435 \u043F\u043E\u0441\u043B\u0435 ${MAX_BLOCKS} \u043F\u043E\u043F\u044B\u0442\u043E\u043A \u0438\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u2014 \u0430\u0433\u0435\u043D\u0442 \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D, \u043D\u0443\u0436\u0435\u043D \u0447\u0435\u043B\u043E\u0432\u0435\u043A.`;
+  const { stop } = session.messages;
+  const message = stop.humanCalled(MAX_BLOCKS);
   const marked = await written(session.statePath("human-call"), String(blocks));
   return {
     kind: "release-with-message",
-    message: marked ? message : `${message} \u041E\u0442\u043C\u0435\u0442\u043A\u0430 \u0434\u043B\u044F \u0437\u0430\u043F\u0438\u0441\u0438 \u043D\u0435 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0430.`
+    message: marked ? message : `${message} ${stop.markerNotSaved}`
   };
 }
 async function verdictOnRedChecks(session, checks, output) {
+  const { stop } = session.messages;
   const counter = session.statePath("stop-blocks");
   const blocks = await countedBlock(counter);
   if (blocks === void 0) {
-    return {
-      kind: "release-with-message",
-      message: `\u0425\u0443\u043A \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0438 \u043D\u0435 \u0441\u043C\u043E\u0433 \u0437\u0430\u043F\u0438\u0441\u0430\u0442\u044C \u0441\u0447\u0451\u0442\u0447\u0438\u043A \u043F\u043E\u043F\u044B\u0442\u043E\u043A (${counter}) \u2014 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438 \u043A\u0440\u0430\u0441\u043D\u044B\u0435, \u0430\u0433\u0435\u043D\u0442 \u043E\u0442\u043F\u0443\u0449\u0435\u043D \u0431\u0435\u0437 \u043F\u043E\u0432\u0442\u043E\u0440\u043E\u0432.`
-    };
+    return { kind: "release-with-message", message: stop.counterNotSaved(counter) };
   }
   if (blocks > MAX_BLOCKS) return callHuman(session, blocks);
   return {
     kind: "block",
-    message: `${checks.command} \u043D\u0435 \u043F\u0440\u043E\u0445\u043E\u0434\u0438\u0442 \u2014 \u0437\u0430\u043A\u043E\u043D\u0447\u0438\u0442\u044C \u0440\u0430\u0431\u043E\u0442\u0443 \u043D\u0435\u043B\u044C\u0437\u044F (\u043F\u043E\u043F\u044B\u0442\u043A\u0430 ${blocks} \u0438\u0437 ${MAX_BLOCKS}). \u0418\u0441\u043F\u0440\u0430\u0432\u044C:
-${tailOf(output)}
-`
+    message: stop.checksFailing({
+      command: checks.command,
+      attempt: blocks,
+      maxAttempts: MAX_BLOCKS,
+      output: tailOf(output)
+    })
   };
 }
 async function codeChangedOrGitMissing(session, checks) {
@@ -3238,19 +3467,18 @@ async function codeChangedOrGitMissing(session, checks) {
 async function verdictOf2(session) {
   const reading = await readConfig(session.root);
   if ("broken" in reading) {
-    return {
-      kind: "release-with-message",
-      message: `\u041A\u043E\u043D\u0444\u0438\u0433 ${PROJECT_CONFIG_FILE} \u043D\u0435 \u0447\u0438\u0442\u0430\u0435\u0442\u0441\u044F \u2014 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438 \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u044B, \u0430\u0433\u0435\u043D\u0442 \u043E\u0442\u043F\u0443\u0449\u0435\u043D. ${reading.broken.message}`
-    };
+    const message = session.messages.stop.configUnreadable({
+      file: PROJECT_CONFIG_FILE,
+      reason: reading.broken.message
+    });
+    return { kind: "release-with-message", message };
   }
   const checks = reading.config === void 0 ? void 0 : checksOf(reading.config);
   if (checks === void 0) return RELEASE;
   const changed = await codeChangedOrGitMissing(session, checks);
   if (changed instanceof GitError) {
-    return {
-      kind: "release-with-message",
-      message: `\u0425\u0443\u043A \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0438 \u043D\u0435 \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u043B git \u2014 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438 \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u044B, \u0430\u0433\u0435\u043D\u0442 \u043E\u0442\u043F\u0443\u0449\u0435\u043D. ${changed.message}`
-    };
+    const message = session.messages.stop.gitUnavailable(changed.message);
+    return { kind: "release-with-message", message };
   }
   if (!changed) return RELEASE;
   const run = runChecks(checks, session.root, session.statePath("checks-output"));
@@ -3285,7 +3513,8 @@ async function gateStop(context) {
   const sessionId = sessionIdOf(context.payload);
   const session = {
     root: context.projectDirectory,
-    statePath: (name) => hookStatePath(context.tmpDir, sessionId, name)
+    statePath: (name) => hookStatePath(context.tmpDir, sessionId, name),
+    messages: context.messages
   };
   return outcomeOf(session, await verdictOf2(session));
 }
@@ -3327,8 +3556,351 @@ async function runHook(name, context) {
   return HOOKS[name](context);
 }
 
+// src/messages/en.ts
+var en2 = {
+  help: {
+    title: "Cyberzavod \u2014 an AI-agent development process, local-first.",
+    languageOption: (languages) => `Message language: --lang ${languages} or the CYBERZAVOD_LANG variable; otherwise the system locale.`
+  },
+  commands: {
+    init: {
+      usage: "init [--yes]",
+      summary: "set up the project in the current directory: wizard, config, AGENTS.md, agent files"
+    },
+    sync: {
+      usage: "sync [--check] [--force]",
+      summary: "detect the stack again and rebuild the agent files; --check only verifies"
+    },
+    status: {
+      usage: "status",
+      summary: "project, workflow, stage agents, checks and the journal"
+    },
+    decision: {
+      usage: 'decision "<what was decided>" [--why "<why>"]',
+      summary: "record a decision in the journal"
+    },
+    note: {
+      usage: 'note "<text>"',
+      summary: "record a note in the journal"
+    },
+    draft: {
+      usage: "draft [<raw session log>]",
+      summary: "build a recording draft from a Claude Code session log"
+    },
+    publish: {
+      usage: "publish [--draft <draft>] [--build <build id>]",
+      summary: "publish the edited draft as records in the journal"
+    },
+    login: {
+      usage: "login",
+      summary: "sign in with GitHub to publish recordings to your gallery (server address \u2014 CYBERZAVOD_API_URL)"
+    },
+    logout: {
+      usage: "logout",
+      summary: "forget the saved GitHub token"
+    },
+    share: {
+      usage: "share <recording id>",
+      summary: "send a session recording from the journal to your gallery and show its link"
+    },
+    unshare: {
+      usage: "unshare <recording id>",
+      summary: "remove a recording from your gallery"
+    },
+    gallery: {
+      usage: "gallery [--public | --private]",
+      summary: "your gallery recordings, the limit and links; --public opens the gallery, --private closes it"
+    },
+    hook: {
+      usage: `hook <${HOOK_NAMES.join("|")}>`,
+      summary: "Claude Code hook: the event arrives on stdin; project settings call it, not a person"
+    }
+  },
+  init: {
+    rulesKept: (file) => `${file} already exists \u2014 left as is`,
+    rulesMoved: ({ from, to }) => `${from} moved to ${to}: the project rules live there now`,
+    rulesStarter: (file) => `${file} \u2014 a starter set of project rules, fill it in`,
+    created: "Created:",
+    ignoredEntry: (entry) => `.gitignore: ${entry}`,
+    journal: (path20) => `Project journal: ${path20}`,
+    nextSteps: "Commit .cyberzavod/, AGENTS.md, CLAUDE.md and .claude/: the hooks run the CLI from the project.\nNext: finish the rules in AGENTS.md and start tasks with /feature in Claude Code."
+  },
+  wizard: {
+    project: ({ name, root }) => `Project: ${name} (${root})`,
+    languages: (values) => `Languages: ${values}`,
+    frameworks: (values) => `Frameworks: ${values}`,
+    packageManager: (value) => `Package manager: ${value}`,
+    git: (hasGit) => `Git: ${hasGit ? "yes" : "no"}`,
+    scripts: (values) => `Scripts: ${values}`,
+    nothingFound: "none found",
+    packageManagerMissing: "not found",
+    projectIdQuestion: "Project id",
+    workflowQuestion: "Workflow",
+    modelQuestion: ({ title, agent }) => `Model for the \u201C${title}\u201D stage (agent ${agent})`,
+    journalQuestion: "Journal directory from the project root",
+    commandsQuestion: (separator) => `Check commands separated by \u201C${separator}\u201D`
+  },
+  sync: {
+    written: "written",
+    removed: "removed",
+    writtenByHuman: "written by a human",
+    outdated: "outdated",
+    extra: "extra",
+    harnessMismatch: ({ file, configVersion, cliVersion }) => `${file}: harness ${configVersion}, but the CLI is ${cliVersion}`,
+    filesOutdated: "Agent files are outdated: run cyberzavod sync"
+  },
+  status: {
+    recordTypes: { session: "sessions", decision: "decisions", note: "notes" },
+    foreman: "foreman",
+    checksNone: "none set",
+    project: ({ id, root }) => `Project: ${id} (${root})`,
+    harness: (version) => `Harness: ${version}`,
+    harnessOutdated: ({ version, cliVersion }) => `Harness: ${version} (CLI is ${cliVersion}, run cyberzavod sync)`,
+    workflow: (name) => `Workflow: ${name}`,
+    checks: (commands) => `Checks: ${commands}`,
+    journal: ({ path: path20, counts }) => `Journal: ${path20} \u2014 ${counts}`,
+    latestRecord: ({ timestamp, type }) => `Latest record: ${timestamp} (${type})`
+  },
+  journal: {
+    recorded: (path20) => `recorded: ${path20}`
+  },
+  login: {
+    openVerification: ({ url, code }) => `Open ${url} and enter the code ${code}`,
+    waiting: "Waiting for confirmation\u2026",
+    loggedIn: (login2) => `signed in: ${login2}`,
+    loggedOut: "signed out: the token was removed",
+    wasNotLoggedIn: "you were not signed in"
+  },
+  share: {
+    sent: (id) => `recording ${id} sent`,
+    replaced: (id) => `recording ${id} replaced`,
+    link: (url) => `link: ${url}`,
+    galleryClosed: "the gallery is closed: the recording is visible only by this link",
+    openGalleryHint: "open the gallery: cyberzavod gallery --public",
+    removed: (id) => `recording ${id} removed from the gallery`,
+    galleryRecordings: ({ count, limit }) => `Recordings in the gallery (${count} of ${limit}):`,
+    freeUpSpace: "Free up space with cyberzavod unshare <id>"
+  },
+  gallery: {
+    closed: (login2) => `${login2}'s gallery: closed, recordings are visible only by links`,
+    open: (login2) => `${login2}'s gallery: open`,
+    recordings: ({ count, limit }) => `Recordings: ${count} of ${limit}`,
+    openHint: "Open the gallery: cyberzavod gallery --public",
+    closeHint: "Close the gallery: cyberzavod gallery --private",
+    page: (url) => `Gallery page: ${url}`,
+    badge: (markdown) => `README badge: ${markdown}`
+  },
+  errors: {
+    missingDecisionText: "the decision text is required",
+    missingNoteText: "the note text is required",
+    missingRecordId: "the recording id is required",
+    unknownHook: (name) => `no hook named ${name}`,
+    languageFlagWithoutValue: "--lang has no value: give a language, for example --lang en",
+    unsupportedLanguage: ({ value, supported }) => `language \u201C${value}\u201D is not supported: available are ${supported}`,
+    projectNotFound: (directory) => `${directory} is not in a Cyberzavod project: run cyberzavod init first`,
+    alreadyConnected: (file) => `${file} already exists: the project is set up, use sync`,
+    toolFromSources: "the CLI is running from sources: build it (pnpm cyberzavod) and run the built one",
+    invalidRecordId: (id) => `${id} does not look like a recording id: only letters, digits, \u201C_\u201D and \u201C-\u201D`,
+    recordMissing: ({ id, file }) => `no recording ${id} in the journal: the file ${file} does not exist`,
+    recordInvalid: ({ id, reason }) => `recording ${id} failed validation: ${reason}`,
+    recordNotSession: ({ id, type }) => `recording ${id} failed validation: its type is ${type}, a session is required`,
+    galleryAccessConflict: "--public and --private cannot be combined: pick one",
+    notLoggedIn: "not signed in: sign in with cyberzavod login",
+    tokenRejected: "the server did not accept the token: sign in again with cyberzavod login",
+    limitReached: "the gallery already holds the maximum number of recordings",
+    credentialsCorrupt: (file) => `the file ${file} is corrupted: sign in again with cyberzavod login`,
+    loginCodeExpired: "the sign-in code expired: run cyberzavod login again",
+    loginDenied: "sign-in was denied on the GitHub page",
+    noConnection: ({ origin, reason }) => `cannot reach ${origin}: ${reason}`,
+    githubUnexpectedField: (name) => `GitHub returned an unexpected response: no field ${name}`,
+    githubNoDeviceCode: "GitHub did not issue a device code",
+    githubNoToken: "GitHub did not issue a token",
+    githubRejected: (reason) => `GitHub rejected the sign-in: ${reason}`,
+    serverUnexpectedResponse: (field2) => `the server returned an unexpected response: no valid field ${field2}`,
+    serverStatus: (status) => `the server answered ${status}`
+  }
+};
+
+// src/messages/ru.ts
+var ru2 = {
+  help: {
+    title: "Cyberzavod \u2014 \u043F\u0440\u043E\u0446\u0435\u0441\u0441 \u0440\u0430\u0437\u0440\u0430\u0431\u043E\u0442\u043A\u0438 \u0441 \u0418\u0418-\u0430\u0433\u0435\u043D\u0442\u0430\u043C\u0438, \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E.",
+    languageOption: (languages) => `\u042F\u0437\u044B\u043A \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0439: --lang ${languages} \u0438\u043B\u0438 \u043F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u0430\u044F CYBERZAVOD_LANG; \u0431\u0435\u0437 \u043D\u0438\u0445 \u2014 \u043F\u043E \u043B\u043E\u043A\u0430\u043B\u0438 \u0441\u0438\u0441\u0442\u0435\u043C\u044B.`
+  },
+  commands: {
+    init: {
+      usage: "init [--yes]",
+      summary: "\u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u043F\u0440\u043E\u0435\u043A\u0442 \u0432 \u0442\u0435\u043A\u0443\u0449\u0435\u043C \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0435: \u043C\u0430\u0441\u0442\u0435\u0440, \u043A\u043E\u043D\u0444\u0438\u0433, AGENTS.md, \u0444\u0430\u0439\u043B\u044B \u0430\u0433\u0435\u043D\u0442\u0430"
+    },
+    sync: {
+      usage: "sync [--check] [--force]",
+      summary: "\u0437\u0430\u043D\u043E\u0432\u043E \u043D\u0430\u0439\u0442\u0438 \u0441\u0442\u0435\u043A \u0438 \u043F\u0435\u0440\u0435\u0441\u043E\u0431\u0440\u0430\u0442\u044C \u0444\u0430\u0439\u043B\u044B \u0430\u0433\u0435\u043D\u0442\u0430; --check \u2014 \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C"
+    },
+    status: {
+      usage: "status",
+      summary: "\u043F\u0440\u043E\u0435\u043A\u0442, \u043F\u0440\u043E\u0446\u0435\u0441\u0441, \u0430\u0433\u0435\u043D\u0442\u044B \u044D\u0442\u0430\u043F\u043E\u0432, \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438 \u0438 \u0436\u0443\u0440\u043D\u0430\u043B"
+    },
+    decision: {
+      usage: 'decision "<\u0447\u0442\u043E \u0440\u0435\u0448\u0438\u043B\u0438>" [--why "<\u043F\u043E\u0447\u0435\u043C\u0443>"]',
+      summary: "\u0437\u0430\u043F\u0438\u0441\u0430\u0442\u044C \u0440\u0435\u0448\u0435\u043D\u0438\u0435 \u0432 \u0436\u0443\u0440\u043D\u0430\u043B"
+    },
+    note: {
+      usage: 'note "<\u0442\u0435\u043A\u0441\u0442>"',
+      summary: "\u0437\u0430\u043F\u0438\u0441\u0430\u0442\u044C \u0437\u0430\u043C\u0435\u0442\u043A\u0443 \u0432 \u0436\u0443\u0440\u043D\u0430\u043B"
+    },
+    draft: {
+      usage: "draft [<\u0441\u044B\u0440\u043E\u0439 \u0436\u0443\u0440\u043D\u0430\u043B \u0441\u0435\u0441\u0441\u0438\u0438>]",
+      summary: "\u0441\u043E\u0431\u0440\u0430\u0442\u044C \u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A \u0437\u0430\u043F\u0438\u0441\u0438 \u0438\u0437 \u0436\u0443\u0440\u043D\u0430\u043B\u0430 \u0441\u0435\u0441\u0441\u0438\u0438 Claude Code"
+    },
+    publish: {
+      usage: "publish [--draft <\u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A>] [--build <id \u0441\u0431\u043E\u0440\u043A\u0438>]",
+      summary: "\u043E\u043F\u0443\u0431\u043B\u0438\u043A\u043E\u0432\u0430\u0442\u044C \u043E\u0442\u0440\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0439 \u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A \u0437\u0430\u043F\u0438\u0441\u044F\u043C\u0438 \u0432 \u0436\u0443\u0440\u043D\u0430\u043B"
+    },
+    login: {
+      usage: "login",
+      summary: "\u0432\u043E\u0439\u0442\u0438 \u0447\u0435\u0440\u0435\u0437 GitHub, \u0447\u0442\u043E\u0431\u044B \u043F\u0443\u0431\u043B\u0438\u043A\u043E\u0432\u0430\u0442\u044C \u0437\u0430\u043F\u0438\u0441\u0438 \u0432 \u0433\u0430\u043B\u0435\u0440\u0435\u044E (\u0430\u0434\u0440\u0435\u0441 \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u2014 CYBERZAVOD_API_URL)"
+    },
+    logout: {
+      usage: "logout",
+      summary: "\u0437\u0430\u0431\u044B\u0442\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D\u043D\u044B\u0439 \u0442\u043E\u043A\u0435\u043D GitHub"
+    },
+    share: {
+      usage: "share <id \u0437\u0430\u043F\u0438\u0441\u0438>",
+      summary: "\u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0437\u0430\u043F\u0438\u0441\u044C \u0441\u0435\u0441\u0441\u0438\u0438 \u0438\u0437 \u0436\u0443\u0440\u043D\u0430\u043B\u0430 \u0432 \u0432\u0430\u0448\u0443 \u0433\u0430\u043B\u0435\u0440\u0435\u044E \u0438 \u043F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0443 \u043D\u0430 \u043D\u0435\u0451"
+    },
+    unshare: {
+      usage: "unshare <id \u0437\u0430\u043F\u0438\u0441\u0438>",
+      summary: "\u0443\u0431\u0440\u0430\u0442\u044C \u0437\u0430\u043F\u0438\u0441\u044C \u0438\u0437 \u0432\u0430\u0448\u0435\u0439 \u0433\u0430\u043B\u0435\u0440\u0435\u0438"
+    },
+    gallery: {
+      usage: "gallery [--public | --private]",
+      summary: "\u0432\u0430\u0448\u0438 \u0437\u0430\u043F\u0438\u0441\u0438 \u0432 \u0433\u0430\u043B\u0435\u0440\u0435\u0435, \u043B\u0438\u043C\u0438\u0442 \u0438 \u0441\u0441\u044B\u043B\u043A\u0438; --public \u043E\u0442\u043A\u0440\u044B\u0432\u0430\u0435\u0442 \u0433\u0430\u043B\u0435\u0440\u0435\u044E, --private \u0437\u0430\u043A\u0440\u044B\u0432\u0430\u0435\u0442"
+    },
+    hook: {
+      usage: `hook <${HOOK_NAMES.join("|")}>`,
+      summary: "\u0445\u0443\u043A Claude Code: \u0441\u043E\u0431\u044B\u0442\u0438\u0435 \u043D\u0430 stdin; \u0435\u0433\u043E \u0432\u044B\u0437\u044B\u0432\u0430\u044E\u0442 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043F\u0440\u043E\u0435\u043A\u0442\u0430, \u0430 \u043D\u0435 \u0447\u0435\u043B\u043E\u0432\u0435\u043A"
+    }
+  },
+  init: {
+    rulesKept: (file) => `${file} \u0443\u0436\u0435 \u0435\u0441\u0442\u044C \u2014 \u043E\u0441\u0442\u0430\u0432\u043B\u0435\u043D`,
+    rulesMoved: ({ from, to }) => `${from} \u043F\u0435\u0440\u0435\u043D\u0435\u0441\u0451\u043D \u0432 ${to}: \u043F\u0440\u0430\u0432\u0438\u043B\u0430 \u043F\u0440\u043E\u0435\u043A\u0442\u0430 \u0442\u0435\u043F\u0435\u0440\u044C \u0442\u0430\u043C`,
+    rulesStarter: (file) => `${file} \u2014 \u0437\u0430\u0433\u043E\u0442\u043E\u0432\u043A\u0430 \u043F\u0440\u0430\u0432\u0438\u043B \u043F\u0440\u043E\u0435\u043A\u0442\u0430, \u0437\u0430\u043F\u043E\u043B\u043D\u0438\u0442\u0435 \u0435\u0451`,
+    created: "\u0421\u043E\u0437\u0434\u0430\u043D\u043E:",
+    ignoredEntry: (entry) => `.gitignore: ${entry}`,
+    journal: (path20) => `\u0416\u0443\u0440\u043D\u0430\u043B \u043F\u0440\u043E\u0435\u043A\u0442\u0430: ${path20}`,
+    nextSteps: "\u0417\u0430\u043A\u043E\u043C\u043C\u0438\u0442\u044C\u0442\u0435 .cyberzavod/, AGENTS.md, CLAUDE.md \u0438 .claude/: \u0445\u0443\u043A\u0438 \u0437\u0430\u043F\u0443\u0441\u043A\u0430\u044E\u0442 CLI \u0438\u0437 \u043F\u0440\u043E\u0435\u043A\u0442\u0430.\n\u0414\u0430\u043B\u044C\u0448\u0435: \u0434\u043E\u043F\u0438\u0448\u0438\u0442\u0435 \u043F\u0440\u0430\u0432\u0438\u043B\u0430 \u0432 AGENTS.md \u0438 \u0437\u0430\u043F\u0443\u0441\u043A\u0430\u0439\u0442\u0435 \u0437\u0430\u0434\u0430\u0447\u0438 \u0447\u0435\u0440\u0435\u0437 /feature \u0432 Claude Code."
+  },
+  wizard: {
+    project: ({ name, root }) => `\u041F\u0440\u043E\u0435\u043A\u0442: ${name} (${root})`,
+    languages: (values) => `\u042F\u0437\u044B\u043A\u0438: ${values}`,
+    frameworks: (values) => `\u0424\u0440\u0435\u0439\u043C\u0432\u043E\u0440\u043A\u0438: ${values}`,
+    packageManager: (value) => `\u041C\u0435\u043D\u0435\u0434\u0436\u0435\u0440 \u043F\u0430\u043A\u0435\u0442\u043E\u0432: ${value}`,
+    git: (hasGit) => `Git: ${hasGit ? "\u0435\u0441\u0442\u044C" : "\u043D\u0435\u0442"}`,
+    scripts: (values) => `\u0421\u043A\u0440\u0438\u043F\u0442\u044B: ${values}`,
+    nothingFound: "\u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B",
+    packageManagerMissing: "\u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D",
+    projectIdQuestion: "\u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440 \u043F\u0440\u043E\u0435\u043A\u0442\u0430",
+    workflowQuestion: "\u041F\u0440\u043E\u0446\u0435\u0441\u0441",
+    modelQuestion: ({ title, agent }) => `\u041C\u043E\u0434\u0435\u043B\u044C \u044D\u0442\u0430\u043F\u0430 \xAB${title}\xBB (\u0430\u0433\u0435\u043D\u0442 ${agent})`,
+    journalQuestion: "\u041A\u0430\u0442\u0430\u043B\u043E\u0433 \u0436\u0443\u0440\u043D\u0430\u043B\u0430 \u043E\u0442 \u043A\u043E\u0440\u043D\u044F \u043F\u0440\u043E\u0435\u043A\u0442\u0430",
+    commandsQuestion: (separator) => `\u041A\u043E\u043C\u0430\u043D\u0434\u044B \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438 \u0447\u0435\u0440\u0435\u0437 \xAB${separator}\xBB`
+  },
+  sync: {
+    written: "\u0437\u0430\u043F\u0438\u0441\u0430\u043D\u044B",
+    removed: "\u0443\u0434\u0430\u043B\u0435\u043D\u044B",
+    writtenByHuman: "\u043D\u0430\u043F\u0438\u0441\u0430\u043D\u044B \u0447\u0435\u043B\u043E\u0432\u0435\u043A\u043E\u043C",
+    outdated: "\u0443\u0441\u0442\u0430\u0440\u0435\u043B\u0438",
+    extra: "\u043B\u0438\u0448\u043D\u0438\u0435",
+    harnessMismatch: ({ file, configVersion, cliVersion }) => `${file}: harness ${configVersion}, \u0430 CLI \u2014 ${cliVersion}`,
+    filesOutdated: "\u0424\u0430\u0439\u043B\u044B \u0430\u0433\u0435\u043D\u0442\u0430 \u0443\u0441\u0442\u0430\u0440\u0435\u043B\u0438: \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 cyberzavod sync"
+  },
+  status: {
+    recordTypes: { session: "\u0441\u0435\u0441\u0441\u0438\u0438", decision: "\u0440\u0435\u0448\u0435\u043D\u0438\u044F", note: "\u0437\u0430\u043C\u0435\u0442\u043A\u0438" },
+    foreman: "\u0432\u0435\u0434\u0443\u0449\u0438\u0439",
+    checksNone: "\u043D\u0435 \u0437\u0430\u0434\u0430\u043D\u044B",
+    project: ({ id, root }) => `\u041F\u0440\u043E\u0435\u043A\u0442: ${id} (${root})`,
+    harness: (version) => `Harness: ${version}`,
+    harnessOutdated: ({ version, cliVersion }) => `Harness: ${version} (CLI \u2014 ${cliVersion}, \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 cyberzavod sync)`,
+    workflow: (name) => `\u041F\u0440\u043E\u0446\u0435\u0441\u0441: ${name}`,
+    checks: (commands) => `\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0438: ${commands}`,
+    journal: ({ path: path20, counts }) => `\u0416\u0443\u0440\u043D\u0430\u043B: ${path20} \u2014 ${counts}`,
+    latestRecord: ({ timestamp, type }) => `\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u044F\u044F \u0437\u0430\u043F\u0438\u0441\u044C: ${timestamp} (${type})`
+  },
+  journal: {
+    recorded: (path20) => `\u0437\u0430\u043F\u0438\u0441\u0430\u043D\u043E: ${path20}`
+  },
+  login: {
+    openVerification: ({ url, code }) => `\u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 ${url} \u0438 \u0432\u0432\u0435\u0434\u0438\u0442\u0435 \u043A\u043E\u0434 ${code}`,
+    waiting: "\u0416\u0434\u0443 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u044F\u2026",
+    loggedIn: (login2) => `\u0432\u0445\u043E\u0434 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D: ${login2}`,
+    loggedOut: "\u0432\u044B \u0432\u044B\u0448\u043B\u0438: \u0442\u043E\u043A\u0435\u043D \u0443\u0434\u0430\u043B\u0451\u043D",
+    wasNotLoggedIn: "\u0432\u0445\u043E\u0434\u0430 \u0438 \u043D\u0435 \u0431\u044B\u043B\u043E"
+  },
+  share: {
+    sent: (id) => `\u0437\u0430\u043F\u0438\u0441\u044C ${id} \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430`,
+    replaced: (id) => `\u0437\u0430\u043F\u0438\u0441\u044C ${id} \u0437\u0430\u043C\u0435\u043D\u0435\u043D\u0430`,
+    link: (url) => `\u0441\u0441\u044B\u043B\u043A\u0430: ${url}`,
+    galleryClosed: "\u0433\u0430\u043B\u0435\u0440\u0435\u044F \u0437\u0430\u043A\u0440\u044B\u0442\u0430: \u0437\u0430\u043F\u0438\u0441\u044C \u0432\u0438\u0434\u043D\u0430 \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u043E \u044D\u0442\u043E\u0439 \u0441\u0441\u044B\u043B\u043A\u0435",
+    openGalleryHint: "\u043E\u0442\u043A\u0440\u044B\u0442\u044C \u0433\u0430\u043B\u0435\u0440\u0435\u044E: cyberzavod gallery --public",
+    removed: (id) => `\u0437\u0430\u043F\u0438\u0441\u044C ${id} \u0443\u0434\u0430\u043B\u0435\u043D\u0430 \u0438\u0437 \u0433\u0430\u043B\u0435\u0440\u0435\u0438`,
+    galleryRecordings: ({ count, limit }) => `\u0417\u0430\u043F\u0438\u0441\u0438 \u0432 \u0433\u0430\u043B\u0435\u0440\u0435\u0435 (${count} \u0438\u0437 ${limit}):`,
+    freeUpSpace: "\u041E\u0441\u0432\u043E\u0431\u043E\u0434\u0438\u0442\u0435 \u043C\u0435\u0441\u0442\u043E \u043A\u043E\u043C\u0430\u043D\u0434\u043E\u0439 cyberzavod unshare <id>"
+  },
+  gallery: {
+    closed: (login2) => `\u0413\u0430\u043B\u0435\u0440\u0435\u044F ${login2}: \u0437\u0430\u043A\u0440\u044B\u0442\u0430, \u0437\u0430\u043F\u0438\u0441\u0438 \u0432\u0438\u0434\u043D\u044B \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u043E \u0441\u0441\u044B\u043B\u043A\u0430\u043C`,
+    open: (login2) => `\u0413\u0430\u043B\u0435\u0440\u0435\u044F ${login2}: \u043E\u0442\u043A\u0440\u044B\u0442\u0430`,
+    recordings: ({ count, limit }) => `\u0417\u0430\u043F\u0438\u0441\u0438: ${count} \u0438\u0437 ${limit}`,
+    openHint: "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0433\u0430\u043B\u0435\u0440\u0435\u044E: cyberzavod gallery --public",
+    closeHint: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C \u0433\u0430\u043B\u0435\u0440\u0435\u044E: cyberzavod gallery --private",
+    page: (url) => `\u0421\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \u0433\u0430\u043B\u0435\u0440\u0435\u0438: ${url}`,
+    badge: (markdown) => `\u0411\u0435\u0439\u0434\u0436 \u0434\u043B\u044F README: ${markdown}`
+  },
+  errors: {
+    missingDecisionText: "\u043D\u0443\u0436\u0435\u043D \u0442\u0435\u043A\u0441\u0442 \u0440\u0435\u0448\u0435\u043D\u0438\u044F",
+    missingNoteText: "\u043D\u0443\u0436\u0435\u043D \u0442\u0435\u043A\u0441\u0442 \u0437\u0430\u043C\u0435\u0442\u043A\u0438",
+    missingRecordId: "\u043D\u0443\u0436\u0435\u043D id \u0437\u0430\u043F\u0438\u0441\u0438",
+    unknownHook: (name) => `\u043D\u0435\u0442 \u0445\u0443\u043A\u0430 ${name}`,
+    languageFlagWithoutValue: "\u0443 --lang \u043D\u0435\u0442 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F: \u0443\u043A\u0430\u0436\u0438\u0442\u0435 \u044F\u0437\u044B\u043A, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 --lang ru",
+    unsupportedLanguage: ({ value, supported }) => `\u044F\u0437\u044B\u043A \xAB${value}\xBB \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F: \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B ${supported}`,
+    projectNotFound: (directory) => `${directory} \u043D\u0435 \u0432 \u043F\u0440\u043E\u0435\u043A\u0442\u0435 Cyberzavod: \u0441\u043D\u0430\u0447\u0430\u043B\u0430 cyberzavod init`,
+    alreadyConnected: (file) => `${file} \u0443\u0436\u0435 \u0435\u0441\u0442\u044C: \u043F\u0440\u043E\u0435\u043A\u0442 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0451\u043D, \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 sync`,
+    toolFromSources: "CLI \u0437\u0430\u043F\u0443\u0449\u0435\u043D \u0438\u0437 \u0438\u0441\u0445\u043E\u0434\u043D\u0438\u043A\u043E\u0432: \u0441\u043E\u0431\u0435\u0440\u0438\u0442\u0435 \u0435\u0433\u043E (pnpm cyberzavod) \u0438 \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u0441\u043E\u0431\u0440\u0430\u043D\u043D\u044B\u0439",
+    invalidRecordId: (id) => `${id} \u043D\u0435 \u043F\u043E\u0445\u043E\u0436 \u043D\u0430 id \u0437\u0430\u043F\u0438\u0441\u0438: \u0442\u043E\u043B\u044C\u043A\u043E \u0431\u0443\u043A\u0432\u044B, \u0446\u0438\u0444\u0440\u044B, \xAB_\xBB \u0438 \xAB-\xBB`,
+    recordMissing: ({ id, file }) => `\u0432 \u0436\u0443\u0440\u043D\u0430\u043B\u0435 \u043D\u0435\u0442 \u0437\u0430\u043F\u0438\u0441\u0438 ${id}: \u0444\u0430\u0439\u043B\u0430 ${file} \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442`,
+    recordInvalid: ({ id, reason }) => `\u0437\u0430\u043F\u0438\u0441\u044C ${id} \u043D\u0435 \u043F\u0440\u043E\u0448\u043B\u0430 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0443: ${reason}`,
+    recordNotSession: ({ id, type }) => `\u0437\u0430\u043F\u0438\u0441\u044C ${id} \u043D\u0435 \u043F\u0440\u043E\u0448\u043B\u0430 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0443: \u0442\u0438\u043F ${type}, \u043D\u0443\u0436\u043D\u0430 \u0441\u0435\u0441\u0441\u0438\u044F`,
+    galleryAccessConflict: "--public \u0438 --private \u0432\u043C\u0435\u0441\u0442\u0435 \u043D\u0435 \u0440\u0430\u0431\u043E\u0442\u0430\u044E\u0442: \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043E\u0434\u043D\u043E",
+    notLoggedIn: "\u043D\u0435\u0442 \u0432\u0445\u043E\u0434\u0430: \u0432\u043E\u0439\u0434\u0438\u0442\u0435 \u043A\u043E\u043C\u0430\u043D\u0434\u043E\u0439 cyberzavod login",
+    tokenRejected: "\u0441\u0435\u0440\u0432\u0435\u0440 \u043D\u0435 \u043F\u0440\u0438\u043D\u044F\u043B \u0442\u043E\u043A\u0435\u043D: \u0432\u043E\u0439\u0434\u0438\u0442\u0435 \u043A\u043E\u043C\u0430\u043D\u0434\u043E\u0439 cyberzavod login",
+    limitReached: "\u0432 \u0433\u0430\u043B\u0435\u0440\u0435\u0435 \u0443\u0436\u0435 \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C \u0437\u0430\u043F\u0438\u0441\u0435\u0439",
+    credentialsCorrupt: (file) => `\u0444\u0430\u0439\u043B ${file} \u043F\u043E\u0432\u0440\u0435\u0436\u0434\u0451\u043D: \u0432\u043E\u0439\u0434\u0438\u0442\u0435 \u0437\u0430\u043D\u043E\u0432\u043E \u043A\u043E\u043C\u0430\u043D\u0434\u043E\u0439 cyberzavod login`,
+    loginCodeExpired: "\u043A\u043E\u0434 \u0432\u0445\u043E\u0434\u0430 \u0438\u0441\u0442\u0451\u043A: \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 cyberzavod login \u0437\u0430\u043D\u043E\u0432\u043E",
+    loginDenied: "\u0432\u0445\u043E\u0434 \u043E\u0442\u043A\u043B\u043E\u043D\u0451\u043D \u043D\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435 GitHub",
+    noConnection: ({ origin, reason }) => `\u043D\u0435\u0442 \u0441\u0432\u044F\u0437\u0438 \u0441 ${origin}: ${reason}`,
+    githubUnexpectedField: (name) => `GitHub \u0432\u0435\u0440\u043D\u0443\u043B \u043D\u0435\u043E\u0436\u0438\u0434\u0430\u043D\u043D\u044B\u0439 \u043E\u0442\u0432\u0435\u0442: \u043D\u0435\u0442 \u043F\u043E\u043B\u044F ${name}`,
+    githubNoDeviceCode: "GitHub \u043D\u0435 \u0432\u044B\u0434\u0430\u043B \u043A\u043E\u0434 \u0443\u0441\u0442\u0440\u043E\u0439\u0441\u0442\u0432\u0430",
+    githubNoToken: "GitHub \u043D\u0435 \u0432\u044B\u0434\u0430\u043B \u0442\u043E\u043A\u0435\u043D",
+    githubRejected: (reason) => `GitHub \u043E\u0442\u043A\u043B\u043E\u043D\u0438\u043B \u0432\u0445\u043E\u0434: ${reason}`,
+    serverUnexpectedResponse: (field2) => `\u0441\u0435\u0440\u0432\u0435\u0440 \u0432\u0435\u0440\u043D\u0443\u043B \u043D\u0435\u043E\u0436\u0438\u0434\u0430\u043D\u043D\u044B\u0439 \u043E\u0442\u0432\u0435\u0442: \u043D\u0435\u0442 \u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u043E\u0433\u043E \u043F\u043E\u043B\u044F ${field2}`,
+    serverStatus: (status) => `\u0441\u0435\u0440\u0432\u0435\u0440 \u043E\u0442\u0432\u0435\u0442\u0438\u043B ${status}`
+  }
+};
+
+// src/messages/catalog.ts
+var CLI_MESSAGES = { en: en2, ru: ru2 };
+
 // src/errors.ts
 var CommandError = class extends Error {
+  describe;
+  /**
+   * Ошибка с текстом на любом языке интерфейса.
+   * @param {LocalizedText<CliMessages>} describe Текст ошибки по набору сообщений.
+   * @param {ErrorOptions} [options] Причина ошибки.
+   */
+  constructor(describe, options) {
+    super(describe(CLI_MESSAGES[DEFAULT_INTERFACE_LANGUAGE]), options);
+    this.describe = describe;
+  }
 };
 
 // src/sharing/http.ts
@@ -3337,7 +3909,10 @@ async function sendRequest(fetchImplementation, url, init) {
     return await fetchImplementation(url, init);
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
-    throw new CommandError(`\u043D\u0435\u0442 \u0441\u0432\u044F\u0437\u0438 \u0441 ${new URL(url).origin}: ${reason}`, { cause: err });
+    const { origin } = new URL(url);
+    throw new CommandError((messages) => messages.errors.noConnection({ origin, reason }), {
+      cause: err
+    });
   }
 }
 async function readJsonBody(response) {
@@ -3359,7 +3934,7 @@ var ApiError = class extends Error {
   status;
   /**
    * Ошибка, о которой сообщил сервер.
-   * @param {string} message Текст ошибки по-русски из ответа сервера.
+   * @param {string} message Текст ошибки из ответа сервера, как он пришёл: язык выбирает сервер.
    * @param {string} code Код ошибки из ответа сервера, например `limit_reached`.
    * @param {number} status HTTP-статус ответа.
    */
@@ -3371,37 +3946,41 @@ var ApiError = class extends Error {
 };
 var UNAUTHORIZED_CODE = "unauthorized";
 var LIMIT_REACHED_CODE = "limit_reached";
-var INVALID_RESPONSE_CODE = "invalid_response";
-var HTTP_ERROR_CODE = "http_error";
 var NEW_RECORDING_STATUS = 201;
 function isString(value) {
   return typeof value === "string";
 }
-function invalidResponse(what, status) {
-  return new ApiError(`\u0441\u0435\u0440\u0432\u0435\u0440 \u0432\u0435\u0440\u043D\u0443\u043B \u043D\u0435\u043E\u0436\u0438\u0434\u0430\u043D\u043D\u044B\u0439 \u043E\u0442\u0432\u0435\u0442: ${what}`, INVALID_RESPONSE_CODE, status);
+var RESPONSE_BODY = "body";
+function invalidResponse(field2) {
+  return new CommandError((messages) => messages.errors.serverUnexpectedResponse(field2));
 }
-function parseSummary(raw, status) {
-  if (!isObject5(raw)) throw invalidResponse("\u0437\u0430\u043F\u0438\u0441\u044C \u043D\u0435 \u043E\u0431\u044A\u0435\u043A\u0442", status);
+function parseSummary(raw, where) {
+  if (!isObject5(raw)) throw invalidResponse(where);
   const { id, slug, projectId, title, language, startedAt, uploadedAt } = raw;
-  if (!isString(id) || !isString(slug) || !isString(projectId) || !isString(title) || !isString(language) || !isString(startedAt) || !isString(uploadedAt)) {
-    throw invalidResponse("\u0432 \u0437\u0430\u043F\u0438\u0441\u0438 \u043D\u0435 \u0445\u0432\u0430\u0442\u0430\u0435\u0442 \u043F\u043E\u043B\u0435\u0439", status);
-  }
+  if (!isString(id)) throw invalidResponse(`${where}.id`);
+  if (!isString(slug)) throw invalidResponse(`${where}.slug`);
+  if (!isString(projectId)) throw invalidResponse(`${where}.projectId`);
+  if (!isString(title)) throw invalidResponse(`${where}.title`);
+  if (!isString(language)) throw invalidResponse(`${where}.language`);
+  if (!isString(startedAt)) throw invalidResponse(`${where}.startedAt`);
+  if (!isString(uploadedAt)) throw invalidResponse(`${where}.uploadedAt`);
   return { id, slug, projectId, title, language, startedAt, uploadedAt };
 }
-function parseMe(raw, status) {
-  if (!isObject5(raw)) throw invalidResponse("\u0430\u0432\u0442\u043E\u0440 \u043D\u0435 \u043E\u0431\u044A\u0435\u043A\u0442", status);
+function parseMe(raw) {
+  if (!isObject5(raw)) throw invalidResponse(RESPONSE_BODY);
   const { login: login2, galleryPublic, limit, recordings } = raw;
-  if (!isString(login2) || typeof galleryPublic !== "boolean" || typeof limit !== "number" || !Array.isArray(recordings)) {
-    throw invalidResponse("\u0443 \u0430\u0432\u0442\u043E\u0440\u0430 \u043D\u0435 \u0445\u0432\u0430\u0442\u0430\u0435\u0442 \u043F\u043E\u043B\u0435\u0439", status);
-  }
-  const summaries = recordings.map((summary) => parseSummary(summary, status));
+  if (!isString(login2)) throw invalidResponse("login");
+  if (typeof galleryPublic !== "boolean") throw invalidResponse("galleryPublic");
+  if (typeof limit !== "number") throw invalidResponse("limit");
+  if (!Array.isArray(recordings)) throw invalidResponse("recordings");
+  const summaries = recordings.map((summary) => parseSummary(summary, "recordings[]"));
   return { login: login2, galleryPublic, limit, recordings: summaries };
 }
 function errorOf(body, status) {
   if (isObject5(body) && isString(body.error) && isString(body.message)) {
     return new ApiError(body.message, body.error, status);
   }
-  return new ApiError(`\u0441\u0435\u0440\u0432\u0435\u0440 \u043E\u0442\u0432\u0435\u0442\u0438\u043B ${status}`, HTTP_ERROR_CODE, status);
+  return new CommandError((messages) => messages.errors.serverStatus(status));
 }
 var HttpCyberzavodApi = class {
   #baseUrl;
@@ -3418,22 +3997,24 @@ var HttpCyberzavodApi = class {
   /**
    * Спрашивает у сервера идентификатор приложения GitHub.
    * @returns {Promise<string>} `clientId` для device flow.
-   * @throws {ApiError} Если вход на сервере недоступен или ответ неожиданный.
+   * @throws {ApiError} Если вход на сервере недоступен.
+   * @throws {CommandError} Если ответ неожиданный.
    */
   async githubClientId() {
-    const { status, body } = await this.#call({ method: "GET", path: "/api/auth/github" });
-    if (!isObject5(body) || !isString(body.clientId)) throw invalidResponse("\u043D\u0435\u0442 clientId", status);
+    const { body } = await this.#call({ method: "GET", path: "/api/auth/github" });
+    if (!isObject5(body) || !isString(body.clientId)) throw invalidResponse("clientId");
     return body.clientId;
   }
   /**
    * Возвращает автора, которому принадлежит токен.
    * @param {string} token Токен GitHub.
    * @returns {Promise<Me>} Автор с галереей и записями.
-   * @throws {ApiError} Если сервер не принял токен или ответ неожиданный.
+   * @throws {ApiError} Если сервер не принял токен.
+   * @throws {CommandError} Если ответ неожиданный.
    */
   async me(token) {
-    const { status, body } = await this.#call({ method: "GET", path: "/api/me", token });
-    return parseMe(body, status);
+    const { body } = await this.#call({ method: "GET", path: "/api/me", token });
+    return parseMe(body);
   }
   /**
    * Отправляет запись в галерею автора.
@@ -3441,7 +4022,8 @@ var HttpCyberzavodApi = class {
    * @param {string} id Идентификатор записи.
    * @param {unknown} record Запись, прошедшая проверку ядра.
    * @returns {Promise<UploadedRecording>} Сведения о записи на сервере.
-   * @throws {ApiError} Если сервер отклонил запись или ответ неожиданный.
+   * @throws {ApiError} Если сервер отклонил запись.
+   * @throws {CommandError} Если ответ неожиданный.
    */
   async uploadRecording(token, id, record) {
     const { status, body } = await this.#call({
@@ -3450,9 +4032,9 @@ var HttpCyberzavodApi = class {
       token,
       body: record
     });
-    if (!isObject5(body)) throw invalidResponse("\u043D\u0435\u0442 \u0441\u0432\u0435\u0434\u0435\u043D\u0438\u0439 \u043E \u0437\u0430\u043F\u0438\u0441\u0438", status);
+    if (!isObject5(body)) throw invalidResponse(RESPONSE_BODY);
     return {
-      recording: parseSummary(body.recording, status),
+      recording: parseSummary(body.recording, "recording"),
       isNew: status === NEW_RECORDING_STATUS
     };
   }
@@ -3499,15 +4081,14 @@ function isApiError(err, code) {
 }
 
 // src/sharing/authorization.ts
-var LOGIN_HINT = "\u0432\u043E\u0439\u0434\u0438\u0442\u0435 \u043A\u043E\u043C\u0430\u043D\u0434\u043E\u0439 cyberzavod login";
 async function withToken(sharing, action) {
   const token = await sharing.credentials.read();
-  if (token === void 0) throw new CommandError(`\u043D\u0435\u0442 \u0432\u0445\u043E\u0434\u0430: ${LOGIN_HINT}`);
+  if (token === void 0) throw new CommandError((messages) => messages.errors.notLoggedIn);
   try {
     return await action(token);
   } catch (err) {
     if (!isApiError(err, UNAUTHORIZED_CODE)) throw err;
-    throw new CommandError(`${err.message}: ${LOGIN_HINT}`, { cause: err });
+    throw new CommandError((messages) => messages.errors.tokenRejected, { cause: err });
   }
 }
 
@@ -3527,7 +4108,7 @@ function badgeMarkdown(siteUrl, login2) {
 // src/commands/gallery.ts
 function galleryAccessOf(isPublicRequested, isPrivateRequested) {
   if (isPublicRequested && isPrivateRequested) {
-    throw new CommandError("--public \u0438 --private \u0432\u043C\u0435\u0441\u0442\u0435 \u043D\u0435 \u0440\u0430\u0431\u043E\u0442\u0430\u044E\u0442: \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043E\u0434\u043D\u043E");
+    throw new CommandError((messages) => messages.errors.galleryAccessConflict);
   }
   if (isPublicRequested) return "public";
   if (isPrivateRequested) return "private";
@@ -3537,33 +4118,36 @@ async function changeAccess(sharing, token, access2) {
   if (access2 !== "keep") await sharing.api.setGalleryPublic(token, access2 === "public");
   return sharing.api.me(token);
 }
-function describeGallery(sharing, me) {
+function describeGallery(sharing, me, messages) {
   const recordingLines2 = me.recordings.map((recording) => {
     const link = recordingLink(sharing.siteUrl, recording.slug);
     return `  ${recording.id}  ${recording.title}
     ${link}`;
   });
-  const recordingsTitle = `\u0417\u0430\u043F\u0438\u0441\u0438: ${me.recordings.length} \u0438\u0437 ${me.limit}`;
+  const recordingsTitle = messages.gallery.recordings({
+    count: me.recordings.length,
+    limit: me.limit
+  });
   if (!me.galleryPublic) {
     return [
-      `\u0413\u0430\u043B\u0435\u0440\u0435\u044F ${me.login}: \u0437\u0430\u043A\u0440\u044B\u0442\u0430, \u0437\u0430\u043F\u0438\u0441\u0438 \u0432\u0438\u0434\u043D\u044B \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u043E \u0441\u0441\u044B\u043B\u043A\u0430\u043C`,
+      messages.gallery.closed(me.login),
       recordingsTitle,
       ...recordingLines2,
-      "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0433\u0430\u043B\u0435\u0440\u0435\u044E: cyberzavod gallery --public"
+      messages.gallery.openHint
     ];
   }
   return [
-    `\u0413\u0430\u043B\u0435\u0440\u0435\u044F ${me.login}: \u043E\u0442\u043A\u0440\u044B\u0442\u0430`,
+    messages.gallery.open(me.login),
     recordingsTitle,
     ...recordingLines2,
-    `\u0421\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \u0433\u0430\u043B\u0435\u0440\u0435\u0438: ${galleryLink(sharing.siteUrl, me.login)}`,
-    `\u0411\u0435\u0439\u0434\u0436 \u0434\u043B\u044F README: ${badgeMarkdown(sharing.siteUrl, me.login)}`,
-    "\u0417\u0430\u043A\u0440\u044B\u0442\u044C \u0433\u0430\u043B\u0435\u0440\u0435\u044E: cyberzavod gallery --private"
+    messages.gallery.page(galleryLink(sharing.siteUrl, me.login)),
+    messages.gallery.badge(badgeMarkdown(sharing.siteUrl, me.login)),
+    messages.gallery.closeHint
   ];
 }
-async function showGallery(sharing, access2) {
+async function showGallery(sharing, access2, messages) {
   const me = await withToken(sharing, (token) => changeAccess(sharing, token, access2));
-  for (const line of describeGallery(sharing, me)) console.log(line);
+  for (const line of describeGallery(sharing, me, messages)) console.log(line);
 }
 
 // src/commands/init.ts
@@ -3750,9 +4334,7 @@ async function readInstallation() {
 }
 function toolOf(installation) {
   if (installation.tool === void 0) {
-    throw new CommandError(
-      "CLI \u0437\u0430\u043F\u0443\u0449\u0435\u043D \u0438\u0437 \u0438\u0441\u0445\u043E\u0434\u043D\u0438\u043A\u043E\u0432: \u0441\u043E\u0431\u0435\u0440\u0438\u0442\u0435 \u0435\u0433\u043E (pnpm cyberzavod) \u0438 \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u0441\u043E\u0431\u0440\u0430\u043D\u043D\u044B\u0439"
-    );
+    throw new CommandError((messages) => messages.errors.toolFromSources);
   }
   return installation.tool;
 }
@@ -3787,43 +4369,48 @@ function terminalPrompter(streams) {
     }
   };
 }
-function describeDetected(root, detected) {
-  const listed = (values) => values.length === 0 ? "\u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B" : values.join(", ");
+function describeDetected(root, detected, messages) {
+  const { wizard } = messages;
+  const listed = (values) => values.length === 0 ? wizard.nothingFound : values.join(", ");
   return [
-    `\u041F\u0440\u043E\u0435\u043A\u0442: ${detected.name} (${root})`,
-    `\u042F\u0437\u044B\u043A\u0438: ${listed(detected.languages)}`,
-    `\u0424\u0440\u0435\u0439\u043C\u0432\u043E\u0440\u043A\u0438: ${listed(detected.frameworks)}`,
-    `\u041C\u0435\u043D\u0435\u0434\u0436\u0435\u0440 \u043F\u0430\u043A\u0435\u0442\u043E\u0432: ${detected.packageManager ?? "\u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D"}`,
-    `Git: ${detected.git ? "\u0435\u0441\u0442\u044C" : "\u043D\u0435\u0442"}`,
-    `\u0421\u043A\u0440\u0438\u043F\u0442\u044B: ${listed(detected.scripts)}`
+    wizard.project({ name: detected.name, root }),
+    wizard.languages(listed(detected.languages)),
+    wizard.frameworks(listed(detected.frameworks)),
+    wizard.packageManager(detected.packageManager ?? wizard.packageManagerMissing),
+    wizard.git(detected.git),
+    wizard.scripts(listed(detected.scripts))
   ];
 }
 function splitList(answer) {
   const parts = answer.split(LIST_SEPARATOR).map((part) => part.trim());
   return parts.filter((part) => part !== "");
 }
-async function askAgents(harness2, stages, prompter) {
+async function askAgents(questions) {
+  const { harness: harness2, stages, prompter, messages } = questions;
   const agents = {};
   for (const stage of stages) {
     const guide = harness2.stages[stage];
     if (guide.role === void 0) continue;
-    const model = await prompter.ask(
-      `\u041C\u043E\u0434\u0435\u043B\u044C \u044D\u0442\u0430\u043F\u0430 \xAB${guide.title}\xBB (\u0430\u0433\u0435\u043D\u0442 ${DEFAULT_AGENT.agent})`,
-      DEFAULT_MODEL
-    );
+    const question = messages.wizard.modelQuestion({
+      title: guide.title,
+      agent: DEFAULT_AGENT.agent
+    });
+    const model = await prompter.ask(question, DEFAULT_MODEL);
     agents[stage] = { ...DEFAULT_AGENT, model };
   }
   return agents;
 }
-async function askProjectConfig(detected, harness2, prompter) {
-  const projectIdAnswer = await prompter.ask("\u0418\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440 \u043F\u0440\u043E\u0435\u043A\u0442\u0430", projectIdOf(detected.name));
-  const workflowName = await prompter.ask("\u041F\u0440\u043E\u0446\u0435\u0441\u0441", "default");
+async function askProjectConfig(options) {
+  const { detected, harness: harness2, prompter, messages } = options;
+  const { wizard } = messages;
+  const projectIdAnswer = await prompter.ask(wizard.projectIdQuestion, projectIdOf(detected.name));
+  const workflowName = await prompter.ask(wizard.workflowQuestion, "default");
   const projectId = projectIdOf(projectIdAnswer);
   const workflow = workflowOf(harness2, workflowName);
-  const agents = await askAgents(harness2, workflow.stages, prompter);
-  const journal = await prompter.ask("\u041A\u0430\u0442\u0430\u043B\u043E\u0433 \u0436\u0443\u0440\u043D\u0430\u043B\u0430 \u043E\u0442 \u043A\u043E\u0440\u043D\u044F \u043F\u0440\u043E\u0435\u043A\u0442\u0430", DEFAULT_JOURNAL);
+  const agents = await askAgents({ harness: harness2, stages: workflow.stages, prompter, messages });
+  const journal = await prompter.ask(wizard.journalQuestion, DEFAULT_JOURNAL);
   const commands = await prompter.ask(
-    `\u041A\u043E\u043C\u0430\u043D\u0434\u044B \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438 \u0447\u0435\u0440\u0435\u0437 \xAB${LIST_SEPARATOR}\xBB`,
+    wizard.commandsQuestion(LIST_SEPARATOR),
     detected.verification.join(`${LIST_SEPARATOR} `)
   );
   return {
@@ -3881,62 +4468,67 @@ function starterRules(template2, name, commands) {
   const verification = commands.length === 0 ? "  - \u043F\u043E\u043A\u0430 \u043D\u0435 \u0437\u0430\u0434\u0430\u043D\u044B" : commands.map((command) => `  - \`${command}\``).join("\n");
   return template2.replace("{{name}}", name).replace("{{verification}}", verification);
 }
-async function ensureRules(root, template2, name, commands) {
+async function ensureRules(source) {
+  const { root, template: template2, name, commands, messages } = source;
   const rules = path15.join(root, RULES_FILE3);
   const hasRules = await readOptionalText(rules) !== void 0;
-  if (hasRules) return `${RULES_FILE3} \u0443\u0436\u0435 \u0435\u0441\u0442\u044C \u2014 \u043E\u0441\u0442\u0430\u0432\u043B\u0435\u043D`;
+  if (hasRules) return messages.init.rulesKept(RULES_FILE3);
   const legacy = path15.join(root, LEGACY_ENTRYPOINT);
   const hasLegacyEntrypoint = await readOptionalText(legacy) !== void 0;
   if (hasLegacyEntrypoint) {
     await rename(legacy, rules);
-    return `${LEGACY_ENTRYPOINT} \u043F\u0435\u0440\u0435\u043D\u0435\u0441\u0451\u043D \u0432 ${RULES_FILE3}: \u043F\u0440\u0430\u0432\u0438\u043B\u0430 \u043F\u0440\u043E\u0435\u043A\u0442\u0430 \u0442\u0435\u043F\u0435\u0440\u044C \u0442\u0430\u043C`;
+    return messages.init.rulesMoved({ from: LEGACY_ENTRYPOINT, to: RULES_FILE3 });
   }
   await writeFile8(rules, starterRules(template2, name, commands));
-  return `${RULES_FILE3} \u2014 \u0437\u0430\u0433\u043E\u0442\u043E\u0432\u043A\u0430 \u043F\u0440\u0430\u0432\u0438\u043B \u043F\u0440\u043E\u0435\u043A\u0442\u0430, \u0437\u0430\u043F\u043E\u043B\u043D\u0438\u0442\u0435 \u0435\u0451`;
+  return messages.init.rulesStarter(RULES_FILE3);
 }
-function printCreated(rules, files, ignored) {
+function printCreated({ rules, files, ignored, messages }) {
   console.log(`
-\u0421\u043E\u0437\u0434\u0430\u043D\u043E:
+${messages.init.created}
   ${PROJECT_CONFIG_FILE}
   ${TOOL_FILE}
   ${rules}`);
   for (const file of files) console.log(`  ${file}`);
-  if (ignored !== void 0) console.log(`  .gitignore: ${ignored}`);
+  if (ignored !== void 0) console.log(`  ${messages.init.ignoredEntry(ignored)}`);
 }
-function printNextSteps(journal) {
-  console.log(
-    `
-\u0416\u0443\u0440\u043D\u0430\u043B \u043F\u0440\u043E\u0435\u043A\u0442\u0430: ${journal}
-\u0417\u0430\u043A\u043E\u043C\u043C\u0438\u0442\u044C\u0442\u0435 .cyberzavod/, AGENTS.md, CLAUDE.md \u0438 .claude/: \u0445\u0443\u043A\u0438 \u0437\u0430\u043F\u0443\u0441\u043A\u0430\u044E\u0442 CLI \u0438\u0437 \u043F\u0440\u043E\u0435\u043A\u0442\u0430.
-\u0414\u0430\u043B\u044C\u0448\u0435: \u0434\u043E\u043F\u0438\u0448\u0438\u0442\u0435 \u043F\u0440\u0430\u0432\u0438\u043B\u0430 \u0432 AGENTS.md \u0438 \u0437\u0430\u043F\u0443\u0441\u043A\u0430\u0439\u0442\u0435 \u0437\u0430\u0434\u0430\u0447\u0438 \u0447\u0435\u0440\u0435\u0437 /feature \u0432 Claude Code.`
-  );
+function printNextSteps(journal, messages) {
+  console.log(`
+${messages.init.journal(journal)}
+${messages.init.nextSteps}`);
 }
-async function initProject(root, prompter, installation) {
+async function initProject(root, options) {
+  const { prompter, installation, messages } = options;
   const isConnected = await readProjectConfig(root) !== void 0;
   if (isConnected) {
-    throw new CommandError(`${PROJECT_CONFIG_FILE} \u0443\u0436\u0435 \u0435\u0441\u0442\u044C: \u043F\u0440\u043E\u0435\u043A\u0442 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0451\u043D, \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 sync`);
+    throw new CommandError((m) => m.errors.alreadyConnected(PROJECT_CONFIG_FILE));
   }
   const tool = toolOf(installation);
   const detected = await detectProject(root);
-  for (const line of describeDetected(root, detected)) console.log(line);
-  const answers = await askProjectConfig(detected, installation.harness, prompter);
+  for (const line of describeDetected(root, detected, messages)) console.log(line);
+  const answers = await askProjectConfig({
+    detected,
+    harness: installation.harness,
+    prompter,
+    messages
+  });
   const { projectId, ...rest } = answers;
   const config = { projectId, harness: HARNESS_VERSION, ...rest };
   await writeProjectConfig(root, config);
-  const rules = await ensureRules(
+  const rules = await ensureRules({
     root,
-    installation.rulesTemplate,
-    detected.name,
-    config.verification.commands
-  );
+    template: installation.rulesTemplate,
+    name: detected.name,
+    commands: config.verification.commands,
+    messages
+  });
   await updateToolFile(root, tool);
   const ignored = await ignoreCapture(root, config.journal);
   const report = await syncClaude({
     projectDirectory: root,
     installation: { harness: installation.harness, templates: installation.claudeTemplates }
   });
-  printCreated(rules, report.changed, ignored);
-  printNextSteps(config.journal);
+  printCreated({ rules, files: report.changed, ignored, messages });
+  printNextSteps(config.journal, messages);
 }
 
 // src/commands/journal.ts
@@ -3948,7 +4540,7 @@ async function requireProjectAt(directory) {
   const root = await findProjectRoot(directory);
   const config = root === void 0 ? void 0 : await readProjectConfig(root);
   if (root === void 0 || config === void 0) {
-    throw new CommandError(`${directory} \u043D\u0435 \u0432 \u043F\u0440\u043E\u0435\u043A\u0442\u0435 Cyberzavod: \u0441\u043D\u0430\u0447\u0430\u043B\u0430 cyberzavod init`);
+    throw new CommandError((messages) => messages.errors.projectNotFound(directory));
   }
   return { root, config, journal: journalDirectory(root, config) };
 }
@@ -3967,26 +4559,29 @@ function manualHeader(projectId, now) {
     source: { type: "manual" }
   };
 }
-async function writeRecord(directory, build) {
+async function writeRecord(directory, build, messages) {
   const project = await requireProjectAt(directory);
   const store = new DirectoryRecordStore(project.journal);
   const record = parseRecord(build(project.config.projectId));
   await store.write(record);
-  console.log(`\u0437\u0430\u043F\u0438\u0441\u0430\u043D\u043E: ${path16.relative(project.root, store.pathOf(record))}`);
+  console.log(messages.journal.recorded(path16.relative(project.root, store.pathOf(record))));
 }
-async function recordDecision(directory, title, description) {
-  await writeRecord(directory, (projectId) => ({
+async function recordDecision(options) {
+  const { directory, title, description, messages } = options;
+  const build = (projectId) => ({
     ...manualHeader(projectId, /* @__PURE__ */ new Date()),
     type: "decision",
     data: { title, description }
-  }));
+  });
+  await writeRecord(directory, build, messages);
 }
-async function recordNote(directory, text) {
-  await writeRecord(directory, (projectId) => ({
+async function recordNote(directory, text, messages) {
+  const build = (projectId) => ({
     ...manualHeader(projectId, /* @__PURE__ */ new Date()),
     type: "note",
     data: { text }
-  }));
+  });
+  await writeRecord(directory, build, messages);
 }
 
 // src/sharing/device-flow.ts
@@ -4009,20 +4604,20 @@ async function waitForAccessToken(options) {
         intervalSeconds += SLOW_DOWN_STEP_SECONDS;
         break;
       case "expired":
-        throw new CommandError("\u043A\u043E\u0434 \u0432\u0445\u043E\u0434\u0430 \u0438\u0441\u0442\u0451\u043A: \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 cyberzavod login \u0437\u0430\u043D\u043E\u0432\u043E");
+        throw new CommandError((messages) => messages.errors.loginCodeExpired);
       case "denied":
-        throw new CommandError("\u0432\u0445\u043E\u0434 \u043E\u0442\u043A\u043B\u043E\u043D\u0451\u043D \u043D\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435 GitHub");
+        throw new CommandError((messages) => messages.errors.loginDenied);
     }
   }
-  throw new CommandError("\u043A\u043E\u0434 \u0432\u0445\u043E\u0434\u0430 \u0438\u0441\u0442\u0451\u043A: \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 cyberzavod login \u0437\u0430\u043D\u043E\u0432\u043E");
+  throw new CommandError((messages) => messages.errors.loginCodeExpired);
 }
 
 // src/commands/login.ts
-async function login(sharing) {
+async function login(sharing, messages) {
   const clientId = await sharing.api.githubClientId();
   const code = await sharing.github.requestDeviceCode(clientId);
-  console.log(`\u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 ${code.verificationUri} \u0438 \u0432\u0432\u0435\u0434\u0438\u0442\u0435 \u043A\u043E\u0434 ${code.userCode}`);
-  console.log("\u0416\u0434\u0443 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u044F\u2026");
+  console.log(messages.login.openVerification({ url: code.verificationUri, code: code.userCode }));
+  console.log(messages.login.waiting);
   const token = await waitForAccessToken({
     auth: sharing.github,
     clientId,
@@ -4031,20 +4626,18 @@ async function login(sharing) {
   });
   const me = await sharing.api.me(token);
   await sharing.credentials.save(token);
-  console.log(`\u0432\u0445\u043E\u0434 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D: ${me.login}`);
+  console.log(messages.login.loggedIn(me.login));
 }
-async function logout(sharing) {
+async function logout(sharing, messages) {
   const hadToken = await sharing.credentials.remove();
-  console.log(hadToken ? "\u0432\u044B \u0432\u044B\u0448\u043B\u0438: \u0442\u043E\u043A\u0435\u043D \u0443\u0434\u0430\u043B\u0451\u043D" : "\u0432\u0445\u043E\u0434\u0430 \u0438 \u043D\u0435 \u0431\u044B\u043B\u043E");
+  console.log(hadToken ? messages.login.loggedOut : messages.login.wasNotLoggedIn);
 }
 
 // src/commands/share.ts
 import { readFile as readFile8 } from "node:fs/promises";
 import path17 from "node:path";
 function requireRecordId(id) {
-  if (!isRecordId(id)) {
-    throw new CommandError(`${id} \u043D\u0435 \u043F\u043E\u0445\u043E\u0436 \u043D\u0430 id \u0437\u0430\u043F\u0438\u0441\u0438: \u0442\u043E\u043B\u044C\u043A\u043E \u0431\u0443\u043A\u0432\u044B, \u0446\u0438\u0444\u0440\u044B, \xAB_\xBB \u0438 \xAB-\xBB`);
-  }
+  if (!isRecordId(id)) throw new CommandError((messages) => messages.errors.invalidRecordId(id));
 }
 async function readRecordText(project, id) {
   const file = path17.join(project.journal, RECORD_COLLECTIONS.session, `${id}.json`);
@@ -4053,43 +4646,56 @@ async function readRecordText(project, id) {
   } catch (err) {
     if (!isNotFound(err)) throw err;
     const shown = path17.relative(project.root, file);
-    throw new CommandError(`\u0432 \u0436\u0443\u0440\u043D\u0430\u043B\u0435 \u043D\u0435\u0442 \u0437\u0430\u043F\u0438\u0441\u0438 ${id}: \u0444\u0430\u0439\u043B\u0430 ${shown} \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442`, {
+    throw new CommandError((messages) => messages.errors.recordMissing({ id, file: shown }), {
       cause: err
     });
   }
 }
 function parseSession(text, id) {
+  const record = parseKnownRecord(text, id);
+  if (record.type !== "session") {
+    throw new CommandError(
+      (messages) => messages.errors.recordNotSession({ id, type: record.type })
+    );
+  }
+  return record;
+}
+function parseKnownRecord(text, id) {
   try {
-    const record = parseRecord(JSON.parse(text));
-    if (record.type !== "session") throw new RecordError(`\u0442\u0438\u043F ${record.type}, \u043D\u0443\u0436\u043D\u0430 \u0441\u0435\u0441\u0441\u0438\u044F`);
-    return record;
+    return parseRecord(JSON.parse(text));
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
-    throw new CommandError(`\u0437\u0430\u043F\u0438\u0441\u044C ${id} \u043D\u0435 \u043F\u0440\u043E\u0448\u043B\u0430 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0443: ${reason}`, { cause: err });
+    throw new CommandError((messages) => messages.errors.recordInvalid({ id, reason }), {
+      cause: err
+    });
   }
 }
 function recordingLines(recordings) {
   return recordings.map((recording) => `  ${recording.id}  ${recording.title}`);
 }
-async function limitReachedError(sharing, token, serverMessage) {
+async function limitReachedError(sharing, token) {
   const me = await sharing.api.me(token);
-  const lines = [
-    serverMessage,
-    `\u0417\u0430\u043F\u0438\u0441\u0438 \u0432 \u0433\u0430\u043B\u0435\u0440\u0435\u0435 (${me.recordings.length} \u0438\u0437 ${me.limit}):`,
-    ...recordingLines(me.recordings),
-    "\u041E\u0441\u0432\u043E\u0431\u043E\u0434\u0438\u0442\u0435 \u043C\u0435\u0441\u0442\u043E \u043A\u043E\u043C\u0430\u043D\u0434\u043E\u0439 cyberzavod unshare <id>"
-  ];
-  return new CommandError(lines.join("\n"));
+  const { recordings, limit } = me;
+  return new CommandError((messages) => {
+    const lines = [
+      messages.errors.limitReached,
+      messages.share.galleryRecordings({ count: recordings.length, limit }),
+      ...recordingLines(recordings),
+      messages.share.freeUpSpace
+    ];
+    return lines.join("\n");
+  });
 }
 async function upload(sharing, token, id, record) {
   try {
     return await sharing.api.uploadRecording(token, id, record);
   } catch (err) {
     if (!isApiError(err, LIMIT_REACHED_CODE)) throw err;
-    throw await limitReachedError(sharing, token, err.message);
+    throw await limitReachedError(sharing, token);
   }
 }
-async function shareRecording(sharing, directory, id) {
+async function shareRecording(sharing, options) {
+  const { directory, id, messages } = options;
   requireRecordId(id);
   const project = await requireProjectAt(directory);
   const text = await readRecordText(project, id);
@@ -4098,71 +4704,68 @@ async function shareRecording(sharing, directory, id) {
     uploaded: await upload(sharing, token, id, record),
     me: await sharing.api.me(token)
   }));
-  const verb = uploaded.isNew ? "\u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430" : "\u0437\u0430\u043C\u0435\u043D\u0435\u043D\u0430";
-  console.log(`\u0437\u0430\u043F\u0438\u0441\u044C ${id} ${verb}`);
-  console.log(`\u0441\u0441\u044B\u043B\u043A\u0430: ${recordingLink(sharing.siteUrl, uploaded.recording.slug)}`);
+  const outcome = uploaded.isNew ? messages.share.sent(id) : messages.share.replaced(id);
+  const link = recordingLink(sharing.siteUrl, uploaded.recording.slug);
+  console.log(outcome);
+  console.log(messages.share.link(link));
   if (!me.galleryPublic) {
-    console.log("\u0433\u0430\u043B\u0435\u0440\u0435\u044F \u0437\u0430\u043A\u0440\u044B\u0442\u0430: \u0437\u0430\u043F\u0438\u0441\u044C \u0432\u0438\u0434\u043D\u0430 \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u043E \u044D\u0442\u043E\u0439 \u0441\u0441\u044B\u043B\u043A\u0435");
-    console.log("\u043E\u0442\u043A\u0440\u044B\u0442\u044C \u0433\u0430\u043B\u0435\u0440\u0435\u044E: cyberzavod gallery --public");
+    console.log(messages.share.galleryClosed);
+    console.log(messages.share.openGalleryHint);
   }
 }
-async function unshareRecording(sharing, id) {
+async function unshareRecording(sharing, id, messages) {
   requireRecordId(id);
   await withToken(sharing, (token) => sharing.api.deleteRecording(token, id));
-  console.log(`\u0437\u0430\u043F\u0438\u0441\u044C ${id} \u0443\u0434\u0430\u043B\u0435\u043D\u0430 \u0438\u0437 \u0433\u0430\u043B\u0435\u0440\u0435\u0438`);
+  console.log(messages.share.removed(id));
 }
 
 // src/commands/status.ts
 import path18 from "node:path";
-var RECORD_TITLES = {
-  session: "\u0441\u0435\u0441\u0441\u0438\u0438",
-  decision: "\u0440\u0435\u0448\u0435\u043D\u0438\u044F",
-  note: "\u0437\u0430\u043C\u0435\u0442\u043A\u0438"
-};
-function performerOf(guide, agent) {
-  if (guide.role === void 0) return "\u0432\u0435\u0434\u0443\u0449\u0438\u0439";
+function performerOf(guide, agent, messages) {
+  if (guide.role === void 0) return messages.status.foreman;
   return `${agent?.agent ?? DEFAULT_AGENT.agent} \xB7 ${agent?.model ?? DEFAULT_MODEL}`;
 }
-function processLines(project, harness2) {
+function processLines(project, harness2, messages) {
   const workflow = workflowOf(harness2, project.config.workflow);
   const stages = workflow.stages.map((stage) => {
     const guide = harness2.stages[stage];
-    const performer = performerOf(guide, project.config.agents[stage]);
+    const performer = performerOf(guide, project.config.agents[stage], messages);
     return `  ${guide.title}: ${performer}`;
   });
-  return [`\u041F\u0440\u043E\u0446\u0435\u0441\u0441: ${workflow.name}`, ...stages];
+  return [messages.status.workflow(workflow.name), ...stages];
 }
-function countLine(records, type) {
+function countLine(records, type, messages) {
   const count = records.filter((record) => record.type === type).length;
-  return `${RECORD_TITLES[type]}: ${count}`;
+  return `${messages.status.recordTypes[type]}: ${count}`;
 }
 function newerOf(newest, record) {
   return newest === void 0 || record.timestamp > newest.timestamp ? record : newest;
 }
-function journalLines(project, records) {
+function journalLines(project, records, messages) {
   const types = Object.keys(RECORD_COLLECTIONS);
-  const counts = types.map((type) => countLine(records, type));
+  const counts = types.map((type) => countLine(records, type, messages));
   const latest = records.reduce(newerOf, void 0);
   const journalPath = path18.relative(project.root, project.journal) || ".";
-  const latestLines = latest === void 0 ? [] : [`\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u044F\u044F \u0437\u0430\u043F\u0438\u0441\u044C: ${latest.timestamp} (${latest.type})`];
-  return [`\u0416\u0443\u0440\u043D\u0430\u043B: ${journalPath} \u2014 ${counts.join(", ")}`, ...latestLines];
+  const latestLines = latest === void 0 ? [] : [messages.status.latestRecord({ timestamp: latest.timestamp, type: latest.type })];
+  const journalLine = messages.status.journal({ path: journalPath, counts: counts.join(", ") });
+  return [journalLine, ...latestLines];
 }
-function harnessLine(version) {
-  if (version === HARNESS_VERSION) return `Harness: ${version}`;
-  return `Harness: ${version} (CLI \u2014 ${HARNESS_VERSION}, \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 cyberzavod sync)`;
+function harnessLine(version, messages) {
+  if (version === HARNESS_VERSION) return messages.status.harness(version);
+  return messages.status.harnessOutdated({ version, cliVersion: HARNESS_VERSION });
 }
-async function printStatus(directory, installation) {
+async function printStatus(directory, installation, messages) {
   const project = await requireProjectAt(directory);
   const { config } = project;
   const checks = config.verification.commands;
-  const checksLine = checks.length === 0 ? "\u043D\u0435 \u0437\u0430\u0434\u0430\u043D\u044B" : checks.join("; ");
+  const checksList = checks.length === 0 ? messages.status.checksNone : checks.join("; ");
   const records = await new DirectoryRecordStore(project.journal).list();
   const lines = [
-    `\u041F\u0440\u043E\u0435\u043A\u0442: ${config.projectId} (${project.root})`,
-    harnessLine(config.harness),
-    ...processLines(project, installation.harness),
-    `\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0438: ${checksLine}`,
-    ...journalLines(project, records)
+    messages.status.project({ id: config.projectId, root: project.root }),
+    harnessLine(config.harness, messages),
+    ...processLines(project, installation.harness, messages),
+    messages.status.checks(checksList),
+    ...journalLines(project, records, messages)
   ];
   for (const line of lines) console.log(line);
 }
@@ -4178,15 +4781,15 @@ function printFiles(title, files) {
   console.log(`${title}:
 ${lines.join("\n")}`);
 }
-function printWrittenReport(report) {
-  printFiles("\u0437\u0430\u043F\u0438\u0441\u0430\u043D\u044B", report.changed);
-  printFiles("\u0443\u0434\u0430\u043B\u0435\u043D\u044B", report.removed);
-  printFiles("\u043D\u0430\u043F\u0438\u0441\u0430\u043D\u044B \u0447\u0435\u043B\u043E\u0432\u0435\u043A\u043E\u043C", report.conflicts);
+function printWrittenReport(report, messages) {
+  printFiles(messages.sync.written, report.changed);
+  printFiles(messages.sync.removed, report.removed);
+  printFiles(messages.sync.writtenByHuman, report.conflicts);
 }
-function printOutdatedReport(report) {
-  printFiles("\u0443\u0441\u0442\u0430\u0440\u0435\u043B\u0438", report.changed);
-  printFiles("\u043B\u0438\u0448\u043D\u0438\u0435", report.removed);
-  printFiles("\u043D\u0430\u043F\u0438\u0441\u0430\u043D\u044B \u0447\u0435\u043B\u043E\u0432\u0435\u043A\u043E\u043C", report.conflicts);
+function printOutdatedReport(report, messages) {
+  printFiles(messages.sync.outdated, report.changed);
+  printFiles(messages.sync.extra, report.removed);
+  printFiles(messages.sync.writtenByHuman, report.conflicts);
 }
 function claudeInstallationOf(installation) {
   return { harness: installation.harness, templates: installation.claudeTemplates };
@@ -4197,7 +4800,7 @@ function withTool(report, isToolChanged) {
 function isClean(report) {
   return report.changed.length + report.removed.length + report.conflicts.length === 0;
 }
-async function checkProject(directory, installation) {
+async function checkProject(directory, installation, messages) {
   const project = await requireProjectAt(directory);
   const tool = toolOf(installation);
   const claudeReport = await syncClaude({
@@ -4210,15 +4813,20 @@ async function checkProject(directory, installation) {
   const isHarnessOutdated = project.config.harness !== HARNESS_VERSION;
   if (isHarnessOutdated) {
     console.log(
-      `${PROJECT_CONFIG_FILE}: harness ${project.config.harness}, \u0430 CLI \u2014 ${HARNESS_VERSION}`
+      messages.sync.harnessMismatch({
+        file: PROJECT_CONFIG_FILE,
+        configVersion: project.config.harness,
+        cliVersion: HARNESS_VERSION
+      })
     );
   }
-  printOutdatedReport(report);
+  printOutdatedReport(report, messages);
   const isUpToDate = isClean(report) && !isHarnessOutdated;
-  if (!isUpToDate) console.log("\u0424\u0430\u0439\u043B\u044B \u0430\u0433\u0435\u043D\u0442\u0430 \u0443\u0441\u0442\u0430\u0440\u0435\u043B\u0438: \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 cyberzavod sync");
+  if (!isUpToDate) console.log(messages.sync.filesOutdated);
   return isUpToDate;
 }
-async function syncProject(directory, options, installation) {
+async function syncProject(directory, options) {
+  const { force, installation, messages } = options;
   const project = await requireProjectAt(directory);
   const tool = toolOf(installation);
   const config = await refreshedConfig(project.root, project.config);
@@ -4227,9 +4835,84 @@ async function syncProject(directory, options, installation) {
   const report = await syncClaude({
     projectDirectory: project.root,
     installation: claudeInstallationOf(installation),
-    force: options.force
+    force
   });
-  printWrittenReport(withTool(report, isToolChanged));
+  printWrittenReport(withTool(report, isToolChanged), messages);
+}
+
+// src/messages/cli-messages.ts
+var COMMAND_NAMES = [
+  "init",
+  "sync",
+  "status",
+  "decision",
+  "note",
+  "draft",
+  "publish",
+  "login",
+  "logout",
+  "share",
+  "unshare",
+  "gallery",
+  "hook"
+];
+
+// src/messages/language.ts
+var LANGUAGE_VARIABLE = "CYBERZAVOD_LANG";
+var LOCALE_VARIABLES = ["LC_ALL", "LC_MESSAGES", "LANG"];
+var LANGUAGE_FLAG = "--lang";
+var INLINE_FLAG_PREFIX = `${LANGUAGE_FLAG}=`;
+var ARGUMENTS_END = "--";
+var LOCALE_LANGUAGE_END = /[_.@-]/;
+function isFlagValue(token) {
+  return token !== void 0 && token !== "" && !token.startsWith("-");
+}
+function flagAt(tokens, index) {
+  const token = tokens[index];
+  if (token === LANGUAGE_FLAG) return { value: tokens[index + 1], length: 2 };
+  if (!token.startsWith(INLINE_FLAG_PREFIX)) return void 0;
+  return { value: token.slice(INLINE_FLAG_PREFIX.length), length: 1 };
+}
+function extractLanguageFlag(argv) {
+  const argumentsEnd = argv.indexOf(ARGUMENTS_END);
+  const optionsLength = argumentsEnd === -1 ? argv.length : argumentsEnd;
+  const rest = [];
+  let flag;
+  let index = 0;
+  while (index < optionsLength) {
+    const match = flagAt(argv, index);
+    if (match === void 0) {
+      rest.push(argv[index]);
+      index++;
+      continue;
+    }
+    if (!isFlagValue(match.value)) {
+      throw new CommandError((messages) => messages.errors.languageFlagWithoutValue);
+    }
+    flag = match.value;
+    index += match.length;
+  }
+  return { flag, rest: [...rest, ...argv.slice(optionsLength)] };
+}
+function localeLanguageOf(env) {
+  const values = LOCALE_VARIABLES.map((name) => env[name]);
+  const locale = values.find((value) => value !== void 0 && value !== "") ?? "";
+  const [code = ""] = locale.split(LOCALE_LANGUAGE_END);
+  return isInterfaceLanguage(code) ? code : DEFAULT_INTERFACE_LANGUAGE;
+}
+function languageOf2({ flag, env }) {
+  if (flag !== void 0) {
+    if (isInterfaceLanguage(flag)) return flag;
+    throw new CommandError(
+      (messages) => messages.errors.unsupportedLanguage({
+        value: flag,
+        supported: INTERFACE_LANGUAGES.join(", ")
+      })
+    );
+  }
+  const fromVariable = env[LANGUAGE_VARIABLE];
+  if (fromVariable !== void 0 && isInterfaceLanguage(fromVariable)) return fromVariable;
+  return localeLanguageOf(env);
 }
 
 // src/sharing/services.ts
@@ -4242,19 +4925,19 @@ var DEVICE_CODE_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code";
 function field(body, name) {
   const value = body[name];
   if (typeof value !== "string" || value === "") {
-    throw new CommandError(`GitHub \u0432\u0435\u0440\u043D\u0443\u043B \u043D\u0435\u043E\u0436\u0438\u0434\u0430\u043D\u043D\u044B\u0439 \u043E\u0442\u0432\u0435\u0442: \u043D\u0435\u0442 \u043F\u043E\u043B\u044F ${name}`);
+    throw new CommandError((messages) => messages.errors.githubUnexpectedField(name));
   }
   return value;
 }
 function seconds(body, name) {
   const value = body[name];
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
-    throw new CommandError(`GitHub \u0432\u0435\u0440\u043D\u0443\u043B \u043D\u0435\u043E\u0436\u0438\u0434\u0430\u043D\u043D\u044B\u0439 \u043E\u0442\u0432\u0435\u0442: \u043D\u0435\u0442 \u043F\u043E\u043B\u044F ${name}`);
+    throw new CommandError((messages) => messages.errors.githubUnexpectedField(name));
   }
   return value;
 }
 function parseDeviceCode(body) {
-  if (!isObject5(body)) throw new CommandError("GitHub \u043D\u0435 \u0432\u044B\u0434\u0430\u043B \u043A\u043E\u0434 \u0443\u0441\u0442\u0440\u043E\u0439\u0441\u0442\u0432\u0430");
+  if (!isObject5(body)) throw new CommandError((messages) => messages.errors.githubNoDeviceCode);
   return {
     deviceCode: field(body, "device_code"),
     userCode: field(body, "user_code"),
@@ -4264,7 +4947,7 @@ function parseDeviceCode(body) {
   };
 }
 function parseTokenPoll(body) {
-  if (!isObject5(body)) throw new CommandError("GitHub \u043D\u0435 \u0432\u044B\u0434\u0430\u043B \u0442\u043E\u043A\u0435\u043D");
+  if (!isObject5(body)) throw new CommandError((messages) => messages.errors.githubNoToken);
   if (typeof body.access_token === "string" && body.access_token !== "") {
     return { status: "granted", token: body.access_token };
   }
@@ -4278,8 +4961,9 @@ function parseTokenPoll(body) {
     case "access_denied":
       return { status: "denied" };
     default: {
-      const reason = typeof body.error_description === "string" ? body.error_description : "";
-      throw new CommandError(`GitHub \u043E\u0442\u043A\u043B\u043E\u043D\u0438\u043B \u0432\u0445\u043E\u0434: ${reason || String(body.error)}`);
+      const description = typeof body.error_description === "string" ? body.error_description : "";
+      const reason = description || String(body.error);
+      throw new CommandError((messages) => messages.errors.githubRejected(reason));
     }
   }
 }
@@ -4375,7 +5059,7 @@ var FileCredentialsStore = class {
     const token = tokenIn(text);
     if (token === void 0) {
       throw new CommandError(
-        `\u0444\u0430\u0439\u043B ${CREDENTIALS_FILE_NAME} \u043F\u043E\u0432\u0440\u0435\u0436\u0434\u0451\u043D: \u0432\u043E\u0439\u0434\u0438\u0442\u0435 \u0437\u0430\u043D\u043E\u0432\u043E \u043A\u043E\u043C\u0430\u043D\u0434\u043E\u0439 cyberzavod login`
+        (messages) => messages.errors.credentialsCorrupt(CREDENTIALS_FILE_NAME)
       );
     }
     return token;
@@ -4430,22 +5114,24 @@ async function readStdin() {
   for await (const chunk of process.stdin) chunks.push(chunk);
   return Buffer.concat(chunks).toString("utf8");
 }
-function requiredText(value, what) {
-  if (value === void 0 || value.trim() === "") throw new CommandError(`\u043D\u0443\u0436\u0435\u043D ${what}`);
+function requiredText(value, missing) {
+  if (value === void 0 || value.trim() === "") throw new CommandError(missing);
   return value;
 }
-function defaultSharing() {
-  return createSharing({ env: process.env, platform: process.platform, homeDirectory: homedir() });
+function defaultSharing(env) {
+  return createSharing({ env, platform: process.platform, homeDirectory: homedir() });
 }
 var COMMANDS = {
   init: {
-    usage: "init [--yes]",
-    summary: "\u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u043F\u0440\u043E\u0435\u043A\u0442 \u0432 \u0442\u0435\u043A\u0443\u0449\u0435\u043C \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0435: \u043C\u0430\u0441\u0442\u0435\u0440, \u043A\u043E\u043D\u0444\u0438\u0433, AGENTS.md, \u0444\u0430\u0439\u043B\u044B \u0430\u0433\u0435\u043D\u0442\u0430",
-    run: async ({ args, directory }) => {
+    run: async ({ args, directory, messages }) => {
       const { values } = parseArgs({ args, options: { yes: { type: "boolean", short: "y" } } });
       const prompter = values.yes === true ? defaultsPrompter() : terminalPrompter({ input: process.stdin, output: process.stdout });
       try {
-        await initProject(directory, prompter, await readInstallation());
+        await initProject(directory, {
+          prompter,
+          installation: await readInstallation(),
+          messages
+        });
       } finally {
         prompter.close();
       }
@@ -4453,77 +5139,67 @@ var COMMANDS = {
     }
   },
   sync: {
-    usage: "sync [--check] [--force]",
-    summary: "\u0437\u0430\u043D\u043E\u0432\u043E \u043D\u0430\u0439\u0442\u0438 \u0441\u0442\u0435\u043A \u0438 \u043F\u0435\u0440\u0435\u0441\u043E\u0431\u0440\u0430\u0442\u044C \u0444\u0430\u0439\u043B\u044B \u0430\u0433\u0435\u043D\u0442\u0430; --check \u2014 \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C",
-    run: async ({ args, directory }) => {
+    run: async ({ args, directory, messages }) => {
       const { values } = parseArgs({
         args,
         options: { check: { type: "boolean" }, force: { type: "boolean" } }
       });
       const installation = await readInstallation();
       if (values.check === true) {
-        const isUpToDate = await checkProject(directory, installation);
+        const isUpToDate = await checkProject(directory, installation, messages);
         return isUpToDate ? SUCCESS : FAILURE;
       }
-      await syncProject(directory, { force: values.force === true }, installation);
+      await syncProject(directory, { force: values.force === true, installation, messages });
       return SUCCESS;
     }
   },
   status: {
-    usage: "status",
-    summary: "\u043F\u0440\u043E\u0435\u043A\u0442, \u043F\u0440\u043E\u0446\u0435\u0441\u0441, \u0430\u0433\u0435\u043D\u0442\u044B \u044D\u0442\u0430\u043F\u043E\u0432, \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438 \u0438 \u0436\u0443\u0440\u043D\u0430\u043B",
-    run: async ({ directory }) => {
-      await printStatus(directory, await readInstallation());
+    run: async ({ directory, messages }) => {
+      await printStatus(directory, await readInstallation(), messages);
       return SUCCESS;
     }
   },
   decision: {
-    usage: 'decision "<\u0447\u0442\u043E \u0440\u0435\u0448\u0438\u043B\u0438>" [--why "<\u043F\u043E\u0447\u0435\u043C\u0443>"]',
-    summary: "\u0437\u0430\u043F\u0438\u0441\u0430\u0442\u044C \u0440\u0435\u0448\u0435\u043D\u0438\u0435 \u0432 \u0436\u0443\u0440\u043D\u0430\u043B",
-    run: async ({ args, directory }) => {
+    run: async ({ args, directory, messages }) => {
       const { values, positionals } = parseArgs({
         args,
         allowPositionals: true,
         options: { why: { type: "string" } }
       });
-      const title = requiredText(positionals.join(" "), "\u0442\u0435\u043A\u0441\u0442 \u0440\u0435\u0448\u0435\u043D\u0438\u044F");
-      await recordDecision(directory, title, values.why ?? "");
+      const title = requiredText(positionals.join(" "), (m) => m.errors.missingDecisionText);
+      await recordDecision({ directory, title, description: values.why ?? "", messages });
       return SUCCESS;
     }
   },
   note: {
-    usage: 'note "<\u0442\u0435\u043A\u0441\u0442>"',
-    summary: "\u0437\u0430\u043F\u0438\u0441\u0430\u0442\u044C \u0437\u0430\u043C\u0435\u0442\u043A\u0443 \u0432 \u0436\u0443\u0440\u043D\u0430\u043B",
-    run: async ({ args, directory }) => {
+    run: async ({ args, directory, messages }) => {
       const { positionals } = parseArgs({ args, allowPositionals: true });
-      const text = requiredText(positionals.join(" "), "\u0442\u0435\u043A\u0441\u0442 \u0437\u0430\u043C\u0435\u0442\u043A\u0438");
-      await recordNote(directory, text);
+      const text = requiredText(positionals.join(" "), (m) => m.errors.missingNoteText);
+      await recordNote(directory, text, messages);
       return SUCCESS;
     }
   },
   draft: {
-    usage: "draft [<\u0441\u044B\u0440\u043E\u0439 \u0436\u0443\u0440\u043D\u0430\u043B \u0441\u0435\u0441\u0441\u0438\u0438>]",
-    summary: "\u0441\u043E\u0431\u0440\u0430\u0442\u044C \u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A \u0437\u0430\u043F\u0438\u0441\u0438 \u0438\u0437 \u0436\u0443\u0440\u043D\u0430\u043B\u0430 \u0441\u0435\u0441\u0441\u0438\u0438 Claude Code",
-    run: async ({ args, directory }) => {
+    run: async ({ args, directory, claudeMessages }) => {
       const { positionals } = parseArgs({ args, allowPositionals: true });
       const [rawPath] = positionals;
       await draftSession({
         projectDirectory: directory,
+        messages: claudeMessages,
         ...rawPath === void 0 ? {} : { rawPath }
       });
       return SUCCESS;
     }
   },
   publish: {
-    usage: "publish [--draft <\u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A>] [--build <id \u0441\u0431\u043E\u0440\u043A\u0438>]",
-    summary: "\u043E\u043F\u0443\u0431\u043B\u0438\u043A\u043E\u0432\u0430\u0442\u044C \u043E\u0442\u0440\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0439 \u0447\u0435\u0440\u043D\u043E\u0432\u0438\u043A \u0437\u0430\u043F\u0438\u0441\u044F\u043C\u0438 \u0432 \u0436\u0443\u0440\u043D\u0430\u043B",
-    run: async ({ args, directory }) => {
+    run: async ({ args, directory, claudeMessages }) => {
       const { values } = parseArgs({
         args,
         options: { draft: { type: "string" }, build: { type: "string" } }
       });
       const published = await publishSessions({
         projectDirectory: directory,
+        messages: claudeMessages,
         ...values.draft === void 0 ? {} : { draftPath: values.draft },
         ...values.build === void 0 ? {} : { buildId: values.build }
       });
@@ -4531,66 +5207,57 @@ var COMMANDS = {
     }
   },
   login: {
-    usage: "login",
-    summary: "\u0432\u043E\u0439\u0442\u0438 \u0447\u0435\u0440\u0435\u0437 GitHub, \u0447\u0442\u043E\u0431\u044B \u043F\u0443\u0431\u043B\u0438\u043A\u043E\u0432\u0430\u0442\u044C \u0437\u0430\u043F\u0438\u0441\u0438 \u0432 \u0433\u0430\u043B\u0435\u0440\u0435\u044E (\u0430\u0434\u0440\u0435\u0441 \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u2014 CYBERZAVOD_API_URL)",
-    run: async () => {
-      await login(defaultSharing());
+    run: async ({ env, messages }) => {
+      await login(defaultSharing(env), messages);
       return SUCCESS;
     }
   },
   logout: {
-    usage: "logout",
-    summary: "\u0437\u0430\u0431\u044B\u0442\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D\u043D\u044B\u0439 \u0442\u043E\u043A\u0435\u043D GitHub",
-    run: async () => {
-      await logout(defaultSharing());
+    run: async ({ env, messages }) => {
+      await logout(defaultSharing(env), messages);
       return SUCCESS;
     }
   },
   share: {
-    usage: "share <id \u0437\u0430\u043F\u0438\u0441\u0438>",
-    summary: "\u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0437\u0430\u043F\u0438\u0441\u044C \u0441\u0435\u0441\u0441\u0438\u0438 \u0438\u0437 \u0436\u0443\u0440\u043D\u0430\u043B\u0430 \u0432 \u0432\u0430\u0448\u0443 \u0433\u0430\u043B\u0435\u0440\u0435\u044E \u0438 \u043F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0443 \u043D\u0430 \u043D\u0435\u0451",
-    run: async ({ args, directory }) => {
+    run: async ({ args, directory, env, messages }) => {
       const { positionals } = parseArgs({ args, allowPositionals: true });
       const [id] = positionals;
-      await shareRecording(defaultSharing(), directory, requiredText(id, "id \u0437\u0430\u043F\u0438\u0441\u0438"));
+      const recordId = requiredText(id, (m) => m.errors.missingRecordId);
+      await shareRecording(defaultSharing(env), { directory, id: recordId, messages });
       return SUCCESS;
     }
   },
   unshare: {
-    usage: "unshare <id \u0437\u0430\u043F\u0438\u0441\u0438>",
-    summary: "\u0443\u0431\u0440\u0430\u0442\u044C \u0437\u0430\u043F\u0438\u0441\u044C \u0438\u0437 \u0432\u0430\u0448\u0435\u0439 \u0433\u0430\u043B\u0435\u0440\u0435\u0438",
-    run: async ({ args }) => {
+    run: async ({ args, env, messages }) => {
       const { positionals } = parseArgs({ args, allowPositionals: true });
       const [id] = positionals;
-      await unshareRecording(defaultSharing(), requiredText(id, "id \u0437\u0430\u043F\u0438\u0441\u0438"));
+      const recordId = requiredText(id, (m) => m.errors.missingRecordId);
+      await unshareRecording(defaultSharing(env), recordId, messages);
       return SUCCESS;
     }
   },
   gallery: {
-    usage: "gallery [--public | --private]",
-    summary: "\u0432\u0430\u0448\u0438 \u0437\u0430\u043F\u0438\u0441\u0438 \u0432 \u0433\u0430\u043B\u0435\u0440\u0435\u0435, \u043B\u0438\u043C\u0438\u0442 \u0438 \u0441\u0441\u044B\u043B\u043A\u0438; --public \u043E\u0442\u043A\u0440\u044B\u0432\u0430\u0435\u0442 \u0433\u0430\u043B\u0435\u0440\u0435\u044E, --private \u0437\u0430\u043A\u0440\u044B\u0432\u0430\u0435\u0442",
-    run: async ({ args }) => {
+    run: async ({ args, env, messages }) => {
       const { values } = parseArgs({
         args,
         options: { public: { type: "boolean" }, private: { type: "boolean" } }
       });
       const access2 = galleryAccessOf(values.public === true, values.private === true);
-      await showGallery(defaultSharing(), access2);
+      await showGallery(defaultSharing(env), access2, messages);
       return SUCCESS;
     }
   },
   hook: {
-    usage: `hook <${HOOK_NAMES.join("|")}>`,
-    summary: "\u0445\u0443\u043A Claude Code: \u0441\u043E\u0431\u044B\u0442\u0438\u0435 \u043D\u0430 stdin; \u0435\u0433\u043E \u0432\u044B\u0437\u044B\u0432\u0430\u044E\u0442 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u043F\u0440\u043E\u0435\u043A\u0442\u0430, \u0430 \u043D\u0435 \u0447\u0435\u043B\u043E\u0432\u0435\u043A",
-    run: async ({ args, directory }) => {
+    run: async ({ args, directory, env, claudeMessages }) => {
       const { positionals } = parseArgs({ args, allowPositionals: true });
       const [name = ""] = positionals;
-      if (!isHookName(name)) throw new CommandError(`\u043D\u0435\u0442 \u0445\u0443\u043A\u0430 ${name}`);
+      if (!isHookName(name)) throw new CommandError((m) => m.errors.unknownHook(name));
       const payload = await readStdin();
       const outcome = await runHook(name, {
         payload,
-        projectDirectory: process.env.CLAUDE_PROJECT_DIR || directory,
-        tmpDir: tmpdir()
+        projectDirectory: env.CLAUDE_PROJECT_DIR || directory,
+        tmpDir: tmpdir(),
+        messages: claudeMessages
       });
       process.stdout.write(outcome.stdout);
       process.stderr.write(outcome.stderr);
@@ -4598,19 +5265,23 @@ var COMMANDS = {
     }
   }
 };
-function usage() {
-  const lines = Object.values(COMMANDS).map(
-    (command) => `  cyberzavod ${command.usage}
-      ${command.summary}`
-  );
-  return `Cyberzavod \u2014 \u043F\u0440\u043E\u0446\u0435\u0441\u0441 \u0440\u0430\u0437\u0440\u0430\u0431\u043E\u0442\u043A\u0438 \u0441 \u0418\u0418-\u0430\u0433\u0435\u043D\u0442\u0430\u043C\u0438, \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E.
+function usage(messages) {
+  const lines = COMMAND_NAMES.map((name) => {
+    const { usage: invocation, summary } = messages.commands[name];
+    return `  cyberzavod ${invocation}
+      ${summary}`;
+  });
+  const languageOption = messages.help.languageOption(INTERFACE_LANGUAGES.join("|"));
+  return `${messages.help.title}
 
-${lines.join("\n")}`;
+${lines.join("\n")}
+
+${languageOption}`;
 }
 var EXPECTED_ERRORS = [
   CommandError,
   ApiError,
-  GenerateError,
+  ClaudeError,
   ProjectFileError,
   JournalError,
   RecordError
@@ -4621,22 +5292,51 @@ function isExpected(err) {
   const code = err instanceof Error && "code" in err ? err.code : void 0;
   return typeof code === "string" && code.startsWith(ARGUMENT_ERROR_PREFIX);
 }
-async function runCli(argv, directory) {
-  const [name, ...args] = argv;
-  const command = name === void 0 ? void 0 : COMMANDS[name];
-  if (command === void 0) {
+function expectedErrorText(err, messages, claudeMessages) {
+  if (err instanceof CommandError) return err.describe(messages);
+  if (err instanceof ClaudeError) return err.describe(claudeMessages);
+  return err.message;
+}
+function isCommandName(name) {
+  return COMMAND_NAMES.includes(name);
+}
+function chooseLanguage(argv, env) {
+  try {
+    const { flag, rest } = extractLanguageFlag(argv);
+    return { language: languageOf2({ flag, env }), rest };
+  } catch (err) {
+    if (err instanceof CommandError) return err;
+    throw err;
+  }
+}
+function printLanguageError(err, env) {
+  const messages = CLI_MESSAGES[languageOf2({ flag: void 0, env })];
+  console.error(`cyberzavod: ${err.describe(messages)}`);
+  return FAILURE;
+}
+async function runCli(argv, directory, env) {
+  const choice = chooseLanguage(argv, env);
+  if (choice instanceof CommandError) return printLanguageError(choice, env);
+  const messages = CLI_MESSAGES[choice.language];
+  const claudeMessages = CLAUDE_MESSAGES[choice.language];
+  const [name, ...args] = choice.rest;
+  if (name === void 0 || !isCommandName(name)) {
     const isHelpRequest = name === void 0 || name === "help" || name === "--help";
-    console.log(usage());
+    console.log(usage(messages));
     return isHelpRequest ? SUCCESS : FAILURE;
   }
   try {
-    return await command.run({ args, directory });
+    return await COMMANDS[name].run({ args, directory, env, messages, claudeMessages });
   } catch (err) {
     if (!isExpected(err)) throw err;
-    console.error(`cyberzavod ${name}: ${err.message}`);
+    console.error(`cyberzavod ${name}: ${expectedErrorText(err, messages, claudeMessages)}`);
     return FAILURE;
   }
 }
 
 // src/bin/cyberzavod.ts
-process.exitCode = await runCli(process.argv.slice(2), process.env.INIT_CWD ?? process.cwd());
+process.exitCode = await runCli(
+  process.argv.slice(2),
+  process.env.INIT_CWD ?? process.cwd(),
+  process.env
+);

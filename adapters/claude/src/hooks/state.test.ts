@@ -2,6 +2,7 @@ import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CLAUDE_MESSAGES } from "../messages/catalog.ts";
 import { claimHumanCallMarker, hookStatePath } from "./state.ts";
 
 let root: string;
@@ -41,7 +42,7 @@ describe("claimHumanCallMarker", () => {
 
     await writeFile(markerPath, "4");
 
-    const claimed = await claimHumanCallMarker("s1", root);
+    const claimed = await claimHumanCallMarker("s1", root, CLAUDE_MESSAGES.en);
 
     expect({
       claimed,
@@ -58,7 +59,7 @@ describe("claimHumanCallMarker", () => {
   it("без отметки возвращает false и молчит", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
-    const claimed = await claimHumanCallMarker("s1", root);
+    const claimed = await claimHumanCallMarker("s1", root, CLAUDE_MESSAGES.en);
 
     expect({ claimed, warnings: warn.mock.calls.length }).toEqual({ claimed: false, warnings: 0 });
   });
@@ -68,7 +69,7 @@ describe("claimHumanCallMarker", () => {
 
     await mkdir(hookStatePath(root, "s1", "human-call"));
 
-    const claimed = await claimHumanCallMarker("s1", root);
+    const claimed = await claimHumanCallMarker("s1", root, CLAUDE_MESSAGES.en);
 
     expect({ claimed, warnings: warn.mock.calls.length }).toEqual({ claimed: false, warnings: 1 });
   });

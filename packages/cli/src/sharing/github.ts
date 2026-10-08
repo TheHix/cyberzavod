@@ -39,7 +39,7 @@ function field(body: Record<string, unknown>, name: string): string {
   const value = body[name];
 
   if (typeof value !== "string" || value === "") {
-    throw new CommandError(`GitHub вернул неожиданный ответ: нет поля ${name}`);
+    throw new CommandError((messages) => messages.errors.githubUnexpectedField(name));
   }
 
   return value;
@@ -49,14 +49,14 @@ function seconds(body: Record<string, unknown>, name: string): number {
   const value = body[name];
 
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
-    throw new CommandError(`GitHub вернул неожиданный ответ: нет поля ${name}`);
+    throw new CommandError((messages) => messages.errors.githubUnexpectedField(name));
   }
 
   return value;
 }
 
 function parseDeviceCode(body: unknown): DeviceCode {
-  if (!isObject(body)) throw new CommandError("GitHub не выдал код устройства");
+  if (!isObject(body)) throw new CommandError((messages) => messages.errors.githubNoDeviceCode);
 
   return {
     deviceCode: field(body, "device_code"),
@@ -68,7 +68,7 @@ function parseDeviceCode(body: unknown): DeviceCode {
 }
 
 function parseTokenPoll(body: unknown): TokenPoll {
-  if (!isObject(body)) throw new CommandError("GitHub не выдал токен");
+  if (!isObject(body)) throw new CommandError((messages) => messages.errors.githubNoToken);
 
   if (typeof body.access_token === "string" && body.access_token !== "") {
     return { status: "granted", token: body.access_token };
@@ -85,9 +85,10 @@ function parseTokenPoll(body: unknown): TokenPoll {
       return { status: "denied" };
 
     default: {
-      const reason = typeof body.error_description === "string" ? body.error_description : "";
+      const description = typeof body.error_description === "string" ? body.error_description : "";
+      const reason = description || String(body.error);
 
-      throw new CommandError(`GitHub отклонил вход: ${reason || String(body.error)}`);
+      throw new CommandError((messages) => messages.errors.githubRejected(reason));
     }
   }
 }

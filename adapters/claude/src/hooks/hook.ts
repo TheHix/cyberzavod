@@ -1,11 +1,17 @@
 // Общее для хуков Claude Code: что хук получает при вызове и что отдаёт обратно.
 
-/** Вызов хука: полезная нагрузка события, корень проекта и каталог для состояния между вызовами. */
+import type { ClaudeMessages } from "../messages/claude-messages.ts";
+
+/**
+ * Вызов хука: полезная нагрузка события, корень проекта, каталог для состояния между вызовами
+ * и тексты на выбранном языке.
+ */
 export interface HookContext {
   /** JSON события Claude Code со stdin. */
   payload: string;
   projectDirectory: string;
   tmpDir: string;
+  messages: ClaudeMessages;
 }
 
 /** Ответ хука Claude Code: код выхода и то, что он печатает в stdout и stderr. */

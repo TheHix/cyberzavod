@@ -1,6 +1,7 @@
 // `cyberzavod gallery`: записи автора на сервере, открыта ли галерея, лимит; открыть и закрыть.
 
 import { CommandError } from "../errors.ts";
+import type { CliMessages } from "../messages/cli-messages.ts";
 import type { Me } from "../sharing/api.ts";
 import { withToken } from "../sharing/authorization.ts";
 import { badgeMarkdown, galleryLink, recordingLink } from "../sharing/links.ts";
@@ -21,7 +22,7 @@ export function galleryAccessOf(
   isPrivateRequested: boolean,
 ): GalleryAccess {
   if (isPublicRequested && isPrivateRequested) {
-    throw new CommandError("--public и --private вместе не работают: выберите одно");
+    throw new CommandError((messages) => messages.errors.galleryAccessConflict);
   }
 
   if (isPublicRequested) return "public";
@@ -36,30 +37,33 @@ async function changeAccess(sharing: Sharing, token: string, access: GalleryAcce
   return sharing.api.me(token);
 }
 
-function describeGallery(sharing: Sharing, me: Me): string[] {
+function describeGallery(sharing: Sharing, me: Me, messages: CliMessages): string[] {
   const recordingLines = me.recordings.map((recording) => {
     const link = recordingLink(sharing.siteUrl, recording.slug);
 
     return `  ${recording.id}  ${recording.title}\n    ${link}`;
   });
-  const recordingsTitle = `Записи: ${me.recordings.length} из ${me.limit}`;
+  const recordingsTitle = messages.gallery.recordings({
+    count: me.recordings.length,
+    limit: me.limit,
+  });
 
   if (!me.galleryPublic) {
     return [
-      `Галерея ${me.login}: закрыта, записи видны только по ссылкам`,
+      messages.gallery.closed(me.login),
       recordingsTitle,
       ...recordingLines,
-      "Открыть галерею: cyberzavod gallery --public",
+      messages.gallery.openHint,
     ];
   }
 
   return [
-    `Галерея ${me.login}: открыта`,
+    messages.gallery.open(me.login),
     recordingsTitle,
     ...recordingLines,
-    `Страница галереи: ${galleryLink(sharing.siteUrl, me.login)}`,
-    `Бейдж для README: ${badgeMarkdown(sharing.siteUrl, me.login)}`,
-    "Закрыть галерею: cyberzavod gallery --private",
+    messages.gallery.page(galleryLink(sharing.siteUrl, me.login)),
+    messages.gallery.badge(badgeMarkdown(sharing.siteUrl, me.login)),
+    messages.gallery.closeHint,
   ];
 }
 
@@ -67,11 +71,16 @@ function describeGallery(sharing: Sharing, me: Me): string[] {
  * Показывает галерею автора; при необходимости сначала открывает или закрывает её.
  * @param {Sharing} sharing Зависимости команд публикации.
  * @param {GalleryAccess} access Что делать с доступом к галерее.
+ * @param {CliMessages} messages Сообщения на выбранном языке.
  * @returns {Promise<void>} Готово, когда состояние галереи напечатано.
  * @throws {CommandError} Если нет входа.
  */
-export async function showGallery(sharing: Sharing, access: GalleryAccess): Promise<void> {
+export async function showGallery(
+  sharing: Sharing,
+  access: GalleryAccess,
+  messages: CliMessages,
+): Promise<void> {
   const me = await withToken(sharing, (token) => changeAccess(sharing, token, access));
 
-  for (const line of describeGallery(sharing, me)) console.log(line);
+  for (const line of describeGallery(sharing, me, messages)) console.log(line);
 }

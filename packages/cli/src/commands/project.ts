@@ -28,7 +28,7 @@ export async function requireProjectAt(directory: string): Promise<ProjectAt> {
   const config = root === undefined ? undefined : await readProjectConfig(root);
 
   if (root === undefined || config === undefined) {
-    throw new CommandError(`${directory} не в проекте Cyberzavod: сначала cyberzavod init`);
+    throw new CommandError((messages) => messages.errors.projectNotFound(directory));
   }
 
   return { root, config, journal: journalDirectory(root, config) };

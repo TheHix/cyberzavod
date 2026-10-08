@@ -5,6 +5,7 @@
 import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { isNotFound } from "@cyberzavod/storage";
+import type { ClaudeMessages } from "../messages/claude-messages.ts";
 
 /** Вид состояния хука. */
 export type HookStateName = "turn-start" | "stop-blocks" | "checks-output" | "human-call";
@@ -32,9 +33,14 @@ export function hookStatePath(tmpDir: string, sessionId: string, name: HookState
  * не роняет хук записи, а становится предупреждением: промпт пишется как обычный.
  * @param {string} sessionId Идентификатор сессии из полезной нагрузки хука.
  * @param {string} tmpDir Каталог временных файлов.
+ * @param {ClaudeMessages} messages Сообщения на выбранном языке.
  * @returns {Promise<boolean>} true, если отметка была и удалена.
  */
-export async function claimHumanCallMarker(sessionId: string, tmpDir: string): Promise<boolean> {
+export async function claimHumanCallMarker(
+  sessionId: string,
+  tmpDir: string,
+  messages: ClaudeMessages,
+): Promise<boolean> {
   const markerPath = hookStatePath(tmpDir, sessionId, "human-call");
 
   try {
@@ -42,7 +48,9 @@ export async function claimHumanCallMarker(sessionId: string, tmpDir: string): P
 
     return true;
   } catch (err) {
-    if (!isNotFound(err)) console.warn(`отметка ${markerPath} не забрана: ${String(err)}`);
+    if (!isNotFound(err)) {
+      console.warn(messages.record.markerNotClaimed({ file: markerPath, reason: String(err) }));
+    }
 
     return false;
   }

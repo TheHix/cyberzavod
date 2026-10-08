@@ -31,6 +31,6 @@ describe("toolOf", () => {
 
     const act = () => toolOf(installation);
 
-    expect(act).toThrow(/соберите/);
+    expect(act).toThrow(/build it/);
   });
 });

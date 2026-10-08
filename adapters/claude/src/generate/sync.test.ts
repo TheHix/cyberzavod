@@ -3,6 +3,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadHarness, PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
+import { ClaudeError } from "../errors.ts";
+import { CLAUDE_MESSAGES } from "../messages/catalog.ts";
 import { GENERATED_MARK } from "./files.ts";
 import { syncClaude, type ClaudeInstallation, type SyncOptions } from "./sync.ts";
 
@@ -107,8 +109,13 @@ describe("syncClaude", () => {
     await writeProjectFile("CLAUDE.md", "Мои правила\n");
 
     const act = () => sync();
+    const error = await act().then(
+      () => undefined,
+      (err: unknown) => err,
+    );
 
-    await expect(act).rejects.toThrow(/CLAUDE\.md/);
+    expect(error).toBeInstanceOf(ClaudeError);
+    expect((error as ClaudeError).describe(CLAUDE_MESSAGES.en)).toMatch(/CLAUDE\.md/);
     expect(await exists(".claude/settings.json")).toBe(false);
   });
 

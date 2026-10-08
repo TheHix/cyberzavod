@@ -18,6 +18,7 @@ import {
   type Speaker,
   type Stage,
 } from "@cyberzavod/core";
+import { ClaudeError } from "../errors.ts";
 import { buildTimeline, eventBuilds } from "./builds.ts";
 import { findLeaks } from "./leaks.ts";
 
@@ -164,17 +165,28 @@ export interface Draft {
   events: DraftEvent[];
 }
 
-/** Ошибка черновика: файл повреждён или текст для публикации не прошёл проверку. */
+/** Ошибка черновика: файл повреждён или не годится для публикации. */
 export class DraftError extends Error {}
 
-// Поля шапки сборки, которые заполняет редактор, если журнал их не принёс, и их названия для людей.
-const HEADER_FIELD_NAMES = {
-  title: "заголовок",
-  language: "язык",
-  project: "проект",
-  harness: "версия harness",
-  workflow: "процесс",
-} as const satisfies Partial<Record<keyof DraftBuild, string>>;
+// Поля шапки сборки, которые заполняет редактор, если журнал их не принёс. Названия для людей
+// лежат в каталоге сообщений.
+const HEADER_FIELDS = [
+  "title",
+  "language",
+  "project",
+  "harness",
+  "workflow",
+] as const satisfies readonly (keyof DraftBuild)[];
+
+/** Поле шапки сборки, которое заполняет редактор. */
+export type HeaderField = (typeof HEADER_FIELDS)[number];
+
+/** Сборка, у которой в шапке остались незаполненные поля. */
+export interface UnfilledBuild {
+  buildId: string;
+  /** Пустые поля по порядку шапки. */
+  fields: HeaderField[];
+}
 
 // Записи этого адаптера пишет Claude Code — агент Anthropic.
 const CLAUDE_SOURCE: RecordSource = { type: "agent", provider: "anthropic", agent: "claude" };
@@ -576,19 +588,17 @@ export function carryOverEdits(previous: Draft, next: Draft): Draft {
 }
 
 /**
- * Называет поля сборок черновика, которые ещё ждут редактуры: пустые заголовок, проект
- * и версия harness.
+ * Находит поля шапки сборок черновика, которые ещё ждут редактуры: заголовок, язык, проект,
+ * версию harness и процесс.
  * @param {Draft} draft Черновик записей.
- * @returns {string[]} По строке на каждую сборку с пустыми полями вида
- *   `сборка <id>: заголовок, проект`, поля — по порядку шапки; заполненные сборки пропущены.
+ * @returns {UnfilledBuild[]} По элементу на каждую сборку с пустыми полями, поля — по порядку
+ *   шапки; заполненные сборки пропущены.
  */
-export function unfilledHeader(draft: Draft): string[] {
-  const fields = Object.keys(HEADER_FIELD_NAMES) as (keyof typeof HEADER_FIELD_NAMES)[];
-
+export function unfilledHeader(draft: Draft): UnfilledBuild[] {
   return draft.builds.flatMap((build) => {
-    const names = fields.filter((field) => build[field] === "").map((f) => HEADER_FIELD_NAMES[f]);
+    const fields = HEADER_FIELDS.filter((field) => build[field] === "");
 
-    return names.length === 0 ? [] : [`сборка ${build.id}: ${names.join(", ")}`];
+    return fields.length === 0 ? [] : [{ buildId: build.id, fields }];
   });
 }
 
@@ -780,13 +790,17 @@ function buildOf(draft: Draft, buildId: string): DraftBuild {
 
 function checkNoLeaks({ data }: SessionRecord, buildId: string): void {
   const texts = [data.title, data.harness, data.workflow, ...data.events.flatMap(textsOf)];
-  const leaks = texts.flatMap((text) => findLeaks(text).map((kind) => `${kind} в «${text}»`));
+  const leaks = texts.flatMap((text) => findLeaks(text).map((kind) => ({ kind, text })));
 
-  if (leaks.length > 0) {
-    throw new DraftError(
-      `в тексте для публикации сборки ${buildId} есть то, что нельзя показывать: ${leaks.join("; ")}`,
+  if (leaks.length === 0) return;
+
+  throw new ClaudeError((messages) => {
+    const described = leaks.map(({ kind, text }) =>
+      messages.errors.leakIn({ kind: messages.leakKinds[kind], text }),
     );
-  }
+
+    return messages.errors.leaksFound({ buildId, leaks: described.join("; ") });
+  });
 }
 
 /**
@@ -800,8 +814,9 @@ function checkNoLeaks({ data }: SessionRecord, buildId: string): void {
  * @returns {SessionRecord} Запись с `id` сборки, прошедшая проверку формата ядра.
  * @throws {RecordError} Если заголовок, проект, версия harness, чистовой промпт или реплика
  *   сборки пусты или запись не соответствует формату ядра.
- * @throws {DraftError} Если сборки нет, в ней нет событий, склеенный промпт стоит без
- *   предыдущего несклеенного или в тексте для публикации похоже на адрес, ключ или личный путь.
+ * @throws {DraftError} Если сборки нет или склеенный промпт стоит без предыдущего несклеенного.
+ * @throws {ClaudeError} Если в сборке нет событий или в тексте для публикации похоже на адрес,
+ *   ключ или личный путь.
  */
 export function publishBuild(draft: Draft, buildId: string): SessionRecord {
   const build = buildOf(draft, buildId);
@@ -809,7 +824,9 @@ export function publishBuild(draft: Draft, buildId: string): SessionRecord {
   const events = draft.events.filter((_event, index) => owners[index] === buildId);
   const timeline = buildTimeline(events);
 
-  if (timeline === undefined) throw new DraftError(`в сборке ${buildId} нет событий`);
+  if (timeline === undefined) {
+    throw new ClaudeError((messages) => messages.errors.buildHasNoEvents(buildId));
+  }
 
   const tokens = totalTokens(events);
   const usage: SessionEvent[] =
@@ -851,6 +868,7 @@ export function publishBuild(draft: Draft, buildId: string): SessionRecord {
  * @returns {SessionRecord[]} Записи по порядку сборок черновика.
  * @throws {RecordError} Если сборка не соответствует формату ядра.
  * @throws {DraftError} По тем же причинам, что и `publishBuild`.
+ * @throws {ClaudeError} По тем же причинам, что и `publishBuild`.
  */
 export function publishDraft(draft: Draft): SessionRecord[] {
   return draft.builds.map((build) => publishBuild(draft, build.id));

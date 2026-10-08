@@ -56,9 +56,7 @@ export async function readInstallation(): Promise<Installation> {
  */
 export function toolOf(installation: Installation): string {
   if (installation.tool === undefined) {
-    throw new CommandError(
-      "CLI запущен из исходников: соберите его (pnpm cyberzavod) и запустите собранный",
-    );
+    throw new CommandError((messages) => messages.errors.toolFromSources);
   }
 
   return installation.tool;
