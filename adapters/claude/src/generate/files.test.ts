@@ -3,23 +3,23 @@ import type { Harness, StageGuide } from "@cyberzavod/core";
 import { claudeFiles, GENERATED_MARK, renderTemplate, type ClaudeProject } from "./files.ts";
 
 function guide(stage: StageGuide["stage"], title: string, role?: string): StageGuide {
-  const base = { stage, title, description: `${title}.`, body: `Текст этапа ${title}.` };
+  const base = { stage, title, description: `${title}.`, body: `Stage text ${title}.` };
 
   return role === undefined ? base : { ...base, role: { name: role, access: "read" } };
 }
 
 function harness(): Harness {
   return {
-    principles: [{ name: "safety", text: "## Безопасность\n\nБез секретов." }],
+    principles: [{ name: "safety", text: "## Safety\n\nNo secrets." }],
     stages: {
-      planning: guide("planning", "Постановка", "analyst"),
-      implementation: guide("implementation", "Код", "coder"),
-      review: guide("review", "Ревью", "reviewer"),
-      verification: guide("verification", "Проверки", "tester"),
-      record: guide("record", "Фиксация"),
+      planning: guide("planning", "Plan", "analyst"),
+      implementation: guide("implementation", "Code", "coder"),
+      review: guide("review", "Review", "reviewer"),
+      verification: guide("verification", "Verify", "tester"),
+      record: guide("record", "Record"),
     },
     workflows: [],
-    conductor: "Правила ведущего.",
+    conductor: "Lead rules.",
   };
 }
 
@@ -74,9 +74,9 @@ describe("claudeFiles", () => {
 
     expect([
       content.includes(GENERATED_MARK),
-      content.includes("Постановка → Код → Фиксация"),
+      content.includes("Plan → Code → Record"),
       content.includes("- `pnpm test`"),
-      content.includes("## Безопасность"),
+      content.includes("## Safety"),
       content.trimEnd().endsWith("@AGENTS.md"),
     ]).toEqual([true, true, true, true, true]);
   });
@@ -104,7 +104,7 @@ describe("claudeFiles", () => {
 
     const content = fileOf(project, ".claude/skills/feature/SKILL.md");
 
-    expect(content).toContain("## Этап «Фиксация»\n\nТекст этапа Фиксация.");
+    expect(content).toContain("## Record stage\n\nStage text Record.");
   });
 });
 

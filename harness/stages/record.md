@@ -1,10 +1,10 @@
 ---
-title: Фиксация
-description: Фиксирует принятую работу — коммиты по правилам проекта и запись сессии в журнал.
+title: Record
+description: Records the accepted work — commits by the project rules and the session recording in the journal.
 ---
 
-Фиксацию делает ведущий сам, без отдельного агента.
+The lead does this stage itself, without a separate agent.
 
-1. Коммиты — небольшие и связные, в формате из AGENTS.md. Если задача пришла из трекера, коммит, который её закрывает, ссылается на неё так, как требует AGENTS.md.
-2. Публикация и выкатка — только если AGENTS.md описывает их для этого проекта; провал после публикации — возврат на доработку.
-3. Решения, принятые по ходу и важные надолго, — записью `npx cyberzavod decision`; заметки — `npx cyberzavod note`. Журнал сессии пишет адаптер агента, запись из него публикуется отдельно.
+1. Commits are small and cohesive, in the format from AGENTS.md. If the task came from a tracker, the commit that closes it refers to it the way AGENTS.md requires.
+2. Publishing and rollout — only if AGENTS.md describes them for this project; a failure after publishing is a rework.
+3. Decisions made along the way that matter for the long term — with a `npx cyberzavod decision` entry; notes — `npx cyberzavod note`. The agent adapter writes the session journal, and the recording from it is published separately.

@@ -70,9 +70,9 @@ export class RawLogError extends Error {}
 // Команды Bash обрезаются: для записи важно, что запускалось, а не полный текст.
 const MAX_COMMAND_LENGTH = 200;
 const UNKNOWN = "unknown";
-// Вердикт — короткая строка вроде «НА ДОРАБОТКУ»; длинная первая строка — уже сам отчёт.
+// Вердикт — короткая строка вроде «NEEDS WORK»; длинная первая строка — уже сам отчёт.
 const MAX_VERDICT_LENGTH = 40;
-// Оформление вокруг вердикта: **ПРИНЯТО**, `ДЕФЕКТ`, # ПРИНЯТО, «НА ДОРАБОТКУ.».
+// Оформление вокруг вердикта: **APPROVED**, `DEFECT`, # APPROVED, «NEEDS WORK.».
 const VERDICT_MARKUP = /[*_`#]/g;
 const TRAILING_PUNCTUATION = /[.:!]+$/;
 // Пометки среды Claude Code перед отчётом сабагента — в квадратных скобках, это не вердикт.

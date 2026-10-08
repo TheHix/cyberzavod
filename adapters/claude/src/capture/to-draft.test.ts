@@ -235,7 +235,7 @@ describe("toDraft", () => {
         kind: "subagent_stop",
         agent: "tester",
         agentId: "t1",
-        verdict: "ДЕФЕКТ",
+        verdict: "DEFECT",
       },
       { ts: START + 4_000, kind: "subagent_start", agent: "coder", agentId: "c2" },
       { ts: START + 5_000, kind: "subagent_stop", agent: "coder", agentId: "c2" },
@@ -245,7 +245,7 @@ describe("toDraft", () => {
         kind: "subagent_stop",
         agent: "reviewer",
         agentId: "r1",
-        verdict: "НА ДОРАБОТКУ",
+        verdict: "NEEDS WORK",
       },
     ];
 
@@ -262,6 +262,8 @@ describe("toDraft", () => {
   });
 
   it.each([
+    ["APPROVED", true],
+    ["NEEDS WORK", false],
     ["ПРИНЯТО", true],
     ["НА ДОРАБОТКУ", false],
   ])("пишет вердикт ревью «%s» как исход проверок с запуском: %s", (verdict, ok) => {
@@ -276,34 +278,53 @@ describe("toDraft", () => {
     expect(checksOf(draft.events)).toEqual([{ ok: false }, { ok, run: "r1" }]);
   });
 
-  it("считает «ГОТОВО» тестировщика пройденными проверками", () => {
-    const raw: RawEvent[] = [
-      { ts: START, kind: "tool", tool: "Bash", ok: false, command: "make check-web" },
-      { ts: START + 1_000, kind: "subagent_start", agent: "tester", agentId: "t1" },
-      {
-        ts: START + 2_000,
-        kind: "subagent_stop",
-        agent: "tester",
-        agentId: "t1",
-        verdict: "ГОТОВО",
-      },
-    ];
+  it.each([["CHECKS PASSED"], ["DONE"], ["ПРОВЕРКИ ПРОЙДЕНЫ"], ["ГОТОВО"]])(
+    "считает вердикт тестировщика «%s» пройденными проверками",
+    (verdict) => {
+      const raw: RawEvent[] = [
+        { ts: START, kind: "tool", tool: "Bash", ok: false, command: "make check-web" },
+        { ts: START + 1_000, kind: "subagent_start", agent: "tester", agentId: "t1" },
+        { ts: START + 2_000, kind: "subagent_stop", agent: "tester", agentId: "t1", verdict },
+      ];
 
-    const draft = toDraft(raw, { sessionId: "s1" });
+      const draft = toDraft(raw, { sessionId: "s1" });
 
-    expect([stagesOf(draft.events), checksOf(draft.events).at(-1)]).toEqual([
-      ["verification", "fail:verification", "verification"],
-      { ok: true, run: "t1" },
-    ]);
-  });
+      expect([stagesOf(draft.events), checksOf(draft.events).at(-1)]).toEqual([
+        ["verification", "fail:verification", "verification"],
+        { ok: true, run: "t1" },
+      ]);
+    },
+  );
+
+  it.each([["DEFECT"], ["ДЕФЕКТ"]])(
+    "считает вердикт тестировщика «%s» возвратом с английской причиной",
+    (verdict) => {
+      const raw: RawEvent[] = [
+        { ts: START, kind: "subagent_start", agent: "tester", agentId: "t1" },
+        { ts: START + 1_000, kind: "subagent_stop", agent: "tester", agentId: "t1", verdict },
+      ];
+
+      const draft = toDraft(raw, { sessionId: "s1" });
+
+      expect(draft.events).toContainEqual(
+        expect.objectContaining({
+          type: "stage_fail",
+          stage: "verification",
+          reason: "the tester found a defect",
+        }),
+      );
+    },
+  );
 
   it.each([
-    ["coder", "ДЕФЕКТ"],
-    ["coder", "НА ДОРАБОТКУ"],
-    ["analyst", "ДЕФЕКТ"],
-    ["tester", "НА ДОРАБОТКУ"],
-    ["reviewer", "ДЕФЕКТ"],
-    ["reviewer", "ГОТОВО"],
+    ["coder", "DEFECT"],
+    ["coder", "NEEDS WORK"],
+    ["analyst", "DEFECT"],
+    ["tester", "NEEDS WORK"],
+    ["tester", "APPROVED"],
+    ["reviewer", "DEFECT"],
+    ["reviewer", "DONE"],
+    ["reviewer", "CHECKS PASSED"],
   ])("не считает вердиктом первую строку «%s»: «%s»", (agent, verdict) => {
     const raw: RawEvent[] = [
       { ts: START, kind: "subagent_start", agent, agentId: "a1" },
@@ -322,7 +343,7 @@ describe("toDraft", () => {
     const raw: RawEvent[] = [
       { ts: START, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
       { ts: START + 1_000, kind: "subagent_stop", agent: "reviewer", agentId: "r1" },
-      { ts: START + 1_100, kind: "subagent_report", agentId: "r1", verdict: "НА ДОРАБОТКУ" },
+      { ts: START + 1_100, kind: "subagent_report", agentId: "r1", verdict: "NEEDS WORK" },
     ];
 
     const draft = toDraft(raw, { sessionId: "s1" });
@@ -338,9 +359,9 @@ describe("toDraft", () => {
         kind: "subagent_stop",
         agent: "tester",
         agentId: "t1",
-        verdict: "ДЕФЕКТ",
+        verdict: "DEFECT",
       },
-      { ts: START + 1_100, kind: "subagent_report", agentId: "t1", verdict: "ДЕФЕКТ" },
+      { ts: START + 1_100, kind: "subagent_report", agentId: "t1", verdict: "DEFECT" },
     ];
 
     const draft = toDraft(raw, { sessionId: "s1" });
@@ -351,7 +372,7 @@ describe("toDraft", () => {
   it("не судит отчёт агента, запуск которого не попал в журнал", () => {
     const raw: RawEvent[] = [
       { ts: START, kind: "tool", tool: "Edit", ok: true },
-      { ts: START + 1_000, kind: "subagent_report", agentId: "r1", verdict: "НА ДОРАБОТКУ" },
+      { ts: START + 1_000, kind: "subagent_report", agentId: "r1", verdict: "NEEDS WORK" },
     ];
 
     const draft = toDraft(raw, { sessionId: "s1" });
@@ -362,9 +383,9 @@ describe("toDraft", () => {
   it("судит заново повторный запуск того же агента", () => {
     const raw: RawEvent[] = [
       { ts: START, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
-      { ts: START + 1_000, kind: "subagent_report", agentId: "r1", verdict: "НА ДОРАБОТКУ" },
+      { ts: START + 1_000, kind: "subagent_report", agentId: "r1", verdict: "NEEDS WORK" },
       { ts: START + 2_000, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
-      { ts: START + 3_000, kind: "subagent_report", agentId: "r1", verdict: "НА ДОРАБОТКУ" },
+      { ts: START + 3_000, kind: "subagent_report", agentId: "r1", verdict: "NEEDS WORK" },
     ];
 
     const draft = toDraft(raw, { sessionId: "s1" });
@@ -399,7 +420,7 @@ describe("toDraft", () => {
         kind: "subagent_stop",
         agent: "general-purpose",
         agentId: "g1",
-        verdict: "ДЕФЕКТ",
+        verdict: "DEFECT",
       },
     ];
 
@@ -1062,7 +1083,7 @@ describe("toDraft: запуски станций", () => {
         kind: "subagent_stop",
         agent: "tester",
         agentId: "t1",
-        verdict: "ДЕФЕКТ",
+        verdict: "DEFECT",
       },
     ];
 
@@ -2067,7 +2088,9 @@ describe("toDraft: вмешательства", () => {
   });
 
   it.each([
+    ["reviewer", "NEEDS WORK"],
     ["reviewer", "НА ДОРАБОТКУ"],
+    ["tester", "DEFECT"],
     ["tester", "ДЕФЕКТ"],
   ])("распознаёт вызов после возврата: %s «%s»", (agent, verdict) => {
     const raw: RawEvent[] = [
@@ -2084,7 +2107,7 @@ describe("toDraft: вмешательства", () => {
   it("берёт возврат из отчёта, пришедшего сообщением в сессию", () => {
     const raw: RawEvent[] = [
       ...stationRun(START, "reviewer", "r1"),
-      { ts: START + 2_000, kind: "subagent_report", agentId: "r1", verdict: "НА ДОРАБОТКУ" },
+      { ts: START + 2_000, kind: "subagent_report", agentId: "r1", verdict: "NEEDS WORK" },
       { ts: START + 9_000, kind: "stop" },
       { ts: START + 20_000, kind: "prompt", text: "Откати кэш" },
     ];
@@ -2126,7 +2149,7 @@ describe("toDraft: вмешательства", () => {
     [
       "последняя станция сдана без возврата",
       [
-        ...stationRun(START, "reviewer", "r1", "ПРИНЯТО"),
+        ...stationRun(START, "reviewer", "r1", "APPROVED"),
         { ts: START + 9_000, kind: "stop" },
         { ts: START + 20_000, kind: "prompt", text: "Дальше" },
       ] satisfies RawEvent[],

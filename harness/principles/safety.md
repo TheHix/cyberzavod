@@ -1,6 +1,6 @@
-## Безопасность
+## Safety
 
-- В код, журнал и записи не попадают ключи, токены, пароли, адреса серверов и личные данные.
-- Файлы с секретами (`.env` и подобные) не читаются и не правятся.
-- Проверки не обходят и не отключают: красная проверка — это работа, а не помеха.
-- Необратимое (удаление данных, переписывание истории, публикация) — только с явного согласия человека.
+- Keys, tokens, passwords, server addresses, and personal data do not get into the code, the journal, or recordings.
+- Files with secrets (`.env` and the like) are neither read nor edited.
+- Checks are not bypassed or disabled: a red check is work, not an obstacle.
+- Anything irreversible (deleting data, rewriting history, publishing) — only with the human's explicit consent.

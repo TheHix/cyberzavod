@@ -1,17 +1,17 @@
 # {{name}}
 
-Правила этого проекта для агентов и людей. Процесс разработки задаёт Cyberzavod: этапы, роли и общие принципы приходят из его harness, здесь — только то, что относится к проекту. Файлы конкретного агента (например, `CLAUDE.md`) создаёт `npx cyberzavod sync` поверх этого файла.
+The rules of this project for agents and humans. The development process is set by Cyberzavod: stages, roles, and general principles come from its harness, and here is only what belongs to the project. The files for a specific agent (for example, `CLAUDE.md`) are created by `npx cyberzavod sync` on top of this file.
 
-## Команды
+## Commands
 
-- Форматирование: впиши команду или удали строку — без неё шаг пропускается.
-- Проверки (`verification.commands` в `.cyberzavod/project.json`):
+- Formatting: put in the command or delete the line — without it the step is skipped.
+- Checks (`verification.commands` in `.cyberzavod/project.json`):
 {{verification}}
 
-## Задачи
+## Tasks
 
-Где лежат задачи, как их читать и как на них ссылаться в коммитах.
+Where the tasks live, how to read them, and how to refer to them in commits.
 
-## Код и тесты
+## Code and tests
 
-Правила кода и тестов проекта: по ним пишет исполнитель, проверяют тестировщик и ревьюер.
+The project's code and test rules: the coder writes by them, the tester and the reviewer check against them.

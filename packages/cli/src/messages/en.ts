@@ -146,7 +146,7 @@ export const en: CliMessages = {
   },
   status: {
     recordTypes: { session: "sessions", decision: "decisions", note: "notes" },
-    foreman: "foreman",
+    foreman: "lead",
     checksNone: "none set",
     project: ({ id, root }) => `Project: ${id} (${root})`,
     harness: (version) => `Harness: ${version}`,

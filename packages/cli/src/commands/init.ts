@@ -26,7 +26,7 @@ const PATH_SEPARATORS = /[\\/]/;
 function starterRules(template: string, name: string, commands: string[]): string {
   const verification =
     commands.length === 0
-      ? "  - пока не заданы"
+      ? "  - not set yet"
       : commands.map((command) => `  - \`${command}\``).join("\n");
 
   return template.replace("{{name}}", name).replace("{{verification}}", verification);

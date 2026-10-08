@@ -99,7 +99,7 @@ export function adapterHooks(version: string): AdapterHooks {
     type: "command",
     command: hookCommand(version, "stop", stopFailureCommand()),
     timeout: STOP_GATE_TIMEOUT_SECONDS,
-    statusMessage: "Запускаю проверки проекта…",
+    statusMessage: "Running project checks…",
   };
   const recordOnly = [{ hooks: [record] }];
 

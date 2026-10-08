@@ -106,20 +106,29 @@ const AGENT_STAGES: Readonly<Record<string, Stage>> = {
 };
 
 // Вердикты станций /feature — первая строка ответа агента, по агенту: чужое слово вердиктом
-// не считается (`НА ДОРАБОТКУ` у тестировщика), а у агентов без таблицы (analyst, coder) первая
+// не считается (`NEEDS WORK` у тестировщика), а у агентов без таблицы (analyst, coder) первая
 // строка — просто начало отчёта. Отказ возвращает деталь с этапа агента, а последний вердикт,
 // как и последний запуск проверок, решает исход сборки.
 type Verdict = { passed: true } | { passed: false; reason: string };
 
+const TESTER_DEFECT_REASON = "the tester found a defect";
+const REVIEW_REWORK_REASON = "the review sent the work back for rework";
+
+// Русские вердикты — слова harness до 0.8.0 из старых сырых журналов.
 const VERDICTS: Readonly<Record<string, Readonly<Record<string, Verdict>>>> = {
   tester: {
+    "CHECKS PASSED": { passed: true },
+    DONE: { passed: true },
+    DEFECT: { passed: false, reason: TESTER_DEFECT_REASON },
     "ПРОВЕРКИ ПРОЙДЕНЫ": { passed: true },
     ГОТОВО: { passed: true },
-    ДЕФЕКТ: { passed: false, reason: "тестировщик нашёл дефект" },
+    ДЕФЕКТ: { passed: false, reason: TESTER_DEFECT_REASON },
   },
   reviewer: {
+    APPROVED: { passed: true },
+    "NEEDS WORK": { passed: false, reason: REVIEW_REWORK_REASON },
     ПРИНЯТО: { passed: true },
-    "НА ДОРАБОТКУ": { passed: false, reason: "ревью вернуло на доработку" },
+    "НА ДОРАБОТКУ": { passed: false, reason: REVIEW_REWORK_REASON },
   },
 };
 
@@ -146,7 +155,7 @@ const SERVICE_MESSAGE_PREFIXES: readonly string[] = [
 const SHORT_SESSION_LENGTH = 8;
 // Длина дня `2026-10-04` в начале строки toISOString — по UTC, где бы ни собирали черновик.
 const ISO_DATE_LENGTH = 10;
-const TEST_FAILURE_REASON = "проверки не прошли";
+const TEST_FAILURE_REASON = "checks failed";
 // Участок токенов до первой привязки сборки: ему нет события, после которого его вставить.
 const BEFORE_FIRST_ANCHOR = -1;
 

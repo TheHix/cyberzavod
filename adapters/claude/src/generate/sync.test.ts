@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadHarness, PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
 import { ClaudeError } from "../errors.ts";
 import { CLAUDE_MESSAGES } from "../messages/catalog.ts";
-import { GENERATED_MARK } from "./files.ts";
+import { GENERATED_MARK, LEGACY_GENERATED_MARK } from "./files.ts";
 import { syncClaude, type ClaudeInstallation, type SyncOptions } from "./sync.ts";
 
 const REPOSITORY = path.resolve(import.meta.dirname, "../../../..");
@@ -138,5 +138,24 @@ describe("syncClaude", () => {
       old: await exists(".claude/agents/old-role.md"),
       mine: await exists(".claude/agents/mine.md"),
     }).toEqual({ removed: [".claude/agents/old-role.md"], old: false, mine: true });
+  });
+
+  it("перезаписывает без force файл с прежней русской отметкой", async () => {
+    await writeProjectFile("CLAUDE.md", `<!-- ${LEGACY_GENERATED_MARK} из harness -->\n`);
+
+    await sync();
+
+    expect(await readFile(path.join(root, "CLAUDE.md"), "utf8")).toContain(GENERATED_MARK);
+  });
+
+  it("удаляет без force ненужный файл с прежней русской отметкой", async () => {
+    await writeProjectFile(".claude/agents/old-role.md", `<!-- ${LEGACY_GENERATED_MARK} -->\n`);
+
+    const report = await sync();
+
+    expect({ removed: report.removed, old: await exists(".claude/agents/old-role.md") }).toEqual({
+      removed: [".claude/agents/old-role.md"],
+      old: false,
+    });
   });
 });

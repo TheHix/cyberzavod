@@ -132,7 +132,7 @@ export function interleavedDraft(): Draft {
         t: 250_000,
         type: "stage_fail",
         stage: "verification",
-        reason: "тестировщик нашёл дефект",
+        reason: "the tester found a defect",
         run: "a3",
       },
       { t: 250_000, type: "usage", tokens: 100, run: "a3" },
