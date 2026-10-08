@@ -89,6 +89,20 @@ describe("syncClaude", () => {
     expect(skill).toContain("`npx cyberzavod@0.3.0 draft`");
   });
 
+  it("скилл публикации ведёт запись в галерею той же версией CLI", async () => {
+    await sync();
+
+    const skill = await readFile(
+      path.join(root, ".claude/skills/publish-recording/SKILL.md"),
+      "utf8",
+    );
+
+    expect(skill).toContain("`npx cyberzavod@0.3.0 share");
+    expect(skill).toContain("`npx cyberzavod@0.3.0 login`");
+    expect(skill).toContain("`npx cyberzavod@0.3.0 gallery --public`");
+    expect(skill).toContain("`npx cyberzavod@0.3.0 unshare");
+  });
+
   it("кладёт скилл /setup, который зовёт CLI той версии, что в конфиге", async () => {
     await sync();
 
