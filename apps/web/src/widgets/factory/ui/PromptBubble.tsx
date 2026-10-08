@@ -11,12 +11,13 @@ import { SpeechBubble } from "./SpeechBubble.tsx";
 interface Props {
   /** Графика цеха — переводит место рабочего в координаты пола; нет, пока не загрузилась. */
   graphics: FactoryGraphics | undefined;
-  /** Поле цеха, свободное от меню и HUD: пузырь раскрывается к его середине. */
+  /** Поле цеха, свободное от меню и HUD: пузырь не выходит за его края. */
   field: Frame;
 }
 
 /**
- * Промпт над рабочим, который его получил: кому, главное указание и раскрываемые уточнения.
+ * Промпт над рабочим, который его получил: кому, главное указание и раскрываемые уточнения. Длинные
+ * уточнения прокручиваются внутри пузыря вместе с указанием, а «свернуть» остаётся под ними.
  * @param {Props} props Свойства компонента.
  * @param {FactoryGraphics | undefined} props.graphics Графика цеха, если уже загружена.
  * @param {Frame} props.field Поле цеха, свободное от меню и HUD.
@@ -32,22 +33,28 @@ export function PromptBubble(props: Props): JSX.Element {
   return (
     <Show when={cue()}>
       {(current) => (
-        <SpeechBubble graphics={props.graphics} field={props.field} position={position()}>
+        <SpeechBubble
+          graphics={props.graphics}
+          field={props.field}
+          position={position()}
+          actions={
+            <Show when={current().prompt.requirements.length > 0}>
+              <Button
+                variant="link"
+                aria-expanded={detailsOpen()}
+                onClick={() => model.togglePromptDetails()}
+              >
+                {detailsOpen() ? UI_TEXT.speech.less[locale] : UI_TEXT.speech.more[locale]}
+              </Button>
+            </Show>
+          }
+        >
           <Chip tone="sky">
             {UI_TEXT.speech.humanTo[locale](recipientOf(current().prompt, locale))}
           </Chip>
           <Title>{current().prompt.goal}</Title>
-          <Show when={current().prompt.requirements.length > 0}>
-            <Button
-              variant="link"
-              aria-expanded={detailsOpen()}
-              onClick={() => model.togglePromptDetails()}
-            >
-              {detailsOpen() ? UI_TEXT.speech.less[locale] : UI_TEXT.speech.more[locale]}
-            </Button>
-            <Show when={detailsOpen()}>
-              <BulletList items={current().prompt.requirements} />
-            </Show>
+          <Show when={detailsOpen()}>
+            <BulletList items={current().prompt.requirements} />
           </Show>
         </SpeechBubble>
       )}

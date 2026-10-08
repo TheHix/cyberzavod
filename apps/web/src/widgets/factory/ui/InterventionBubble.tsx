@@ -12,7 +12,7 @@ import { SpeechBubble } from "./SpeechBubble.tsx";
 interface Props {
   /** Графика цеха — переводит место мастера в координаты пола; нет, пока не загрузилась. */
   graphics: FactoryGraphics | undefined;
-  /** Поле цеха, свободное от меню и HUD: пузырь раскрывается к его середине. */
+  /** Поле цеха, свободное от меню и HUD: пузырь не выходит за его края. */
   field: Frame;
 }
 
@@ -34,12 +34,18 @@ export function InterventionBubble(props: Props): JSX.Element {
   return (
     <Show when={cue()}>
       {(current) => (
-        <SpeechBubble graphics={props.graphics} field={props.field} position={position()}>
+        <SpeechBubble
+          graphics={props.graphics}
+          field={props.field}
+          position={position()}
+          actions={
+            <Button variant="link" onClick={() => showInterventionDetails(model, current().index)}>
+              {UI_TEXT.speech.more[locale]}
+            </Button>
+          }
+        >
           <Chip tone="sun">{labelOf(current().intervention, locale)}</Chip>
           <Title>{current().intervention.line}</Title>
-          <Button variant="link" onClick={() => showInterventionDetails(model, current().index)}>
-            {UI_TEXT.speech.more[locale]}
-          </Button>
         </SpeechBubble>
       )}
     </Show>

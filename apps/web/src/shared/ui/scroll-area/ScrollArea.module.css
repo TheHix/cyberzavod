@@ -1,0 +1,31 @@
+/* Содержимое прокручивается в высоте, которую блоку отвели снаружи: без min-height блок во
+   флекс-колонке вырос бы по содержимому. Прокрутка у края блока не переходит на страницу и на то,
+   что под ним. */
+.area {
+  --scroll-shadow-size: var(--space-s);
+  --scroll-shadow-color: color-mix(in srgb, var(--ink) 35%, transparent);
+  /* Заплатка вдвое выше тени: сплошной половиной она закрывает тень целиком, а второй половиной
+     сходит на нет, чтобы у края не было ступеньки. */
+  --scroll-cover-size: calc(2 * var(--scroll-shadow-size));
+
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Тени — только когда текст не помещается: без прокрутки показывать им нечего, а на дробной
+   координате блока тень и заплатка расходятся на пиксель и оставляют у края серую полоску. */
+.area[data-overflowing] {
+  /* Тени у краёв стоят на месте, а бумажные заплатки едут вместе с текстом: у края, до которого
+     текст уже дошёл, заплатка закрывает тень. Так тень видна только там, где есть ещё текст, и без
+     слежки за прокруткой. */
+  background:
+    linear-gradient(var(--paper) 50%, transparent) top / 100% var(--scroll-cover-size) no-repeat
+      local,
+    linear-gradient(transparent, var(--paper) 50%) bottom / 100% var(--scroll-cover-size) no-repeat
+      local,
+    radial-gradient(farthest-side at 50% 0, var(--scroll-shadow-color), transparent) top / 100%
+      var(--scroll-shadow-size) no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, var(--scroll-shadow-color), transparent) bottom /
+      100% var(--scroll-shadow-size) no-repeat scroll;
+}

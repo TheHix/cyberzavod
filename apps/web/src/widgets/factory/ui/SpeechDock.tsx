@@ -5,12 +5,12 @@ import { recipientOf } from "@/entities/prompt";
 import { useLocale } from "@/shared/i18n/locale-context.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { useStoreValue } from "@/shared/lib/use-store-value.ts";
-import { BulletList, Button, Chip, Title } from "@/shared/ui";
+import { BulletList, Button, Chip, ScrollArea, Title } from "@/shared/ui";
 import { useFactoryModel } from "./model-context.ts";
 import { showInterventionDetails, showMessageDetails } from "./open-journal.ts";
 import styles from "./SpeechDock.module.css";
 
-/** Сколько строк текста держит полка: больше обрезается, полный текст — в журнале. */
+/** Сколько строк текста держит полка: остальное — в журнале или под «подробнее». */
 const LINE_COUNT = 2;
 
 interface Props {
@@ -21,7 +21,8 @@ interface Props {
 /**
  * Полка речи в HUD: то, что на широком экране висит пузырём над говорящим, на узком стоит над
  * управлением, а на низком рядом с ним, чтобы не закрывать станки. Высота постоянная: поле цеха не
- * прыгает от смены реплик.
+ * прыгает от смены реплик. «Подробнее» у промпта показывает указание целиком и уточнения: они
+ * прокручиваются вместе в ограниченной высоте, и полка не забирает у цеха всё поле.
  * @param {Props} props Свойства компонента.
  * @param {string} props.title Название сборки для паузы между репликами.
  * @returns {JSX.Element} Полка с вмешательством, промптом, репликой или названием сборки.
@@ -87,11 +88,18 @@ export function SpeechDock(props: Props): JSX.Element {
                   </Button>
                 </Show>
               </div>
-              <Title size="m" lines={LINE_COUNT}>
-                {current().prompt.goal}
-              </Title>
-              <Show when={detailsOpen()}>
-                <BulletList items={current().prompt.requirements} />
+              <Show
+                when={detailsOpen()}
+                fallback={
+                  <Title size="m" lines={LINE_COUNT}>
+                    {current().prompt.goal}
+                  </Title>
+                }
+              >
+                <ScrollArea class={styles.details}>
+                  <Title size="m">{current().prompt.goal}</Title>
+                  <BulletList items={current().prompt.requirements} />
+                </ScrollArea>
               </Show>
             </>
           )}
