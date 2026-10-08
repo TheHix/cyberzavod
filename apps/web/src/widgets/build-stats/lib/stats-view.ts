@@ -6,6 +6,7 @@ import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { formatNumber, formatTokens } from "@/shared/lib/format.ts";
 import type { BarItem, StatItem } from "@/shared/ui";
+import { barOf } from "./bars.ts";
 
 /** Что показывает страница аналитики: заглушку, пока сборок нет, или числа и диаграммы. */
 export type StatsView =
@@ -29,10 +30,6 @@ function stageLabel(key: string, locale: Locale): string {
 
 function reasonLabel(key: string, locale: Locale): string {
   return isInterventionReason(key) ? INTERVENTION_LABELS[key][locale] : key;
-}
-
-function barOf(label: string, count: number, locale: Locale): BarItem {
-  return { label, value: count, valueText: formatNumber(count, locale) };
 }
 
 // Самые частые — сверху: диаграмма отвечает, где процесс буксует сильнее всего.

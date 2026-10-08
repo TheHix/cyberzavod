@@ -1,0 +1,77 @@
+---
+// Примеры на странице галерей: эталонные проекты сайта карточками, как галереи в списке ниже.
+// Собираются при сборке сайта и уходят в остров GalleryBoard слотом: записи журнала в его пропсы
+// и в клиентский чанк не попадают.
+import type { SessionRecord } from "@cyberzavod/core";
+import { projectOf, projectUrl, publishedProjects } from "@/entities/project";
+import { projectSeriesOf, totalsOf } from "@/entities/recording";
+import type { Locale } from "@/shared/i18n/locale.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
+import { formatCount, formatDuration } from "@/shared/lib/format.ts";
+import { Card, ChipList, Title } from "@/shared/ui";
+
+interface Props {
+  /** Записи сборок сайта в любом порядке. */
+  recordings: readonly SessionRecord[];
+  /** Язык страницы: на нём подписи, названия проектов и длительность. */
+  locale: Locale;
+}
+
+const { recordings, locale } = Astro.props;
+const examples = projectSeriesOf(recordings).map((series) => ({
+  project: projectOf(publishedProjects, series.projectId),
+  totals: totalsOf(series.recordings),
+}));
+---
+
+{examples.length > 0 && (
+  <section class="examples">
+    <Title as="h2">{UI_TEXT.examples.heading[locale]}</Title>
+    <p class="note">{UI_TEXT.examples.intro[locale]}</p>
+    <ul class="list">
+      {examples.map(({ project, totals }) => (
+        <li>
+          <Card>
+            <div class="card">
+              <a href={projectUrl(project.id, locale)}>
+                <Title as="span">{project.name[locale]}</Title>
+              </a>
+              {project.stack !== undefined && <ChipList items={project.stack} />}
+              <p class="note">
+                {formatCount(totals.builds, UI_TEXT.lists.builds, locale)} ·{" "}
+                {formatDuration(totals.durationMs, locale)}
+              </p>
+            </div>
+          </Card>
+        </li>
+      ))}
+    </ul>
+  </section>
+)}
+
+<style>
+  .examples {
+    display: grid;
+    gap: var(--space-l);
+  }
+
+  .list {
+    display: grid;
+    gap: var(--space-m);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .card {
+    display: grid;
+    gap: var(--space-xs);
+    justify-items: start;
+  }
+
+  .note {
+    margin: 0;
+    color: var(--ink-soft);
+    font-weight: 700;
+  }
+</style>

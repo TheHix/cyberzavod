@@ -7,8 +7,8 @@ import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { languageNoteOf } from "@/shared/lib/language-note.ts";
 import { useStoreValue } from "@/shared/lib/use-store-value.ts";
 import { Panel } from "@/shared/ui";
+import type { BuildProject } from "../lib/build-project.ts";
 import { Factory } from "./Factory.tsx";
-import type { BuildProject } from "./Hud.tsx";
 
 interface Props {
   /** Язык страницы: на нём подписи цеха и сообщения. */

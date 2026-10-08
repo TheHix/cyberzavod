@@ -29,7 +29,9 @@ interface FilledProps {
 function Chart(props: ChartProps): JSX.Element {
   return (
     <section class={styles.section}>
-      <Title as="h2">{props.heading}</Title>
+      <Title as="h3" size="m">
+        {props.heading}
+      </Title>
       <Show
         when={props.items.length > 0}
         fallback={<p class={styles.note}>{UI_TEXT.stats.none[props.locale]}</p>}

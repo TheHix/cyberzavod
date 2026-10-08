@@ -40,6 +40,7 @@ const languageNote = languageNoteOf(language, locale);
         <li id={anchor}>
           <JournalEntry
             client:visible
+            recordingId={recording.id}
             speech={entry.speech}
             locale={locale}
             clock={clock}

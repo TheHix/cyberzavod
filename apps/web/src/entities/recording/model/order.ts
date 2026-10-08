@@ -10,3 +10,13 @@ export function newestFirst(a: SessionRecord, b: SessionRecord): number {
   // Время в ISO 8601 по UTC сравнивается как строка; при равном времени порядок задаёт id.
   return b.timestamp.localeCompare(a.timestamp) || b.id.localeCompare(a.id);
 }
+
+/**
+ * Порядок задач внутри проекта: начатые раньше — первыми, как их и делали.
+ * @param {SessionRecord} a Первая запись.
+ * @param {SessionRecord} b Вторая запись.
+ * @returns {number} Отрицательное число, если `a` идёт раньше `b`.
+ */
+export function oldestFirst(a: SessionRecord, b: SessionRecord): number {
+  return newestFirst(b, a);
+}

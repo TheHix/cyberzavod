@@ -1,0 +1,14 @@
+/* Метки строкой: не помещаются — переносятся, а не сжимаются до многоточия. */
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  min-width: 0;
+}

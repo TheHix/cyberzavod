@@ -1,0 +1,18 @@
+---
+// Журнал серии сборок на главной и на странице проекта: показывает ту сборку, что сейчас в цехе.
+// Полные записи грузятся файлами в браузере, поэтому весь журнал — один остров; пока панель
+// закрыта, его не видно, и острову хватает времени простоя.
+import type { Locale } from "@/shared/i18n/locale.ts";
+import { SeriesJournal } from "./SeriesJournal.tsx";
+
+interface Props {
+  /** id сборок серии в порядке, в каком их проигрывает цех. */
+  recordingIds: readonly string[];
+  /** Язык страницы: на нём метки, подписи и сообщения журнала. */
+  locale: Locale;
+}
+
+const { recordingIds, locale } = Astro.props;
+---
+
+<SeriesJournal client:idle recordingIds={recordingIds} locale={locale} />

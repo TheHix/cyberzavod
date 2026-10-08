@@ -348,7 +348,7 @@ describe("createFactoryModel: вмешательства", () => {
   it("считает вмешательства в итогах сборки", () => {
     const model = createFactoryModel(briefOf(recordingWithInterventions()));
 
-    expect(model.summary.interventions).toBe(2);
+    expect(model.$summary.get().interventions).toBe(2);
   });
 
   it("ставит сцену на начало пузыря вмешательства, и $speech указывает на него", () => {
@@ -607,5 +607,152 @@ describe("createFactoryModel: план", () => {
     model.setLayout(structuredClone(WIDE_LAYOUT));
 
     expect(model.$promptDetailsOpen.get()).toBe(true);
+  });
+});
+
+// Вторая запись серии: другой id и итоги, промпт под тем же номером 0.
+function nextRecording(): SessionRecord {
+  const base = recordingWithPrompt();
+
+  return {
+    ...base,
+    id: "test-2",
+    data: {
+      ...base.data,
+      title: "Тест 2",
+      events: [
+        { t: 0, type: "build_start" },
+        { t: 30_000, type: "prompt", goal: "Поправь подпись", requirements: ["В HUD"] },
+        { t: 90_000, type: "build_end", ok: true },
+      ],
+    },
+  };
+}
+
+describe("createFactoryModel: смена записи", () => {
+  it("ставит в цех новую запись: сценарий, id и итоги — её", () => {
+    const model = createFactoryModel(recordingWithPrompt());
+
+    model.load(nextRecording());
+
+    expect({
+      title: model.$recording.get().data.title,
+      id: model.$recordingId.get(),
+      durationMs: model.$summary.get().durationMs,
+      prompts: model.$script.get().prompts.length,
+    }).toEqual({ title: "Тест 2", id: "test-2", durationMs: 90_000, prompts: 1 });
+  });
+
+  it("ставит сцену в начало новой записи", () => {
+    const model = createFactoryModel(recordingWithPrompt());
+
+    model.seek(duringPrompt(model, 1));
+
+    model.load(nextRecording());
+
+    expect(model.$scene.get().time).toBe(0);
+  });
+
+  it.each([true, false])("сохраняет «идёт или пауза» (идёт: %s)", (playing) => {
+    const model = createFactoryModel(recordingWithPrompt());
+
+    model.start(playing);
+
+    model.load(nextRecording());
+
+    expect(model.$playing.get()).toBe(playing);
+  });
+
+  it("сохраняет скорость", () => {
+    const model = createFactoryModel(recordingWithPrompt());
+
+    model.setSpeed(2);
+
+    model.load(nextRecording());
+
+    expect(model.$playback.get().speed).toBe(2);
+  });
+
+  it("строит сценарий новой записи на текущем плане", () => {
+    const model = createFactoryModel(recordingWithPrompt(), PORTRAIT_LAYOUT);
+
+    model.load(nextRecording());
+
+    expect([model.$layout.get(), model.$script.get().layout.width]).toEqual([
+      PORTRAIT_LAYOUT,
+      PORTRAIT_LAYOUT.width,
+    ]);
+  });
+
+  it("закрывает уточнения промпта", () => {
+    const model = createFactoryModel(recordingWithPrompt());
+
+    model.seek(duringPrompt(model, 0));
+    model.togglePromptDetails();
+
+    model.load(nextRecording());
+
+    expect(model.$promptDetailsOpen.get()).toBe(false);
+  });
+
+  it("при смене плана строит сценарий той записи, что сейчас в цехе", () => {
+    const model = createFactoryModel(recordingWithPrompt());
+
+    model.load(nextRecording());
+
+    model.setLayout(PORTRAIT_LAYOUT);
+
+    expect({
+      recordingTime: model.$recordingTime.get(),
+      prompts: model.$script.get().prompts.length,
+    }).toEqual({ recordingTime: 0, prompts: 1 });
+  });
+
+  it("отдаёт подписчикам сцены один кадр при смене записи", () => {
+    const model = createFactoryModel(recordingWithPrompt());
+    const times: number[] = [];
+
+    model.seek(duringPrompt(model, 1));
+    model.$scene.listen((scene) => times.push(scene.time));
+
+    model.load(nextRecording());
+
+    expect(times).toEqual([0]);
+  });
+});
+
+describe("createFactoryModel: play", () => {
+  it("пускает стоящую сцену", () => {
+    const model = createFactoryModel(recordingWithPrompt());
+
+    model.start(false);
+
+    model.play();
+
+    expect(model.$playing.get()).toBe(true);
+  });
+
+  it("не останавливает идущую сцену", () => {
+    const model = createFactoryModel(recordingWithPrompt());
+
+    model.start(true);
+
+    model.play();
+
+    expect(model.$playing.get()).toBe(true);
+  });
+
+  it("досмотренную сцену запускает с начала", () => {
+    const model = createFactoryModel(recordingWithPrompt());
+
+    model.start(false);
+    model.seek(model.$playback.get().duration);
+
+    model.play();
+
+    expect({ time: model.$scene.get().time, playing: model.$playing.get() }).toEqual({
+      time: 0,
+      playing: true,
+    });
   });
 });

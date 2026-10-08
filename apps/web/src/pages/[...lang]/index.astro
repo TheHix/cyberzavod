@@ -1,12 +1,10 @@
 ---
 import type { GetStaticPaths } from "astro";
-import { briefOf } from "@cyberzavod/core";
 import GameLayout from "@/app/layouts/GameLayout.astro";
-import { Factory } from "@/widgets/factory";
-import { BuildJournal } from "@/widgets/build-journal";
+import { SeriesFactory, seriesBuildsOf } from "@/widgets/factory";
+import { SeriesBuildJournal } from "@/widgets/build-journal";
 import { projectLinkOf, projectOf, publishedProjects } from "@/entities/project";
-import { publishedRecordings } from "@/entities/recording";
-import { languageNoteOf } from "@/shared/lib/language-note.ts";
+import { projectSeriesOf, publishedRecordings } from "@/entities/recording";
 import { PANELS } from "@/shared/config/panels.ts";
 import { site } from "@/shared/config/site.ts";
 import { LOCALES, type Locale } from "@/shared/i18n/locale.ts";
@@ -25,36 +23,36 @@ interface Props {
 }
 
 const { locale } = Astro.props;
-const [latest] = publishedRecordings;
+// Серия по кругу: сборки проекта по порядку задач, затем сборки следующего проекта.
+const seriesBuilds = projectSeriesOf(publishedRecordings).flatMap(({ projectId, recordings }) => {
+  const project = projectOf(publishedProjects, projectId);
+
+  return seriesBuildsOf(recordings, projectLinkOf(project, locale), locale);
+});
+const recordingIds = seriesBuilds.map((build) => build.recording.id);
+const hasBuilds = seriesBuilds.length > 0;
 ---
 
 <GameLayout
   locale={locale}
-  journal={latest !== undefined}
+  journal={hasBuilds}
   heading={UI_TEXT.pages.homeHeading[locale](site.name[locale])}
 >
-  {latest ? (
-    <Factory
-      client:load
-      locale={locale}
-      recording={briefOf(latest)}
-      languageNote={languageNoteOf(latest.data.language, locale)}
-      project={projectLinkOf(projectOf(publishedProjects, latest.projectId), locale)}
-      titleLevel="h2"
-    />
+  {hasBuilds ? (
+    <SeriesFactory client:load locale={locale} builds={seriesBuilds} titleLevel="h2" />
   ) : (
     <Panel label={UI_TEXT.pages.floor[locale]}>
       <p>{UI_TEXT.lists.noRecordings[locale]}</p>
     </Panel>
   )}
-  {latest && (
+  {hasBuilds && (
     <Drawer
       slot="drawers"
       id={PANELS.journal}
       title={UI_TEXT.panels.journal[locale]}
       closeLabel={UI_TEXT.panels.close[locale]}
     >
-      <BuildJournal recording={latest} locale={locale} />
+      <SeriesBuildJournal recordingIds={recordingIds} locale={locale} />
     </Drawer>
   )}
 </GameLayout>

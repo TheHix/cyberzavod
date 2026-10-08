@@ -1,0 +1,103 @@
+---
+// Записи сборок по проектам: блок на проект в порядке, в каком завод за них брался. Шапка блока —
+// название со ссылкой на страницу проекта, стек и итоги; итоги сворачивают и разворачивают
+// описание, ссылку на репозиторий и сборки по порядку задач. Ссылка на проект стоит вне
+// `<summary>`: внутри него она была бы кнопкой в кнопке.
+import type { SessionRecord } from "@cyberzavod/core";
+import { projectOf, projectUrl, publishedProjects } from "@/entities/project";
+import { projectSeriesOf, totalsOf } from "@/entities/recording";
+import type { Locale } from "@/shared/i18n/locale.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
+import { formatCount, formatDuration } from "@/shared/lib/format.ts";
+import { ButtonLink, Card, ChipList, Disclosure, Title } from "@/shared/ui";
+import ProjectBuilds from "./ProjectBuilds.astro";
+
+interface Props {
+  /** Записи сборок в любом порядке. */
+  recordings: readonly SessionRecord[];
+  /** Язык страницы: на нём подписи, описания проектов и форматы чисел и дат. */
+  locale: Locale;
+}
+
+const { recordings, locale } = Astro.props;
+const projectSeries = projectSeriesOf(recordings);
+---
+
+{projectSeries.length === 0 ? (
+  <p class="note">{UI_TEXT.lists.noRecordings[locale]}</p>
+) : (
+  <ul class="projects">
+    {projectSeries.map((series) => {
+      const project = projectOf(publishedProjects, series.projectId);
+      const totals = totalsOf(series.recordings);
+
+      return (
+        <li>
+          <Card>
+            <div class="project">
+              <div class="header">
+                <Title as="h3">
+                  <a href={projectUrl(project.id, locale)}>{project.name[locale]}</a>
+                </Title>
+                {project.stack !== undefined && <ChipList items={project.stack} />}
+              </div>
+              <Disclosure open>
+                <span slot="summary" class="note">
+                  {formatCount(totals.builds, UI_TEXT.lists.builds, locale)} ·{" "}
+                  {formatDuration(totals.durationMs, locale)} ·{" "}
+                  {formatCount(totals.tokens, UI_TEXT.lists.tokens, locale)}
+                </span>
+                <div class="body">
+                  <p class="description">{project.description[locale]}</p>
+                  {project.repo !== undefined && (
+                    <div>
+                      <ButtonLink variant="link" href={project.repo}>
+                        {UI_TEXT.project.repo[locale]}
+                      </ButtonLink>
+                    </div>
+                  )}
+                  <ProjectBuilds recordings={series.recordings} locale={locale} />
+                </div>
+              </Disclosure>
+            </div>
+          </Card>
+        </li>
+      );
+    })}
+  </ul>
+)}
+
+<style>
+  .projects {
+    display: grid;
+    gap: var(--space-m);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .project,
+  .header,
+  .body {
+    display: grid;
+    gap: var(--space-s);
+  }
+
+  .header {
+    justify-items: start;
+  }
+
+  .body {
+    gap: var(--space-m);
+  }
+
+  .description {
+    margin: 0;
+  }
+
+  .note {
+    margin: 0;
+    color: var(--ink-soft);
+    font-weight: 700;
+  }
+</style>

@@ -1,8 +1,18 @@
 .list {
+  container-type: inline-size;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-s);
   margin: 0;
+}
+
+/* Две плашки в узком месте (панель на телефоне) не вмещают значение вроде «21 мин 47 с», а
+   значение не переносится: там счётчики встают в одну колонку. В HUD шириной 25rem колонок две.
+   Переменные CSS в условии запроса не работают — порог числом. */
+@container (width < 22rem) {
+  .stat {
+    grid-column: 1 / -1;
+  }
 }
 
 .stat {
@@ -22,4 +32,11 @@
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.detail {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--text-s);
+  font-weight: 700;
 }

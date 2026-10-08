@@ -1,6 +1,7 @@
 import { atom } from "nanostores";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  $sceneRecordingId,
   $sceneSpeech,
   connectScene,
   isSameSpeech,
@@ -12,14 +13,17 @@ import {
 const FIRST_PROMPT: Speech = { kind: "prompt", index: 0 };
 const FIRST_MESSAGE: Speech = { kind: "message", index: 0 };
 const FIRST_INTERVENTION: Speech = { kind: "intervention", index: 0 };
+const RECORDING_ID = "2026-10-07-79fd668f";
+const NEXT_RECORDING_ID = "2026-10-07-79fd668f-2";
 
-// Сцена-заглушка: речь задаёт тест, а перемотку он видит по вызовам.
-function stubScene(speech: Speech | null = null) {
+// Сцена-заглушка: запись и речь задаёт тест, а перемотку он видит по вызовам.
+function stubScene(speech: Speech | null = null, recordingId = RECORDING_ID) {
+  const $recordingId = atom(recordingId);
   const $speech = atom<Speech | null>(speech);
   const seekToSpeech = vi.fn<(speech: Speech) => void>();
-  const scene: JournalScene = { $speech, seekToSpeech };
+  const scene: JournalScene = { $recordingId, $speech, seekToSpeech };
 
-  return { scene, $speech, seekToSpeech };
+  return { scene, $recordingId, $speech, seekToSpeech };
 }
 
 const disconnects: (() => void)[] = [];
@@ -67,6 +71,33 @@ describe("connectScene", () => {
     expect($sceneSpeech.get()).toBeNull();
   });
 
+  it("переносит запись сцены в $sceneRecordingId", () => {
+    const { scene } = stubScene();
+
+    connect(scene);
+
+    expect($sceneRecordingId.get()).toBe(RECORDING_ID);
+  });
+
+  it("следит за сменой записи в сцене", () => {
+    const { scene, $recordingId } = stubScene();
+
+    connect(scene);
+
+    $recordingId.set(NEXT_RECORDING_ID);
+
+    expect($sceneRecordingId.get()).toBe(NEXT_RECORDING_ID);
+  });
+
+  it("сбрасывает запись при отключении", () => {
+    const { scene } = stubScene();
+    const disconnect = connect(scene);
+
+    disconnect();
+
+    expect($sceneRecordingId.get()).toBeNull();
+  });
+
   it("перестаёт следить за сценой после отключения", () => {
     const { scene, $speech } = stubScene();
     const disconnect = connect(scene);
@@ -110,7 +141,7 @@ describe("connectScene", () => {
     connect(newer.scene);
     disconnectOlder();
 
-    seekScene(FIRST_PROMPT);
+    seekScene(RECORDING_ID, FIRST_PROMPT);
 
     expect(newer.seekToSpeech).toHaveBeenCalledWith(FIRST_PROMPT);
   });
@@ -124,13 +155,24 @@ describe("seekScene", () => {
 
     connect(scene);
 
-    seekScene(FIRST_MESSAGE);
+    seekScene(RECORDING_ID, FIRST_MESSAGE);
 
     expect(seekToSpeech).toHaveBeenCalledExactlyOnceWith(FIRST_MESSAGE);
   });
 
+  it("не перематывает сцену, которая проигрывает другую запись", () => {
+    const { scene, $recordingId, seekToSpeech } = stubScene();
+
+    connect(scene);
+    $recordingId.set(NEXT_RECORDING_ID);
+
+    seekScene(RECORDING_ID, FIRST_MESSAGE);
+
+    expect(seekToSpeech).not.toHaveBeenCalled();
+  });
+
   it("ничего не делает без сцены", () => {
-    const act = () => seekScene(FIRST_MESSAGE);
+    const act = () => seekScene(RECORDING_ID, FIRST_MESSAGE);
 
     expect(act).not.toThrow();
   });
@@ -141,7 +183,7 @@ describe("seekScene", () => {
 
     disconnect();
 
-    seekScene(FIRST_MESSAGE);
+    seekScene(RECORDING_ID, FIRST_MESSAGE);
 
     expect(seekToSpeech).not.toHaveBeenCalled();
   });
