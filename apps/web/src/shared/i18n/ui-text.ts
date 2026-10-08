@@ -82,8 +82,8 @@ export const UI_TEXT = {
     noRecordings: { en: "No builds yet.", ru: "Записей пока нет." },
     noGuides: { en: "No guides yet.", ru: "Гайдов пока нет." },
     otherBuilds: {
-      en: "Below are the reference projects the floor built from scratch. Builds of other projects are in the galleries of Cyberzavod users.",
-      ru: "Ниже — эталонные проекты, которые цех собрал с нуля. Сборки других проектов — в галереях пользователей Киберзавода.",
+      en: "Below are example projects the floor built from scratch. Builds of other projects are in the galleries of Cyberzavod users.",
+      ru: "Ниже — проекты, которые цех собрал с нуля. Сборки других проектов — в галереях пользователей Киберзавода.",
     },
     tokens: {
       en: { one: "token", other: "tokens" },
@@ -132,8 +132,8 @@ export const UI_TEXT = {
       ru: "Ваша галерея Киберзавода: открыть или закрыть её, посмотреть записи сборок и удалить лишние.",
     },
     statsDescription: {
-      en: "Reference projects side by side — time, tokens, reworks and human input per build — and where the process stalls across open galleries.",
-      ru: "Эталонные проекты рядом — время, токены, возвраты и участие человека на сборку — и где процесс буксует в открытых галереях.",
+      en: "Where the process stalls: reworks by stage, human interventions, tokens and build outcomes across open galleries.",
+      ru: "Где процесс буксует: возвраты по этапам, вмешательства человека, токены и исходы сборок по открытым галереям.",
     },
     recordingDescription: {
       en: (title: string) =>
@@ -344,28 +344,12 @@ export const UI_TEXT = {
       ru: { one: "вмешательство", few: "вмешательства", many: "вмешательств" },
     },
   },
-  /** Аналитика: сравнение эталонных проектов при сборке сайта и раздел открытых галерей. */
-  statsSections: {
-    referenceHeading: { en: "Reference projects", ru: "Эталонные проекты" },
-    referenceIntro: {
-      en: "Projects the floor built from scratch with the same process, compared per build. Counted from the build recordings on this site.",
-      ru: "Проекты, которые цех собрал с нуля по одному процессу, — в пересчёте на сборку. Посчитано по записям сборок на этом сайте.",
-    },
-    durationPerBuild: { en: "Time per build on average", ru: "Время в среднем на сборку" },
-    tokensPerBuild: { en: "Tokens per build on average", ru: "Токены в среднем на сборку" },
-    reworksPerBuild: { en: "Reworks per build", ru: "Возвраты на сборку" },
-    human: {
-      en: "Human input: prompts and interventions",
-      ru: "Участие человека: промпты и вмешательства",
-    },
-    galleriesHeading: { en: "Open galleries", ru: "Открытые галереи" },
-  },
-  /** Галереи: примеры — эталонные проекты сайта над галереями пользователей. */
+  /** Галереи: примеры — проекты, которые цех собрал с нуля, — над галереями пользователей. */
   examples: {
     heading: { en: "Examples", ru: "Примеры" },
     intro: {
-      en: "Reference projects the floor built from scratch: every build can be watched on the floor.",
-      ru: "Эталонные проекты, которые цех собрал с нуля: каждую сборку можно посмотреть в цехе.",
+      en: "Example projects the floor built from scratch: every build can be watched on the floor.",
+      ru: "Проекты, которые цех собрал с нуля: каждую сборку можно посмотреть в цехе.",
     },
     userGalleriesHeading: { en: "User galleries", ru: "Галереи пользователей" },
   },
