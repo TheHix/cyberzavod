@@ -20,6 +20,7 @@ export { GithubMark } from "./github-mark/GithubMark.tsx";
 export { Panel } from "./panel/Panel.tsx";
 export { PixelPlaque } from "./pixel-plaque/PixelPlaque.tsx";
 export { codeBlockClass, Prose } from "./prose/Prose.tsx";
+export { ScrollArea } from "./scroll-area/ScrollArea.tsx";
 export { SegmentedControl, type SegmentOption } from "./segmented-control/SegmentedControl.tsx";
 export { Slider } from "./slider/Slider.tsx";
 export { StatList, type StatItem } from "./stat/Stat.tsx";

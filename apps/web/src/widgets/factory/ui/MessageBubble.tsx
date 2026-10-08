@@ -12,7 +12,7 @@ import { SpeechBubble } from "./SpeechBubble.tsx";
 interface Props {
   /** Графика цеха — переводит место говорящего в координаты пола; нет, пока не загрузилась. */
   graphics: FactoryGraphics | undefined;
-  /** Поле цеха, свободное от меню и HUD: пузырь раскрывается к его середине. */
+  /** Поле цеха, свободное от меню и HUD: пузырь не выходит за его края. */
   field: Frame;
 }
 
@@ -33,12 +33,18 @@ export function MessageBubble(props: Props): JSX.Element {
   return (
     <Show when={cue()}>
       {(current) => (
-        <SpeechBubble graphics={props.graphics} field={props.field} position={position()}>
+        <SpeechBubble
+          graphics={props.graphics}
+          field={props.field}
+          position={position()}
+          actions={
+            <Button variant="link" onClick={() => showMessageDetails(model, current().index)}>
+              {UI_TEXT.speech.more[locale]}
+            </Button>
+          }
+        >
           <Chip tone="sky">{routeOf(current().message, locale)}</Chip>
           <Title>{current().message.line}</Title>
-          <Button variant="link" onClick={() => showMessageDetails(model, current().index)}>
-            {UI_TEXT.speech.more[locale]}
-          </Button>
         </SpeechBubble>
       )}
     </Show>

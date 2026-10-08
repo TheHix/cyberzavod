@@ -2,6 +2,10 @@
    реплики меняются. Колонка не шире полки: иначе длинная метка распирает её под соседнее
    управление. */
 .dock {
+  /* Раскрытый промпт — указание с уточнениями — не выше этого: дальше он прокручивается, а поле
+     цеха остаётся. */
+  --details-max-height: 35dvh;
+
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-auto-rows: min-content;
@@ -16,4 +20,11 @@
   align-items: center;
   justify-content: space-between;
   min-height: var(--chip-height);
+}
+
+.details {
+  display: grid;
+  grid-auto-rows: max-content;
+  gap: var(--space-xs);
+  max-height: var(--details-max-height);
 }
