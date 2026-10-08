@@ -21,10 +21,16 @@ export const ru: CliMessages = {
   },
   commands: {
     init: {
-      usage: "init [--yes]",
-      summary: "подключить проект: мастер, конфиг, AGENTS.md, файлы агента",
+      usage: "init [--yes] [--id <id>] [--check <command>] [--journal <path>]",
+      summary: "подключить проект: конфиг, AGENTS.md, файлы агента",
       parameters: [
-        { name: "--yes, -y", description: "взять предложенные ответы, ничего не спрашивать" },
+        { name: "--yes, -y", description: "не спрашивать подтверждение" },
+        { name: "--id <id>", description: "id проекта; по умолчанию — имя пакета или каталога" },
+        {
+          name: "--check <command>",
+          description: "команда проверки, можно несколько; заменяет найденные",
+        },
+        { name: "--journal <path>", description: "каталог журнала от корня проекта" },
       ],
     },
     sync: {
@@ -111,30 +117,21 @@ export const ru: CliMessages = {
     },
   },
   init: {
-    rulesKept: (file) => `${file} уже есть — оставлен`,
-    rulesMoved: ({ from, to }) => `${from} перенесён в ${to}: правила проекта теперь там`,
-    rulesStarter: (file) => `${file} — заготовка правил проекта, заполните её`,
-    created: "Создано:",
-    ignoredEntry: (entry) => `.gitignore: ${entry}`,
-    journal: (path) => `Журнал проекта: ${path}`,
-    nextSteps:
-      "Закоммитьте .cyberzavod/, AGENTS.md, CLAUDE.md и .claude/: хуки запускают cyberzavod через npx, версией из конфига.\n" +
-      "Дальше: допишите правила в AGENTS.md и запускайте задачи через /feature в Claude Code.",
-  },
-  wizard: {
-    project: ({ name, root }) => `Проект: ${name} (${root})`,
-    languages: (values) => `Языки: ${values}`,
-    frameworks: (values) => `Фреймворки: ${values}`,
-    packageManager: (value) => `Менеджер пакетов: ${value}`,
-    git: (hasGit) => `Git: ${hasGit ? "есть" : "нет"}`,
-    scripts: (values) => `Скрипты: ${values}`,
-    nothingFound: "не найдены",
-    packageManagerMissing: "не найден",
-    projectIdQuestion: "Идентификатор проекта",
-    workflowQuestion: "Процесс",
-    modelQuestion: ({ title, agent }) => `Модель этапа «${title}» (агент ${agent})`,
-    journalQuestion: "Каталог журнала от корня проекта",
-    commandsQuestion: (separator) => `Команды проверки через «${separator}»`,
+    summaryTitle: "Cyberzavod подключит этот проект:",
+    projectId: (id) => `Id проекта: ${id}`,
+    checks: (commands) => `Проверки: ${commands}`,
+    checksMissing: (file) => `Проверки: не найдены — /setup или правка ${file}`,
+    rulesStarter: (file) => `Правила для агентов: ${file} — заготовка, допишите её`,
+    rulesMoved: ({ from, to }) => `Правила для агентов: ваш ${from} станет ${to}`,
+    rulesKept: (file) => `Правила для агентов: ${file} уже есть, не изменится`,
+    journal: (path) => `Журнал сессий: ${path}`,
+    files: (paths) => `Появятся: ${paths}`,
+    overrideHint: `Поменять: --id, --check, --journal — подробнее: ${CLI_COMMAND} init --help`,
+    confirm: "Продолжить? [Y/n]",
+    cancelled: "Отменено: ничего не записано",
+    done: "Готово: проект подключён.",
+    commit: (paths) => `Закоммитьте: ${paths}`,
+    nextSteps: "Дальше: откройте Claude Code и запустите /setup, затем /feature <задача>.",
   },
   sync: {
     written: "записаны",
@@ -202,6 +199,10 @@ export const ru: CliMessages = {
     projectNotFound: (directory) =>
       `${directory} не в проекте Cyberzavod: сначала ${CLI_COMMAND} init`,
     alreadyConnected: (file) => `${file} уже есть: проект подключён, используйте sync`,
+    blankOption: (option) => `${option} пуст: укажите значение`,
+    journalIsProjectRoot: (path) =>
+      `--journal ${path} — это корень проекта: укажите каталог журнала, например .cyberzavod/journal`,
+    absoluteJournal: (path) => `--journal — путь от корня проекта, а не абсолютный: ${path}`,
     invalidRecordId: (id) => `${id} не похож на id записи: только буквы, цифры, «_» и «-»`,
     recordMissing: ({ id, file }) => `в журнале нет записи ${id}: файла ${file} не существует`,
     recordInvalid: ({ id, reason }) => `запись ${id} не прошла проверку: ${reason}`,

@@ -365,6 +365,75 @@ describe("runCli", () => {
     });
   });
 
+  it("init с флагами --id, --check и --journal пишет заданное и не создаёт .gitignore", async () => {
+    const code = await runCli(
+      [
+        "init",
+        "--id",
+        "lab",
+        "--check",
+        "make check",
+        "--check",
+        "make e2e",
+        "--journal",
+        "../shop.cyberzavod",
+      ],
+      root,
+      NO_LOCALE,
+    );
+
+    const configText = await readFile(path.join(root, PROJECT_CONFIG_FILE), "utf8");
+    const config = parseProjectConfig(JSON.parse(configText));
+
+    expect({
+      code,
+      projectId: config.projectId,
+      commands: config.verification.commands,
+      journal: config.journal,
+      gitignore: await exists(path.join(root, ".gitignore")),
+    }).toEqual({
+      code: 0,
+      projectId: "lab",
+      commands: ["make check", "make e2e"],
+      journal: "../shop.cyberzavod",
+      gitignore: false,
+    });
+  });
+
+  it("init без --yes вне терминала подключает проект без вопроса", async () => {
+    const code = await runCli(["init"], root, NO_LOCALE);
+
+    expect({
+      code,
+      connected: await exists(path.join(root, PROJECT_CONFIG_FILE)),
+      asked: printedLog().includes(CLI_MESSAGES.en.init.confirm),
+    }).toEqual({ code: 0, connected: true, asked: false });
+  });
+
+  it.each([
+    ["--id", ["init", "--id", ""]],
+    ["--check", ["init", "--check", " "]],
+    ["--journal", ["init", "--journal", ""]],
+    ["--journal", ["init", "--journal", "/var/journal"]],
+  ])("init с неверным %s выходит с кодом 1 и ничего не пишет", async (option, args) => {
+    const code = await runCli(args, root, NO_LOCALE);
+
+    expect({
+      code,
+      error: printedError().startsWith(`cyberzavod init: ${option}`),
+      created: await exists(path.join(root, ".cyberzavod")),
+    }).toEqual({ code: 1, error: true, created: false });
+  });
+
+  it("init --yes в итоге зовёт закоммитить файлы и запустить /setup", async () => {
+    await runCli(["init", "--yes"], root, NO_LOCALE);
+
+    const output = printedLog();
+
+    expect(output).toContain("Commit: .cyberzavod/, AGENTS.md, CLAUDE.md, .claude/, .gitignore");
+    expect(output).toContain("/setup");
+  });
+
   it("init прячет от git сырые журналы", async () => {
     await runCli(["init", "--yes"], root, NO_LOCALE);
 

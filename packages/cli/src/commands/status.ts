@@ -13,7 +13,7 @@ import { DirectoryRecordStore, RECORD_COLLECTIONS, workflowOf } from "@cyberzavo
 import type { CommandError } from "../errors.ts";
 import { HARNESS_VERSION, type Installation } from "../installation/installation.ts";
 import type { CliMessages } from "../messages/cli-messages.ts";
-import { DEFAULT_AGENT } from "../wizard.ts";
+import { DEFAULT_AGENT } from "../initial-config.ts";
 import { requireProjectAt, type ProjectAt } from "./project.ts";
 
 function performerOf(

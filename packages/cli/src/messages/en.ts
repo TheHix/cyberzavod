@@ -22,9 +22,17 @@ export const en: CliMessages = {
   },
   commands: {
     init: {
-      usage: "init [--yes]",
-      summary: "set up the project: wizard, config, AGENTS.md, agent files",
-      parameters: [{ name: "--yes, -y", description: "take the suggested answers, ask nothing" }],
+      usage: "init [--yes] [--id <id>] [--check <command>] [--journal <path>]",
+      summary: "set up the project: config, AGENTS.md, agent files",
+      parameters: [
+        { name: "--yes, -y", description: "do not ask for confirmation" },
+        { name: "--id <id>", description: "project id; default: package or directory name" },
+        {
+          name: "--check <command>",
+          description: "check command, repeatable; replaces the detected ones",
+        },
+        { name: "--journal <path>", description: "journal directory from the project root" },
+      ],
     },
     sync: {
       usage: "sync [--check] [--force]",
@@ -110,30 +118,21 @@ export const en: CliMessages = {
     },
   },
   init: {
-    rulesKept: (file) => `${file} already exists — left as is`,
-    rulesMoved: ({ from, to }) => `${from} moved to ${to}: the project rules live there now`,
-    rulesStarter: (file) => `${file} — a starter set of project rules, fill it in`,
-    created: "Created:",
-    ignoredEntry: (entry) => `.gitignore: ${entry}`,
-    journal: (path) => `Project journal: ${path}`,
-    nextSteps:
-      "Commit .cyberzavod/, AGENTS.md, CLAUDE.md and .claude/: the hooks run cyberzavod through npx, at the version from the config.\n" +
-      "Next: finish the rules in AGENTS.md and start tasks with /feature in Claude Code.",
-  },
-  wizard: {
-    project: ({ name, root }) => `Project: ${name} (${root})`,
-    languages: (values) => `Languages: ${values}`,
-    frameworks: (values) => `Frameworks: ${values}`,
-    packageManager: (value) => `Package manager: ${value}`,
-    git: (hasGit) => `Git: ${hasGit ? "yes" : "no"}`,
-    scripts: (values) => `Scripts: ${values}`,
-    nothingFound: "none found",
-    packageManagerMissing: "not found",
-    projectIdQuestion: "Project id",
-    workflowQuestion: "Workflow",
-    modelQuestion: ({ title, agent }) => `Model for the “${title}” stage (agent ${agent})`,
-    journalQuestion: "Journal directory from the project root",
-    commandsQuestion: (separator) => `Check commands separated by “${separator}”`,
+    summaryTitle: "Cyberzavod will set up this project:",
+    projectId: (id) => `Project id: ${id}`,
+    checks: (commands) => `Checks: ${commands}`,
+    checksMissing: (file) => `Checks: none found — /setup or edit ${file}`,
+    rulesStarter: (file) => `Agent rules: ${file} — a starter set, fill it in`,
+    rulesMoved: ({ from, to }) => `Agent rules: your ${from} becomes ${to}`,
+    rulesKept: (file) => `Agent rules: ${file} already exists, it stays as is`,
+    journal: (path) => `Session journal: ${path}`,
+    files: (paths) => `Will appear: ${paths}`,
+    overrideHint: `Change: --id, --check, --journal — details: ${CLI_COMMAND} init --help`,
+    confirm: "Continue? [Y/n]",
+    cancelled: "Cancelled: nothing was written",
+    done: "Done: the project is set up.",
+    commit: (paths) => `Commit: ${paths}`,
+    nextSteps: "Next: open Claude Code and run /setup, then /feature <task>.",
   },
   sync: {
     written: "written",
@@ -201,6 +200,11 @@ export const en: CliMessages = {
     projectNotFound: (directory) =>
       `${directory} is not in a Cyberzavod project: run ${CLI_COMMAND} init first`,
     alreadyConnected: (file) => `${file} already exists: the project is set up, use sync`,
+    blankOption: (option) => `${option} is empty: give a value`,
+    journalIsProjectRoot: (path) =>
+      `--journal ${path} is the project root: give a directory for the journal, for example .cyberzavod/journal`,
+    absoluteJournal: (path) =>
+      `--journal must be a path from the project root, not an absolute one: ${path}`,
     invalidRecordId: (id) =>
       `${id} does not look like a recording id: only letters, digits, “_” and “-”`,
     recordMissing: ({ id, file }) =>

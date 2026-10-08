@@ -1,4 +1,4 @@
-// Тексты CLI для человека: справка, вопросы мастера, сводки и ошибки. Значение — строка или
+// Тексты CLI для человека: справка, сводки, подтверждение и ошибки. Значение — строка или
 // функция от того, что в неё подставляют; при двух и более параметрах — один объект с именованными
 // полями. Язык выбирает `languageOf`, наборы лежат в `en.ts` и `ru.ts`.
 
@@ -61,33 +61,27 @@ export interface HelpMessages {
   languageOption(languages: string): string;
 }
 
-/** Тексты команды `init`. */
+/** Тексты команды `init`: сводка перед вопросом, вопрос и итог. Строки сводки — без отступа. */
 export interface InitMessages {
-  rulesKept(file: string): string;
-  rulesMoved(params: { from: string; to: string }): string;
+  summaryTitle: string;
+  projectId(id: string): string;
+  /** Проверки, найденные или заданные флагом; `commands` — через запятую. */
+  checks(commands: string): string;
+  /** Проверок нет; `file` — конфиг проекта, куда их можно вписать. */
+  checksMissing(file: string): string;
   rulesStarter(file: string): string;
-  created: string;
-  ignoredEntry(entry: string): string;
+  rulesMoved(params: { from: string; to: string }): string;
+  rulesKept(file: string): string;
   journal(path: string): string;
+  /** Файлы, которые появятся; `paths` — через запятую. */
+  files(paths: string): string;
+  overrideHint: string;
+  confirm: string;
+  cancelled: string;
+  done: string;
+  /** Что закоммитить; `paths` — через запятую. */
+  commit(paths: string): string;
   nextSteps: string;
-}
-
-/** Тексты мастера: сводка найденного и вопросы. */
-export interface WizardMessages {
-  project(params: { name: string; root: string }): string;
-  languages(values: string): string;
-  frameworks(values: string): string;
-  packageManager(value: string): string;
-  git(hasGit: boolean): string;
-  scripts(values: string): string;
-  /** Что показать вместо пустого списка найденного. */
-  nothingFound: string;
-  packageManagerMissing: string;
-  projectIdQuestion: string;
-  workflowQuestion: string;
-  modelQuestion(params: { title: string; agent: string }): string;
-  journalQuestion: string;
-  commandsQuestion(separator: string): string;
 }
 
 /** Тексты команды `sync`. */
@@ -164,6 +158,9 @@ export interface ErrorMessages {
   unsupportedLanguage(params: { value: string; supported: string }): string;
   projectNotFound(directory: string): string;
   alreadyConnected(file: string): string;
+  blankOption(option: string): string;
+  absoluteJournal(path: string): string;
+  journalIsProjectRoot(path: string): string;
   invalidRecordId(id: string): string;
   recordMissing(params: { id: string; file: string }): string;
   recordInvalid(params: { id: string; reason: string }): string;
@@ -189,7 +186,6 @@ export interface CliMessages {
   help: HelpMessages;
   commands: Readonly<Record<CommandName, CommandHelp>>;
   init: InitMessages;
-  wizard: WizardMessages;
   sync: SyncMessages;
   status: StatusMessages;
   journal: JournalMessages;
