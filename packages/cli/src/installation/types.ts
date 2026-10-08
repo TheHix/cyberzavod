@@ -7,6 +7,4 @@ export interface Assets {
   harness: HarnessFiles;
   /** Шаблоны по имени файла. */
   templates: Readonly<Record<string, string>>;
-  /** Текст собранного CLI; undefined — CLI запущен из исходников. */
-  tool: string | undefined;
 }

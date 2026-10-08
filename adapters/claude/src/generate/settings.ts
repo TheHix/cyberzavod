@@ -1,8 +1,9 @@
 // Хуки адаптера в `.claude/settings.json` проекта. Настройки принадлежат проекту: адаптер
-// заменяет только свои обработчики — их команда запускает CLI из проекта
-// (`.cyberzavod/bin/cyberzavod.mjs`) — и дописывает свои запреты, остальное оставляет как есть.
+// заменяет только свои обработчики — их команда запускает пакет через npx той версии, что
+// записана в конфиге, — и дописывает свои запреты, остальное оставляет как есть.
 
-import { TOOL_FILE } from "@cyberzavod/storage";
+import { LEGACY_TOOL_FILE } from "@cyberzavod/storage";
+import { PACKAGE_NAME } from "../cli-command.ts";
 import type { HookName } from "../hooks/index.ts";
 
 /** Обработчик хука Claude Code. */
@@ -41,27 +42,62 @@ export const ADAPTER_DENY = [
   "Edit(**/capture/claude/raw/**)",
 ] as const;
 
+// --prefer-offline и --fetch-retries=0: пакет в кэше npm берётся без обращения к registry, а без
+// сети и кэша npx падает сразу, а не через минуты. --prefix от $CLAUDE_PROJECT_DIR, а не от
+// текущего каталога (сессия могла сделать cd): пакет из node_modules проекта найдётся из любого
+// подкаталога. Кавычки — ради пробелов в пути.
+const HOOK_RUNNER = 'npx -y --prefer-offline --fetch-retries=0 --prefix "$CLAUDE_PROJECT_DIR"';
+
+// Запись и начало хода без сети молча пропускаются.
+const SKIP_ON_FAILURE = "true";
+
+// Запасной путь срабатывает и когда хук остановки упал внутри, поэтому текст не обещает причину.
+// Без апострофов: команда лежит в одинарных кавычках.
+const STOP_FAILURE_MESSAGE =
+  "Cyberzavod: the stop hook failed or could not start (for example, npx without network). Project checks were skipped.";
+
+function stopFailureCommand(): string {
+  return `echo '${JSON.stringify({ systemMessage: STOP_FAILURE_MESSAGE })}'`;
+}
+
+// Флаги npx между `npx` и пакетом в следующих версиях могут измениться: хуки прежних версий
+// узнаются по пакету и имени хука, а не по полному началу команды.
+const NPX_HANDLER_PATTERN = new RegExp(`^npx\\s.*\\s${PACKAGE_NAME}@\\S+ hook `);
+
 function isOwnHandler(handler: HookHandler): boolean {
-  return handler.command.includes(TOOL_FILE);
+  const isNpxHandler = NPX_HANDLER_PATTERN.test(handler.command);
+  const isLegacyHandler = handler.command.includes(LEGACY_TOOL_FILE);
+
+  return isNpxHandler || isLegacyHandler;
 }
 
-// От $CLAUDE_PROJECT_DIR, а не от текущего каталога: сессия могла сделать cd. Кавычки — ради
-// пробелов в пути; такую запись понимают и Git Bash, и PowerShell, которыми Claude Code
-// запускает хуки на Windows.
-function hookCommand(hook: HookName): string {
-  return `node "$CLAUDE_PROJECT_DIR/${TOOL_FILE}" hook ${hook}`;
+// `|| …` срабатывает на любой ненулевой код, поэтому запасной путь — только для «npx не
+// запустился»: остановка блокирует JSON-решением с кодом 0, а не кодом 2. Синтаксис POSIX: на
+// Windows Claude Code запускает хуки через Git Bash, PowerShell не поддерживается.
+function hookCommand(version: string, hook: HookName, onFailure: string): string {
+  return `${HOOK_RUNNER} ${PACKAGE_NAME}@${version} hook ${hook} || ${onFailure}`;
 }
 
-function adapterHooks(): AdapterHooks {
-  const record: HookHandler = { type: "command", command: hookCommand("record"), async: true };
+/**
+ * Обработчики адаптера для версии Cyberzavod из конфига проекта: запись сессии на каждом событии,
+ * начало хода и проверки при остановке.
+ * @param {string} version Версия Cyberzavod из конфига проекта.
+ * @returns {AdapterHooks} Обработчики по событиям.
+ */
+export function adapterHooks(version: string): AdapterHooks {
+  const record: HookHandler = {
+    type: "command",
+    command: hookCommand(version, "record", SKIP_ON_FAILURE),
+    async: true,
+  };
   const turnStart: HookHandler = {
     type: "command",
-    command: hookCommand("turn-start"),
+    command: hookCommand(version, "turn-start", SKIP_ON_FAILURE),
     timeout: TURN_START_TIMEOUT_SECONDS,
   };
   const stopGate: HookHandler = {
     type: "command",
-    command: hookCommand("stop"),
+    command: hookCommand(version, "stop", stopFailureCommand()),
     timeout: STOP_GATE_TIMEOUT_SECONDS,
     statusMessage: "Запускаю проверки проекта…",
   };
@@ -77,9 +113,6 @@ function adapterHooks(): AdapterHooks {
     Stop: [{ hooks: [record, stopGate] }],
   };
 }
-
-/** Обработчики адаптера: запись сессии на каждом событии, начало хода и проверки при остановке. */
-export const ADAPTER_HOOKS: AdapterHooks = adapterHooks();
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

@@ -138,7 +138,6 @@ export interface ErrorMessages {
   unsupportedLanguage(params: { value: string; supported: string }): string;
   projectNotFound(directory: string): string;
   alreadyConnected(file: string): string;
-  toolFromSources: string;
   invalidRecordId(id: string): string;
   recordMissing(params: { id: string; file: string }): string;
   recordInvalid(params: { id: string; reason: string }): string;

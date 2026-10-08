@@ -1,6 +1,6 @@
 // Английские тексты CLI.
 
-import { HOOK_NAMES } from "@cyberzavod/adapter-claude";
+import { CLI_COMMAND, HOOK_NAMES } from "@cyberzavod/adapter-claude";
 import type { CliMessages } from "./cli-messages.ts";
 
 /** Тексты CLI на английском. */
@@ -76,7 +76,7 @@ export const en: CliMessages = {
     ignoredEntry: (entry) => `.gitignore: ${entry}`,
     journal: (path) => `Project journal: ${path}`,
     nextSteps:
-      "Commit .cyberzavod/, AGENTS.md, CLAUDE.md and .claude/: the hooks run the CLI from the project.\n" +
+      "Commit .cyberzavod/, AGENTS.md, CLAUDE.md and .claude/: the hooks run cyberzavod through npx, at the version from the config.\n" +
       "Next: finish the rules in AGENTS.md and start tasks with /feature in Claude Code.",
   },
   wizard: {
@@ -102,7 +102,7 @@ export const en: CliMessages = {
     extra: "extra",
     harnessMismatch: ({ file, configVersion, cliVersion }) =>
       `${file}: harness ${configVersion}, but the CLI is ${cliVersion}`,
-    filesOutdated: "Agent files are outdated: run cyberzavod sync",
+    filesOutdated: `Agent files are outdated: run ${CLI_COMMAND} sync`,
   },
   status: {
     recordTypes: { session: "sessions", decision: "decisions", note: "notes" },
@@ -111,7 +111,7 @@ export const en: CliMessages = {
     project: ({ id, root }) => `Project: ${id} (${root})`,
     harness: (version) => `Harness: ${version}`,
     harnessOutdated: ({ version, cliVersion }) =>
-      `Harness: ${version} (CLI is ${cliVersion}, run cyberzavod sync)`,
+      `Harness: ${version} (CLI is ${cliVersion}, run ${CLI_COMMAND} sync)`,
     workflow: (name) => `Workflow: ${name}`,
     checks: (commands) => `Checks: ${commands}`,
     journal: ({ path, counts }) => `Journal: ${path} — ${counts}`,
@@ -132,17 +132,17 @@ export const en: CliMessages = {
     replaced: (id) => `recording ${id} replaced`,
     link: (url) => `link: ${url}`,
     galleryClosed: "the gallery is closed: the recording is visible only by this link",
-    openGalleryHint: "open the gallery: cyberzavod gallery --public",
+    openGalleryHint: `open the gallery: ${CLI_COMMAND} gallery --public`,
     removed: (id) => `recording ${id} removed from the gallery`,
     galleryRecordings: ({ count, limit }) => `Recordings in the gallery (${count} of ${limit}):`,
-    freeUpSpace: "Free up space with cyberzavod unshare <id>",
+    freeUpSpace: `Free up space with ${CLI_COMMAND} unshare <id>`,
   },
   gallery: {
     closed: (login) => `${login}'s gallery: closed, recordings are visible only by links`,
     open: (login) => `${login}'s gallery: open`,
     recordings: ({ count, limit }) => `Recordings: ${count} of ${limit}`,
-    openHint: "Open the gallery: cyberzavod gallery --public",
-    closeHint: "Close the gallery: cyberzavod gallery --private",
+    openHint: `Open the gallery: ${CLI_COMMAND} gallery --public`,
+    closeHint: `Close the gallery: ${CLI_COMMAND} gallery --private`,
     page: (url) => `Gallery page: ${url}`,
     badge: (markdown) => `README badge: ${markdown}`,
   },
@@ -155,10 +155,8 @@ export const en: CliMessages = {
     unsupportedLanguage: ({ value, supported }) =>
       `language “${value}” is not supported: available are ${supported}`,
     projectNotFound: (directory) =>
-      `${directory} is not in a Cyberzavod project: run cyberzavod init first`,
+      `${directory} is not in a Cyberzavod project: run ${CLI_COMMAND} init first`,
     alreadyConnected: (file) => `${file} already exists: the project is set up, use sync`,
-    toolFromSources:
-      "the CLI is running from sources: build it (pnpm cyberzavod) and run the built one",
     invalidRecordId: (id) =>
       `${id} does not look like a recording id: only letters, digits, “_” and “-”`,
     recordMissing: ({ id, file }) =>
@@ -167,12 +165,12 @@ export const en: CliMessages = {
     recordNotSession: ({ id, type }) =>
       `recording ${id} failed validation: its type is ${type}, a session is required`,
     galleryAccessConflict: "--public and --private cannot be combined: pick one",
-    notLoggedIn: "not signed in: sign in with cyberzavod login",
-    tokenRejected: "the server did not accept the token: sign in again with cyberzavod login",
+    notLoggedIn: `not signed in: sign in with ${CLI_COMMAND} login`,
+    tokenRejected: `the server did not accept the token: sign in again with ${CLI_COMMAND} login`,
     limitReached: "the gallery already holds the maximum number of recordings",
     credentialsCorrupt: (file) =>
-      `the file ${file} is corrupted: sign in again with cyberzavod login`,
-    loginCodeExpired: "the sign-in code expired: run cyberzavod login again",
+      `the file ${file} is corrupted: sign in again with ${CLI_COMMAND} login`,
+    loginCodeExpired: `the sign-in code expired: run ${CLI_COMMAND} login again`,
     loginDenied: "sign-in was denied on the GitHub page",
     noConnection: ({ origin, reason }) => `cannot reach ${origin}: ${reason}`,
     githubUnexpectedField: (name) => `GitHub returned an unexpected response: no field ${name}`,

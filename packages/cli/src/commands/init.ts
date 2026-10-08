@@ -4,20 +4,14 @@
 import { rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { syncClaude } from "@cyberzavod/adapter-claude";
-import {
-  PROJECT_CONFIG_FILE,
-  readProjectConfig,
-  TOOL_FILE,
-  writeProjectConfig,
-} from "@cyberzavod/storage";
+import { PROJECT_CONFIG_FILE, readProjectConfig, writeProjectConfig } from "@cyberzavod/storage";
 import { detectProject } from "../detect.ts";
 import { CommandError } from "../errors.ts";
 import { readOptionalText } from "../files.ts";
-import { HARNESS_VERSION, toolOf, type Installation } from "../installation/installation.ts";
+import { HARNESS_VERSION, type Installation } from "../installation/installation.ts";
 import type { CliMessages } from "../messages/cli-messages.ts";
 import { askProjectConfig, describeDetected, type Prompter } from "../wizard.ts";
 import { ignoreCapture } from "./gitignore.ts";
-import { updateToolFile } from "./tool-file.ts";
 
 const RULES_FILE = "AGENTS.md";
 const LEGACY_ENTRYPOINT = "CLAUDE.md";
@@ -71,7 +65,7 @@ interface CreatedReport {
 }
 
 function printCreated({ rules, files, ignored, messages }: CreatedReport): void {
-  console.log(`\n${messages.init.created}\n  ${PROJECT_CONFIG_FILE}\n  ${TOOL_FILE}\n  ${rules}`);
+  console.log(`\n${messages.init.created}\n  ${PROJECT_CONFIG_FILE}\n  ${rules}`);
 
   for (const file of files) console.log(`  ${file}`);
 
@@ -97,7 +91,7 @@ export interface InitOptions {
  * @param {string} root Корень проекта — каталог, из которого запущена команда.
  * @param {InitOptions} options Кто отвечает на вопросы мастера, версия Cyberzavod, сообщения.
  * @returns {Promise<void>} Готово, когда всё записано.
- * @throws {CommandError} Если проект уже подключён или CLI запущен из исходников.
+ * @throws {CommandError} Если проект уже подключён.
  */
 export async function initProject(root: string, options: InitOptions): Promise<void> {
   const { prompter, installation, messages } = options;
@@ -107,7 +101,6 @@ export async function initProject(root: string, options: InitOptions): Promise<v
     throw new CommandError((m) => m.errors.alreadyConnected(PROJECT_CONFIG_FILE));
   }
 
-  const tool = toolOf(installation);
   const detected = await detectProject(root);
 
   for (const line of describeDetected(root, detected, messages)) console.log(line);
@@ -130,8 +123,6 @@ export async function initProject(root: string, options: InitOptions): Promise<v
     commands: config.verification.commands,
     messages,
   });
-
-  await updateToolFile(root, tool);
 
   const ignored = await ignoreCapture(root, config.journal);
   const report = await syncClaude({

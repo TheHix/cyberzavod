@@ -24,7 +24,7 @@ format: ## Привести код к стилю: Prettier и ESLint --fix дл�
 
 check: check-web check-api check-docker check-scripts ## Все проверки: то же, что запускает CI
 
-# Сверка файлов агента и вендоренного CLI со сборкой — здесь, а не в check-scripts: сборке нужны
+# Сверка файлов агента со сборкой — здесь, а не в check-scripts: сборке нужны
 # Node и зависимости workspace, а job scripts их не ставит. `pnpm -r run check` собирает CLI.
 check-web: ## Стиль, типы, тесты и сборка фронта и пакетов, файлы агента совпадают с harness
 	pnpm lint

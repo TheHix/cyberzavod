@@ -73,11 +73,11 @@ describe("syncClaude", () => {
     expect({
       changed: report.changed.includes("src/CLAUDE.md"),
       agent: await exists(".claude/agents/coder.md"),
-      hook: settings.includes(".cyberzavod/bin/cyberzavod.mjs"),
+      hook: settings.includes("cyberzavod@0.3.0 hook record"),
     }).toEqual({ changed: true, agent: true, hook: true });
   });
 
-  it("зовёт в текстах CLI, который лежит в проекте", async () => {
+  it("зовёт в текстах CLI той версии, что в конфиге", async () => {
     await sync();
 
     const skill = await readFile(
@@ -85,7 +85,7 @@ describe("syncClaude", () => {
       "utf8",
     );
 
-    expect(skill).toContain("`node .cyberzavod/bin/cyberzavod.mjs draft`");
+    expect(skill).toContain("`npx cyberzavod@0.3.0 draft`");
   });
 
   it("в режиме проверки ничего не пишет и называет устаревшие файлы", async () => {

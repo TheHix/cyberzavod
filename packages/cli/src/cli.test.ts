@@ -1,23 +1,13 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseProjectConfig } from "@cyberzavod/core";
-import { PROJECT_CONFIG_FILE, TOOL_FILE } from "@cyberzavod/storage";
+import { LEGACY_TOOL_FILE, PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
 import { runCli } from "./cli.ts";
+import { HARNESS_VERSION } from "./installation/installation.ts";
 import type { Environment } from "./messages/language.ts";
-
-// Из исходников CLI собранного себя не знает; тесту хватает любого текста на его месте.
-const BUILT_TOOL = "// собранный cyberzavod\n";
-
-vi.mock("./installation/assets.ts", async (importOriginal) => {
-  const original = await importOriginal<typeof import("./installation/assets.ts")>();
-
-  return {
-    readAssets: async () => ({ ...(await original.readAssets()), tool: BUILT_TOOL }),
-  };
-});
 
 const SESSION_ID = "cli-test-hook-language";
 const EN_TITLE = "Cyberzavod — an AI-agent development process, local-first.";
@@ -43,6 +33,13 @@ function printedLog(): string {
 
 function printedError(): string {
   return vi.mocked(console.error).mock.calls.join("\n");
+}
+
+async function exists(file: string): Promise<boolean> {
+  return access(file).then(
+    () => true,
+    () => false,
+  );
 }
 
 async function journalFiles(collection: string): Promise<string[]> {
@@ -145,14 +142,14 @@ describe("runCli", () => {
       ["status"],
       { CYBERZAVOD_LANG: "ru" },
       (root: string) =>
-        `cyberzavod status: ${root} не в проекте Cyberzavod: сначала cyberzavod init`,
+        `cyberzavod status: ${root} не в проекте Cyberzavod: сначала npx cyberzavod init`,
     ],
     [
       "по флагу поверх переменной",
       ["status", "--lang", "en"],
       { CYBERZAVOD_LANG: "ru" },
       (root: string) =>
-        `cyberzavod status: ${root} is not in a Cyberzavod project: run cyberzavod init first`,
+        `cyberzavod status: ${root} is not in a Cyberzavod project: run npx cyberzavod init first`,
     ],
   ])("ошибка команды печатается на выбранном языке %s", async (_name, argv, env, expected) => {
     await runCli(argv, root, env);
@@ -177,14 +174,14 @@ describe("runCli", () => {
     expect(systemMessage.startsWith(start)).toBe(true);
   });
 
-  it("справка называет команды публикации", async () => {
+  it("справка называет команды публикации и начинается с npx", async () => {
     await runCli([], root, NO_LOCALE);
 
     const help = printedLog();
 
     expect(
       ["login", "logout", "share", "unshare", "gallery"].map((name) =>
-        help.includes(`cyberzavod ${name}`),
+        help.includes(`npx cyberzavod ${name}`),
       ),
     ).toEqual([true, true, true, true, true]);
   });
@@ -227,16 +224,23 @@ describe("runCli", () => {
     });
   });
 
-  it("init кладёт в проект собранный CLI и прячет от git сырые журналы", async () => {
+  it("init прячет от git сырые журналы", async () => {
     await runCli(["init", "--yes"], root, NO_LOCALE);
 
-    const tool = await readFile(path.join(root, TOOL_FILE), "utf8");
     const gitignore = await readFile(path.join(root, ".gitignore"), "utf8");
 
-    expect({ tool, gitignore }).toEqual({
-      tool: BUILT_TOOL,
-      gitignore: "/.cyberzavod/journal/capture/\n",
-    });
+    expect(gitignore).toBe("/.cyberzavod/journal/capture/\n");
+  });
+
+  it("init не кладёт CLI в проект, а хуки зовут его через npx", async () => {
+    await runCli(["init", "--yes"], root, NO_LOCALE);
+
+    const settings = await readFile(path.join(root, ".claude/settings.json"), "utf8");
+
+    expect({
+      binDirectory: await exists(path.join(root, ".cyberzavod/bin")),
+      hooks: settings.includes(`cyberzavod@${HARNESS_VERSION} hook record`),
+    }).toEqual({ binDirectory: false, hooks: true });
   });
 
   it("переносит написанный человеком CLAUDE.md в AGENTS.md", async () => {
@@ -277,6 +281,78 @@ describe("runCli", () => {
     const code = await runCli(["sync", "--check"], root, NO_LOCALE);
 
     expect(code).toBe(0);
+  });
+
+  it("sync --check находит CLI прежних версий", async () => {
+    await initialized();
+    const legacyFile = path.join(root, ...LEGACY_TOOL_FILE.split("/"));
+
+    await mkdir(path.dirname(legacyFile), { recursive: true });
+    await writeFile(legacyFile, "// cyberzavod прежних версий\n");
+
+    const code = await runCli(["sync", "--check"], root, NO_LOCALE);
+
+    expect({ code, reported: printedLog().includes(LEGACY_TOOL_FILE) }).toEqual({
+      code: 1,
+      reported: true,
+    });
+  });
+
+  it("sync удаляет CLI прежних версий и пустой каталог bin", async () => {
+    await initialized();
+    const legacyFile = path.join(root, ...LEGACY_TOOL_FILE.split("/"));
+
+    await mkdir(path.dirname(legacyFile), { recursive: true });
+    await writeFile(legacyFile, "// cyberzavod прежних версий\n");
+
+    await runCli(["sync"], root, NO_LOCALE);
+
+    expect({
+      binDirectory: await exists(path.dirname(legacyFile)),
+      reported: printedLog().includes(LEGACY_TOOL_FILE),
+    }).toEqual({ binDirectory: false, reported: true });
+  });
+
+  it("sync не трогает каталог bin, если в нём лежит чужой файл", async () => {
+    await initialized();
+    const legacyFile = path.join(root, ...LEGACY_TOOL_FILE.split("/"));
+    const foreignFile = path.join(path.dirname(legacyFile), "other.sh");
+
+    await mkdir(path.dirname(legacyFile), { recursive: true });
+    await writeFile(legacyFile, "// cyberzavod прежних версий\n");
+    await writeFile(foreignFile, "echo\n");
+
+    await runCli(["sync"], root, NO_LOCALE);
+
+    expect({ legacy: await exists(legacyFile), foreign: await exists(foreignFile) }).toEqual({
+      legacy: false,
+      foreign: true,
+    });
+  });
+
+  it("sync поднимает версию в конфиге и хуках", async () => {
+    await initialized();
+    const configFile = path.join(root, PROJECT_CONFIG_FILE);
+    const settingsFile = path.join(root, ".claude/settings.json");
+    const config = JSON.parse(await readFile(configFile, "utf8")) as object;
+    const settings = await readFile(settingsFile, "utf8");
+
+    await writeFile(configFile, JSON.stringify({ ...config, harness: "0.7.1" }));
+    await writeFile(
+      settingsFile,
+      settings.replaceAll(`cyberzavod@${HARNESS_VERSION}`, "cyberzavod@0.7.1"),
+    );
+
+    await runCli(["sync"], root, NO_LOCALE);
+
+    const synced = parseProjectConfig(JSON.parse(await readFile(configFile, "utf8")));
+    const syncedSettings = await readFile(settingsFile, "utf8");
+
+    expect({
+      harness: synced.harness,
+      hooks: syncedSettings.includes(`cyberzavod@${HARNESS_VERSION} hook record`),
+      stale: syncedSettings.includes("cyberzavod@0.7.1"),
+    }).toEqual({ harness: HARNESS_VERSION, hooks: true, stale: false });
   });
 
   it("decision и note пишут записи в журнал проекта", async () => {

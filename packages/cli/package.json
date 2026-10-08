@@ -1,6 +1,6 @@
 {
   "name": "cyberzavod",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Local-first, model-agnostic development harness for AI coding agents: process, checks and a journal of sessions in your repository.",
   "license": "MIT",
   "author": {
@@ -32,7 +32,8 @@
   },
   "scripts": {
     "build": "node scripts/build.ts",
-    "prepack": "node scripts/build.ts && node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\"",
+    "prepare": "node scripts/build.ts",
+    "prepack": "node -e \"require('node:fs').copyFileSync('../../LICENSE', 'LICENSE')\"",
     "check": "tsc -p . && vitest run && node scripts/build.ts"
   },
   "devDependencies": {

@@ -1,13 +1,11 @@
-// Запущенная версия Cyberzavod: версия, harness, шаблоны и собранный CLI, который команды кладут
-// в проект.
+// Запущенная версия Cyberzavod: версия, harness и шаблоны.
 
 import type { ClaudeTemplates } from "@cyberzavod/adapter-claude";
 import { parseHarness, type Harness, type HarnessError } from "@cyberzavod/core";
-import { CommandError } from "../errors.ts";
 import { readAssets } from "./assets.ts";
 
 /** Версия Cyberzavod: её ставит в конфиг проекта этот CLI, она же — версия npm-пакета. */
-export const HARNESS_VERSION = "0.7.1";
+export const HARNESS_VERSION = "0.8.0";
 
 const RULES_TEMPLATE = "rules.md";
 
@@ -17,8 +15,6 @@ export interface Installation {
   /** Заготовка AGENTS.md нового проекта. */
   rulesTemplate: string;
   claudeTemplates: ClaudeTemplates;
-  /** Текст собранного CLI; undefined — CLI запущен из исходников. */
-  tool: string | undefined;
 }
 
 function template(templates: Readonly<Record<string, string>>, name: string): string {
@@ -31,11 +27,11 @@ function template(templates: Readonly<Record<string, string>>, name: string): st
 
 /**
  * Читает запущенную версию Cyberzavod.
- * @returns {Promise<Installation>} Harness, шаблоны и собранный CLI.
+ * @returns {Promise<Installation>} Harness и шаблоны.
  * @throws {HarnessError} Если harness установки не прошёл проверку.
  */
 export async function readInstallation(): Promise<Installation> {
-  const { harness, templates, tool } = await readAssets();
+  const { harness, templates } = await readAssets();
 
   return {
     harness: parseHarness(harness),
@@ -44,20 +40,5 @@ export async function readInstallation(): Promise<Installation> {
       publishRecording: template(templates, "publish-recording.md"),
       recordingEditor: template(templates, "recording-editor.md"),
     },
-    tool,
   };
-}
-
-/**
- * Собранный CLI, который кладут в проект: без него хукам нечего запускать.
- * @param {Installation} installation Запущенная версия.
- * @returns {string} Текст собранного CLI.
- * @throws {CommandError} Если CLI запущен из исходников.
- */
-export function toolOf(installation: Installation): string {
-  if (installation.tool === undefined) {
-    throw new CommandError((messages) => messages.errors.toolFromSources);
-  }
-
-  return installation.tool;
 }

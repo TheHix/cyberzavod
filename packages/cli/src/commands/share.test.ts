@@ -177,7 +177,7 @@ describe("shareRecording", () => {
 
     const act = () => shareRecording(sharing, { directory: root, id: SESSION_ID, messages });
 
-    await expect(act()).rejects.toThrow(/not signed in: sign in with cyberzavod login/);
+    await expect(act()).rejects.toThrow(/not signed in: sign in with npx cyberzavod login/);
     expect(sharing.api.uploadRecording).not.toHaveBeenCalled();
   });
 

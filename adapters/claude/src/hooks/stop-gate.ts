@@ -1,9 +1,11 @@
 // Хук Stop: если агент в этом ходе менял код, он не может закончить, пока проверки проекта
 // красные. Нет конфига или команд проверок — агент отпускается без проверок; битый конфиг —
-// отпускается с сообщением. Код выхода 2 возвращает агента к работе, а stderr он получает как
-// задание. Защита от вечного цикла: после MAX_BLOCKS отказов за ход агент отпускается, зовёт
-// человека и оставляет отметку `human-call` для записи сессии; если счётчик не удаётся записать,
-// агент тоже отпускается. Счётчик обнуляет начало хода, поэтому здесь он только растёт.
+// отпускается с сообщением. Возвращает агента к работе JSON-решение `block` с кодом выхода 0:
+// ненулевой код хуки адаптера читают как «npx не запустился» и отпускают агента (см.
+// generate/settings.ts), поэтому код 2 здесь не годится. Защита от вечного цикла: после
+// MAX_BLOCKS отказов за ход агент отпускается, зовёт человека и оставляет отметку `human-call`
+// для записи сессии; если счётчик не удаётся записать, агент тоже отпускается. Счётчик обнуляет
+// начало хода, поэтому здесь он только растёт.
 
 import { readFile, rm, writeFile } from "node:fs/promises";
 import {
@@ -21,8 +23,7 @@ import { hookStatePath, type HookStateName } from "./state.ts";
 
 const MAX_BLOCKS = 3;
 const OUTPUT_TAIL_LINES = 40;
-const BLOCK_EXIT_CODE = 2;
-const RELEASE_EXIT_CODE = 0;
+const SUCCESS_EXIT_CODE = 0;
 
 /** Решение хука остановки. */
 type StopVerdict =
@@ -207,12 +208,16 @@ async function outcomeOf(session: StopSession, verdict: StopVerdict): Promise<Ho
       await endTurn(session);
 
       return {
-        exitCode: RELEASE_EXIT_CODE,
+        exitCode: SUCCESS_EXIT_CODE,
         stdout: `${JSON.stringify({ systemMessage: verdict.message })}\n`,
         stderr: "",
       };
     case "block":
-      return { exitCode: BLOCK_EXIT_CODE, stdout: "", stderr: verdict.message };
+      return {
+        exitCode: SUCCESS_EXIT_CODE,
+        stdout: `${JSON.stringify({ decision: "block", reason: verdict.message })}\n`,
+        stderr: "",
+      };
   }
 }
 

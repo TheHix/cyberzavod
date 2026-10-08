@@ -18,6 +18,7 @@
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^24.19.1",
     "@vitest/eslint-plugin": "^1.6.27",
+    "cyberzavod": "workspace:*",
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-astro": "^3.2.1",
