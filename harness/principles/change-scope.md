@@ -1,6 +1,6 @@
-## Объём изменений
+## Change scope
 
-- Делай то, о чём задача, и не больше. Замеченное по пути, но не относящееся к задаче, называй в отчёте, а не чини молча.
-- Не сохраняй старое ради старого: если изменение делает код ненужным, удали его, без слоёв совместимости, которые никто не просил.
-- Небольшие связные коммиты: один коммит — одно законченное изменение, проверки зелёные.
-- Развилку, которую не решить по коду и правилам проекта, не решай сам — спроси человека.
+- Do what the task is about, and no more. Name what you noticed along the way but is unrelated to the task in the report, rather than quietly fixing it.
+- Do not keep the old for the sake of the old: if a change makes code unnecessary, delete it, without compatibility layers nobody asked for.
+- Small cohesive commits: one commit is one complete change, with the checks green.
+- A fork that cannot be resolved from the code and the project rules is not yours to resolve — ask the human.

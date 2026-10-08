@@ -12,6 +12,7 @@ import { GenerateError } from "./claude.ts";
 import {
   claudeFiles,
   GENERATED_MARK,
+  LEGACY_GENERATED_MARK,
   type ClaudeProject,
   type ClaudeTemplates,
   type GeneratedFile,
@@ -172,7 +173,7 @@ function withUnixNewlines(text: string): string {
 }
 
 function isGenerated(text: string): boolean {
-  return text.includes(GENERATED_MARK);
+  return text.includes(GENERATED_MARK) || text.includes(LEGACY_GENERATED_MARK);
 }
 
 function ignoreMissing(err: unknown): string[] {

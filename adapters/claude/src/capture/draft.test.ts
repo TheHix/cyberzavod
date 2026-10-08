@@ -1063,7 +1063,7 @@ describe("publishBuild", () => {
         t: 3_000,
         type: "stage_fail",
         stage: "verification",
-        reason: "проверки не прошли",
+        reason: "checks failed",
         project: "cyberzavod",
       },
     );

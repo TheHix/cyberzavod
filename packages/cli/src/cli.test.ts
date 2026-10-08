@@ -18,6 +18,9 @@ const RU_TITLE = "Cyberzavod — процесс разработки с ИИ-а�
 const SCREEN_ROWS = 24;
 const SCREEN_COLUMNS = 80;
 
+// Всё, что init кладёт в проект, пишется по-английски: язык человека выбирает только CLI.
+const CYRILLIC = /\p{Script=Cyrillic}/u;
+
 // Окружение без языковых переменных: язык сообщений — английский.
 const NO_LOCALE: Environment = {};
 
@@ -45,6 +48,14 @@ async function exists(file: string): Promise<boolean> {
     () => true,
     () => false,
   );
+}
+
+async function filesUnder(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { recursive: true, withFileTypes: true });
+
+  return entries
+    .filter((entry) => entry.isFile())
+    .map((entry) => path.join(entry.parentPath, entry.name));
 }
 
 async function journalFiles(collection: string): Promise<string[]> {
@@ -362,6 +373,27 @@ describe("runCli", () => {
       commands: ["npm run test"],
       rules: true,
       imports: true,
+    });
+  });
+
+  it("init пишет файлы без кириллицы", async () => {
+    // Без package.json проверки не найдены, и в AGENTS.md попадает заглушка starterRules.
+    await rm(path.join(root, "package.json"));
+
+    const code = await runCli(["init", "--yes"], root, { CYBERZAVOD_LANG: "ru" });
+
+    const files = await filesUnder(root);
+    const contents = await Promise.all(
+      files.map(async (file) => ({ file, text: await readFile(file, "utf8") })),
+    );
+    const withCyrillic = contents
+      .filter(({ text }) => CYRILLIC.test(text))
+      .map(({ file }) => path.relative(root, file));
+
+    expect({ code, hasRules: await exists(path.join(root, "AGENTS.md")), withCyrillic }).toEqual({
+      code: 0,
+      hasRules: true,
+      withCyrillic: [],
     });
   });
 
