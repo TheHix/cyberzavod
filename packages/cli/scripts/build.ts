@@ -1,5 +1,5 @@
 // Сборка npm-пакета: CLI со всеми пакетами монорепозитория, harness и шаблонами — в один файл
-// без зависимостей. Этот же файл init и sync кладут в проект, и хуки запускают его оттуда.
+// без зависимостей. Файл публикует npm, а запускает npx.
 
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
@@ -38,21 +38,17 @@ async function readTemplates(): Promise<Record<string, string>> {
   return templates;
 }
 
-// Собранный CLI знает себя сам: читает свой файл, чтобы положить его в проект.
 async function embeddedAssetsModule(): Promise<string> {
   const harnessFiles = await readHarnessFiles(HARNESS_DIRECTORY);
   const templateFiles = await readTemplates();
   const harness = sortedByName(harnessFiles);
   const templates = sortedByName(templateFiles);
 
-  return `import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-
-const harness = ${JSON.stringify(harness)};
+  return `const harness = ${JSON.stringify(harness)};
 const templates = ${JSON.stringify(templates)};
 
 export async function readAssets() {
-  return { harness, templates, tool: readFileSync(fileURLToPath(import.meta.url), "utf8") };
+  return { harness, templates };
 }
 `;
 }

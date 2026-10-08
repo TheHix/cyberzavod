@@ -1,5 +1,6 @@
 // Русские тексты адаптера Claude Code.
 
+import { CLI_COMMAND } from "../cli-command.ts";
 import type { ClaudeMessages } from "./claude-messages.ts";
 
 /** Тексты адаптера на русском. */
@@ -63,8 +64,9 @@ export const ru: ClaudeMessages = {
     settingsNotObject: (file) => `${file} не разобран: настройки должны быть объектом`,
     settingsNotParsed: ({ file, reason }) => `${file} не разобран: ${reason}`,
     unknownPlaceholder: (placeholder) => `в шаблоне неизвестная подстановка ${placeholder}`,
-    projectNotFound: (directory) => `${directory} не в проекте Cyberzavod: сначала cyberzavod init`,
-    noDrafts: "черновиков ещё нет: сначала cyberzavod draft",
+    projectNotFound: (directory) =>
+      `${directory} не в проекте Cyberzavod: сначала ${CLI_COMMAND} init`,
+    noDrafts: `черновиков ещё нет: сначала ${CLI_COMMAND} draft`,
     noRawLogs: (directory) => `журналов сессий ещё нет: хуки пишут их в ${directory}`,
     earlierDraftNotParsed: (file) =>
       `прошлый черновик ${file} не разобран — исправьте или удалите его`,

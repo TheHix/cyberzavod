@@ -4,12 +4,12 @@
 
 import { syncClaude, type ClaudeInstallation, type SyncReport } from "@cyberzavod/adapter-claude";
 import type { ProjectConfig } from "@cyberzavod/core";
-import { PROJECT_CONFIG_FILE, TOOL_FILE, writeProjectConfig } from "@cyberzavod/storage";
+import { LEGACY_TOOL_FILE, PROJECT_CONFIG_FILE, writeProjectConfig } from "@cyberzavod/storage";
 import { detectProject, stackOf } from "../detect.ts";
-import { HARNESS_VERSION, toolOf, type Installation } from "../installation/installation.ts";
+import { HARNESS_VERSION, type Installation } from "../installation/installation.ts";
 import type { CliMessages } from "../messages/cli-messages.ts";
+import { hasLegacyTool, removeLegacyTool } from "./legacy-tool.ts";
 import { requireProjectAt } from "./project.ts";
-import { isToolFileOutdated, updateToolFile } from "./tool-file.ts";
 
 /** Что нужно синхронизации: перезаписывать ли файлы человека, версия Cyberzavod и тексты. */
 export interface SyncCommandOptions {
@@ -51,8 +51,10 @@ function claudeInstallationOf(installation: Installation): ClaudeInstallation {
   return { harness: installation.harness, templates: installation.claudeTemplates };
 }
 
-function withTool(report: SyncReport, isToolChanged: boolean): SyncReport {
-  return isToolChanged ? { ...report, changed: [TOOL_FILE, ...report.changed] } : report;
+function withLegacyTool(report: SyncReport, isLegacyToolRemoved: boolean): SyncReport {
+  return isLegacyToolRemoved
+    ? { ...report, removed: [LEGACY_TOOL_FILE, ...report.removed] }
+    : report;
 }
 
 function isClean(report: SyncReport): boolean {
@@ -60,12 +62,12 @@ function isClean(report: SyncReport): boolean {
 }
 
 /**
- * Проверяет, что файлы агента и собранный CLI в проекте актуальны, ничего не записывая.
+ * Проверяет, что файлы агента актуальны и CLI прежних версий из проекта убран, ничего не записывая.
  * @param {string} directory Каталог внутри проекта.
  * @param {Installation} installation Запущенная версия Cyberzavod.
  * @param {CliMessages} messages Сообщения на выбранном языке.
  * @returns {Promise<boolean>} true, если синхронизировать нечего.
- * @throws {Error} Если проекта нет, CLI запущен из исходников или файлы агента не собрать.
+ * @throws {Error} Если проекта нет или файлы агента не собрать.
  */
 export async function checkProject(
   directory: string,
@@ -73,14 +75,13 @@ export async function checkProject(
   messages: CliMessages,
 ): Promise<boolean> {
   const project = await requireProjectAt(directory);
-  const tool = toolOf(installation);
   const claudeReport = await syncClaude({
     projectDirectory: project.root,
     installation: claudeInstallationOf(installation),
     check: true,
   });
-  const isToolOutdated = await isToolFileOutdated(project.root, tool);
-  const report = withTool(claudeReport, isToolOutdated);
+  const isLegacyToolPresent = await hasLegacyTool(project.root);
+  const report = withLegacyTool(claudeReport, isLegacyToolPresent);
   const isHarnessOutdated = project.config.harness !== HARNESS_VERSION;
 
   if (isHarnessOutdated) {
@@ -103,26 +104,28 @@ export async function checkProject(
 }
 
 /**
- * Синхронизирует проект с harness: обновляет конфиг, собранный CLI и файлы агента.
+ * Синхронизирует проект с harness: обновляет конфиг и файлы агента, убирает CLI прежних версий.
  * @param {string} directory Каталог внутри проекта.
  * @param {SyncCommandOptions} options Перезаписать ли файлы человека, версия, сообщения.
  * @returns {Promise<void>} Готово, когда всё записано.
- * @throws {Error} Если проекта нет, CLI запущен из исходников или файлы агента не собрать.
+ * @throws {Error} Если проекта нет или файлы агента не собрать.
  */
 export async function syncProject(directory: string, options: SyncCommandOptions): Promise<void> {
   const { force, installation, messages } = options;
   const project = await requireProjectAt(directory);
-  const tool = toolOf(installation);
   const config = await refreshedConfig(project.root, project.config);
 
   await writeProjectConfig(project.root, config);
 
-  const isToolChanged = await updateToolFile(project.root, tool);
+  const isLegacyToolPresent = await hasLegacyTool(project.root);
+
+  if (isLegacyToolPresent) await removeLegacyTool(project.root);
+
   const report = await syncClaude({
     projectDirectory: project.root,
     installation: claudeInstallationOf(installation),
     force,
   });
 
-  printWrittenReport(withTool(report, isToolChanged), messages);
+  printWrittenReport(withLegacyTool(report, isLegacyToolPresent), messages);
 }

@@ -12,7 +12,6 @@ import { gateStop } from "./stop-gate.ts";
 import { startTurn } from "./turn-start.ts";
 
 const SESSION = "test-session";
-const BLOCKED = 2;
 const RELEASED = 0;
 // Проверка падает, пока существует apps/broken.
 const RED_WHEN_BROKEN = "test ! -f apps/broken || (echo 'ошибка типов в apps/broken'; exit 1)";
@@ -70,6 +69,19 @@ async function stopTimes(times: number): Promise<HookOutcome | undefined> {
   return outcome;
 }
 
+// Причина отказа из JSON-решения `block` на stdout; undefined, если хук агента не держит.
+function blockReason(outcome: HookOutcome): string | undefined {
+  if (outcome.stdout === "") return undefined;
+
+  const parsed = JSON.parse(outcome.stdout) as { decision?: string; reason?: string };
+
+  return parsed.decision === "block" ? parsed.reason : undefined;
+}
+
+function isBlocked(outcome: HookOutcome): boolean {
+  return blockReason(outcome) !== undefined;
+}
+
 function stateFile(name: string): string {
   return path.join(tmpDir, `cyberzavod-${name}-${SESSION}`);
 }
@@ -101,10 +113,29 @@ describe("gateStop", () => {
 
     const outcome = await gateStop(context());
 
-    expect({ code: outcome.exitCode, attempt: outcome.stderr.includes("attempt 1 of 3") }).toEqual({
-      code: BLOCKED,
+    expect({
+      blocked: isBlocked(outcome),
+      attempt: blockReason(outcome)?.includes("attempt 1 of 3"),
+    }).toEqual({
+      blocked: true,
       attempt: true,
     });
+  });
+
+  it("держит остановку решением block с кодом выхода 0", async () => {
+    await makeRepo();
+    await startTurn(context());
+    await breakCode();
+
+    const outcome = await gateStop(context());
+
+    expect({ code: outcome.exitCode, stderr: outcome.stderr, blocked: isBlocked(outcome) }).toEqual(
+      {
+        code: 0,
+        stderr: "",
+        blocked: true,
+      },
+    );
   });
 
   it("говорит с агентом на языке сообщений хука", async () => {
@@ -114,7 +145,9 @@ describe("gateStop", () => {
 
     const outcome = await gateStop(context(CLAUDE_MESSAGES.ru));
 
-    expect(outcome.stderr).toContain("не проходит — закончить работу нельзя (попытка 1 из 3)");
+    expect(blockReason(outcome)).toContain(
+      "не проходит — закончить работу нельзя (попытка 1 из 3)",
+    );
   });
 
   it("показывает агенту вывод проверок", async () => {
@@ -124,7 +157,7 @@ describe("gateStop", () => {
 
     const outcome = await gateStop(context());
 
-    expect(outcome.stderr).toContain("ошибка типов в apps/broken");
+    expect(blockReason(outcome)).toContain("ошибка типов в apps/broken");
   });
 
   it("после трёх отказов отпускает агента с сообщением и оставляет отметку", async () => {
@@ -186,8 +219,11 @@ describe("gateStop", () => {
 
     const outcome = await gateStop(context());
 
-    expect({ code: outcome.exitCode, attempt: outcome.stderr.includes("attempt 1 of 3") }).toEqual({
-      code: BLOCKED,
+    expect({
+      blocked: isBlocked(outcome),
+      attempt: blockReason(outcome)?.includes("attempt 1 of 3"),
+    }).toEqual({
+      blocked: true,
       attempt: true,
     });
   });
@@ -211,7 +247,7 @@ describe("gateStop", () => {
 
     const outcome = await gateStop(context());
 
-    expect(outcome.exitCode).toBe(BLOCKED);
+    expect(isBlocked(outcome)).toBe(true);
   });
 
   it("сообщение посреди хода не сдвигает начало хода", async () => {
@@ -222,7 +258,7 @@ describe("gateStop", () => {
 
     const outcome = await gateStop(context());
 
-    expect(outcome.exitCode).toBe(BLOCKED);
+    expect(isBlocked(outcome)).toBe(true);
   });
 
   it("без отпечатка красные правки в коде держат остановку", async () => {
@@ -231,7 +267,7 @@ describe("gateStop", () => {
 
     const outcome = await gateStop(context());
 
-    expect(outcome.exitCode).toBe(BLOCKED);
+    expect(isBlocked(outcome)).toBe(true);
   });
 
   it("незаписываемый счётчик отпускает, а не зацикливает", async () => {
@@ -258,11 +294,13 @@ describe("gateStop", () => {
     const outcome = await gateStop(context());
 
     expect({
-      code: outcome.exitCode,
+      blocked: isBlocked(outcome),
       first: existsSync(path.join(repo, "first-ran")),
       second: existsSync(path.join(repo, "second-ran")),
-      named: outcome.stderr.startsWith("touch first-ran && touch second-ran && exit 1 fails"),
-    }).toEqual({ code: BLOCKED, first: true, second: true, named: true });
+      named: blockReason(outcome)?.startsWith(
+        "touch first-ran && touch second-ran && exit 1 fails",
+      ),
+    }).toEqual({ blocked: true, first: true, second: true, named: true });
   });
 
   it("правки вне paths не держат агента", async () => {
@@ -283,7 +321,7 @@ describe("gateStop", () => {
 
     const outcome = await gateStop(context());
 
-    expect(outcome.exitCode).toBe(BLOCKED);
+    expect(isBlocked(outcome)).toBe(true);
   });
 
   it("без конфига агент отпускается молча", async () => {

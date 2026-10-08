@@ -12,10 +12,11 @@ export const MARKER_DIRECTORY = ".cyberzavod";
 export const PROJECT_CONFIG_FILE = path.join(MARKER_DIRECTORY, "project.json");
 
 /**
- * Собранный CLI внутри проекта, от корня через `/`. Его запускают хуки агента: так им не нужны
- * ни сеть, ни npm, ни установка Cyberzavod на машине.
+ * Собранный CLI внутри проекта до версии 0.8.0, от корня через `/`: туда клали файл, который
+ * запускали хуки. Теперь хуки идут через npx, `sync` этот файл удаляет, а адаптер по нему
+ * узнаёт хуки прежних версий.
  */
-export const TOOL_FILE = `${MARKER_DIRECTORY}/bin/cyberzavod.mjs`;
+export const LEGACY_TOOL_FILE = `${MARKER_DIRECTORY}/bin/cyberzavod.mjs`;
 
 /** Журнал проекта по умолчанию, от корня через `/`: рядом с конфигом, в репозитории проекта. */
 export const DEFAULT_JOURNAL = `${MARKER_DIRECTORY}/journal`;

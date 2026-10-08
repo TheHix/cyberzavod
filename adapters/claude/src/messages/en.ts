@@ -1,5 +1,6 @@
 // Английские тексты адаптера Claude Code.
 
+import { CLI_COMMAND } from "../cli-command.ts";
 import type { ClaudeMessages } from "./claude-messages.ts";
 
 /** Тексты адаптера на английском. */
@@ -64,8 +65,8 @@ export const en: ClaudeMessages = {
     settingsNotParsed: ({ file, reason }) => `${file} cannot be parsed: ${reason}`,
     unknownPlaceholder: (placeholder) => `the template has an unknown placeholder ${placeholder}`,
     projectNotFound: (directory) =>
-      `${directory} is not in a Cyberzavod project: run cyberzavod init first`,
-    noDrafts: "no drafts yet: run cyberzavod draft first",
+      `${directory} is not in a Cyberzavod project: run ${CLI_COMMAND} init first`,
+    noDrafts: `no drafts yet: run ${CLI_COMMAND} draft first`,
     noRawLogs: (directory) => `no session logs yet: the hooks write them to ${directory}`,
     earlierDraftNotParsed: (file) =>
       `the earlier draft ${file} cannot be parsed — fix or delete it`,

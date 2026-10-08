@@ -107,7 +107,7 @@ describe("publishSessions", () => {
     const act = () => publishSessions({ projectDirectory: root, messages: CLAUDE_MESSAGES.en });
 
     await expect(act()).rejects.toThrow(ClaudeError);
-    await expect(act()).rejects.toThrow("no drafts yet: run cyberzavod draft first");
+    await expect(act()).rejects.toThrow("no drafts yet: run npx cyberzavod draft first");
   });
 
   it("вне проекта — ошибка адаптера", async () => {

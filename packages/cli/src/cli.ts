@@ -5,6 +5,7 @@ import { homedir, tmpdir } from "node:os";
 import { parseArgs } from "node:util";
 import {
   CLAUDE_MESSAGES,
+  CLI_COMMAND,
   ClaudeError,
   draftSession,
   isHookName,
@@ -260,7 +261,7 @@ export function usage(messages: CliMessages): string {
   const lines = COMMAND_NAMES.map((name) => {
     const { usage: invocation, summary } = messages.commands[name];
 
-    return `  cyberzavod ${invocation}\n      ${summary}`;
+    return `  ${CLI_COMMAND} ${invocation}\n      ${summary}`;
   });
   const languageOption = messages.help.languageOption(INTERFACE_LANGUAGES.join("|"));
 

@@ -5,11 +5,11 @@ export {
   DEFAULT_JOURNAL,
   findProjectRoot,
   isNotFound,
+  LEGACY_TOOL_FILE,
   MARKER_DIRECTORY,
   PROJECT_CONFIG_FILE,
   ProjectFileError,
   readProjectConfig,
-  TOOL_FILE,
   writeProjectConfig,
 } from "./project.ts";
 export {

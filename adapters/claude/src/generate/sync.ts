@@ -5,7 +5,8 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Harness } from "@cyberzavod/core";
-import { isNotFound, TOOL_FILE, workflowOf } from "@cyberzavod/storage";
+import { isNotFound, workflowOf } from "@cyberzavod/storage";
+import { pinnedCliCommand } from "../cli-command.ts";
 import { captureDirectories, requireProject, type LocatedProject } from "../paths.ts";
 import { GenerateError } from "./claude.ts";
 import {
@@ -15,11 +16,9 @@ import {
   type ClaudeTemplates,
   type GeneratedFile,
 } from "./files.ts";
-import { ADAPTER_HOOKS, mergeSettings, type Settings } from "./settings.ts";
+import { adapterHooks, mergeSettings, type Settings } from "./settings.ts";
 
 const SETTINGS_FILE = ".claude/settings.json";
-// Хуки и сгенерированные тексты зовут CLI, который лежит в самом проекте.
-const PROJECT_CLI = `node ${TOOL_FILE}`;
 const RULES_FILE = "AGENTS.md";
 const ENTRYPOINT_FILE = "CLAUDE.md";
 const GENERATED_DIRECTORIES = [".claude/agents", ".claude/skills"];
@@ -121,7 +120,7 @@ async function claudeProjectOf(
       raw: relativeTo(project.root, capture.raw),
       drafts: relativeTo(project.root, capture.drafts),
     },
-    cli: PROJECT_CLI,
+    cli: pinnedCliCommand(project.config.harness),
     templates,
   };
 }
@@ -154,12 +153,12 @@ function settingsText(settings: Settings): string {
   return `${JSON.stringify(settings, null, 2)}\n`;
 }
 
-async function settingsFile(root: string): Promise<GeneratedFile> {
+async function settingsFile(root: string, version: string): Promise<GeneratedFile> {
   const current = parseSettings(await readOptional(path.join(root, SETTINGS_FILE)), SETTINGS_FILE);
 
   return {
     path: SETTINGS_FILE,
-    content: settingsText(mergeSettings(current, ADAPTER_HOOKS)),
+    content: settingsText(mergeSettings(current, adapterHooks(version))),
   };
 }
 
@@ -250,7 +249,10 @@ async function writeFiles(root: string, files: GeneratedFile[], paths: string[])
 export async function syncClaude(options: SyncOptions): Promise<SyncReport> {
   const project = await requireProject(options.projectDirectory);
   const claudeProject = await claudeProjectOf(project, options.installation);
-  const files = [...claudeFiles(claudeProject), await settingsFile(project.root)];
+  const files = [
+    ...claudeFiles(claudeProject),
+    await settingsFile(project.root, project.config.harness),
+  ];
   const { changed, conflicts } = await compare(project.root, files, options.force === true);
   const wanted = new Set(files.map(({ path: filePath }) => filePath));
   const onDisk = await generatedOnDisk(project.root, project.journal);

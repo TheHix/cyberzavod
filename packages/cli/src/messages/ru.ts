@@ -1,6 +1,6 @@
 // Русские тексты CLI.
 
-import { HOOK_NAMES } from "@cyberzavod/adapter-claude";
+import { CLI_COMMAND, HOOK_NAMES } from "@cyberzavod/adapter-claude";
 import type { CliMessages } from "./cli-messages.ts";
 
 /** Тексты CLI на русском. */
@@ -74,7 +74,7 @@ export const ru: CliMessages = {
     ignoredEntry: (entry) => `.gitignore: ${entry}`,
     journal: (path) => `Журнал проекта: ${path}`,
     nextSteps:
-      "Закоммитьте .cyberzavod/, AGENTS.md, CLAUDE.md и .claude/: хуки запускают CLI из проекта.\n" +
+      "Закоммитьте .cyberzavod/, AGENTS.md, CLAUDE.md и .claude/: хуки запускают cyberzavod через npx, версией из конфига.\n" +
       "Дальше: допишите правила в AGENTS.md и запускайте задачи через /feature в Claude Code.",
   },
   wizard: {
@@ -100,7 +100,7 @@ export const ru: CliMessages = {
     extra: "лишние",
     harnessMismatch: ({ file, configVersion, cliVersion }) =>
       `${file}: harness ${configVersion}, а CLI — ${cliVersion}`,
-    filesOutdated: "Файлы агента устарели: запустите cyberzavod sync",
+    filesOutdated: `Файлы агента устарели: запустите ${CLI_COMMAND} sync`,
   },
   status: {
     recordTypes: { session: "сессии", decision: "решения", note: "заметки" },
@@ -109,7 +109,7 @@ export const ru: CliMessages = {
     project: ({ id, root }) => `Проект: ${id} (${root})`,
     harness: (version) => `Harness: ${version}`,
     harnessOutdated: ({ version, cliVersion }) =>
-      `Harness: ${version} (CLI — ${cliVersion}, запустите cyberzavod sync)`,
+      `Harness: ${version} (CLI — ${cliVersion}, запустите ${CLI_COMMAND} sync)`,
     workflow: (name) => `Процесс: ${name}`,
     checks: (commands) => `Проверки: ${commands}`,
     journal: ({ path, counts }) => `Журнал: ${path} — ${counts}`,
@@ -130,17 +130,17 @@ export const ru: CliMessages = {
     replaced: (id) => `запись ${id} заменена`,
     link: (url) => `ссылка: ${url}`,
     galleryClosed: "галерея закрыта: запись видна только по этой ссылке",
-    openGalleryHint: "открыть галерею: cyberzavod gallery --public",
+    openGalleryHint: `открыть галерею: ${CLI_COMMAND} gallery --public`,
     removed: (id) => `запись ${id} удалена из галереи`,
     galleryRecordings: ({ count, limit }) => `Записи в галерее (${count} из ${limit}):`,
-    freeUpSpace: "Освободите место командой cyberzavod unshare <id>",
+    freeUpSpace: `Освободите место командой ${CLI_COMMAND} unshare <id>`,
   },
   gallery: {
     closed: (login) => `Галерея ${login}: закрыта, записи видны только по ссылкам`,
     open: (login) => `Галерея ${login}: открыта`,
     recordings: ({ count, limit }) => `Записи: ${count} из ${limit}`,
-    openHint: "Открыть галерею: cyberzavod gallery --public",
-    closeHint: "Закрыть галерею: cyberzavod gallery --private",
+    openHint: `Открыть галерею: ${CLI_COMMAND} gallery --public`,
+    closeHint: `Закрыть галерею: ${CLI_COMMAND} gallery --private`,
     page: (url) => `Страница галереи: ${url}`,
     badge: (markdown) => `Бейдж для README: ${markdown}`,
   },
@@ -152,22 +152,21 @@ export const ru: CliMessages = {
     languageFlagWithoutValue: "у --lang нет значения: укажите язык, например --lang ru",
     unsupportedLanguage: ({ value, supported }) =>
       `язык «${value}» не поддерживается: доступны ${supported}`,
-    projectNotFound: (directory) => `${directory} не в проекте Cyberzavod: сначала cyberzavod init`,
+    projectNotFound: (directory) =>
+      `${directory} не в проекте Cyberzavod: сначала ${CLI_COMMAND} init`,
     alreadyConnected: (file) => `${file} уже есть: проект подключён, используйте sync`,
-    toolFromSources:
-      "CLI запущен из исходников: соберите его (pnpm cyberzavod) и запустите собранный",
     invalidRecordId: (id) => `${id} не похож на id записи: только буквы, цифры, «_» и «-»`,
     recordMissing: ({ id, file }) => `в журнале нет записи ${id}: файла ${file} не существует`,
     recordInvalid: ({ id, reason }) => `запись ${id} не прошла проверку: ${reason}`,
     recordNotSession: ({ id, type }) =>
       `запись ${id} не прошла проверку: тип ${type}, нужна сессия`,
     galleryAccessConflict: "--public и --private вместе не работают: выберите одно",
-    notLoggedIn: "нет входа: войдите командой cyberzavod login",
-    tokenRejected: "сервер не принял токен: войдите командой cyberzavod login",
+    notLoggedIn: `нет входа: войдите командой ${CLI_COMMAND} login`,
+    tokenRejected: `сервер не принял токен: войдите командой ${CLI_COMMAND} login`,
     limitReached: "в галерее уже максимум записей",
     credentialsCorrupt: (file) =>
-      `файл ${file} повреждён: войдите заново командой cyberzavod login`,
-    loginCodeExpired: "код входа истёк: запустите cyberzavod login заново",
+      `файл ${file} повреждён: войдите заново командой ${CLI_COMMAND} login`,
+    loginCodeExpired: `код входа истёк: запустите ${CLI_COMMAND} login заново`,
     loginDenied: "вход отклонён на странице GitHub",
     noConnection: ({ origin, reason }) => `нет связи с ${origin}: ${reason}`,
     githubUnexpectedField: (name) => `GitHub вернул неожиданный ответ: нет поля ${name}`,
