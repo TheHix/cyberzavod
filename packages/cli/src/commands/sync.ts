@@ -9,7 +9,7 @@ import { detectProject, stackOf } from "../detect.ts";
 import { HARNESS_VERSION, type Installation } from "../installation/installation.ts";
 import type { CliMessages } from "../messages/cli-messages.ts";
 import { hasLegacyTool, removeLegacyTool } from "./legacy-tool.ts";
-import { requireProjectAt } from "./project.ts";
+import { requireProjectAt, type ProjectAt } from "./project.ts";
 
 /** Что нужно синхронизации: перезаписывать ли файлы человека, версия Cyberzavod и тексты. */
 export interface SyncCommandOptions {
@@ -61,6 +61,41 @@ function isClean(report: SyncReport): boolean {
   return report.changed.length + report.removed.length + report.conflicts.length === 0;
 }
 
+/** Что расходится с запущенной версией: файлы агента и версия harness в конфиге. */
+export interface ProjectFilesInspection {
+  /** Файлы агента, которые устарели, лишние или написаны человеком; в том числе прежний CLI. */
+  report: SyncReport;
+  /** Версия harness в конфиге проекта. */
+  configVersion: string;
+  /** Версия в конфиге не совпадает с версией запущенного CLI. */
+  isHarnessOutdated: boolean;
+}
+
+/**
+ * Сравнивает файлы агента проекта с тем, что собрала бы запущенная версия, ничего не записывая.
+ * @param {ProjectAt} project Подключённый проект.
+ * @param {Installation} installation Запущенная версия Cyberzavod.
+ * @returns {Promise<ProjectFilesInspection>} Расхождения файлов и версии.
+ * @throws {Error} Если файлы агента не собрать.
+ */
+export async function inspectProjectFiles(
+  project: ProjectAt,
+  installation: Installation,
+): Promise<ProjectFilesInspection> {
+  const claudeReport = await syncClaude({
+    projectDirectory: project.root,
+    installation: claudeInstallationOf(installation),
+    check: true,
+  });
+  const isLegacyToolPresent = await hasLegacyTool(project.root);
+
+  return {
+    report: withLegacyTool(claudeReport, isLegacyToolPresent),
+    configVersion: project.config.harness,
+    isHarnessOutdated: project.config.harness !== HARNESS_VERSION,
+  };
+}
+
 /**
  * Проверяет, что файлы агента актуальны и CLI прежних версий из проекта убран, ничего не записывая.
  * @param {string} directory Каталог внутри проекта.
@@ -75,20 +110,16 @@ export async function checkProject(
   messages: CliMessages,
 ): Promise<boolean> {
   const project = await requireProjectAt(directory);
-  const claudeReport = await syncClaude({
-    projectDirectory: project.root,
-    installation: claudeInstallationOf(installation),
-    check: true,
-  });
-  const isLegacyToolPresent = await hasLegacyTool(project.root);
-  const report = withLegacyTool(claudeReport, isLegacyToolPresent);
-  const isHarnessOutdated = project.config.harness !== HARNESS_VERSION;
+  const { report, configVersion, isHarnessOutdated } = await inspectProjectFiles(
+    project,
+    installation,
+  );
 
   if (isHarnessOutdated) {
     console.log(
       messages.sync.harnessMismatch({
         file: PROJECT_CONFIG_FILE,
-        configVersion: project.config.harness,
+        configVersion,
         cliVersion: HARNESS_VERSION,
       }),
     );

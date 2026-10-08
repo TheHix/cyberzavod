@@ -17,9 +17,14 @@ import {
   type ClaudeTemplates,
   type GeneratedFile,
 } from "./files.ts";
-import { adapterHooks, mergeSettings, type Settings } from "./settings.ts";
+import {
+  adapterHooks,
+  mergeSettings,
+  parseSettings,
+  SETTINGS_FILE,
+  type Settings,
+} from "./settings.ts";
 
-const SETTINGS_FILE = ".claude/settings.json";
 const RULES_FILE = "AGENTS.md";
 const ENTRYPOINT_FILE = "CLAUDE.md";
 const GENERATED_DIRECTORIES = [".claude/agents", ".claude/skills"];
@@ -124,30 +129,6 @@ async function claudeProjectOf(
     cli: pinnedCliCommand(project.config.harness),
     templates,
   };
-}
-
-function parseJson(text: string, file: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch (err) {
-    const reason = (err as Error).message;
-
-    throw new GenerateError((messages) => messages.errors.settingsNotParsed({ file, reason }), {
-      cause: err,
-    });
-  }
-}
-
-function parseSettings(text: string | undefined, file: string): Settings {
-  if (text === undefined) return {};
-
-  const parsed = parseJson(text, file);
-
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new GenerateError((messages) => messages.errors.settingsNotObject(file));
-  }
-
-  return parsed as Settings;
 }
 
 function settingsText(settings: Settings): string {

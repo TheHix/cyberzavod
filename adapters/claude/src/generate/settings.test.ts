@@ -3,9 +3,11 @@ import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { LEGACY_TOOL_FILE } from "@cyberzavod/storage";
 import {
   ADAPTER_DENY,
   adapterHooks,
+  inspectHooks,
   mergeSettings,
   SettingsError,
   type HookGroup,
@@ -218,6 +220,81 @@ describe("mergeSettings", () => {
     ["deny не список", { permissions: { deny: "Read(.env)" } }],
   ])("отклоняет настройки: %s", (_name, settings) => {
     const act = () => mergeSettings(settings, adapterHooks(VERSION));
+
+    expect(act).toThrow(SettingsError);
+  });
+});
+
+describe("inspectHooks", () => {
+  it("видит хуки, поставленные mergeSettings", () => {
+    const settings = mergeSettings(projectHooks(), adapterHooks(VERSION));
+
+    const inspection = inspectHooks(settings, VERSION);
+
+    expect(inspection).toEqual({ kind: "installed" });
+  });
+
+  it.each([
+    ["пустые настройки", {}],
+    [
+      "только чужие обработчики",
+      { hooks: { PreToolUse: [{ hooks: [{ type: "command", command: "./guard.sh" }] }] } },
+    ],
+  ])("говорит, что хуков нет: %s", (_name, settings) => {
+    const inspection = inspectHooks(settings, VERSION);
+
+    expect(inspection).toEqual({ kind: "missing" });
+  });
+
+  it("называет версию, если хуки поставлены другой версией", () => {
+    const settings = mergeSettings({}, adapterHooks("0.7.0"));
+
+    const inspection = inspectHooks(settings, VERSION);
+
+    expect(inspection).toEqual({ kind: "otherVersion", found: ["0.7.0"] });
+  });
+
+  it("называет прежний вшитый CLI по имени его файла", () => {
+    const settings = projectHooks();
+
+    const inspection = inspectHooks(settings, VERSION);
+
+    expect(inspection).toEqual({ kind: "otherVersion", found: [LEGACY_TOOL_FILE] });
+  });
+
+  it("называет события, где не хватает обработчика", () => {
+    const settings = mergeSettings({}, adapterHooks(VERSION));
+    const remaining = Object.entries(settings.hooks as Record<string, unknown>).filter(
+      ([event]) => event !== "Stop",
+    );
+
+    const inspection = inspectHooks({ ...settings, hooks: Object.fromEntries(remaining) }, VERSION);
+
+    expect(inspection).toEqual({ kind: "incomplete", events: ["Stop"] });
+  });
+
+  it("не принимает за свой обработчик события с чужой командой вместо нашей", () => {
+    const settings = mergeSettings({}, adapterHooks(VERSION));
+    const hooks = {
+      ...(settings.hooks as Record<string, unknown>),
+      Stop: [{ hooks: [{ type: "command", command: `${NPX_PREFIX} hook record || true` }] }],
+    };
+
+    const inspection = inspectHooks({ ...settings, hooks }, VERSION);
+
+    expect(inspection).toEqual({ kind: "incomplete", events: ["Stop"] });
+  });
+
+  it("не считает чужие обработчики помехой", () => {
+    const settings = mergeSettings(projectHooks(), adapterHooks(VERSION));
+
+    const inspection = inspectHooks(settings, VERSION);
+
+    expect(inspection).toEqual({ kind: "installed" });
+  });
+
+  it("отклоняет hooks не того вида", () => {
+    const act = () => inspectHooks({ hooks: [] }, VERSION);
 
     expect(act).toThrow(SettingsError);
   });

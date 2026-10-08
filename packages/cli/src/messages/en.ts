@@ -42,6 +42,16 @@ export const en: CliMessages = {
         { name: "--force", description: "overwrite files written by a human" },
       ],
     },
+    doctor: {
+      usage: "doctor [--run-checks]",
+      summary: "check the setup and say how to fix each problem",
+      parameters: [
+        {
+          name: "--run-checks",
+          description: "run the check commands instead of only looking for them",
+        },
+      ],
+    },
     status: {
       usage: "status",
       summary: "project, workflow, stage agents, checks and the journal",
@@ -143,6 +153,89 @@ export const en: CliMessages = {
     harnessMismatch: ({ file, configVersion, cliVersion }) =>
       `${file}: harness ${configVersion}, but the CLI is ${cliVersion}`,
     filesOutdated: `Agent files are outdated: run ${CLI_COMMAND} sync`,
+  },
+  doctor: {
+    fix: (text) => `How to fix: ${text}`,
+    hint: (text) => `Hint: ${text}`,
+    allPassed: "All good.",
+    problems: (count) => `Problems: ${count}.`,
+    node: {
+      passed: (version) => `Node.js ${version}`,
+      tooOld: ({ version, minimum }) =>
+        `Node.js ${version} is too old: ${minimum} or newer is needed`,
+      install: (minimum) => `install Node.js ${minimum} or newer`,
+    },
+    git: {
+      passed: "git is installed",
+      missing: "git was not found in PATH",
+      install: "install git and make sure it is in PATH",
+    },
+    gallery: {
+      signedIn: "gallery: signed in",
+      notSignedIn: "gallery: not signed in (needed only to publish recordings)",
+      signIn: `to publish recordings, run ${CLI_COMMAND} login`,
+      corrupt: "gallery: the saved sign-in file is corrupted",
+      signInAgain: `run ${CLI_COMMAND} login again`,
+    },
+    config: {
+      passed: ({ file, projectId, harness }) => `${file}: project ${projectId}, harness ${harness}`,
+      notFound: (directory) => `no Cyberzavod project found from ${directory}`,
+      init: `run ${CLI_COMMAND} init in the project root`,
+      invalid: (reason) => `the project config cannot be used: ${reason}`,
+      repair: (file) => `correct ${file} following the message above`,
+    },
+    hooks: {
+      passed: (version) => `agent hooks are installed for ${version}`,
+      missing: (file) => `agent hooks are not installed in ${file}`,
+      otherVersion: ({ file, found, configVersion }) =>
+        `agent hooks in ${file} are for ${found}, but the config says ${configVersion}`,
+      incomplete: (events) => `agent hooks are incomplete: nothing is set for ${events}`,
+      unreadable: (reason) => `agent hooks cannot be checked: ${reason}`,
+      sync: `run ${CLI_COMMAND} sync`,
+      repairSettings: (file) => `fix the JSON in ${file}, then run ${CLI_COMMAND} sync`,
+    },
+    files: {
+      upToDate: "agent files are up to date",
+      versionsDiffer: ({ file, configVersion, cliVersion }) =>
+        `${file} says harness ${configVersion}, but this CLI is ${cliVersion}: the agent files cannot be compared`,
+      matchVersion: (configVersion) =>
+        `run ${CLI_COMMAND} sync, or run ${CLI_COMMAND}@${configVersion} doctor`,
+      outdated: (count) => `agent files are outdated or extra: ${count}`,
+      sync: `run ${CLI_COMMAND} sync (${CLI_COMMAND} sync --check lists the files)`,
+      writtenByHuman: (files) => `agent files written by a human: ${files}`,
+      moveToRules: (rulesFile) =>
+        `move your edits to ${rulesFile} and run ${CLI_COMMAND} sync --force`,
+      cannotCheck: (reason) => `agent files cannot be checked: ${reason}`,
+      fixCause: `remove the cause above and run ${CLI_COMMAND} sync --check`,
+    },
+    rules: {
+      passed: (file) => `${file} is filled in`,
+      missing: (file) => `${file} does not exist`,
+      create: "create it or run /setup in Claude Code",
+      unfilled: (file) => `${file} still has starter placeholders`,
+      fill: "run /setup in Claude Code",
+    },
+    commands: {
+      noneSet: (file) => `no check commands are set in ${file}`,
+      setUp: (file) => `run /setup in Claude Code or add the commands to ${file}`,
+      programsFound: (programs) =>
+        `programs ${programs} found; the commands were not run — ${CLI_COMMAND} doctor --run-checks`,
+      programsMissing: (programs) => `check programs not found: ${programs}`,
+      fixPrograms: (file) =>
+        `install the programs or correct the commands in ${file}; a command that starts with a shell builtin (cd web && …) is not recognised: wrap it in a make target or a script, or run ${CLI_COMMAND} doctor --run-checks`,
+      allPassed: (count) => `check commands pass: ${count}`,
+      quoted: (command) => `“${command}”`,
+      exited: ({ command, code }) => `“${command}” (exit ${code})`,
+      notStarted: ({ command, reason }) => `“${command}” (not started: ${reason})`,
+      failed: (commands) => `check commands failed: ${commands}`,
+      runYourself: (commands) => `run ${commands} yourself and read the error`,
+    },
+    gitignore: {
+      passed: (entry) => `.gitignore ignores ${entry}`,
+      nothingToIgnore: "the journal is outside the project: nothing to ignore",
+      missing: (entry) => `.gitignore has no line ${entry}: raw session logs may get committed`,
+      add: ({ entry, file }) => `add the line ${entry} to ${file}`,
+    },
   },
   status: {
     recordTypes: { session: "sessions", decision: "decisions", note: "notes" },

@@ -5,6 +5,7 @@
 import { LEGACY_TOOL_FILE } from "@cyberzavod/storage";
 import { PACKAGE_NAME } from "../cli-command.ts";
 import type { HookName } from "../hooks/index.ts";
+import { GenerateError } from "./claude.ts";
 
 /** Обработчик хука Claude Code. */
 export interface HookHandler {
@@ -26,6 +27,40 @@ export type Settings = Record<string, unknown>;
 
 /** Ошибка настроек: файл проекта не того вида, чтобы в него встроить хуки. */
 export class SettingsError extends Error {}
+
+/** Путь настроек Claude Code относительно корня проекта. */
+export const SETTINGS_FILE = ".claude/settings.json";
+
+function parseJson(text: string, file: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    const reason = (err as Error).message;
+
+    throw new GenerateError((messages) => messages.errors.settingsNotParsed({ file, reason }), {
+      cause: err,
+    });
+  }
+}
+
+/**
+ * Разбирает текст настроек проекта.
+ * @param {string | undefined} text Содержимое файла; undefined, если файла нет.
+ * @param {string} file Путь файла для сообщения об ошибке.
+ * @returns {Settings} Настройки; пустой объект, если файла нет.
+ * @throws {GenerateError} Если текст не JSON или это не объект.
+ */
+export function parseSettings(text: string | undefined, file: string): Settings {
+  if (text === undefined) return {};
+
+  const parsed = parseJson(text, file);
+
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new GenerateError((messages) => messages.errors.settingsNotObject(file));
+  }
+
+  return parsed as Settings;
+}
 
 /** Обработчики адаптера по событиям хуков. */
 export type AdapterHooks = Readonly<Record<string, HookGroup[]>>;
@@ -62,13 +97,20 @@ function stopFailureCommand(): string {
 
 // Флаги npx между `npx` и пакетом в следующих версиях могут измениться: хуки прежних версий
 // узнаются по пакету и имени хука, а не по полному началу команды.
-const NPX_HANDLER_PATTERN = new RegExp(`^npx\\s.*\\s${PACKAGE_NAME}@\\S+ hook `);
+const NPX_HANDLER_PATTERN = new RegExp(`^npx\\s.*\\s${PACKAGE_NAME}@(\\S+) hook `);
+
+// Версия, на которую ссылается свой обработчик; у прежнего CLI в проекте версии нет, он узнаётся
+// по имени файла. Чужой обработчик — undefined.
+function ownVersionOf(handler: HookHandler): string | undefined {
+  const [, npxVersion] = NPX_HANDLER_PATTERN.exec(handler.command) ?? [];
+
+  if (npxVersion !== undefined) return npxVersion;
+
+  return handler.command.includes(LEGACY_TOOL_FILE) ? LEGACY_TOOL_FILE : undefined;
+}
 
 function isOwnHandler(handler: HookHandler): boolean {
-  const isNpxHandler = NPX_HANDLER_PATTERN.test(handler.command);
-  const isLegacyHandler = handler.command.includes(LEGACY_TOOL_FILE);
-
-  return isNpxHandler || isLegacyHandler;
+  return ownVersionOf(handler) !== undefined;
 }
 
 // `|| …` срабатывает на любой ненулевой код, поэтому запасной путь — только для «npx не
@@ -190,4 +232,69 @@ export function mergeSettings(settings: Settings, hooks: AdapterHooks): Settings
     permissions: mergedPermissions(settings.permissions),
     hooks: mergedHooks(settings.hooks, hooks),
   };
+}
+
+/**
+ * Хуки адаптера в настройках проекта: все на месте (`installed`), своих нет (`missing`), свои
+ * ссылаются на другие версии (`otherVersion`; прежний CLI в проекте называется как
+ * `LEGACY_TOOL_FILE`) или у событий `events` нет какого-то обработчика этой версии (`incomplete`).
+ */
+export type HooksInspection =
+  | { kind: "installed" }
+  | { kind: "missing" }
+  | { kind: "otherVersion"; found: string[] }
+  | { kind: "incomplete"; events: string[] };
+
+interface OwnHandler {
+  event: string;
+  command: string;
+  version: string;
+}
+
+function ownHandlersOf(hooks: Record<string, unknown>): OwnHandler[] {
+  return Object.entries(hooks).flatMap(([event, value]) => {
+    const handlers = groupsOf(event, value).flatMap((group) => group.hooks);
+
+    return handlers.flatMap((handler) => {
+      const version = ownVersionOf(handler);
+
+      return version === undefined ? [] : [{ event, command: handler.command, version }];
+    });
+  });
+}
+
+function isEventComplete(event: string, groups: HookGroup[], own: OwnHandler[]): boolean {
+  const present = own.filter((handler) => handler.event === event).map(({ command }) => command);
+  const expected = groups.flatMap((group) => group.hooks.map(({ command }) => command));
+
+  return expected.every((command) => present.includes(command));
+}
+
+/**
+ * Сверяет хуки в настройках проекта с теми, что адаптер ставит для версии из конфига. Чужие
+ * обработчики и прочие настройки в расчёт не идут.
+ * @param {Settings} settings Настройки проекта; пустой объект, если файла нет.
+ * @param {string} version Версия Cyberzavod из конфига проекта.
+ * @returns {HooksInspection} Состояние хуков.
+ * @throws {SettingsError} Если `hooks` в настройках не того вида.
+ */
+export function inspectHooks(settings: Settings, version: string): HooksInspection {
+  if (settings.hooks !== undefined && !isObject(settings.hooks)) {
+    throw new SettingsError("hooks должен быть объектом");
+  }
+
+  const own = ownHandlersOf(settings.hooks ?? {});
+
+  if (own.length === 0) return { kind: "missing" };
+
+  const otherVersions = own.map((handler) => handler.version).filter((found) => found !== version);
+
+  if (otherVersions.length > 0) return { kind: "otherVersion", found: [...new Set(otherVersions)] };
+
+  const expected = Object.entries(adapterHooks(version));
+  const events = expected
+    .filter(([event, groups]) => !isEventComplete(event, groups, own))
+    .map(([event]) => event);
+
+  return events.length === 0 ? { kind: "installed" } : { kind: "incomplete", events };
 }

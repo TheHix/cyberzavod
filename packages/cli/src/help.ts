@@ -67,7 +67,6 @@ export function generalHelp(
 
   return [
     messages.help.title,
-    "",
     messages.help.quickStart,
     "",
     sections.join("\n\n"),

@@ -16,7 +16,8 @@ import type { Installation } from "../installation/installation.ts";
 import type { CliMessages } from "../messages/cli-messages.ts";
 import { appendIgnoreEntry, captureIgnoreEntry, GITIGNORE_FILE } from "./gitignore.ts";
 
-const RULES_FILE = "AGENTS.md";
+/** Файл правил проекта для агентов в его корне. */
+export const RULES_FILE = "AGENTS.md";
 const LEGACY_ENTRYPOINT = "CLAUDE.md";
 const AGENT_DIRECTORY = ".claude/";
 const SUMMARY_INDENT = "  ";

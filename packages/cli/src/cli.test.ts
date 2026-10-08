@@ -1,5 +1,5 @@
 import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,6 +10,8 @@ import { HARNESS_VERSION } from "./installation/installation.ts";
 import { CLI_MESSAGES } from "./messages/catalog.ts";
 import { COMMAND_NAMES } from "./messages/cli-messages.ts";
 import type { Environment } from "./messages/language.ts";
+import { SECRET_TOKEN } from "./sharing/fixtures.ts";
+import { credentialsFile, FileCredentialsStore } from "./sharing/settings.ts";
 
 const SESSION_ID = "cli-test-hook-language";
 const EN_TITLE = "Cyberzavod — an AI-agent development process, local-first.";
@@ -249,6 +251,7 @@ describe("runCli", () => {
       "unshare",
       "gallery",
       "sync",
+      "doctor",
     ]);
   });
 
@@ -317,6 +320,106 @@ describe("runCli", () => {
     expect({ code, started: await exists(path.join(root, ".cyberzavod")) }).toEqual({
       code: 0,
       started: false,
+    });
+  });
+
+  it("doctor --help называет --run-checks", async () => {
+    await runCli(["doctor", "--help"], root, NO_LOCALE);
+
+    expect(printedLog()).toContain("--run-checks");
+  });
+
+  describe("doctor", () => {
+    // Каталог настроек во временной папке: тесты не читают настоящий ~/.config.
+    function isolatedConfig(): string {
+      return path.join(workspace, "config");
+    }
+
+    async function healthyEnvironment(checks: string): Promise<Environment> {
+      const env: Environment = {
+        PATH: process.env.PATH,
+        XDG_CONFIG_HOME: isolatedConfig(),
+      };
+      const credentials = credentialsFile({
+        env,
+        platform: process.platform,
+        homeDirectory: homedir(),
+      });
+
+      await runCli(["init", "--yes", "--check", checks], root, env);
+      await writeFile(path.join(root, "AGENTS.md"), "# Rules\n");
+      await new FileCredentialsStore(credentials).save(SECRET_TOKEN);
+      vi.mocked(console.log).mockClear();
+
+      return env;
+    }
+
+    it("вне проекта печатает проверки машины, зовёт init и выходит с 1", async () => {
+      const code = await runCli(["doctor"], root, {
+        PATH: process.env.PATH,
+        XDG_CONFIG_HOME: isolatedConfig(),
+      });
+
+      expect({
+        code,
+        init: printedLog().includes("run npx cyberzavod init"),
+        problems: printedLog().endsWith("Problems: 1."),
+      }).toEqual({
+        code: 1,
+        init: true,
+        problems: true,
+      });
+    });
+
+    it("в исправном проекте выходит с 0 и не печатает токен", async () => {
+      const env = await healthyEnvironment("node --version");
+
+      const code = await runCli(["doctor"], root, env);
+
+      expect({
+        code,
+        last: printedLog().split("\n").at(-1),
+        hasToken: printedLog().includes(SECRET_TOKEN),
+      }).toEqual({
+        code: 0,
+        last: "All good.",
+        hasToken: false,
+      });
+    });
+
+    it("с --run-checks выходит с 1, если команда проверки упала", async () => {
+      const env = await healthyEnvironment('node -e "process.exit(3)"');
+
+      const code = await runCli(["doctor", "--run-checks"], root, env);
+
+      expect({ code, problem: printedLog().includes("(exit 3)") }).toEqual({
+        code: 1,
+        problem: true,
+      });
+    });
+
+    it("без --run-checks упавшую команду не запускает", async () => {
+      const env = await healthyEnvironment('node -e "process.exit(3)"');
+
+      const code = await runCli(["doctor"], root, env);
+
+      expect(code).toBe(0);
+    });
+
+    it("печатает по-русски", async () => {
+      const code = await runCli(["doctor"], root, {
+        PATH: process.env.PATH,
+        XDG_CONFIG_HOME: isolatedConfig(),
+        CYBERZAVOD_LANG: "ru",
+      });
+
+      expect({
+        code,
+        text: printedLog().includes("Как починить: выполните npx cyberzavod init"),
+      }).toEqual({
+        code: 1,
+        text: true,
+      });
     });
   });
 
