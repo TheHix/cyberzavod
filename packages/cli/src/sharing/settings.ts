@@ -97,8 +97,8 @@ export class FileCredentialsStore implements CredentialsStore {
     const token = tokenIn(text);
 
     if (token === undefined) {
-      throw new CommandError(
-        `файл ${CREDENTIALS_FILE_NAME} повреждён: войдите заново командой cyberzavod login`,
+      throw new CommandError((messages) =>
+        messages.errors.credentialsCorrupt(CREDENTIALS_FILE_NAME),
       );
     }
 

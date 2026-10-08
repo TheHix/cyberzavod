@@ -75,7 +75,7 @@ describe("waitForAccessToken", () => {
     const { result } = wait(auth);
 
     await expect(result).rejects.toThrow(CommandError);
-    await expect(result).rejects.toThrow(/истёк/);
+    await expect(result).rejects.toThrow(/expired/);
   });
 
   it("access_denied — ошибка об отказе", async () => {
@@ -83,7 +83,7 @@ describe("waitForAccessToken", () => {
 
     const { result } = wait(auth);
 
-    await expect(result).rejects.toThrow(/отклонён/);
+    await expect(result).rejects.toThrow(/denied/);
   });
 
   it("перестаёт ждать, когда истёк срок кода, даже если GitHub молчит", async () => {
@@ -92,6 +92,6 @@ describe("waitForAccessToken", () => {
 
     const { result } = wait(auth, shortLived);
 
-    await expect(result).rejects.toThrow(/истёк/);
+    await expect(result).rejects.toThrow(/expired/);
   });
 });

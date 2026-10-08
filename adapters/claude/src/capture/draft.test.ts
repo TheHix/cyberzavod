@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { RecordError } from "@cyberzavod/core";
+import { ClaudeError } from "../errors.ts";
+import { CLAUDE_MESSAGES } from "../messages/catalog.ts";
 import {
   carryOverEdits,
   DraftError,
@@ -23,6 +25,16 @@ import {
   intervention,
   SECOND_BUILD_ID,
 } from "./draft.fixtures.ts";
+
+function thrownBy(act: () => unknown): unknown {
+  try {
+    act();
+  } catch (err) {
+    return err;
+  }
+
+  return undefined;
+}
 
 function promptsOnly(edits: EditableDraftEvent[]) {
   return edits.flatMap((edit) => (edit.type === "draft_prompt" ? [edit] : []));
@@ -776,6 +788,21 @@ describe("publishBuild", () => {
     expect(act).toThrow(/line/);
   });
 
+  it("утечка — ошибка адаптера: текст на каждом языке называет вид и место", () => {
+    const draft = editedDraft();
+
+    draft.events.push(intervention({ t: 2_500, text: "Зайди на 203.0.113.7" }));
+
+    const act = () => publishOnly(draft);
+    const error = thrownBy(act) as ClaudeError;
+
+    expect(error).toBeInstanceOf(ClaudeError);
+    expect([error.describe(CLAUDE_MESSAGES.en), error.describe(CLAUDE_MESSAGES.ru)]).toEqual([
+      expect.stringContaining("IP address in “Зайди на 203.0.113.7”") as string,
+      expect.stringContaining("IP-адрес в «Зайди на 203.0.113.7»") as string,
+    ]);
+  });
+
   it("не публикует адрес сервера в тексте вмешательства", () => {
     const draft = editedDraft();
 
@@ -783,7 +810,7 @@ describe("publishBuild", () => {
 
     const act = () => publishOnly(draft);
 
-    expect(act).toThrow(/IP-адрес/);
+    expect(act).toThrow(/IP address/);
   });
 
   it("не публикует черновик без чистовой версии промпта", () => {
@@ -831,7 +858,7 @@ describe("publishBuild", () => {
 
     const act = () => publishOnly(draft);
 
-    expect(act).toThrow(DraftError);
+    expect(act).toThrow(ClaudeError);
   });
 
   it("не публикует сборку без заголовка", () => {
@@ -856,7 +883,7 @@ describe("publishBuild", () => {
 
     const act = () => publishOnly(draft);
 
-    expect(act).toThrow(/IP-адрес/);
+    expect(act).toThrow(/IP address/);
   });
 
   it("проверяет на утечки и модель промпта", () => {
@@ -873,7 +900,7 @@ describe("publishBuild", () => {
 
     const act = () => publishOnly(draft);
 
-    expect(act).toThrow(/IP-адрес/);
+    expect(act).toThrow(/IP address/);
   });
 
   it("не публикует адрес сервера, попавший в чистовую версию", () => {
@@ -889,7 +916,7 @@ describe("publishBuild", () => {
 
     const act = () => publishOnly(draft);
 
-    expect(act).toThrow(/IP-адрес/);
+    expect(act).toThrow(/IP address/);
   });
 
   it("публикует реплику без исходного текста, source и запуска", () => {
@@ -986,7 +1013,7 @@ describe("publishBuild", () => {
 
     const act = () => publishOnly(draft);
 
-    expect(act).toThrow(/IP-адрес/);
+    expect(act).toThrow(/IP address/);
   });
 
   it("не повторяет этап, на котором сборка уже стоит", () => {
@@ -1083,7 +1110,7 @@ describe("publishBuild", () => {
     const empty = () => publishBuild(draft, "empty");
 
     expect(unknown).toThrow(/нет сборки no-such-build/);
-    expect(empty).toThrow(/нет событий/);
+    expect(empty).toThrow(/build empty has no events/);
   });
 });
 
@@ -1234,7 +1261,7 @@ describe("publishDraft: несколько сборок", () => {
     const second = () => publishBuild(draft, SECOND_BUILD_ID);
 
     expect(first).not.toThrow();
-    expect(second).toThrow(/IP-адрес/);
+    expect(second).toThrow(/IP address/);
   });
 
   it("публикует черновик с одной сборкой одной записью с id черновика", () => {
@@ -1262,7 +1289,9 @@ describe("unfilledHeader", () => {
 
     const names = unfilledHeader(draft);
 
-    expect(names).toEqual([`сборка ${BUILD_ID}: заголовок, язык, проект, версия harness`]);
+    expect(names).toEqual([
+      { buildId: BUILD_ID, fields: ["title", "language", "project", "harness"] },
+    ]);
   });
 
   it("называет пустые поля по каждой сборке и пропускает заполненные", () => {
@@ -1272,6 +1301,6 @@ describe("unfilledHeader", () => {
 
     const names = unfilledHeader(draft);
 
-    expect(names).toEqual([`сборка ${SECOND_BUILD_ID}: заголовок, проект`]);
+    expect(names).toEqual([{ buildId: SECOND_BUILD_ID, fields: ["title", "project"] }]);
   });
 });

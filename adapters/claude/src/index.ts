@@ -3,7 +3,9 @@
 
 export { draftSession, type DraftSessionOptions } from "./commands/draft.ts";
 export { publishSessions, type PublishSessionsOptions } from "./commands/publish.ts";
-export { GenerateError } from "./generate/claude.ts";
+export { ClaudeError } from "./errors.ts";
+export { CLAUDE_MESSAGES } from "./messages/catalog.ts";
+export type { ClaudeMessages } from "./messages/claude-messages.ts";
 export {
   syncClaude,
   type ClaudeInstallation,

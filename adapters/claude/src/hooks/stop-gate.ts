@@ -12,6 +12,7 @@ import {
   ProjectFileError,
   readProjectConfig,
 } from "@cyberzavod/storage";
+import type { ClaudeMessages } from "../messages/claude-messages.ts";
 import type { ProjectConfig } from "@cyberzavod/core";
 import { checksOf, runChecks, type ProjectChecks } from "./checks.ts";
 import { codeFingerprint, GitError, hasUncommittedChanges } from "./fingerprint.ts";
@@ -35,6 +36,7 @@ const RELEASE: StopVerdict = { kind: "release" };
 interface StopSession {
   root: string;
   statePath(name: HookStateName): string;
+  messages: ClaudeMessages;
 }
 
 type ConfigReading = { config: ProjectConfig | undefined } | { broken: ProjectFileError };
@@ -103,12 +105,13 @@ function tailOf(output: string): string {
 
 // Отметка нужна хуку записи: следующий промпт человека — вызов хуком остановки.
 async function callHuman(session: StopSession, blocks: number): Promise<StopVerdict> {
-  const message = `Проверки красные после ${MAX_BLOCKS} попыток исправить — агент остановлен, нужен человек.`;
+  const { stop } = session.messages;
+  const message = stop.humanCalled(MAX_BLOCKS);
   const marked = await written(session.statePath("human-call"), String(blocks));
 
   return {
     kind: "release-with-message",
-    message: marked ? message : `${message} Отметка для записи не сохранена.`,
+    message: marked ? message : `${message} ${stop.markerNotSaved}`,
   };
 }
 
@@ -117,20 +120,23 @@ async function verdictOnRedChecks(
   checks: ProjectChecks,
   output: string,
 ): Promise<StopVerdict> {
+  const { stop } = session.messages;
   const counter = session.statePath("stop-blocks");
   const blocks = await countedBlock(counter);
 
   if (blocks === undefined) {
-    return {
-      kind: "release-with-message",
-      message: `Хук остановки не смог записать счётчик попыток (${counter}) — проверки красные, агент отпущен без повторов.`,
-    };
+    return { kind: "release-with-message", message: stop.counterNotSaved(counter) };
   }
   if (blocks > MAX_BLOCKS) return callHuman(session, blocks);
 
   return {
     kind: "block",
-    message: `${checks.command} не проходит — закончить работу нельзя (попытка ${blocks} из ${MAX_BLOCKS}). Исправь:\n${tailOf(output)}\n`,
+    message: stop.checksFailing({
+      command: checks.command,
+      attempt: blocks,
+      maxAttempts: MAX_BLOCKS,
+      output: tailOf(output),
+    }),
   };
 }
 
@@ -152,10 +158,12 @@ async function verdictOf(session: StopSession): Promise<StopVerdict> {
   const reading = await readConfig(session.root);
 
   if ("broken" in reading) {
-    return {
-      kind: "release-with-message",
-      message: `Конфиг ${PROJECT_CONFIG_FILE} не читается — проверки пропущены, агент отпущен. ${reading.broken.message}`,
-    };
+    const message = session.messages.stop.configUnreadable({
+      file: PROJECT_CONFIG_FILE,
+      reason: reading.broken.message,
+    });
+
+    return { kind: "release-with-message", message };
   }
 
   const checks = reading.config === undefined ? undefined : checksOf(reading.config);
@@ -165,10 +173,9 @@ async function verdictOf(session: StopSession): Promise<StopVerdict> {
   const changed = await codeChangedOrGitMissing(session, checks);
 
   if (changed instanceof GitError) {
-    return {
-      kind: "release-with-message",
-      message: `Хук остановки не запустил git — проверки пропущены, агент отпущен. ${changed.message}`,
-    };
+    const message = session.messages.stop.gitUnavailable(changed.message);
+
+    return { kind: "release-with-message", message };
   }
   if (!changed) return RELEASE;
 
@@ -219,6 +226,7 @@ export async function gateStop(context: HookContext): Promise<HookOutcome> {
   const session: StopSession = {
     root: context.projectDirectory,
     statePath: (name) => hookStatePath(context.tmpDir, sessionId, name),
+    messages: context.messages,
   };
 
   return outcomeOf(session, await verdictOf(session));

@@ -55,7 +55,7 @@ describe("HttpGithubAuth.requestDeviceCode", () => {
 
     const act = () => auth.requestDeviceCode("client-id");
 
-    await expect(act()).rejects.toThrow(/нет связи с https:\/\/github.com/);
+    await expect(act()).rejects.toThrow(/cannot reach https:\/\/github.com/);
   });
 });
 

@@ -13,6 +13,7 @@ import {
 } from "@cyberzavod/core";
 import { DEFAULT_JOURNAL, workflowOf } from "@cyberzavod/storage";
 import { projectIdOf, stackOf, type DetectedProject } from "./detect.ts";
+import type { CliMessages } from "./messages/cli-messages.ts";
 
 /** Кто отвечает на вопросы мастера: человек в терминале или значения по умолчанию. */
 export interface Prompter {
@@ -89,18 +90,25 @@ export function terminalPrompter(streams: TerminalStreams): Prompter {
  * Описывает найденное в проекте для человека.
  * @param {string} root Корень проекта.
  * @param {DetectedProject} detected Найденное.
+ * @param {CliMessages} messages Сообщения на выбранном языке.
  * @returns {string[]} Строки сводки.
  */
-export function describeDetected(root: string, detected: DetectedProject): string[] {
-  const listed = (values: string[]) => (values.length === 0 ? "не найдены" : values.join(", "));
+export function describeDetected(
+  root: string,
+  detected: DetectedProject,
+  messages: CliMessages,
+): string[] {
+  const { wizard } = messages;
+  const listed = (values: string[]) =>
+    values.length === 0 ? wizard.nothingFound : values.join(", ");
 
   return [
-    `Проект: ${detected.name} (${root})`,
-    `Языки: ${listed(detected.languages)}`,
-    `Фреймворки: ${listed(detected.frameworks)}`,
-    `Менеджер пакетов: ${detected.packageManager ?? "не найден"}`,
-    `Git: ${detected.git ? "есть" : "нет"}`,
-    `Скрипты: ${listed(detected.scripts)}`,
+    wizard.project({ name: detected.name, root }),
+    wizard.languages(listed(detected.languages)),
+    wizard.frameworks(listed(detected.frameworks)),
+    wizard.packageManager(detected.packageManager ?? wizard.packageManagerMissing),
+    wizard.git(detected.git),
+    wizard.scripts(listed(detected.scripts)),
   ];
 }
 
@@ -110,11 +118,15 @@ function splitList(answer: string): string[] {
   return parts.filter((part) => part !== "");
 }
 
-async function askAgents(
-  harness: Harness,
-  stages: Stage[],
-  prompter: Prompter,
-): Promise<Partial<Record<Stage, AgentConfig>>> {
+interface AgentQuestions {
+  harness: Harness;
+  stages: Stage[];
+  prompter: Prompter;
+  messages: CliMessages;
+}
+
+async function askAgents(questions: AgentQuestions): Promise<Partial<Record<Stage, AgentConfig>>> {
+  const { harness, stages, prompter, messages } = questions;
   const agents: Partial<Record<Stage, AgentConfig>> = {};
 
   for (const stage of stages) {
@@ -122,10 +134,11 @@ async function askAgents(
 
     if (guide.role === undefined) continue;
 
-    const model = await prompter.ask(
-      `Модель этапа «${guide.title}» (агент ${DEFAULT_AGENT.agent})`,
-      DEFAULT_MODEL,
-    );
+    const question = messages.wizard.modelQuestion({
+      title: guide.title,
+      agent: DEFAULT_AGENT.agent,
+    });
+    const model = await prompter.ask(question, DEFAULT_MODEL);
 
     agents[stage] = { ...DEFAULT_AGENT, model };
   }
@@ -133,27 +146,37 @@ async function askAgents(
   return agents;
 }
 
+/** Что нужно мастеру: найденное в проекте, harness, кто отвечает и тексты. */
+export interface WizardOptions {
+  /** Найденное в проекте. */
+  detected: DetectedProject;
+  /** Harness: процессы и этапы. */
+  harness: Harness;
+  /** Кто отвечает на вопросы. */
+  prompter: Prompter;
+  /** Сообщения на выбранном языке. */
+  messages: CliMessages;
+}
+
 /**
  * Собирает конфиг проекта из найденного и ответов человека.
- * @param {DetectedProject} detected Найденное в проекте.
- * @param {Harness} harness Harness: процессы и этапы.
- * @param {Prompter} prompter Кто отвечает на вопросы.
+ * @param {WizardOptions} options Найденное, harness, кто отвечает и сообщения.
  * @returns {Promise<Omit<ProjectConfig, "harness">>} Конфиг без версии harness: её ставит CLI.
  * @throws {HarnessError} Если выбран процесс, которого нет в harness.
  */
 export async function askProjectConfig(
-  detected: DetectedProject,
-  harness: Harness,
-  prompter: Prompter,
+  options: WizardOptions,
 ): Promise<Omit<ProjectConfig, "harness">> {
-  const projectIdAnswer = await prompter.ask("Идентификатор проекта", projectIdOf(detected.name));
-  const workflowName = await prompter.ask("Процесс", "default");
+  const { detected, harness, prompter, messages } = options;
+  const { wizard } = messages;
+  const projectIdAnswer = await prompter.ask(wizard.projectIdQuestion, projectIdOf(detected.name));
+  const workflowName = await prompter.ask(wizard.workflowQuestion, "default");
   const projectId = projectIdOf(projectIdAnswer);
   const workflow = workflowOf(harness, workflowName);
-  const agents = await askAgents(harness, workflow.stages, prompter);
-  const journal = await prompter.ask("Каталог журнала от корня проекта", DEFAULT_JOURNAL);
+  const agents = await askAgents({ harness, stages: workflow.stages, prompter, messages });
+  const journal = await prompter.ask(wizard.journalQuestion, DEFAULT_JOURNAL);
   const commands = await prompter.ask(
-    `Команды проверки через «${LIST_SEPARATOR}»`,
+    wizard.commandsQuestion(LIST_SEPARATOR),
     detected.verification.join(`${LIST_SEPARATOR} `),
   );
 

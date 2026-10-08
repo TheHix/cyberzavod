@@ -4,8 +4,6 @@ import { CommandError } from "../errors.ts";
 import { isApiError, UNAUTHORIZED_CODE } from "./api.ts";
 import type { Sharing } from "./services.ts";
 
-const LOGIN_HINT = "войдите командой cyberzavod login";
-
 /**
  * Выполняет действие автора с сохранённым токеном.
  * @param {Sharing} sharing Зависимости команд публикации.
@@ -19,13 +17,13 @@ export async function withToken<Result>(
 ): Promise<Result> {
   const token = await sharing.credentials.read();
 
-  if (token === undefined) throw new CommandError(`нет входа: ${LOGIN_HINT}`);
+  if (token === undefined) throw new CommandError((messages) => messages.errors.notLoggedIn);
 
   try {
     return await action(token);
   } catch (err) {
     if (!isApiError(err, UNAUTHORIZED_CODE)) throw err;
 
-    throw new CommandError(`${err.message}: ${LOGIN_HINT}`, { cause: err });
+    throw new CommandError((messages) => messages.errors.tokenRejected, { cause: err });
   }
 }

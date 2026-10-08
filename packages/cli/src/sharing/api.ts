@@ -1,6 +1,7 @@
 // Сервер Cyberzavod: интерфейс, которым пользуются команды, и его реализация поверх HTTP.
 // Формат ответов — контракт API; всё, что пришло по сети, проверяется до того, как его получат команды.
 
+import { CommandError } from "../errors.ts";
 import { isObject, readJsonBody, sendRequest, type FetchFunction } from "./http.ts";
 
 /** Краткие сведения о записи автора на сервере. */
@@ -36,7 +37,7 @@ export class ApiError extends Error {
 
   /**
    * Ошибка, о которой сообщил сервер.
-   * @param {string} message Текст ошибки по-русски из ответа сервера.
+   * @param {string} message Текст ошибки из ответа сервера, как он пришёл: язык выбирает сервер.
    * @param {string} code Код ошибки из ответа сервера, например `limit_reached`.
    * @param {number} status HTTP-статус ответа.
    */
@@ -53,8 +54,6 @@ export const UNAUTHORIZED_CODE = "unauthorized";
 /** Код ошибки сервера, когда у автора уже максимум записей. */
 export const LIMIT_REACHED_CODE = "limit_reached";
 
-const INVALID_RESPONSE_CODE = "invalid_response";
-const HTTP_ERROR_CODE = "http_error";
 const NEW_RECORDING_STATUS = 201;
 
 /** Что команды берут у сервера; запросы автора несут токен GitHub. */
@@ -71,55 +70,53 @@ function isString(value: unknown): value is string {
   return typeof value === "string";
 }
 
-function invalidResponse(what: string, status: number): ApiError {
-  return new ApiError(`сервер вернул неожиданный ответ: ${what}`, INVALID_RESPONSE_CODE, status);
+const RESPONSE_BODY = "body";
+
+// Поле названо путём по JSON сервера: оно одинаково на любом языке сообщений.
+function invalidResponse(field: string): CommandError {
+  return new CommandError((messages) => messages.errors.serverUnexpectedResponse(field));
 }
 
-function parseSummary(raw: unknown, status: number): RecordingSummary {
-  if (!isObject(raw)) throw invalidResponse("запись не объект", status);
+// `where` — путь к записи в ответе: по нему видно, какое именно поле сервер не прислал.
+function parseSummary(raw: unknown, where: string): RecordingSummary {
+  if (!isObject(raw)) throw invalidResponse(where);
 
   const { id, slug, projectId, title, language, startedAt, uploadedAt } = raw;
 
-  if (
-    !isString(id) ||
-    !isString(slug) ||
-    !isString(projectId) ||
-    !isString(title) ||
-    !isString(language) ||
-    !isString(startedAt) ||
-    !isString(uploadedAt)
-  ) {
-    throw invalidResponse("в записи не хватает полей", status);
-  }
+  if (!isString(id)) throw invalidResponse(`${where}.id`);
+  if (!isString(slug)) throw invalidResponse(`${where}.slug`);
+  if (!isString(projectId)) throw invalidResponse(`${where}.projectId`);
+  if (!isString(title)) throw invalidResponse(`${where}.title`);
+  if (!isString(language)) throw invalidResponse(`${where}.language`);
+  if (!isString(startedAt)) throw invalidResponse(`${where}.startedAt`);
+  if (!isString(uploadedAt)) throw invalidResponse(`${where}.uploadedAt`);
 
   return { id, slug, projectId, title, language, startedAt, uploadedAt };
 }
 
-function parseMe(raw: unknown, status: number): Me {
-  if (!isObject(raw)) throw invalidResponse("автор не объект", status);
+function parseMe(raw: unknown): Me {
+  if (!isObject(raw)) throw invalidResponse(RESPONSE_BODY);
 
   const { login, galleryPublic, limit, recordings } = raw;
 
-  if (
-    !isString(login) ||
-    typeof galleryPublic !== "boolean" ||
-    typeof limit !== "number" ||
-    !Array.isArray(recordings)
-  ) {
-    throw invalidResponse("у автора не хватает полей", status);
-  }
+  if (!isString(login)) throw invalidResponse("login");
+  if (typeof galleryPublic !== "boolean") throw invalidResponse("galleryPublic");
+  if (typeof limit !== "number") throw invalidResponse("limit");
+  if (!Array.isArray(recordings)) throw invalidResponse("recordings");
 
-  const summaries = recordings.map((summary: unknown) => parseSummary(summary, status));
+  const summaries = recordings.map((summary: unknown) => parseSummary(summary, "recordings[]"));
 
   return { login, galleryPublic, limit, recordings: summaries };
 }
 
-function errorOf(body: unknown, status: number): ApiError {
+// Сервер Cyberzavod отвечает ошибкой `{error, message}`; ответ без неё — не его ошибка, а сбой
+// по дороге, и текст о нём пишет CLI.
+function errorOf(body: unknown, status: number): ApiError | CommandError {
   if (isObject(body) && isString(body.error) && isString(body.message)) {
     return new ApiError(body.message, body.error, status);
   }
 
-  return new ApiError(`сервер ответил ${status}`, HTTP_ERROR_CODE, status);
+  return new CommandError((messages) => messages.errors.serverStatus(status));
 }
 
 interface Call {
@@ -152,12 +149,13 @@ export class HttpCyberzavodApi implements CyberzavodApi {
   /**
    * Спрашивает у сервера идентификатор приложения GitHub.
    * @returns {Promise<string>} `clientId` для device flow.
-   * @throws {ApiError} Если вход на сервере недоступен или ответ неожиданный.
+   * @throws {ApiError} Если вход на сервере недоступен.
+   * @throws {CommandError} Если ответ неожиданный.
    */
   async githubClientId(): Promise<string> {
-    const { status, body } = await this.#call({ method: "GET", path: "/api/auth/github" });
+    const { body } = await this.#call({ method: "GET", path: "/api/auth/github" });
 
-    if (!isObject(body) || !isString(body.clientId)) throw invalidResponse("нет clientId", status);
+    if (!isObject(body) || !isString(body.clientId)) throw invalidResponse("clientId");
 
     return body.clientId;
   }
@@ -166,12 +164,13 @@ export class HttpCyberzavodApi implements CyberzavodApi {
    * Возвращает автора, которому принадлежит токен.
    * @param {string} token Токен GitHub.
    * @returns {Promise<Me>} Автор с галереей и записями.
-   * @throws {ApiError} Если сервер не принял токен или ответ неожиданный.
+   * @throws {ApiError} Если сервер не принял токен.
+   * @throws {CommandError} Если ответ неожиданный.
    */
   async me(token: string): Promise<Me> {
-    const { status, body } = await this.#call({ method: "GET", path: "/api/me", token });
+    const { body } = await this.#call({ method: "GET", path: "/api/me", token });
 
-    return parseMe(body, status);
+    return parseMe(body);
   }
 
   /**
@@ -180,7 +179,8 @@ export class HttpCyberzavodApi implements CyberzavodApi {
    * @param {string} id Идентификатор записи.
    * @param {unknown} record Запись, прошедшая проверку ядра.
    * @returns {Promise<UploadedRecording>} Сведения о записи на сервере.
-   * @throws {ApiError} Если сервер отклонил запись или ответ неожиданный.
+   * @throws {ApiError} Если сервер отклонил запись.
+   * @throws {CommandError} Если ответ неожиданный.
    */
   async uploadRecording(token: string, id: string, record: unknown): Promise<UploadedRecording> {
     const { status, body } = await this.#call({
@@ -190,10 +190,10 @@ export class HttpCyberzavodApi implements CyberzavodApi {
       body: record,
     });
 
-    if (!isObject(body)) throw invalidResponse("нет сведений о записи", status);
+    if (!isObject(body)) throw invalidResponse(RESPONSE_BODY);
 
     return {
-      recording: parseSummary(body.recording, status),
+      recording: parseSummary(body.recording, "recording"),
       isNew: status === NEW_RECORDING_STATUS,
     };
   }

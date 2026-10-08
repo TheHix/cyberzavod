@@ -43,7 +43,9 @@ export {
   type DraftPrompt,
   type DraftRun,
   type EditableDraftEvent,
+  type HeaderField,
   type MessageSource,
+  type UnfilledBuild,
 } from "./draft.ts";
 export {
   buildTimeline,
@@ -52,7 +54,7 @@ export {
   projectsWithoutBuild,
   unassignedRuns,
 } from "./builds.ts";
-export { findLeaks } from "./leaks.ts";
+export { findLeaks, type LeakKind } from "./leaks.ts";
 export {
   agentAssignments,
   agentReports,

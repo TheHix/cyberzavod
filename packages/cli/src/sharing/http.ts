@@ -26,7 +26,11 @@ export async function sendRequest(
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
 
-    throw new CommandError(`нет связи с ${new URL(url).origin}: ${reason}`, { cause: err });
+    const { origin } = new URL(url);
+
+    throw new CommandError((messages) => messages.errors.noConnection({ origin, reason }), {
+      cause: err,
+    });
   }
 }
 

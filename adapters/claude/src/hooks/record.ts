@@ -29,11 +29,13 @@ function withProject(event: RawEvent, project: LocatedProject): RawEvent {
 async function withStopGateMark(
   event: RawEvent,
   sessionId: string,
-  tmpDir: string,
+  context: HookContext,
 ): Promise<RawEvent> {
   if (event.kind !== "prompt" || !isHumanPrompt(event.text)) return event;
 
-  return (await claimHumanCallMarker(sessionId, tmpDir)) ? markAfterStopGate(event) : event;
+  const isClaimed = await claimHumanCallMarker(sessionId, context.tmpDir, context.messages);
+
+  return isClaimed ? markAfterStopGate(event) : event;
 }
 
 /**
@@ -56,7 +58,9 @@ export async function recordEvent(context: HookContext): Promise<HookOutcome> {
   } catch (err) {
     if (!(err instanceof ProjectFileError)) throw err;
 
-    return { ...SILENT_EXIT, stderr: `сессия не записана: ${err.message}\n` };
+    const reason = context.messages.record.sessionNotRecorded(err.message);
+
+    return { ...SILENT_EXIT, stderr: `${reason}\n` };
   }
 
   if (project === undefined) return SILENT_EXIT;
@@ -68,7 +72,7 @@ export async function recordEvent(context: HookContext): Promise<HookOutcome> {
   }
 
   const stampedEvent = withProject(hookEvent, project);
-  const event = await withStopGateMark(stampedEvent, sessionId, context.tmpDir);
+  const event = await withStopGateMark(stampedEvent, sessionId, context);
   const { raw } = captureDirectories(project.journal);
 
   await mkdir(raw, { recursive: true });
