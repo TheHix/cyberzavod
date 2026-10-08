@@ -5,7 +5,7 @@
 import { rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { syncClaude } from "@cyberzavod/adapter-claude";
-import type { ProjectConfig } from "@cyberzavod/core";
+import { RULES_TODO_MARK, type ProjectConfig } from "@cyberzavod/core";
 import { PROJECT_CONFIG_FILE, readProjectConfig, writeProjectConfig } from "@cyberzavod/storage";
 import type { Confirmation } from "../confirmation.ts";
 import { detectProject } from "../detect.ts";
@@ -22,14 +22,18 @@ const AGENT_DIRECTORY = ".claude/";
 const SUMMARY_INDENT = "  ";
 const LIST_SEPARATOR = ", ";
 const PATH_SEPARATORS = /[\\/]/;
+const TODO_PLACEHOLDER = "{{todo}}";
 
 function starterRules(template: string, name: string, commands: string[]): string {
   const verification =
     commands.length === 0
-      ? "  - not set yet"
+      ? `  - not set yet ${RULES_TODO_MARK}`
       : commands.map((command) => `  - \`${command}\``).join("\n");
 
-  return template.replace("{{name}}", name).replace("{{verification}}", verification);
+  return template
+    .replace("{{name}}", name)
+    .replace("{{verification}}", verification)
+    .replaceAll(TODO_PLACEHOLDER, RULES_TODO_MARK);
 }
 
 // Что будет с правилами проекта: AGENTS.md уже есть и не меняется; написанный человеком

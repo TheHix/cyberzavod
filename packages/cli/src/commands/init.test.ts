@@ -2,6 +2,7 @@ import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { RULES_TODO_MARK } from "@cyberzavod/core";
 import { PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
 import type { Confirmation } from "../confirmation.ts";
 import { readInstallation, type Installation } from "../installation/installation.ts";
@@ -113,6 +114,34 @@ describe("initProject", () => {
     expect(seen[0]).toContain(messages.init.checksMissing(".cyberzavod/project.json"));
     expect(seen[0]).toContain("/setup");
   });
+
+  it.each([
+    { commands: ["npm run test"], marked: 3 },
+    { commands: [], marked: 4 },
+  ])(
+    "отмечает каждую заглушку заготовки AGENTS.md ($marked отметки при проверках: $commands)",
+    async ({ commands, marked }) => {
+      const { confirm } = answering(true);
+
+      await initProject(root, {
+        confirm,
+        overrides: { checks: commands },
+        installation,
+        messages,
+      });
+
+      const rules = await readFile(path.join(root, "AGENTS.md"), "utf8");
+      const lines = rules.split("\n");
+      const markedLines = lines.filter((line) => line.includes(RULES_TODO_MARK));
+      const commandLines = lines.filter((line) => line.includes("`npm run test`"));
+
+      expect({
+        marked: markedLines.length,
+        commandsMarked: commandLines.some((line) => line.includes(RULES_TODO_MARK)),
+        hasPlaceholder: rules.includes("{{"),
+      }).toEqual({ marked, commandsMarked: false, hasPlaceholder: false });
+    },
+  );
 
   it.each(["en", "ru"] as const)("сводка (%s) укладывается в 80 колонок", async (language) => {
     const { confirm, seen } = answering(true);

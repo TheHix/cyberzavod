@@ -39,6 +39,7 @@ export async function readInstallation(): Promise<Installation> {
     claudeTemplates: {
       publishRecording: template(templates, "publish-recording.md"),
       recordingEditor: template(templates, "recording-editor.md"),
+      setup: template(templates, "setup.md"),
     },
   };
 }
