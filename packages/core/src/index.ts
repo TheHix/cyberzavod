@@ -71,3 +71,11 @@ export {
 } from "./record.ts";
 export type { RecordStore } from "./store.ts";
 export { ProjectError, parseProject, type Project } from "./project.ts";
+export {
+  DEFAULT_INTERFACE_LANGUAGE,
+  INTERFACE_LANGUAGES,
+  isInterfaceLanguage,
+  type InterfaceLanguage,
+  type LocalizedText,
+  type MessageCatalog,
+} from "./interface-language.ts";
