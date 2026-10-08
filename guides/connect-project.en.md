@@ -149,7 +149,7 @@ A published recording is shared from the CLI straight into your personal gallery
    node .cyberzavod/bin/cyberzavod.mjs share <id>
    ```
 
-   Before sending, `share` checks the recording the same way the site does. In reply it prints a link like `https://cyberzavod.com/r/?id=<slug>`: the same floor and build log as on the factory's own recordings. Sharing the same `id` again replaces the recording, and the link stays the same.
+   Before sending, `share` checks the recording the same way the site does. In reply it prints a link like `https://cyberzavod.com/r/?id=<slug>`: the same floor and build log as on the recordings on the home page. Sharing the same `id` again replaces the recording, and the link stays the same.
 
 3. The gallery is private by default: a recording is visible only to those who have the link. To list the gallery on the site, open it:
 
@@ -174,7 +174,7 @@ The same can be done on the site, without a terminal: sign in with GitHub in the
 The home page and the project pages of the site are built from the factory repository: recordings from its `.cyberzavod/journal/sessions/` and project cards from `projects/`. To have your project there with a card, open a pull request to the [factory repository](https://github.com/bysavelii/cyberzavod) with two files:
 
 - the recording `.cyberzavod/journal/sessions/<id>.json` from your project log;
-- the card `projects/<id>.json`: `id`, `name` and a one-line `description` in every site language (`{ "en": …, "ru": … }`) and optional `repo` and `website`, `https` only.
+- the card `projects/<id>.json`: `id`, `name` and a one-line `description` in every site language (`{ "en": …, "ru": … }`) and optional `repo` and `website`, `https` only, and `stack` — up to six labels such as `["TypeScript", "Vite"]`.
 
 Before that, run `pnpm install` and `make check-web` in the clone: it builds the site and catches a broken card or recording.
 
@@ -187,6 +187,10 @@ Before that, run `pnpm install` and `make check-web` in the clone: it builds the
 
 ## A live example
 
-Personal Finance Lab is an external project the factory runs: [project page](/projects/personal-finance-lab/). The recording ["Personal Finance Lab: a finance lab from scratch"](/recordings/2026-10-05-4365c610-2/) is the second task of its session; the recording itself is in Russian. The first task of the same session is the recording `2026-10-05-4365c610` of the `cyberzavod` project. This is what several tasks in one session look like.
+The factory has built three reference projects from scratch. Each one started with a single human prompt for a series of tasks, and the lead ran that series through the process on its own: plan, code, review, verify, record. After its series, Split the Bill got more work on new human prompts. Each task is a separate recording; the project page lists its builds in task order, along with the totals: time, tokens, reworks and human involvement. The recordings themselves are in Russian.
+
+- Split the Bill is a web app in TypeScript and Vite: [project page](/projects/split-bill/). In the recording ["The Share link: the bill in the page address"](/recordings/2026-10-07-79fd668f-3/) the review tries to break the link parser and returns the task: a forged link crashed the page.
+- dupes is a command-line tool in Rust: [project page](/projects/dupes/). In the recording ["Safe cleanup to the trash, JSON and README"](/recordings/2026-10-07-aa4e0a7d-3/) the review returns the move to the trash twice, until the tool no longer puts real files at risk.
+- doc-diff compares versions of a contract, in Python: [project page](/projects/doc-diff/). The recording ["The doc-diff skeleton and text extraction from PDF and DOCX"](/recordings/2026-10-07-4948cd46/) opens the series: it holds the human's prompt for all five tasks at once.
 
 The sources of the harness, the CLI and the Claude Code adapter are in the factory repository: [`harness/`](https://github.com/bysavelii/cyberzavod/tree/main/harness), [`packages/cli`](https://github.com/bysavelii/cyberzavod/tree/main/packages/cli) and [`adapters/claude`](https://github.com/bysavelii/cyberzavod/tree/main/adapters/claude). They ship to npm as a single package, `cyberzavod`.

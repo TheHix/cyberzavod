@@ -1,0 +1,13 @@
+{
+  "id": "dupes",
+  "name": {
+    "en": "dupes",
+    "ru": "dupes"
+  },
+  "description": {
+    "en": "A command-line tool that finds duplicate files and similar photos, shows how much space they take and moves the extra copies to the trash instead of deleting them for good.",
+    "ru": "Программа для командной строки: находит одинаковые файлы и похожие фото, показывает, сколько места они занимают, и убирает лишние копии в корзину, а не удаляет навсегда."
+  },
+  "repo": "https://github.com/bysavelii/dupes",
+  "stack": ["Rust"]
+}
