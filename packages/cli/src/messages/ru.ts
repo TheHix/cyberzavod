@@ -1,69 +1,113 @@
 // Русские тексты CLI.
 
 import { CLI_COMMAND, HOOK_NAMES } from "@cyberzavod/adapter-claude";
+import { API_URL_VARIABLE, DEFAULT_API_URL } from "../sharing/services.ts";
 import type { CliMessages } from "./cli-messages.ts";
 
 /** Тексты CLI на русском. */
 export const ru: CliMessages = {
   help: {
     title: "Cyberzavod — процесс разработки с ИИ-агентами, локально.",
-    languageOption: (languages) =>
-      `Язык сообщений: --lang ${languages} или переменная CYBERZAVOD_LANG; без них — по локали системы.`,
+    quickStart: `Старт: ${CLI_COMMAND} init, затем в Claude Code /setup и /feature <задача>.`,
+    sections: {
+      start: "Начало",
+      journal: "Журнал",
+      gallery: "Галерея",
+      maintenance: "Обслуживание",
+    },
+    commandHelpHint: `Подробнее о команде: ${CLI_COMMAND} <команда> --help`,
+    parametersTitle: "Параметры:",
+    languageOption: (languages) => `Язык: --lang ${languages}, CYBERZAVOD_LANG или локаль системы.`,
   },
   commands: {
     init: {
       usage: "init [--yes]",
-      summary: "подключить проект в текущем каталоге: мастер, конфиг, AGENTS.md, файлы агента",
+      summary: "подключить проект: мастер, конфиг, AGENTS.md, файлы агента",
+      parameters: [
+        { name: "--yes, -y", description: "взять предложенные ответы, ничего не спрашивать" },
+      ],
     },
     sync: {
       usage: "sync [--check] [--force]",
-      summary: "заново найти стек и пересобрать файлы агента; --check — только проверить",
+      summary: "заново распознать стек и пересобрать файлы агента",
+      parameters: [
+        { name: "--check", description: "только сообщить, что устарело; выход 1, если есть" },
+        { name: "--force", description: "перезаписать файлы, написанные человеком" },
+      ],
     },
     status: {
       usage: "status",
       summary: "проект, процесс, агенты этапов, проверки и журнал",
+      parameters: [],
     },
     decision: {
       usage: 'decision "<что решили>" [--why "<почему>"]',
       summary: "записать решение в журнал",
+      parameters: [
+        { name: '"<что решили>"', description: "текст решения" },
+        { name: "--why", description: "причина, она сохраняется вместе с решением" },
+      ],
     },
     note: {
       usage: 'note "<текст>"',
       summary: "записать заметку в журнал",
+      parameters: [{ name: '"<текст>"', description: "текст заметки" }],
     },
     draft: {
       usage: "draft [<сырой журнал сессии>]",
       summary: "собрать черновик записи из журнала сессии Claude Code",
+      parameters: [
+        {
+          name: "<сырой журнал сессии>",
+          description: "путь к журналу; без него — самый свежий сырой журнал",
+        },
+      ],
     },
     publish: {
       usage: "publish [--draft <черновик>] [--build <id сборки>]",
       summary: "опубликовать отредактированный черновик записями в журнал",
+      parameters: [
+        { name: "--draft", description: "путь к черновику; без него — самый свежий" },
+        { name: "--build", description: "сборка черновика; без неё — все" },
+      ],
     },
     login: {
       usage: "login",
-      summary:
-        "войти через GitHub, чтобы публиковать записи в галерею (адрес сервера — CYBERZAVOD_API_URL)",
+      summary: "войти через GitHub, чтобы публиковать записи в галерею",
+      parameters: [
+        {
+          name: API_URL_VARIABLE,
+          description: `адрес сервера; по умолчанию ${DEFAULT_API_URL}`,
+        },
+      ],
     },
     logout: {
       usage: "logout",
       summary: "забыть сохранённый токен GitHub",
+      parameters: [],
     },
     share: {
       usage: "share <id записи>",
-      summary: "отправить запись сессии из журнала в вашу галерею и показать ссылку на неё",
+      summary: "отправить запись из журнала в вашу галерею",
+      parameters: [{ name: "<id записи>", description: "id записи сессии" }],
     },
     unshare: {
       usage: "unshare <id записи>",
       summary: "убрать запись из вашей галереи",
+      parameters: [{ name: "<id записи>", description: "id записи в галерее" }],
     },
     gallery: {
       usage: "gallery [--public | --private]",
-      summary:
-        "ваши записи в галерее, лимит и ссылки; --public открывает галерею, --private закрывает",
+      summary: "ваша галерея: записи, лимит, ссылки; открыть или закрыть",
+      parameters: [
+        { name: "--public", description: "открыть галерею" },
+        { name: "--private", description: "закрыть галерею" },
+      ],
     },
     hook: {
       usage: `hook <${HOOK_NAMES.join("|")}>`,
-      summary: "хук Claude Code: событие на stdin; его вызывают настройки проекта, а не человек",
+      summary: "хук Claude Code: его вызывают настройки проекта, а не человек",
+      parameters: [{ name: "<имя хука>", description: "событие приходит на stdin" }],
     },
   },
   init: {
@@ -149,6 +193,9 @@ export const ru: CliMessages = {
     missingNoteText: "нужен текст заметки",
     missingRecordId: "нужен id записи",
     unknownHook: (name) => `нет хука ${name}`,
+    unknownCommand: (name) => `неизвестная команда «${name}»: все команды — ${CLI_COMMAND} --help`,
+    unknownCommandWithSuggestion: ({ name, suggestion }) =>
+      `неизвестная команда «${name}»: может быть, ${CLI_COMMAND} ${suggestion}? Все команды: ${CLI_COMMAND} --help`,
     languageFlagWithoutValue: "у --lang нет значения: укажите язык, например --lang ru",
     unsupportedLanguage: ({ value, supported }) =>
       `язык «${value}» не поддерживается: доступны ${supported}`,

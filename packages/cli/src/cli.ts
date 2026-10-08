@@ -5,7 +5,6 @@ import { homedir, tmpdir } from "node:os";
 import { parseArgs } from "node:util";
 import {
   CLAUDE_MESSAGES,
-  CLI_COMMAND,
   ClaudeError,
   draftSession,
   isHookName,
@@ -13,12 +12,7 @@ import {
   runHook,
   type ClaudeMessages,
 } from "@cyberzavod/adapter-claude";
-import {
-  INTERFACE_LANGUAGES,
-  RecordError,
-  type InterfaceLanguage,
-  type LocalizedText,
-} from "@cyberzavod/core";
+import { RecordError, type InterfaceLanguage, type LocalizedText } from "@cyberzavod/core";
 import { JournalError, ProjectFileError } from "@cyberzavod/storage";
 import { galleryAccessOf, showGallery } from "./commands/gallery.ts";
 import { initProject } from "./commands/init.ts";
@@ -27,7 +21,9 @@ import { login, logout } from "./commands/login.ts";
 import { shareRecording, unshareRecording } from "./commands/share.ts";
 import { printStatus } from "./commands/status.ts";
 import { checkProject, syncProject } from "./commands/sync.ts";
+import { closestName } from "./closest-name.ts";
 import { CommandError } from "./errors.ts";
+import { commandHelp, generalHelp, listedCommandNames, type CommandPlacement } from "./help.ts";
 import { readInstallation } from "./installation/installation.ts";
 import { CLI_MESSAGES } from "./messages/catalog.ts";
 import { COMMAND_NAMES, type CliMessages, type CommandName } from "./messages/cli-messages.ts";
@@ -38,6 +34,9 @@ import { defaultsPrompter, terminalPrompter } from "./wizard.ts";
 
 const SUCCESS = 0;
 const FAILURE = 1;
+const GENERAL_HELP_REQUESTS: readonly string[] = ["help", "--help", "-h"];
+const COMMAND_HELP_FLAGS: readonly string[] = ["--help", "-h"];
+const OPTIONS_END = "--";
 
 /**
  * Как запущена команда: её аргументы, каталог, из которого её вызвали, окружение и тексты на
@@ -51,8 +50,10 @@ interface Invocation {
   claudeMessages: ClaudeMessages;
 }
 
-// Справка команды лежит в каталоге сообщений: команда без справки не компилируется.
+// Справка команды лежит в каталоге сообщений: команда без справки не компилируется. Раздел —
+// место команды в общей справке; служебные команды (`service`) в списке не показываются.
 interface Command {
+  section: CommandPlacement;
   run(invocation: Invocation): Promise<number>;
 }
 
@@ -76,6 +77,7 @@ function defaultSharing(env: Environment): Sharing {
 
 const COMMANDS: Readonly<Record<CommandName, Command>> = {
   init: {
+    section: "start",
     run: async ({ args, directory, messages }) => {
       const { values } = parseArgs({ args, options: { yes: { type: "boolean", short: "y" } } });
       const prompter =
@@ -97,6 +99,7 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
     },
   },
   sync: {
+    section: "maintenance",
     run: async ({ args, directory, messages }) => {
       const { values } = parseArgs({
         args,
@@ -116,6 +119,7 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
     },
   },
   status: {
+    section: "start",
     run: async ({ directory, messages }) => {
       await printStatus(directory, await readInstallation(), messages);
 
@@ -123,6 +127,7 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
     },
   },
   decision: {
+    section: "journal",
     run: async ({ args, directory, messages }) => {
       const { values, positionals } = parseArgs({
         args,
@@ -138,6 +143,7 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
     },
   },
   note: {
+    section: "journal",
     run: async ({ args, directory, messages }) => {
       const { positionals } = parseArgs({ args, allowPositionals: true });
 
@@ -149,6 +155,7 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
     },
   },
   draft: {
+    section: "service",
     run: async ({ args, directory, claudeMessages }) => {
       const { positionals } = parseArgs({ args, allowPositionals: true });
       const [rawPath] = positionals;
@@ -163,6 +170,7 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
     },
   },
   publish: {
+    section: "service",
     run: async ({ args, directory, claudeMessages }) => {
       const { values } = parseArgs({
         args,
@@ -179,6 +187,7 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
     },
   },
   login: {
+    section: "gallery",
     run: async ({ env, messages }) => {
       await login(defaultSharing(env), messages);
 
@@ -186,6 +195,7 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
     },
   },
   logout: {
+    section: "gallery",
     run: async ({ env, messages }) => {
       await logout(defaultSharing(env), messages);
 
@@ -193,6 +203,7 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
     },
   },
   share: {
+    section: "gallery",
     run: async ({ args, directory, env, messages }) => {
       const { positionals } = parseArgs({ args, allowPositionals: true });
       const [id] = positionals;
@@ -205,6 +216,7 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
     },
   },
   unshare: {
+    section: "gallery",
     run: async ({ args, env, messages }) => {
       const { positionals } = parseArgs({ args, allowPositionals: true });
       const [id] = positionals;
@@ -217,6 +229,7 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
     },
   },
   gallery: {
+    section: "gallery",
     run: async ({ args, env, messages }) => {
       const { values } = parseArgs({
         args,
@@ -230,6 +243,7 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
     },
   },
   hook: {
+    section: "service",
     run: async ({ args, directory, env, claudeMessages }) => {
       const { positionals } = parseArgs({ args, allowPositionals: true });
       const [name = ""] = positionals;
@@ -251,22 +265,6 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
     },
   },
 };
-
-/**
- * Текст справки: команды, что они делают, и как выбрать язык.
- * @param {CliMessages} messages Сообщения на выбранном языке.
- * @returns {string} Справка.
- */
-export function usage(messages: CliMessages): string {
-  const lines = COMMAND_NAMES.map((name) => {
-    const { usage: invocation, summary } = messages.commands[name];
-
-    return `  ${CLI_COMMAND} ${invocation}\n      ${summary}`;
-  });
-  const languageOption = messages.help.languageOption(INTERFACE_LANGUAGES.join("|"));
-
-  return `${messages.help.title}\n\n${lines.join("\n")}\n\n${languageOption}`;
-}
 
 const EXPECTED_ERRORS = [
   CommandError,
@@ -303,6 +301,26 @@ function expectedErrorText(
 
 function isCommandName(name: string): name is CommandName {
   return (COMMAND_NAMES as readonly string[]).includes(name);
+}
+
+function hasHelpFlag(args: readonly string[]): boolean {
+  const optionEnd = args.indexOf(OPTIONS_END);
+  const options = optionEnd === -1 ? args : args.slice(0, optionEnd);
+
+  return options.some((argument) => COMMAND_HELP_FLAGS.includes(argument));
+}
+
+// Служебные команды не подсказываются: человек их не набирает.
+function printUnknownCommand(name: string, messages: CliMessages): number {
+  const suggestion = closestName(name, listedCommandNames(COMMANDS));
+  const text =
+    suggestion === undefined
+      ? messages.errors.unknownCommand(name)
+      : messages.errors.unknownCommandWithSuggestion({ name, suggestion });
+
+  console.error(`cyberzavod: ${text}`);
+
+  return FAILURE;
 }
 
 /** Выбранный язык и аргументы без флага `--lang`. */
@@ -348,12 +366,18 @@ export async function runCli(argv: string[], directory: string, env: Environment
   const claudeMessages = CLAUDE_MESSAGES[choice.language];
   const [name, ...args] = choice.rest;
 
-  if (name === undefined || !isCommandName(name)) {
-    const isHelpRequest = name === undefined || name === "help" || name === "--help";
+  if (name === undefined || GENERAL_HELP_REQUESTS.includes(name)) {
+    console.log(generalHelp(messages, COMMANDS));
 
-    console.log(usage(messages));
+    return SUCCESS;
+  }
 
-    return isHelpRequest ? SUCCESS : FAILURE;
+  if (!isCommandName(name)) return printUnknownCommand(name, messages);
+
+  if (hasHelpFlag(args)) {
+    console.log(commandHelp(name, messages));
+
+    return SUCCESS;
   }
 
   try {

@@ -13,7 +13,7 @@ Cyberzavod — локальный, независимый от модели harn
 - `make dev` — Postgres и API в Docker, фронт с горячей перезагрузкой на http://localhost:4321.
 - `make up` / `make down` — поднять или остановить Docker-окружение.
 - `make format` — привести код к стилю (Prettier, ESLint --fix, gofumpt, goimports).
-- `pnpm cyberzavod <команда>` — собрать CLI из рабочей копии и запустить: `init`, `sync`, `status`, `decision`, `note`, `draft`, `publish`, `hook`, `login`, `logout`, `share`, `unshare`, `gallery`; `pnpm cyberzavod --help` — подробности.
+- `pnpm cyberzavod <команда>` — собрать CLI из рабочей копии и запустить: `init`, `sync`, `status`, `decision`, `note`, `draft`, `publish`, `hook`, `login`, `logout`, `share`, `unshare`, `gallery`; `pnpm cyberzavod --help` — команды по разделам, `pnpm cyberzavod <команда> --help` — флаги команды.
 - `pnpm cyberzavod sync` — после правки `harness/`, шаблонов, CLI, адаптера или конфига: перегенерировать `CLAUDE.md` и `.claude/`. `make check-web` ловит, если забыли.
 - `/feature <номер issue>` — провести задачу через процесс: постановка (ждёт одобрения человека), код, ревью, проверки, фиксация.
 - `/publish-recording` — опубликовать сессию: черновик из сырого журнала, чистовая редактура промптов и реплик, проверка человеком, запись в `.cyberzavod/journal/sessions/`. Оттуда запись уходит на сайт, поэтому сессию самого завода публикуют только вместе с его карточкой (см. `projects/` в «Устройстве»).

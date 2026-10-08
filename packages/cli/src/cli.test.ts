@@ -7,11 +7,16 @@ import { parseProjectConfig } from "@cyberzavod/core";
 import { LEGACY_TOOL_FILE, PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
 import { runCli } from "./cli.ts";
 import { HARNESS_VERSION } from "./installation/installation.ts";
+import { CLI_MESSAGES } from "./messages/catalog.ts";
+import { COMMAND_NAMES } from "./messages/cli-messages.ts";
 import type { Environment } from "./messages/language.ts";
 
 const SESSION_ID = "cli-test-hook-language";
 const EN_TITLE = "Cyberzavod — an AI-agent development process, local-first.";
 const RU_TITLE = "Cyberzavod — процесс разработки с ИИ-агентами, локально.";
+// Справка должна помещаться в экран терминала по умолчанию.
+const SCREEN_ROWS = 24;
+const SCREEN_COLUMNS = 80;
 
 // Окружение без языковых переменных: язык сообщений — английский.
 const NO_LOCALE: Environment = {};
@@ -67,18 +72,58 @@ describe("runCli", () => {
     expect(code).toBe(0);
   });
 
-  it("на неизвестную команду печатает справку и выходит с ошибкой", async () => {
+  it("на неизвестную команду без подсказки сообщает об ошибке и зовёт --help", async () => {
     const code = await runCli(["deploy"], root, NO_LOCALE);
 
-    expect(code).toBe(1);
+    expect({ code, error: printedError(), log: printedLog() }).toEqual({
+      code: 1,
+      error: "cyberzavod: unknown command “deploy”: all commands — npx cyberzavod --help",
+      log: "",
+    });
+  });
+
+  it("на опечатку подсказывает ближайшую команду", async () => {
+    const code = await runCli(["stats"], root, NO_LOCALE);
+
+    expect({ code, error: printedError(), log: printedLog() }).toEqual({
+      code: 1,
+      error:
+        "cyberzavod: unknown command “stats”: did you mean npx cyberzavod status? All commands: npx cyberzavod --help",
+      log: "",
+    });
+  });
+
+  it("подсказывает на языке сообщений", async () => {
+    await runCli(["stats"], root, { CYBERZAVOD_LANG: "ru" });
+
+    expect(printedError()).toBe(
+      "cyberzavod: неизвестная команда «stats»: может быть, npx cyberzavod status? Все команды: npx cyberzavod --help",
+    );
+  });
+
+  it("не подсказывает служебную команду", async () => {
+    const code = await runCli(["publsh"], root, NO_LOCALE);
+
+    expect({ code, error: printedError() }).toEqual({
+      code: 1,
+      error: "cyberzavod: unknown command “publsh”: all commands — npx cyberzavod --help",
+    });
   });
 
   it.each(["constructor", "__proto__", "toString"])(
-    "имя %s из прототипа объекта — неизвестная команда: справка и код 1",
+    "имя %s из прототипа объекта — неизвестная команда: ошибка и код 1",
     async (name) => {
       const code = await runCli([name], root, NO_LOCALE);
 
-      expect({ code, help: printedLog().startsWith(EN_TITLE) }).toEqual({ code: 1, help: true });
+      expect({
+        code,
+        error: printedError().startsWith("cyberzavod: unknown command"),
+        log: printedLog(),
+      }).toEqual({
+        code: 1,
+        error: true,
+        log: "",
+      });
     },
   );
 
@@ -174,16 +219,112 @@ describe("runCli", () => {
     expect(systemMessage.startsWith(start)).toBe(true);
   });
 
-  it("справка называет команды публикации и начинается с npx", async () => {
-    await runCli([], root, NO_LOCALE);
+  it("справка называет видимые команды по разделам и не называет служебные", async () => {
+    await runCli(["--help"], root, NO_LOCALE);
+
+    const lines = printedLog().split("\n");
+    const listed = lines
+      .filter((line) => line.startsWith("  "))
+      .map((line) => line.trim().split(" ")[0]);
+
+    expect(listed).toEqual([
+      "init",
+      "status",
+      "decision",
+      "note",
+      "login",
+      "logout",
+      "share",
+      "unshare",
+      "gallery",
+      "sync",
+    ]);
+  });
+
+  it("справка говорит, с чего начать", async () => {
+    await runCli(["--help"], root, NO_LOCALE);
 
     const help = printedLog();
 
-    expect(
-      ["login", "logout", "share", "unshare", "gallery"].map((name) =>
-        help.includes(`npx cyberzavod ${name}`),
-      ),
-    ).toEqual([true, true, true, true, true]);
+    expect(help).toContain("npx cyberzavod init");
+    expect(help).toContain("/setup");
+    expect(help).toContain("/feature");
+  });
+
+  it.each([
+    ["en", NO_LOCALE],
+    ["ru", { CYBERZAVOD_LANG: "ru" }],
+  ] as const)("общая справка (%s) помещается в экран", async (_language, env) => {
+    await runCli(["--help"], root, env);
+
+    const lines = printedLog().split("\n");
+    const longestLine = Math.max(...lines.map((line) => line.length));
+
+    expect({ rows: lines.length <= SCREEN_ROWS, columns: longestLine <= SCREEN_COLUMNS }).toEqual({
+      rows: true,
+      columns: true,
+    });
+  });
+
+  it.each(COMMAND_NAMES)("%s --help печатает справку команды и не запускает её", async (name) => {
+    const stdin = vi.spyOn(process, "stdin", "get");
+
+    const code = await runCli([name, "--help"], root, NO_LOCALE);
+
+    const [firstLine] = printedLog().split("\n");
+
+    expect({ code, firstLine, readsStdin: stdin.mock.calls.length }).toEqual({
+      code: 0,
+      firstLine: `npx cyberzavod ${CLI_MESSAGES.en.commands[name].usage}`,
+      readsStdin: 0,
+    });
+  });
+
+  it.each(["en", "ru"] as const)(
+    "справка каждой команды (%s) укладывается в ширину экрана",
+    async (language) => {
+      const longestLines: Record<string, number> = {};
+
+      for (const name of COMMAND_NAMES) {
+        vi.mocked(console.log).mockClear();
+        await runCli([name, "--help"], root, { CYBERZAVOD_LANG: language });
+
+        const lines = printedLog().split("\n");
+
+        longestLines[name] = Math.max(...lines.map((line) => line.length));
+      }
+
+      const tooWide = Object.entries(longestLines).filter(([, width]) => width > SCREEN_COLUMNS);
+
+      expect(tooWide).toEqual([]);
+    },
+  );
+
+  it("-h после аргументов команды тоже печатает справку", async () => {
+    const code = await runCli(["decision", "text", "-h"], root, NO_LOCALE);
+
+    expect({ code, started: await exists(path.join(root, ".cyberzavod")) }).toEqual({
+      code: 0,
+      started: false,
+    });
+  });
+
+  it("gallery --help перечисляет флаги доступа", async () => {
+    await runCli(["gallery", "--help"], root, NO_LOCALE);
+
+    const help = printedLog();
+
+    expect(help).toContain("--public");
+    expect(help).toContain("--private");
+  });
+
+  it("--help после -- — аргумент команды, а не запрос справки", async () => {
+    const code = await runCli(["note", "--", "--help"], root, NO_LOCALE);
+
+    expect({ code, error: printedError().startsWith("cyberzavod note:") }).toEqual({
+      code: 1,
+      error: true,
+    });
   });
 
   it("share и unshare без id выходят с ошибкой до обращения в сеть", async () => {

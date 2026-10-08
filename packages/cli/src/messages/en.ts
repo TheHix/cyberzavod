@@ -1,71 +1,112 @@
 // Английские тексты CLI.
 
 import { CLI_COMMAND, HOOK_NAMES } from "@cyberzavod/adapter-claude";
+import { API_URL_VARIABLE, DEFAULT_API_URL } from "../sharing/services.ts";
 import type { CliMessages } from "./cli-messages.ts";
 
 /** Тексты CLI на английском. */
 export const en: CliMessages = {
   help: {
     title: "Cyberzavod — an AI-agent development process, local-first.",
+    quickStart: `Start here: ${CLI_COMMAND} init, then /setup and /feature <task> in Claude Code.`,
+    sections: {
+      start: "Getting started",
+      journal: "Journal",
+      gallery: "Gallery",
+      maintenance: "Maintenance",
+    },
+    commandHelpHint: `Command details: ${CLI_COMMAND} <command> --help`,
+    parametersTitle: "Parameters:",
     languageOption: (languages) =>
-      `Message language: --lang ${languages} or the CYBERZAVOD_LANG variable; otherwise the system locale.`,
+      `Language: --lang ${languages}, CYBERZAVOD_LANG or the system locale.`,
   },
   commands: {
     init: {
       usage: "init [--yes]",
-      summary:
-        "set up the project in the current directory: wizard, config, AGENTS.md, agent files",
+      summary: "set up the project: wizard, config, AGENTS.md, agent files",
+      parameters: [{ name: "--yes, -y", description: "take the suggested answers, ask nothing" }],
     },
     sync: {
       usage: "sync [--check] [--force]",
-      summary: "detect the stack again and rebuild the agent files; --check only verifies",
+      summary: "detect the stack again and rebuild the agent files",
+      parameters: [
+        { name: "--check", description: "only report what is outdated; exit 1 if anything is" },
+        { name: "--force", description: "overwrite files written by a human" },
+      ],
     },
     status: {
       usage: "status",
       summary: "project, workflow, stage agents, checks and the journal",
+      parameters: [],
     },
     decision: {
       usage: 'decision "<what was decided>" [--why "<why>"]',
       summary: "record a decision in the journal",
+      parameters: [
+        { name: '"<what was decided>"', description: "the decision text" },
+        { name: "--why", description: "the reason, saved with the decision" },
+      ],
     },
     note: {
       usage: 'note "<text>"',
       summary: "record a note in the journal",
+      parameters: [{ name: '"<text>"', description: "the note text" }],
     },
     draft: {
       usage: "draft [<raw session log>]",
       summary: "build a recording draft from a Claude Code session log",
+      parameters: [
+        {
+          name: "<raw session log>",
+          description: "path to the log; default — the newest raw log",
+        },
+      ],
     },
     publish: {
       usage: "publish [--draft <draft>] [--build <build id>]",
       summary: "publish the edited draft as records in the journal",
+      parameters: [
+        { name: "--draft", description: "path to the draft; default — the newest one" },
+        { name: "--build", description: "draft build to publish; default — all" },
+      ],
     },
     login: {
       usage: "login",
-      summary:
-        "sign in with GitHub to publish recordings to your gallery (server address — CYBERZAVOD_API_URL)",
+      summary: "sign in with GitHub to publish recordings to your gallery",
+      parameters: [
+        {
+          name: API_URL_VARIABLE,
+          description: `server address; default ${DEFAULT_API_URL}`,
+        },
+      ],
     },
     logout: {
       usage: "logout",
       summary: "forget the saved GitHub token",
+      parameters: [],
     },
     share: {
       usage: "share <recording id>",
-      summary: "send a session recording from the journal to your gallery and show its link",
+      summary: "send a recording from the journal to your gallery",
+      parameters: [{ name: "<recording id>", description: "id of a session recording" }],
     },
     unshare: {
       usage: "unshare <recording id>",
       summary: "remove a recording from your gallery",
+      parameters: [{ name: "<recording id>", description: "id of a recording in the gallery" }],
     },
     gallery: {
       usage: "gallery [--public | --private]",
-      summary:
-        "your gallery recordings, the limit and links; --public opens the gallery, --private closes it",
+      summary: "your gallery: recordings, limit, links; open or close it",
+      parameters: [
+        { name: "--public", description: "open the gallery" },
+        { name: "--private", description: "close the gallery" },
+      ],
     },
     hook: {
       usage: `hook <${HOOK_NAMES.join("|")}>`,
-      summary:
-        "Claude Code hook: the event arrives on stdin; project settings call it, not a person",
+      summary: "Claude Code hook: project settings call it, not a person",
+      parameters: [{ name: "<hook name>", description: "the event arrives on stdin" }],
     },
   },
   init: {
@@ -151,6 +192,9 @@ export const en: CliMessages = {
     missingNoteText: "the note text is required",
     missingRecordId: "the recording id is required",
     unknownHook: (name) => `no hook named ${name}`,
+    unknownCommand: (name) => `unknown command “${name}”: all commands — ${CLI_COMMAND} --help`,
+    unknownCommandWithSuggestion: ({ name, suggestion }) =>
+      `unknown command “${name}”: did you mean ${CLI_COMMAND} ${suggestion}? All commands: ${CLI_COMMAND} --help`,
     languageFlagWithoutValue: "--lang has no value: give a language, for example --lang en",
     unsupportedLanguage: ({ value, supported }) =>
       `language “${value}” is not supported: available are ${supported}`,

@@ -24,15 +24,39 @@ export const COMMAND_NAMES = [
 /** Имя команды CLI. */
 export type CommandName = (typeof COMMAND_NAMES)[number];
 
-/** Справка по команде: строка вызова без имени программы и описание. */
+/** Разделы справки в порядке показа. Служебные команды в раздел не входят и в списке скрыты. */
+export const COMMAND_SECTIONS = ["start", "journal", "gallery", "maintenance"] as const;
+
+/** Раздел справки. */
+export type CommandSection = (typeof COMMAND_SECTIONS)[number];
+
+/** Флаг, аргумент или переменная окружения команды и их описание. */
+export interface CommandParameter {
+  name: string;
+  description: string;
+}
+
+/**
+ * Справка по команде: строка вызова без имени программы, короткое описание для списка команд
+ * (одна строка) и параметры для справки самой команды.
+ */
 export interface CommandHelp {
   usage: string;
   summary: string;
+  parameters: readonly CommandParameter[];
 }
 
 /** Тексты справки. */
 export interface HelpMessages {
   title: string;
+  /** Строка «с чего начать» под заголовком. */
+  quickStart: string;
+  /** Заголовки разделов списка команд. */
+  sections: Readonly<Record<CommandSection, string>>;
+  /** Строка о том, как узнать подробности команды. */
+  commandHelpHint: string;
+  /** Заголовок списка параметров в справке команды. */
+  parametersTitle: string;
   /** Строка про выбор языка; `languages` — поддерживаемые коды через «|». */
   languageOption(languages: string): string;
 }
@@ -134,6 +158,8 @@ export interface ErrorMessages {
   missingNoteText: string;
   missingRecordId: string;
   unknownHook(name: string): string;
+  unknownCommand(name: string): string;
+  unknownCommandWithSuggestion(params: { name: string; suggestion: string }): string;
   languageFlagWithoutValue: string;
   unsupportedLanguage(params: { value: string; supported: string }): string;
   projectNotFound(directory: string): string;
