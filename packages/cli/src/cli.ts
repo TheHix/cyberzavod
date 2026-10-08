@@ -22,15 +22,16 @@ import { shareRecording, unshareRecording } from "./commands/share.ts";
 import { printStatus } from "./commands/status.ts";
 import { checkProject, syncProject } from "./commands/sync.ts";
 import { closestName } from "./closest-name.ts";
+import { confirmWithoutAsking, terminalConfirmation } from "./confirmation.ts";
 import { CommandError } from "./errors.ts";
 import { commandHelp, generalHelp, listedCommandNames, type CommandPlacement } from "./help.ts";
+import type { InitOverrides } from "./initial-config.ts";
 import { readInstallation } from "./installation/installation.ts";
 import { CLI_MESSAGES } from "./messages/catalog.ts";
 import { COMMAND_NAMES, type CliMessages, type CommandName } from "./messages/cli-messages.ts";
 import { extractLanguageFlag, languageOf, type Environment } from "./messages/language.ts";
 import { ApiError } from "./sharing/api.ts";
 import { createSharing, type Sharing } from "./sharing/services.ts";
-import { defaultsPrompter, terminalPrompter } from "./wizard.ts";
 
 const SUCCESS = 0;
 const FAILURE = 1;
@@ -75,25 +76,44 @@ function defaultSharing(env: Environment): Sharing {
   return createSharing({ env, platform: process.platform, homeDirectory: homedir() });
 }
 
+interface InitFlags {
+  id?: string | undefined;
+  check?: string[] | undefined;
+  journal?: string | undefined;
+}
+
+function initOverridesOf(flags: InitFlags): InitOverrides {
+  return {
+    ...(flags.id === undefined ? {} : { projectId: flags.id }),
+    ...(flags.check === undefined ? {} : { checks: flags.check }),
+    ...(flags.journal === undefined ? {} : { journal: flags.journal }),
+  };
+}
+
 const COMMANDS: Readonly<Record<CommandName, Command>> = {
   init: {
     section: "start",
     run: async ({ args, directory, messages }) => {
-      const { values } = parseArgs({ args, options: { yes: { type: "boolean", short: "y" } } });
-      const prompter =
-        values.yes === true
-          ? defaultsPrompter()
-          : terminalPrompter({ input: process.stdin, output: process.stdout });
+      const { values } = parseArgs({
+        args,
+        options: {
+          yes: { type: "boolean", short: "y" },
+          id: { type: "string" },
+          check: { type: "string", multiple: true },
+          journal: { type: "string" },
+        },
+      });
+      const canAsk = values.yes !== true && process.stdin.isTTY === true;
+      const confirm = canAsk
+        ? terminalConfirmation({ input: process.stdin, output: process.stdout })
+        : confirmWithoutAsking;
 
-      try {
-        await initProject(directory, {
-          prompter,
-          installation: await readInstallation(),
-          messages,
-        });
-      } finally {
-        prompter.close();
-      }
+      await initProject(directory, {
+        confirm,
+        overrides: initOverridesOf(values),
+        installation: await readInstallation(),
+        messages,
+      });
 
       return SUCCESS;
     },

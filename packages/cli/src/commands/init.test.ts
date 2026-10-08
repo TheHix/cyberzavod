@@ -1,0 +1,178 @@
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
+import type { Confirmation } from "../confirmation.ts";
+import { readInstallation, type Installation } from "../installation/installation.ts";
+import { CLI_MESSAGES } from "../messages/catalog.ts";
+import { initProject } from "./init.ts";
+
+const MAX_SUMMARY_LINES = 12;
+const MAX_SUMMARY_COLUMNS = 80;
+const messages = CLI_MESSAGES.ru;
+
+let root: string;
+let installation: Installation;
+
+function printed(): string {
+  return vi
+    .mocked(console.log)
+    .mock.calls.map((call) => call.join(" "))
+    .join("\n");
+}
+
+async function exists(file: string): Promise<boolean> {
+  return access(path.join(root, file)).then(
+    () => true,
+    () => false,
+  );
+}
+
+// Запоминает, что было напечатано к моменту вопроса, и отвечает заготовленным ответом.
+function answering(isConfirmed: boolean): {
+  confirm: Confirmation;
+  asked: string[];
+  seen: string[];
+} {
+  const asked: string[] = [];
+  const seen: string[] = [];
+  const confirm: Confirmation = (question) => {
+    asked.push(question);
+    seen.push(printed());
+
+    return Promise.resolve(isConfirmed);
+  };
+
+  return { confirm, asked, seen };
+}
+
+describe("initProject", () => {
+  beforeEach(async () => {
+    root = await mkdtemp(path.join(tmpdir(), "cyberzavod-init-"));
+    installation = await readInstallation();
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it("после отказа ничего не пишет и сообщает об отмене", async () => {
+    await writeFile(path.join(root, "CLAUDE.md"), "# Мои правила\n");
+    const { confirm } = answering(false);
+
+    await initProject(root, { confirm, overrides: {}, installation, messages });
+
+    expect({
+      cancelled: printed().includes(messages.init.cancelled),
+      done: printed().includes(messages.init.done),
+      created: await Promise.all(
+        [PROJECT_CONFIG_FILE, "AGENTS.md", ".claude", ".gitignore"].map(exists),
+      ),
+      entrypoint: await readFile(path.join(root, "CLAUDE.md"), "utf8"),
+    }).toEqual({
+      cancelled: true,
+      done: false,
+      created: [false, false, false, false],
+      entrypoint: "# Мои правила\n",
+    });
+  });
+
+  it("спрашивает один раз «Продолжить?» и после согласия подключает проект", async () => {
+    const { confirm, asked } = answering(true);
+
+    await initProject(root, { confirm, overrides: {}, installation, messages });
+
+    expect({ asked, connected: await exists(PROJECT_CONFIG_FILE) }).toEqual({
+      asked: [messages.init.confirm],
+      connected: true,
+    });
+  });
+
+  it("печатает сводку до вопроса, не длиннее 12 строк", async () => {
+    await writeFile(path.join(root, "package.json"), JSON.stringify({ scripts: { test: "x" } }));
+    const { confirm, seen } = answering(true);
+
+    await initProject(root, { confirm, overrides: {}, installation, messages });
+
+    const [summary = ""] = seen;
+
+    expect({
+      lines: summary.split("\n").length <= MAX_SUMMARY_LINES,
+      names: summary.includes("npm run test") && summary.includes(".cyberzavod/journal"),
+    }).toEqual({ lines: true, names: true });
+  });
+
+  it("без проверок сводка отправляет к /setup", async () => {
+    const { confirm, seen } = answering(true);
+
+    await initProject(root, { confirm, overrides: {}, installation, messages });
+
+    expect(seen[0]).toContain(messages.init.checksMissing(".cyberzavod/project.json"));
+    expect(seen[0]).toContain("/setup");
+  });
+
+  it.each(["en", "ru"] as const)("сводка (%s) укладывается в 80 колонок", async (language) => {
+    const { confirm, seen } = answering(true);
+
+    await initProject(root, {
+      confirm,
+      overrides: {},
+      installation,
+      messages: CLI_MESSAGES[language],
+    });
+
+    const [summary = ""] = seen;
+    const widest = Math.max(...summary.split("\n").map((line) => line.length));
+
+    expect(widest).toBeLessThanOrEqual(MAX_SUMMARY_COLUMNS);
+  });
+
+  it("итог называет верхние каталоги и файлы для коммита без повторов", async () => {
+    const { confirm } = answering(true);
+
+    await initProject(root, { confirm, overrides: {}, installation, messages });
+
+    expect(printed()).toContain(
+      "Закоммитьте: .cyberzavod/, AGENTS.md, CLAUDE.md, .claude/, .gitignore",
+    );
+  });
+
+  it("не называет в итоге AGENTS.md, если он уже был, и .gitignore, если журнал вне проекта", async () => {
+    await writeFile(path.join(root, "AGENTS.md"), "# Правила\n");
+    const { confirm } = answering(true);
+
+    await initProject(root, {
+      confirm,
+      overrides: { journal: "../shop.cyberzavod" },
+      installation,
+      messages,
+    });
+
+    expect(printed()).toContain("Закоммитьте: .cyberzavod/, CLAUDE.md, .claude/\n");
+  });
+
+  it("называет в сводке перенос написанного человеком CLAUDE.md", async () => {
+    await writeFile(path.join(root, "CLAUDE.md"), "# Мои правила\n");
+    const { confirm, seen } = answering(true);
+
+    await initProject(root, { confirm, overrides: {}, installation, messages });
+
+    expect(seen[0]).toContain(messages.init.rulesMoved({ from: "CLAUDE.md", to: "AGENTS.md" }));
+  });
+
+  it("отклоняет неверный флаг до вопроса и ничего не пишет", async () => {
+    const { confirm, asked } = answering(true);
+
+    const act = () =>
+      initProject(root, { confirm, overrides: { projectId: "" }, installation, messages });
+
+    await expect(act).rejects.toThrow(/--id is empty/);
+    expect({ asked, connected: await exists(PROJECT_CONFIG_FILE) }).toEqual({
+      asked: [],
+      connected: false,
+    });
+  });
+});
