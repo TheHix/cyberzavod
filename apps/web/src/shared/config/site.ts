@@ -4,8 +4,8 @@ import type { Translated } from "@/shared/i18n/locale.ts";
 export const site = {
   name: { en: "Cyberzavod", ru: "Киберзавод" },
   description: {
-    en: "A factory floor where AI agents build products. The reference recordings on the site are real builds of projects the floor made from scratch: prompts, stages, reworks.",
-    ru: "Цех, в котором ИИ-агенты собирают продукты. Эталонные записи на сайте — настоящие сборки проектов, которые цех собрал с нуля: промпты, этапы, возвраты на доработку.",
+    en: "A factory floor where AI agents build products. The site replays real builds of projects the floor made from scratch: prompts, stages, reworks.",
+    ru: "Цех, в котором ИИ-агенты собирают продукты. На сайте — настоящие сборки проектов, которые цех собрал с нуля: промпты, этапы, возвраты на доработку.",
   },
   repoUrl: "https://github.com/bysavelii/cyberzavod",
   author: { name: "bysavelii", url: "https://bysavelii.com" },

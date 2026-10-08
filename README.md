@@ -6,7 +6,7 @@ Cyberzavod is a local-first, model-agnostic development harness for AI-assisted 
 
 Cyberzavod owns the development process, not the technology stack. It does not write code and it is not an agent: it gives the agent you already use a process to follow, checks that the work is green before the agent stops, and keeps a journal of sessions and decisions next to your project.
 
-The site [cyberzavod.com](https://cyberzavod.com) is the visual side: a top-down factory floor that replays recorded sessions in which AI agents built reference projects from scratch, task by task, through the Cyberzavod process.
+The site [cyberzavod.com](https://cyberzavod.com) is the visual side: a top-down factory floor that replays recorded sessions in which AI agents built example projects from scratch, task by task, through the Cyberzavod process.
 
 ## The problem
 
@@ -94,7 +94,7 @@ The record format is the whole contract between the tool and any viewer. [cyberz
 | `packages/storage` | Disk: project config, the directory record store, harness loading |
 | `packages/cli` | The `cyberzavod` npm package: the CLI, bundled with everything below into one file |
 | `adapters/claude` | The Claude Code adapter: file generator, hooks, session capture |
-| `.cyberzavod/` | This repository's own connection: config, vendored CLI and journal; `.cyberzavod/journal/sessions/` holds the recordings the site shows: builds of the reference projects |
+| `.cyberzavod/` | This repository's own connection: config, vendored CLI and journal; `.cyberzavod/journal/sessions/` holds the recordings the site shows: builds of the example projects |
 | `projects/` | Cards of the projects whose recordings the site shows: name, description, links, stack |
 | `apps/web` | The site: Astro, SolidJS, PixiJS factory floor |
 | `apps/api` | The API: Go and Postgres |

@@ -1,13 +1,14 @@
 {
   "id": "split-bill",
   "name": {
-    "en": "Split the Bill",
+    "en": "Split the bill",
     "ru": "Делим счёт"
   },
   "description": {
-    "en": "A web app for groups on a trip or at a café: expenses, a who-owes-whom total settled in the fewest transfers, and a bill shared by a link with no server.",
-    "ru": "Веб-приложение для компании в поездке или в кафе: траты, итог «кто кому сколько должен» с минимумом переводов и счёт по ссылке без сервера."
+    "en": "A web app for people who travel in a group or go to a cafe together: enter the expenses, and the app calculates who owes whom and how much and reduces the settlements to the minimal number of transfers. In English and Russian, with the bill in US dollars or Russian rubles.",
+    "ru": "Веб-приложение для тех, кто ездит компанией или ходит вместе в кафе: внесите траты, и приложение посчитает, кто кому сколько должен, и сведёт расчёты к минимальному числу переводов. На английском и русском, счёт — в долларах США или российских рублях."
   },
   "repo": "https://github.com/bysavelii/split-bill",
-  "stack": ["TypeScript", "Vite"]
+  "website": "https://bysavelii.github.io/split-bill/",
+  "stack": ["TypeScript", "Astro", "Solid"]
 }

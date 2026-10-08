@@ -1,6 +1,6 @@
 # Изолированное окружение для разработки и для агентов: видна только папка проекта,
-# сеть наружу — только по белому списку (init-firewall.sh). Основано на эталонном
-# dev-контейнере Claude Code: https://github.com/anthropics/claude-code/tree/main/.devcontainer
+# сеть наружу — только по белому списку (init-firewall.sh). Основано на dev-контейнере
+# из репозитория Claude Code: https://github.com/anthropics/claude-code/tree/main/.devcontainer
 
 FROM golang:1.27-trixie AS go
 

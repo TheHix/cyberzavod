@@ -53,8 +53,7 @@ export function totalsOf(recordings: readonly SessionRecord[]): RecordingTotals 
 }
 
 /**
- * Среднее значение счётчика на одну сборку. Округляет тот, кто показывает: время — до секунд,
- * возвраты — до сотых.
+ * Среднее значение счётчика на одну сборку. Округляет тот, кто показывает: время — до секунд.
  * @param {RecordingTotals} totals Итоги сборок.
  * @param {SummedCount} count Какой счётчик делить.
  * @returns {number} Частное без округления; у итогов без сборок — 0.
