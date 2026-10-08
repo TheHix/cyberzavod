@@ -11,8 +11,10 @@ export {
 } from "./button/Button.tsx";
 export { Card } from "./card/Card.tsx";
 export { Chip, type ChipTone } from "./chip/Chip.tsx";
+export { ChipList } from "./chip-list/ChipList.tsx";
 export { CopyButton, type CopyLabels } from "./copy-button/CopyButton.tsx";
 export { CopyableCode } from "./copyable-code/CopyableCode.tsx";
+export { Disclosure } from "./disclosure/Disclosure.tsx";
 export { Drawer } from "./drawer/Drawer.tsx";
 export { GithubMark } from "./github-mark/GithubMark.tsx";
 export { Panel } from "./panel/Panel.tsx";

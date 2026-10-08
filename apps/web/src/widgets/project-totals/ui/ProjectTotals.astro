@@ -1,0 +1,21 @@
+---
+// Итоги проекта счётчиками: считаются при сборке сайта из записей его сборок, без API.
+import type { SessionRecord } from "@cyberzavod/core";
+import { totalsOf } from "@/entities/recording";
+import type { Locale } from "@/shared/i18n/locale.ts";
+import { StatList } from "@/shared/ui";
+import { projectTotalsOf } from "../lib/totals-view.ts";
+
+interface Props {
+  /** Записи сборок проекта в любом порядке. */
+  recordings: readonly SessionRecord[];
+  /** Язык страницы: на нём подписи, числа и длительность. */
+  locale: Locale;
+}
+
+const { recordings, locale } = Astro.props;
+const totals = totalsOf(recordings);
+const items = projectTotalsOf(totals, locale);
+---
+
+<StatList items={items} />

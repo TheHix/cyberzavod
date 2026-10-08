@@ -44,6 +44,7 @@ export function JournalTimeline(props: Props): JSX.Element {
               return (
                 <li id={header().anchor}>
                   <JournalEntry
+                    recordingId={props.recording.id}
                     speech={entry.speech}
                     locale={props.locale}
                     clock={header().clock}

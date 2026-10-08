@@ -1,4 +1,5 @@
 export {
+  $sceneRecordingId,
   $sceneSpeech,
   connectScene,
   isSameSpeech,

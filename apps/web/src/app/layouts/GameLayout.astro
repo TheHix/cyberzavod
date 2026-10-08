@@ -5,7 +5,7 @@
 // Содержимое страницы — цех со своим HUD — встаёт в поле справа от меню.
 import BaseLayout from "./BaseLayout.astro";
 import { GuideList } from "@/widgets/guide-list";
-import { RecordingList } from "@/widgets/recording-list";
+import { RecordingsByProject } from "@/widgets/recording-list";
 import { Sidebar } from "@/widgets/sidebar";
 import { AccountLink, SignInFailedNotice } from "@/features/sign-in";
 import { galleriesUrl } from "@/entities/gallery";
@@ -78,7 +78,7 @@ const closeLabel = UI_TEXT.panels.close[locale];
           <AccountLink client:load locale={locale} layout="text" />
         </div>
       </div>
-      <RecordingList recordings={publishedRecordings} locale={locale} />
+      <RecordingsByProject recordings={publishedRecordings} locale={locale} />
     </div>
   </Drawer>
   <Drawer id={PANELS.guides} title={UI_TEXT.panels.guides[locale]} closeLabel={closeLabel}>

@@ -28,6 +28,7 @@ export function PlaybackControls(): JSX.Element {
   const status = useStoreValue(model.$status);
   const playback = useStoreValue(model.$playback);
   const recordingTime = useStoreValue(model.$recordingTime);
+  const summary = useStoreValue(model.$summary);
   const isReady = () => status() === "ready";
 
   return (
@@ -58,9 +59,7 @@ export function PlaybackControls(): JSX.Element {
         />
         <div class={styles.times}>
           <span title={UI_TEXT.playback.elapsed[locale]}>{formatClock(recordingTime())}</span>
-          <span title={UI_TEXT.playback.length[locale]}>
-            {formatClock(model.summary.durationMs)}
-          </span>
+          <span title={UI_TEXT.playback.length[locale]}>{formatClock(summary().durationMs)}</span>
         </div>
       </div>
       <div class={styles.speed}>

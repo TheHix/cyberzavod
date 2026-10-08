@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   advance,
+  isAtEnd,
   seek,
   speedFrom,
   startPlayback,
@@ -47,6 +48,20 @@ describe("seek", () => {
     const next = seek(playback, position);
 
     expect(next.position).toBe(expected);
+  });
+});
+
+describe("isAtEnd", () => {
+  it.each([
+    [10_000, true],
+    [9_999, false],
+    [0, false],
+  ])("в момент %i мс сцены длиной 10 с отвечает %s", (position, expected) => {
+    const playback = seek(startPlayback(10_000, false), position);
+
+    const atEnd = isAtEnd(playback);
+
+    expect(atEnd).toBe(expected);
   });
 });
 

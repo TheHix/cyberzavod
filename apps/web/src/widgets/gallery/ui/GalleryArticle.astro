@@ -1,16 +1,21 @@
 ---
 // Страница галерей в поле: список и галерея автора приходят из API в браузере. При сборке
-// параметров адреса нет — в разметке общий список в загрузке.
+// параметров адреса нет — в разметке общий список в загрузке. Примеры над списком собраны из
+// записей сайта при сборке.
+import type { SessionRecord } from "@cyberzavod/core";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { Panel } from "@/shared/ui";
 import { GalleryBoard } from "./GalleryBoard.tsx";
+import GalleryExamples from "./GalleryExamples.astro";
 
 interface Props {
+  /** Записи сборок сайта: по ним — примеры над галереями пользователей. */
+  recordings: readonly SessionRecord[];
   /** Язык страницы. */
   locale: Locale;
 }
 
-const { locale } = Astro.props;
+const { recordings, locale } = Astro.props;
 
 if (Astro.site === undefined) throw new Error("в astro.config.ts не задан site");
 
@@ -19,7 +24,9 @@ const siteUrl = Astro.site.href;
 
 <Panel scrollable>
   <div class="article">
-    <GalleryBoard client:load locale={locale} siteUrl={siteUrl} />
+    <GalleryBoard client:load locale={locale} siteUrl={siteUrl}>
+      <GalleryExamples slot="examples" recordings={recordings} locale={locale} />
+    </GalleryBoard>
   </div>
 </Panel>
 

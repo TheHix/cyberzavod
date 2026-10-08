@@ -1,0 +1,13 @@
+{
+  "id": "doc-diff",
+  "name": {
+    "en": "doc-diff",
+    "ru": "doc-diff"
+  },
+  "description": {
+    "en": "Shows what changed between two versions of a contract in PDF or DOCX: added, removed, changed and moved clauses, as text in the terminal or a two-column HTML report.",
+    "ru": "Показывает, что изменилось между двумя версиями договора в PDF или DOCX: добавленные, удалённые, изменённые и перенесённые пункты — текстом в терминале или HTML-отчётом в две колонки."
+  },
+  "repo": "https://github.com/bysavelii/doc-diff",
+  "stack": ["Python"]
+}

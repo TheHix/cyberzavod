@@ -1,19 +1,19 @@
 ---
 import type { GetStaticPaths } from "astro";
-import { briefOf, type SessionRecord } from "@cyberzavod/core";
+import type { SessionRecord } from "@cyberzavod/core";
 import GameLayout from "@/app/layouts/GameLayout.astro";
-import { Factory } from "@/widgets/factory";
-import { BuildJournal } from "@/widgets/build-journal";
+import { SeriesFactory, seriesBuildsOf } from "@/widgets/factory";
+import { SeriesBuildJournal } from "@/widgets/build-journal";
 import { ProjectCard } from "@/widgets/project-card";
-import { RecordingList } from "@/widgets/recording-list";
+import { ProjectTotals } from "@/widgets/project-totals";
+import { ProjectBuilds } from "@/widgets/recording-list";
 import { projectLinkOf, publishedProjects, type PublishedProject } from "@/entities/project";
 import { publishedRecordings, recordingsOfProject } from "@/entities/recording";
-import { languageNoteOf } from "@/shared/lib/language-note.ts";
 import { PANELS } from "@/shared/config/panels.ts";
 import { LOCALES, type Locale } from "@/shared/i18n/locale.ts";
 import { localeParam } from "@/shared/i18n/path.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
-import { Drawer, Panel } from "@/shared/ui";
+import { Drawer, Panel, Title } from "@/shared/ui";
 
 export const getStaticPaths = (() =>
   LOCALES.flatMap((locale) =>
@@ -30,12 +30,16 @@ export const getStaticPaths = (() =>
 interface Props {
   locale: Locale;
   project: PublishedProject;
+  /** Сборки проекта по порядку задач. */
   recordings: readonly SessionRecord[];
 }
 
 const { locale, project, recordings } = Astro.props;
 const closeLabel = UI_TEXT.panels.close[locale];
-const [latest] = recordings;
+// Серия этого проекта по кругу: с первой сборки по порядку задач.
+const seriesBuilds = seriesBuildsOf(recordings, projectLinkOf(project, locale), locale);
+const recordingIds = seriesBuilds.map((build) => build.recording.id);
+const hasBuilds = seriesBuilds.length > 0;
 ---
 
 <GameLayout
@@ -43,37 +47,39 @@ const [latest] = recordings;
   title={UI_TEXT.pages.projectTitle[locale](project.name[locale])}
   description={project.description[locale]}
   heading={project.name[locale]}
-  journal={latest !== undefined}
+  journal={hasBuilds}
   project
 >
-  {latest ? (
-    <Factory
-      client:load
-      locale={locale}
-      recording={briefOf(latest)}
-      languageNote={languageNoteOf(latest.data.language, locale)}
-      project={projectLinkOf(project, locale)}
-      titleLevel="h2"
-    />
+  {hasBuilds ? (
+    <SeriesFactory client:load locale={locale} builds={seriesBuilds} titleLevel="h2" />
   ) : (
     <Panel label={UI_TEXT.pages.floor[locale]}>
       <p>{UI_TEXT.pages.noBuilds[locale]}</p>
     </Panel>
   )}
-  {latest && (
+  {hasBuilds && (
     <Drawer
       slot="drawers"
       id={PANELS.journal}
       title={UI_TEXT.panels.journal[locale]}
       closeLabel={closeLabel}
     >
-      <BuildJournal recording={latest} locale={locale} />
+      <SeriesBuildJournal recordingIds={recordingIds} locale={locale} />
     </Drawer>
   )}
   <Drawer slot="drawers" id={PANELS.project} title={project.name[locale]} closeLabel={closeLabel}>
     <div class="project">
       <ProjectCard project={project} locale={locale} />
-      <RecordingList recordings={recordings} locale={locale} />
+      {hasBuilds && (
+        <section class="section">
+          <Title as="h3">{UI_TEXT.projectPanel.totalsHeading[locale]}</Title>
+          <ProjectTotals recordings={recordings} locale={locale} />
+        </section>
+      )}
+      <section class="section">
+        <Title as="h3">{UI_TEXT.projectPanel.buildsHeading[locale]}</Title>
+        <ProjectBuilds recordings={recordings} locale={locale} />
+      </section>
     </div>
   </Drawer>
 </GameLayout>
@@ -82,5 +88,10 @@ const [latest] = recordings;
   .project {
     display: grid;
     gap: var(--space-xl);
+  }
+
+  .section {
+    display: grid;
+    gap: var(--space-m);
   }
 </style>

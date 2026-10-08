@@ -82,8 +82,8 @@ export const UI_TEXT = {
     noRecordings: { en: "No builds yet.", ru: "Записей пока нет." },
     noGuides: { en: "No guides yet.", ru: "Гайдов пока нет." },
     otherBuilds: {
-      en: "Builds of other projects are in the galleries of Cyberzavod users.",
-      ru: "Сборки других проектов — в галереях пользователей Киберзавода.",
+      en: "Below are the reference projects the floor built from scratch. Builds of other projects are in the galleries of Cyberzavod users.",
+      ru: "Ниже — эталонные проекты, которые цех собрал с нуля. Сборки других проектов — в галереях пользователей Киберзавода.",
     },
     tokens: {
       en: { one: "token", other: "tokens" },
@@ -132,8 +132,8 @@ export const UI_TEXT = {
       ru: "Ваша галерея Киберзавода: открыть или закрыть её, посмотреть записи сборок и удалить лишние.",
     },
     statsDescription: {
-      en: "Where the process stalls: reworks by stage, human interventions, tokens and build outcomes across open galleries.",
-      ru: "Где процесс буксует: возвраты по этапам, вмешательства человека, токены и исходы сборок по открытым галереям.",
+      en: "Reference projects side by side — time, tokens, reworks and human input per build — and where the process stalls across open galleries.",
+      ru: "Эталонные проекты рядом — время, токены, возвраты и участие человека на сборку — и где процесс буксует в открытых галереях.",
     },
     recordingDescription: {
       en: (title: string) =>
@@ -325,6 +325,50 @@ export const UI_TEXT = {
     failed: { en: "failed", ru: "с ошибкой" },
     none: { en: "None so far.", ru: "Пока не было." },
   },
+  /** Панель «Проект»: итоги сборок проекта и сами сборки по порядку задач. */
+  projectPanel: {
+    totalsHeading: { en: "Totals", ru: "Итоги" },
+    buildsHeading: { en: "Builds in task order", ru: "Сборки по порядку задач" },
+    builds: { en: "Builds", ru: "Сборки" },
+    duration: { en: "Total time", ru: "Общее время" },
+    durationPerBuild: { en: "Per build on average", ru: "В среднем на сборку" },
+    tokens: { en: "Total tokens", ru: "Токены всего" },
+    reworks: { en: "Reworks", ru: "Возвраты" },
+    withoutReworks: {
+      en: (clean: number, builds: number) => `${clean} of ${builds} without reworks`,
+      ru: (clean: number, builds: number) => `без возвратов ${clean} из ${builds}`,
+    },
+    human: { en: "Human input", ru: "Участие человека" },
+    interventions: {
+      en: { one: "intervention", other: "interventions" },
+      ru: { one: "вмешательство", few: "вмешательства", many: "вмешательств" },
+    },
+  },
+  /** Аналитика: сравнение эталонных проектов при сборке сайта и раздел открытых галерей. */
+  statsSections: {
+    referenceHeading: { en: "Reference projects", ru: "Эталонные проекты" },
+    referenceIntro: {
+      en: "Projects the floor built from scratch with the same process, compared per build. Counted from the build recordings on this site.",
+      ru: "Проекты, которые цех собрал с нуля по одному процессу, — в пересчёте на сборку. Посчитано по записям сборок на этом сайте.",
+    },
+    durationPerBuild: { en: "Time per build on average", ru: "Время в среднем на сборку" },
+    tokensPerBuild: { en: "Tokens per build on average", ru: "Токены в среднем на сборку" },
+    reworksPerBuild: { en: "Reworks per build", ru: "Возвраты на сборку" },
+    human: {
+      en: "Human input: prompts and interventions",
+      ru: "Участие человека: промпты и вмешательства",
+    },
+    galleriesHeading: { en: "Open galleries", ru: "Открытые галереи" },
+  },
+  /** Галереи: примеры — эталонные проекты сайта над галереями пользователей. */
+  examples: {
+    heading: { en: "Examples", ru: "Примеры" },
+    intro: {
+      en: "Reference projects the floor built from scratch: every build can be watched on the floor.",
+      ru: "Эталонные проекты, которые цех собрал с нуля: каждую сборку можно посмотреть в цехе.",
+    },
+    userGalleriesHeading: { en: "User galleries", ru: "Галереи пользователей" },
+  },
   /** Остров цеха. */
   factory: {
     canvasLabel: {
@@ -335,6 +379,26 @@ export const UI_TEXT = {
     failed: {
       en: "The floor failed to start — try reloading the page.",
       ru: "Цех не запустился — попробуйте обновить страницу.",
+    },
+  },
+  /** Серия сборок на главной и странице проекта: место сборки в HUD и журнал текущей сборки. */
+  series: {
+    buildOf: {
+      en: (number: number, count: number) => `build ${number} of ${count}`,
+      ru: (number: number, count: number) => `сборка ${number} из ${count}`,
+    },
+    journalLoading: { en: "Loading the build log…", ru: "Загружаем журнал сборки…" },
+    journalMissing: {
+      en: "The log of this build was not found — try reloading the page.",
+      ru: "Журнал этой сборки не нашёлся — попробуйте обновить страницу.",
+    },
+    journalBroken: {
+      en: "The log of this build did not pass the check.",
+      ru: "Журнал этой сборки не прошёл проверку.",
+    },
+    journalFailed: {
+      en: "Could not load the build log — try reloading the page.",
+      ru: "Не удалось загрузить журнал сборки — попробуйте обновить страницу.",
     },
   },
   /** Кнопка «копировать» у блоков кода: подписи по состояниям. */

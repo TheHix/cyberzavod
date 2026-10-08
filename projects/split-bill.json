@@ -1,0 +1,13 @@
+{
+  "id": "split-bill",
+  "name": {
+    "en": "Split the Bill",
+    "ru": "Делим счёт"
+  },
+  "description": {
+    "en": "A web app for groups on a trip or at a café: expenses, a who-owes-whom total settled in the fewest transfers, and a bill shared by a link with no server.",
+    "ru": "Веб-приложение для компании в поездке или в кафе: траты, итог «кто кому сколько должен» с минимумом переводов и счёт по ссылке без сервера."
+  },
+  "repo": "https://github.com/bysavelii/split-bill",
+  "stack": ["TypeScript", "Vite"]
+}

@@ -61,6 +61,15 @@ export function withDuration(playback: Playback, duration: number, position: num
 }
 
 /**
+ * Дошла ли сцена до конца.
+ * @param {Playback} playback Текущее состояние.
+ * @returns {boolean} `true`, если момент — конец сцены.
+ */
+export function isAtEnd(playback: Playback): boolean {
+  return playback.position >= playback.duration;
+}
+
+/**
  * Ставит на паузу или продолжает; досмотренную сцену запускает с начала.
  * @param {Playback} playback Текущее состояние.
  * @returns {Playback} Состояние после переключения.
@@ -68,9 +77,9 @@ export function withDuration(playback: Playback, duration: number, position: num
 export function togglePlaying(playback: Playback): Playback {
   if (playback.playing) return { ...playback, playing: false };
 
-  const atEnd = playback.position >= playback.duration;
+  const position = isAtEnd(playback) ? 0 : playback.position;
 
-  return { ...playback, position: atEnd ? 0 : playback.position, playing: true };
+  return { ...playback, position, playing: true };
 }
 
 /**

@@ -1,18 +1,22 @@
 ---
-// Страница аналитики: заголовок и пояснение — в разметке, числа и диаграммы приходят из API
-// в браузере.
+// Страница аналитики: сравнение эталонных проектов собрано из записей при сборке сайта, а числа
+// и диаграммы открытых галерей приходят из API в браузере.
+import type { SessionRecord } from "@cyberzavod/core";
 import { galleriesUrl } from "@/entities/gallery";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { ButtonLink, Panel, Title } from "@/shared/ui";
+import ReferenceProjects from "./ReferenceProjects.astro";
 import { StatsBoard } from "./StatsBoard.tsx";
 
 interface Props {
+  /** Записи сборок сайта: по ним — сравнение эталонных проектов. */
+  recordings: readonly SessionRecord[];
   /** Язык страницы. */
   locale: Locale;
 }
 
-const { locale } = Astro.props;
+const { recordings, locale } = Astro.props;
 ---
 
 <Panel scrollable>
@@ -20,8 +24,12 @@ const { locale } = Astro.props;
     <Title as="h1" size="xl">
       {UI_TEXT.stats.heading[locale]}
     </Title>
-    <p class="intro">{UI_TEXT.stats.intro[locale]}</p>
-    <StatsBoard client:load locale={locale} />
+    <ReferenceProjects recordings={recordings} locale={locale} />
+    <section class="section">
+      <Title as="h2">{UI_TEXT.statsSections.galleriesHeading[locale]}</Title>
+      <p class="intro">{UI_TEXT.stats.intro[locale]}</p>
+      <StatsBoard client:load locale={locale} />
+    </section>
     <div class="links">
       <ButtonLink href={galleriesUrl(locale)}>{UI_TEXT.pages.galleriesTitle[locale]}</ButtonLink>
     </div>
@@ -32,8 +40,13 @@ const { locale } = Astro.props;
   .article {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-l);
+    gap: var(--space-xl);
     max-width: 48rem;
+  }
+
+  .section {
+    display: grid;
+    gap: var(--space-l);
   }
 
   .intro {

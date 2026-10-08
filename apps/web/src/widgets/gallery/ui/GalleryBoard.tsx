@@ -17,18 +17,31 @@ interface Props {
   locale: Locale;
   /** Адрес сайта — `site` из конфига Astro: для строки бейджа в README. */
   siteUrl: string;
+  /**
+   * Примеры — эталонные проекты сайта: статичная разметка, которую ставит Astro, над галереями
+   * пользователей в общем списке. В галерее автора их нет.
+   */
+  examples?: JSX.Element;
 }
 
 type ListPage = Extract<GalleryPage, { view: "list" }>;
 type AuthorPage = Extract<GalleryPage, { view: "author" }>;
 
-function ListView(props: { page: ListPage; locale: Locale }): JSX.Element {
+interface ListViewProps {
+  page: ListPage;
+  examples: JSX.Element;
+  locale: Locale;
+}
+
+function ListView(props: ListViewProps): JSX.Element {
   return (
     <>
       <Title as="h1" size="xl">
         {UI_TEXT.gallery.listHeading[props.locale]}
       </Title>
       <p class={styles.note}>{UI_TEXT.gallery.listIntro[props.locale]}</p>
+      {props.examples}
+      <Title as="h2">{UI_TEXT.examples.userGalleriesHeading[props.locale]}</Title>
       <Show
         when={readyValue(props.page.galleries)}
         fallback={
@@ -81,6 +94,7 @@ function AuthorView(props: { page: AuthorPage; siteUrl: string; locale: Locale }
  * @param {Props} props Свойства компонента.
  * @param {Locale} props.locale Язык страницы.
  * @param {string} props.siteUrl Адрес сайта.
+ * @param {JSX.Element} [props.examples] Примеры над галереями пользователей.
  * @returns {JSX.Element} Список галерей или галерея автора.
  */
 export function GalleryBoard(props: Props): JSX.Element {
@@ -106,7 +120,7 @@ export function GalleryBoard(props: Props): JSX.Element {
     <div class={styles.board}>
       <Switch>
         <Match when={listPage()}>
-          {(list) => <ListView page={list()} locale={props.locale} />}
+          {(list) => <ListView page={list()} examples={props.examples} locale={props.locale} />}
         </Match>
         <Match when={authorPage()}>
           {(author) => <AuthorView page={author()} siteUrl={props.siteUrl} locale={props.locale} />}

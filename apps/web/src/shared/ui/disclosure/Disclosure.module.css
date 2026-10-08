@@ -1,0 +1,42 @@
+/* Сворачиваемый блок: шапка со стрелкой, содержимое под ней. Свой маркер браузера скрыт —
+   вместо него стрелка, которая поворачивается вниз, когда блок раскрыт. */
+.disclosure {
+  --marker-size: 1.25rem;
+}
+
+.summary {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.marker {
+  display: flex;
+  flex: none;
+  width: var(--marker-size);
+  height: var(--marker-size);
+  transition: transform var(--motion-fast) ease;
+}
+
+.marker > svg {
+  width: 100%;
+  height: 100%;
+}
+
+.disclosure[open] > .summary .marker {
+  transform: rotate(90deg);
+}
+
+.heading {
+  min-width: 0;
+}
+
+.body {
+  margin-top: var(--space-s);
+}

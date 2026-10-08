@@ -21,12 +21,20 @@ export interface Project<Language extends string> {
   repo?: string;
   /** Адрес сайта проекта, https. */
   website?: string;
+  /**
+   * Языки и инструменты проекта, как их пишут сами: «TypeScript», «Vite». Не переводятся и
+   * показываются как есть, по порядку.
+   */
+  stack?: readonly string[];
 }
 
 /** Ошибка карточки проекта: она пришла извне и не прошла проверку. */
 export class ProjectError extends Error {}
 
 const SECURE_PROTOCOL = "https:";
+
+// Стек — короткая подпись к проекту, а не список зависимостей.
+const MAX_STACK_ITEMS = 6;
 
 function isSecureUrl(value: unknown): value is string {
   if (typeof value !== "string" || !URL.canParse(value)) return false;
@@ -47,6 +55,23 @@ function parseLink(
   }
 
   return { [field]: value };
+}
+
+// Необязательный стек: нет в карточке — нет и в результате, как у ссылок.
+function parseStack(raw: Record<string, unknown>): Pick<Project<string>, "stack"> {
+  const { stack } = raw;
+
+  if (stack === undefined) return {};
+
+  const isList = Array.isArray(stack) && stack.length > 0 && stack.length <= MAX_STACK_ITEMS;
+
+  if (!isList || !stack.every(isLine)) {
+    throw new ProjectError(
+      `stack должен быть списком из 1–${MAX_STACK_ITEMS} непустых строк без переводов строки`,
+    );
+  }
+
+  return { stack: [...stack] };
 }
 
 function parseText<Language extends string>(
@@ -94,5 +119,6 @@ export function parseProject<Language extends string>(
     description: parseText(raw.description, "description", languages),
     ...parseLink(raw, "repo"),
     ...parseLink(raw, "website"),
+    ...parseStack(raw),
   };
 }
