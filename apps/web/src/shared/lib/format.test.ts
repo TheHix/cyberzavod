@@ -48,9 +48,15 @@ describe("formatDuration", () => {
 
 describe("formatClock", () => {
   it("показывает минуты и секунды в первый час", () => {
-    const result = formatClock(125_900);
+    const result = formatClock(125_400);
 
     expect(result).toBe("2:05");
+  });
+
+  it("округляет секунды так же, как счётчик времени: «17:22» рядом с «17 мин 22 с»", () => {
+    const result = formatClock(1_041_800);
+
+    expect(result).toBe("17:22");
   });
 
   it("добавляет часы после первого часа", () => {

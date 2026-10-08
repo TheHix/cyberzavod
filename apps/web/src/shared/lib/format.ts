@@ -12,6 +12,12 @@ function twoDigits(value: number): string {
   return String(value).padStart(2, "0");
 }
 
+// Счётчик времени и часы шкалы показывают одну длительность: секунды у них округляются одинаково,
+// иначе «17 мин 22 с» в итогах стояло бы рядом с «17:21» на шкале.
+function wholeSecondsOf(ms: number): number {
+  return Math.round(ms / SECOND_MS);
+}
+
 /**
  * Форматирует длительность для счётчика: секунды, минуты с секундами или часы с минутами.
  * @param {number} ms Длительность в миллисекундах.
@@ -20,7 +26,7 @@ function twoDigits(value: number): string {
  */
 export function formatDuration(ms: number, locale: Locale): string {
   const { hour, minute, second } = UI_TEXT.duration;
-  const totalSeconds = Math.round(ms / SECOND_MS);
+  const totalSeconds = wholeSecondsOf(ms);
   const totalMinutes = Math.floor(totalSeconds / MINUTE_SECONDS);
   const hours = Math.floor(totalMinutes / HOUR_MINUTES);
 
@@ -35,12 +41,13 @@ export function formatDuration(ms: number, locale: Locale): string {
 }
 
 /**
- * Форматирует момент сборки от её начала, как время на шкале проигрывателя.
+ * Форматирует момент сборки от её начала, как время на шкале проигрывателя. Секунды округляются
+ * так же, как в `formatDuration`.
  * @param {number} ms Миллисекунды от начала сборки.
  * @returns {string} Строка вида «2:05» или «1:02:05».
  */
 export function formatClock(ms: number): string {
-  const totalSeconds = Math.floor(ms / SECOND_MS);
+  const totalSeconds = wholeSecondsOf(ms);
   const totalMinutes = Math.floor(totalSeconds / MINUTE_SECONDS);
   const hours = Math.floor(totalMinutes / HOUR_MINUTES);
   const seconds = twoDigits(totalSeconds % MINUTE_SECONDS);
