@@ -7,12 +7,16 @@ import type { FactoryModel } from "../model/factory.ts";
 // журнале может ещё не быть. Столько журнал ждёт её, чтобы прокрутить к ней.
 const ENTRY_WAIT_MS = 10_000;
 
+// Запись встаёт к верху журнала, а не в середину: длинная реплика выше панели, и посередине её
+// шапка и начало текста ушли бы за верхний край.
+const ENTRY_ALIGNMENT: ScrollIntoViewOptions = { block: "start" };
+
 // Прокручивает журнал к записи; если её ещё нет, ждёт, пока журнал её покажет.
 function scrollToEntry(panel: HTMLElement, anchor: string): void {
   const entry = document.getElementById(anchor);
 
   if (entry !== null) {
-    entry.scrollIntoView({ block: "center" });
+    entry.scrollIntoView(ENTRY_ALIGNMENT);
 
     return;
   }
@@ -23,7 +27,7 @@ function scrollToEntry(panel: HTMLElement, anchor: string): void {
     if (shownEntry === null) return;
 
     observer.disconnect();
-    shownEntry.scrollIntoView({ block: "center" });
+    shownEntry.scrollIntoView(ENTRY_ALIGNMENT);
   });
 
   observer.observe(panel, { childList: true, subtree: true });
