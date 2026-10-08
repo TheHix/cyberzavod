@@ -14,6 +14,7 @@ import {
 } from "@cyberzavod/adapter-claude";
 import { RecordError, type InterfaceLanguage, type LocalizedText } from "@cyberzavod/core";
 import { JournalError, ProjectFileError } from "@cyberzavod/storage";
+import { projectChecksWith, runDoctor, type DoctorOptions } from "./commands/doctor.ts";
 import { galleryAccessOf, showGallery } from "./commands/gallery.ts";
 import { initProject } from "./commands/init.ts";
 import { recordDecision, recordNote } from "./commands/journal.ts";
@@ -21,17 +22,23 @@ import { login, logout } from "./commands/login.ts";
 import { shareRecording, unshareRecording } from "./commands/share.ts";
 import { printStatus } from "./commands/status.ts";
 import { checkProject, syncProject } from "./commands/sync.ts";
+import type { ProjectCheck } from "./doctor/check.ts";
+import { commandsFoundCheck } from "./doctor/commands-found.ts";
+import { commandsPassCheck } from "./doctor/commands-pass.ts";
+import { isProgramAvailable } from "./doctor/programs.ts";
+import { runCommandInShell } from "./doctor/run-command.ts";
 import { closestName } from "./closest-name.ts";
 import { confirmWithoutAsking, terminalConfirmation } from "./confirmation.ts";
 import { CommandError } from "./errors.ts";
 import { commandHelp, generalHelp, listedCommandNames, type CommandPlacement } from "./help.ts";
 import type { InitOverrides } from "./initial-config.ts";
-import { readInstallation } from "./installation/installation.ts";
+import { readInstallation, type Installation } from "./installation/installation.ts";
 import { CLI_MESSAGES } from "./messages/catalog.ts";
 import { COMMAND_NAMES, type CliMessages, type CommandName } from "./messages/cli-messages.ts";
 import { extractLanguageFlag, languageOf, type Environment } from "./messages/language.ts";
 import { ApiError } from "./sharing/api.ts";
 import { createSharing, type Sharing } from "./sharing/services.ts";
+import { credentialsFile, FileCredentialsStore } from "./sharing/settings.ts";
 
 const SUCCESS = 0;
 const FAILURE = 1;
@@ -74,6 +81,35 @@ function requiredText(value: string | undefined, missing: LocalizedText<CliMessa
 
 function defaultSharing(env: Environment): Sharing {
   return createSharing({ env, platform: process.platform, homeDirectory: homedir() });
+}
+
+// Машина и поиск программ с окружением вызова: PATH берётся из него, а не из process.env.
+function doctorOptionsOf(
+  invocation: Pick<Invocation, "directory" | "env" | "messages" | "claudeMessages">,
+  installation: Installation,
+  commandsCheck: ProjectCheck,
+): DoctorOptions {
+  const { directory, env, messages, claudeMessages } = invocation;
+  const platform = process.platform;
+  const credentials = new FileCredentialsStore(
+    credentialsFile({ env, platform, homeDirectory: homedir() }),
+  );
+
+  return {
+    machine: {
+      nodeVersion: process.versions.node,
+      credentials,
+      isProgramAvailable: (name) => isProgramAvailable({ name, root: directory, env, platform }),
+    },
+    projectChecks: projectChecksWith(commandsCheck),
+    projectTools: {
+      isProgramAvailable: (name, root) => isProgramAvailable({ name, root, env, platform }),
+      runCommand: runCommandInShell,
+    },
+    installation,
+    messages,
+    claudeMessages,
+  };
 }
 
 interface InitFlags {
@@ -136,6 +172,20 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
       await syncProject(directory, { force: values.force === true, installation, messages });
 
       return SUCCESS;
+    },
+  },
+  doctor: {
+    section: "maintenance",
+    run: async (invocation) => {
+      const { values } = parseArgs({
+        args: invocation.args,
+        options: { "run-checks": { type: "boolean" } },
+      });
+      const commandsCheck = values["run-checks"] === true ? commandsPassCheck : commandsFoundCheck;
+      const options = doctorOptionsOf(invocation, await readInstallation(), commandsCheck);
+      const isHealthy = await runDoctor(invocation.directory, options);
+
+      return isHealthy ? SUCCESS : FAILURE;
     },
   },
   status: {

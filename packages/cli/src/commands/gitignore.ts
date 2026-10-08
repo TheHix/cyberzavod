@@ -22,6 +22,22 @@ export function captureIgnoreEntry(journal: string): string | undefined {
   return `/${relative}/${CAPTURE_DIRECTORY}/`;
 }
 
+function hasEntryIn(text: string | undefined, entry: string): boolean {
+  return text?.split(/\r?\n/).includes(entry) === true;
+}
+
+/**
+ * Есть ли в `.gitignore` проекта точно такая строка.
+ * @param {string} root Корень проекта.
+ * @param {string} entry Строка для `.gitignore`.
+ * @returns {Promise<boolean>} true, если строка есть; нет файла — false.
+ */
+export async function hasIgnoreEntry(root: string, entry: string): Promise<boolean> {
+  const current = await readOptionalText(path.join(root, GITIGNORE_FILE));
+
+  return hasEntryIn(current, entry);
+}
+
 /**
  * Дописывает строку в `.gitignore` проекта.
  * @param {string} root Корень проекта.
@@ -32,7 +48,7 @@ export async function appendIgnoreEntry(root: string, entry: string): Promise<bo
   const file = path.join(root, GITIGNORE_FILE);
   const current = await readOptionalText(file);
 
-  if (current?.split(/\r?\n/).includes(entry) === true) return false;
+  if (hasEntryIn(current, entry)) return false;
 
   const separator = current === undefined || current.endsWith("\n") ? "" : "\n";
 

@@ -8,6 +8,7 @@ import type { RecordType } from "@cyberzavod/core";
 export const COMMAND_NAMES = [
   "init",
   "sync",
+  "doctor",
   "status",
   "decision",
   "note",
@@ -93,6 +94,86 @@ export interface SyncMessages {
   extra: string;
   harnessMismatch(params: { file: string; configVersion: string; cliVersion: string }): string;
   filesOutdated: string;
+}
+
+/**
+ * Тексты команды `doctor`: подпись и подсказка на каждый исход каждой проверки. Подпись `passed` и
+ * `notice` описывает найденное, `problem` — что не так; подсказка — одно действие.
+ */
+export interface DoctorMessages {
+  /** Подсказка под строкой с ✗ без отступа; `text` — действие. */
+  fix(text: string): string;
+  /** Подсказка под строкой с «–» без отступа; `text` — необязательное действие. */
+  hint(text: string): string;
+  allPassed: string;
+  problems(count: number): string;
+  node: {
+    passed(version: string): string;
+    tooOld(params: { version: string; minimum: number }): string;
+    install(minimum: number): string;
+  };
+  git: { passed: string; missing: string; install: string };
+  gallery: {
+    signedIn: string;
+    notSignedIn: string;
+    signIn: string;
+    corrupt: string;
+    signInAgain: string;
+  };
+  config: {
+    passed(params: { file: string; projectId: string; harness: string }): string;
+    notFound(directory: string): string;
+    init: string;
+    invalid(reason: string): string;
+    repair(file: string): string;
+  };
+  hooks: {
+    passed(version: string): string;
+    missing(file: string): string;
+    otherVersion(params: { file: string; found: string; configVersion: string }): string;
+    incomplete(events: string): string;
+    unreadable(reason: string): string;
+    sync: string;
+    repairSettings(file: string): string;
+  };
+  files: {
+    upToDate: string;
+    versionsDiffer(params: { file: string; configVersion: string; cliVersion: string }): string;
+    matchVersion(configVersion: string): string;
+    outdated(count: number): string;
+    sync: string;
+    writtenByHuman(files: string): string;
+    moveToRules(rulesFile: string): string;
+    cannotCheck(reason: string): string;
+    fixCause: string;
+  };
+  rules: {
+    passed(file: string): string;
+    missing(file: string): string;
+    create: string;
+    unfilled(file: string): string;
+    fill: string;
+  };
+  commands: {
+    noneSet(file: string): string;
+    setUp(file: string): string;
+    programsFound(programs: string): string;
+    programsMissing(programs: string): string;
+    fixPrograms(file: string): string;
+    allPassed(count: number): string;
+    /** Команда в кавычках языка. */
+    quoted(command: string): string;
+    exited(params: { command: string; code: number }): string;
+    notStarted(params: { command: string; reason: string }): string;
+    failed(commands: string): string;
+    runYourself(commands: string): string;
+  };
+  gitignore: {
+    passed(entry: string): string;
+    nothingToIgnore: string;
+    missing(entry: string): string;
+    add(params: { entry: string; file: string }): string;
+  };
 }
 
 /** Тексты команды `status`. */
@@ -187,6 +268,7 @@ export interface CliMessages {
   commands: Readonly<Record<CommandName, CommandHelp>>;
   init: InitMessages;
   sync: SyncMessages;
+  doctor: DoctorMessages;
   status: StatusMessages;
   journal: JournalMessages;
   login: LoginMessages;

@@ -41,6 +41,16 @@ export const ru: CliMessages = {
         { name: "--force", description: "перезаписать файлы, написанные человеком" },
       ],
     },
+    doctor: {
+      usage: "doctor [--run-checks]",
+      summary: "проверить подключение и подсказать, как починить",
+      parameters: [
+        {
+          name: "--run-checks",
+          description: "запустить команды проверок, а не только искать их",
+        },
+      ],
+    },
     status: {
       usage: "status",
       summary: "проект, процесс, агенты этапов, проверки и журнал",
@@ -142,6 +152,90 @@ export const ru: CliMessages = {
     harnessMismatch: ({ file, configVersion, cliVersion }) =>
       `${file}: harness ${configVersion}, а CLI — ${cliVersion}`,
     filesOutdated: `Файлы агента устарели: запустите ${CLI_COMMAND} sync`,
+  },
+  doctor: {
+    fix: (text) => `Как починить: ${text}`,
+    hint: (text) => `Подсказка: ${text}`,
+    allPassed: "Всё в порядке.",
+    problems: (count) => `Проблем: ${count}.`,
+    node: {
+      passed: (version) => `Node.js ${version}`,
+      tooOld: ({ version, minimum }) =>
+        `Node.js ${version} слишком старый: нужен ${minimum} или новее`,
+      install: (minimum) => `установите Node.js ${minimum} или новее`,
+    },
+    git: {
+      passed: "git установлен",
+      missing: "git не найден в PATH",
+      install: "установите git и убедитесь, что он в PATH",
+    },
+    gallery: {
+      signedIn: "галерея: вход выполнен",
+      notSignedIn: "галерея: вход не выполнен (нужен только для публикации записей)",
+      signIn: `чтобы публиковать записи, выполните ${CLI_COMMAND} login`,
+      corrupt: "галерея: файл с сохранённым входом повреждён",
+      signInAgain: `выполните ${CLI_COMMAND} login заново`,
+    },
+    config: {
+      passed: ({ file, projectId, harness }) => `${file}: проект ${projectId}, harness ${harness}`,
+      notFound: (directory) => `проект Cyberzavod не найден от ${directory}`,
+      init: `выполните ${CLI_COMMAND} init в корне проекта`,
+      invalid: (reason) => `конфиг проекта не годится: ${reason}`,
+      repair: (file) => `исправьте ${file} по сообщению выше`,
+    },
+    hooks: {
+      passed: (version) => `хуки агента установлены для ${version}`,
+      missing: (file) => `хуки агента не установлены в ${file}`,
+      otherVersion: ({ file, found, configVersion }) =>
+        `хуки агента в ${file} — для ${found}, а в конфиге ${configVersion}`,
+      incomplete: (events) => `хуки агента неполные: нет обработчиков у ${events}`,
+      unreadable: (reason) => `хуки агента не проверить: ${reason}`,
+      sync: `выполните ${CLI_COMMAND} sync`,
+      repairSettings: (file) => `исправьте JSON в ${file}, затем выполните ${CLI_COMMAND} sync`,
+    },
+    files: {
+      upToDate: "файлы агента актуальны",
+      versionsDiffer: ({ file, configVersion, cliVersion }) =>
+        `в ${file} harness ${configVersion}, а этот CLI ${cliVersion}: файлы агента не сравнить`,
+      matchVersion: (configVersion) =>
+        `выполните ${CLI_COMMAND} sync или запустите ${CLI_COMMAND}@${configVersion} doctor`,
+      outdated: (count) => `файлы агента устарели или лишние: ${count}`,
+      sync: `выполните ${CLI_COMMAND} sync (список файлов — ${CLI_COMMAND} sync --check)`,
+      writtenByHuman: (files) => `файлы агента написаны человеком: ${files}`,
+      moveToRules: (rulesFile) =>
+        `перенесите правки в ${rulesFile} и выполните ${CLI_COMMAND} sync --force`,
+      cannotCheck: (reason) => `файлы агента не проверить: ${reason}`,
+      fixCause: `устраните причину выше и выполните ${CLI_COMMAND} sync --check`,
+    },
+    rules: {
+      passed: (file) => `${file} заполнен`,
+      missing: (file) => `${file} не найден`,
+      create: "создайте его или запустите /setup в Claude Code",
+      unfilled: (file) => `в ${file} остались заглушки заготовки`,
+      fill: "запустите /setup в Claude Code",
+    },
+    commands: {
+      noneSet: (file) => `команды проверок не заданы в ${file}`,
+      setUp: (file) => `запустите /setup в Claude Code или впишите команды в ${file}`,
+      programsFound: (programs) =>
+        `программы ${programs} найдены; команды не запускались — ${CLI_COMMAND} doctor --run-checks`,
+      programsMissing: (programs) => `программы проверок не найдены: ${programs}`,
+      fixPrograms: (file) =>
+        `установите программы или поправьте команды в ${file}; команда, начатая со встроенной команды оболочки (cd web && …), не распознаётся: оберните её в make-цель или скрипт либо запустите ${CLI_COMMAND} doctor --run-checks`,
+      allPassed: (count) => `команды проверок проходят: ${count}`,
+      quoted: (command) => `«${command}»`,
+      exited: ({ command, code }) => `«${command}» (код выхода ${code})`,
+      notStarted: ({ command, reason }) => `«${command}» (не запустилась: ${reason})`,
+      failed: (commands) => `команды проверок не прошли: ${commands}`,
+      runYourself: (commands) => `запустите ${commands} сами и посмотрите ошибку`,
+    },
+    gitignore: {
+      passed: (entry) => `.gitignore игнорирует ${entry}`,
+      nothingToIgnore: "журнал вне проекта: игнорировать нечего",
+      missing: (entry) =>
+        `в .gitignore нет строки ${entry}: сырые журналы сессий могут попасть в коммит`,
+      add: ({ entry, file }) => `допишите строку ${entry} в ${file}`,
+    },
   },
   status: {
     recordTypes: { session: "сессии", decision: "решения", note: "заметки" },
