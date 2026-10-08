@@ -1,6 +1,6 @@
 # Dev-контейнер
 
-Изолированное окружение для разработки и для ИИ-агентов. Основано на [эталонном dev-контейнере Claude Code](https://github.com/anthropics/claude-code/tree/main/.devcontainer).
+Изолированное окружение для разработки и для ИИ-агентов. Основано на [dev-контейнере из репозитория Claude Code](https://github.com/anthropics/claude-code/tree/main/.devcontainer).
 
 ## Запуск
 
