@@ -33,6 +33,24 @@ describe("login", () => {
     expect(printed()).toContain("вход выполнен: alice");
   });
 
+  it("печатает адрес и код до первого опроса GitHub", async () => {
+    let printedBeforePolling = "";
+    const pollAccessToken = vi.fn(async () => {
+      printedBeforePolling = printed();
+
+      return { status: "granted" as const, token: SECRET_TOKEN };
+    });
+    const sharing = fakeSharing({
+      credentials: memoryCredentials(),
+      github: fakeGithub({ pollAccessToken }),
+    });
+
+    await login(sharing, messages);
+
+    expect(printedBeforePolling).toContain("WDJB-MJHT");
+    expect(printedBeforePolling).toContain("https://github.com/login/device");
+  });
+
   it("не печатает токен", async () => {
     await login(fakeSharing({ credentials: memoryCredentials() }), messages);
 
