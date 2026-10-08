@@ -47,6 +47,7 @@ async function installation(): Promise<ClaudeInstallation> {
     templates: {
       publishRecording: await readFile(path.join(TEMPLATES, "publish-recording.md"), "utf8"),
       recordingEditor: await readFile(path.join(TEMPLATES, "recording-editor.md"), "utf8"),
+      setup: await readFile(path.join(TEMPLATES, "setup.md"), "utf8"),
     },
   };
 }
@@ -86,6 +87,14 @@ describe("syncClaude", () => {
     );
 
     expect(skill).toContain("`npx cyberzavod@0.3.0 draft`");
+  });
+
+  it("кладёт скилл /setup, который зовёт CLI той версии, что в конфиге", async () => {
+    await sync();
+
+    const skill = await readFile(path.join(root, ".claude/skills/setup/SKILL.md"), "utf8");
+
+    expect(skill).toContain("`npx cyberzavod@0.3.0 sync`");
   });
 
   it("в режиме проверки ничего не пишет и называет устаревшие файлы", async () => {

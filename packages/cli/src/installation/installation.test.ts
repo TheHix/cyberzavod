@@ -22,4 +22,10 @@ describe("readInstallation", () => {
       rules: installation.rulesTemplate.length > 0,
     }).toEqual({ workflows: ["default"], rules: true });
   });
+
+  it("читает шаблон скилла /setup", async () => {
+    const installation = await readInstallation();
+
+    expect(installation.claudeTemplates.setup.length).toBeGreaterThan(0);
+  });
 });

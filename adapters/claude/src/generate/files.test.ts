@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Harness, StageGuide } from "@cyberzavod/core";
+import { RULES_TODO_MARK, type Harness, type StageGuide } from "@cyberzavod/core";
 import { claudeFiles, GENERATED_MARK, renderTemplate, type ClaudeProject } from "./files.ts";
 
 function guide(stage: StageGuide["stage"], title: string, role?: string): StageGuide {
@@ -38,7 +38,11 @@ function claudeProject(): ClaudeProject {
     rules: ["", "apps/web"],
     capture: { raw: "journal/capture/claude/raw", drafts: "journal/capture/claude/drafts" },
     cli: "cyberzavod",
-    templates: { publishRecording: "{{generated}}\n{{cli}} draft", recordingEditor: "{{drafts}}" },
+    templates: {
+      publishRecording: "{{generated}}\n{{cli}} draft",
+      recordingEditor: "{{drafts}}",
+      setup: "{{generated}}\n{{todo}}",
+    },
   };
 }
 
@@ -62,6 +66,7 @@ describe("claudeFiles", () => {
       ".claude/agents/analyst.md",
       ".claude/agents/coder.md",
       ".claude/skills/feature/SKILL.md",
+      ".claude/skills/setup/SKILL.md",
       ".claude/skills/publish-recording/SKILL.md",
       ".claude/agents/recording-editor.md",
     ]);
@@ -106,6 +111,14 @@ describe("claudeFiles", () => {
 
     expect(content).toContain("## Record stage\n\nStage text Record.");
   });
+
+  it("кладёт скилл настройки с отметкой генерации", () => {
+    const project = claudeProject();
+
+    const content = fileOf(project, ".claude/skills/setup/SKILL.md");
+
+    expect(content).toContain(GENERATED_MARK);
+  });
 });
 
 describe("renderTemplate", () => {
@@ -115,6 +128,14 @@ describe("renderTemplate", () => {
     const text = renderTemplate("{{cli}} draft {{raw}} {{drafts}}", project);
 
     expect(text).toBe("cyberzavod draft journal/capture/claude/raw journal/capture/claude/drafts");
+  });
+
+  it("подставляет отметку заглушки заготовки", () => {
+    const project = claudeProject();
+
+    const text = renderTemplate("line {{todo}}", project);
+
+    expect(text).toBe(`line ${RULES_TODO_MARK}`);
   });
 
   it("отклоняет неизвестную подстановку", () => {

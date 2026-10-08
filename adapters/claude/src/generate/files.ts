@@ -1,8 +1,15 @@
 // Файлы Claude Code проекта, собранные из harness и конфига проекта: тонкие CLAUDE.md поверх
-// AGENTS.md, агенты ролей, скиллы процесса и публикации записи. Здесь — только тексты; что
-// с ними делать на диске, решает sync.ts.
+// AGENTS.md, агенты ролей, скиллы процесса, настройки проекта и публикации записи. Здесь —
+// только тексты; что с ними делать на диске, решает sync.ts.
 
-import type { Harness, ProjectConfig, StageGuide, StageRole, Workflow } from "@cyberzavod/core";
+import {
+  RULES_TODO_MARK,
+  type Harness,
+  type ProjectConfig,
+  type StageGuide,
+  type StageRole,
+  type Workflow,
+} from "@cyberzavod/core";
 import {
   claudeEffortOf,
   claudeModelOf,
@@ -29,6 +36,7 @@ export interface GeneratedFile {
 export interface ClaudeTemplates {
   publishRecording: string;
   recordingEditor: string;
+  setup: string;
 }
 
 /** Всё, из чего собираются файлы Claude Code проекта. */
@@ -164,8 +172,10 @@ function featureSkill(project: ClaudeProject): GeneratedFile {
 }
 
 /**
- * Подставляет в шаблон адаптера отметку генерации, команду CLI и каталоги журнала.
- * @param {string} template Текст шаблона с `{{generated}}`, `{{cli}}`, `{{raw}}`, `{{drafts}}`.
+ * Подставляет в шаблон адаптера отметку генерации, команду CLI, каталоги журнала и отметку
+ * заглушки заготовки AGENTS.md.
+ * @param {string} template Текст шаблона с `{{generated}}`, `{{cli}}`, `{{raw}}`, `{{drafts}}`,
+ * `{{todo}}`.
  * @param {ClaudeProject} project Проект.
  * @returns {string} Готовый текст файла.
  * @throws {GenerateError} Если в шаблоне подстановка, которой адаптер не знает.
@@ -176,6 +186,7 @@ export function renderTemplate(template: string, project: ClaudeProject): string
     cli: project.cli,
     raw: project.capture.raw,
     drafts: project.capture.drafts,
+    todo: RULES_TODO_MARK,
   };
 
   return template.replace(/\{\{(\w+)\}\}/g, (placeholder, name: string) => {
@@ -187,6 +198,13 @@ export function renderTemplate(template: string, project: ClaudeProject): string
 
     return value;
   });
+}
+
+function setupSkill(project: ClaudeProject): GeneratedFile {
+  return {
+    path: ".claude/skills/setup/SKILL.md",
+    content: renderTemplate(project.templates.setup, project),
+  };
 }
 
 function recordingFiles(project: ClaudeProject): GeneratedFile[] {
@@ -213,6 +231,7 @@ export function claudeFiles(project: ClaudeProject): GeneratedFile[] {
     ...entrypoints(project),
     ...roleAgents(project),
     featureSkill(project),
+    setupSkill(project),
     ...recordingFiles(project),
   ];
 }
