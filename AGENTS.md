@@ -10,6 +10,7 @@ Cyberzavod — локальный, независимый от модели harn
 
 - `make check` — все проверки: типы, тесты, сборка фронта и API, сборка Docker-образа. CI вызывает те же make-цели. Должна проходить перед любым коммитом.
 - `make check-web check-api` — проверки без Docker; их же запускает хук остановки (`verification.commands` в `.cyberzavod/project.json`). `check-web` заодно проверяет `cyberzavod sync --check`: сгенерированные файлы не отстали от harness и конфига.
+- `pnpm smoke` — дымовая проверка настоящего npm-пакета: `npm pack`, установка архива и путь человека от `init` до `disconnect` во временном проекте; CI гоняет её на Linux, macOS и Windows.
 - `make dev` — Postgres и API в Docker, фронт с горячей перезагрузкой на http://localhost:4321.
 - `make up` / `make down` — поднять или остановить Docker-окружение.
 - `make format` — привести код к стилю (Prettier, ESLint --fix, gofumpt, goimports).

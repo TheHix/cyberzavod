@@ -11,7 +11,8 @@
     "dev": "pnpm --filter @cyberzavod/web dev",
     "lint": "prettier --check . && eslint . --max-warnings 0",
     "format": "prettier --write . && eslint --fix . && prettier --write .",
-    "check": "pnpm -r run check"
+    "check": "pnpm -r run check",
+    "smoke": "node packages/cli/scripts/smoke.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

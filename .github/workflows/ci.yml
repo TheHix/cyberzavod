@@ -58,6 +58,30 @@ jobs:
           install-only: true
       - run: make check-api check-docker
 
+  # Настоящий npm-пакет на трёх ОС и двух Node: npm pack, установка архива и путь человека в
+  # проекте с пробелом в пути (packages/cli/scripts/smoke.ts). Зависимости ставит Node 24 —
+  # её требует workspace, — а сам пакет проверяется и на самой старой поддерживаемой Node.
+  package:
+    name: package (${{ matrix.os }}, Node ${{ matrix.node }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      - run: pnpm smoke
+
   scripts:
     runs-on: ubuntu-latest
     steps:
@@ -70,7 +94,7 @@ jobs:
     # Без имени GitHub перечисляет в нём все значения матрицы, вместе с «.» контекста сайта.
     name: images (${{ matrix.image }})
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [web, api, scripts]
+    needs: [web, api, scripts, package]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
