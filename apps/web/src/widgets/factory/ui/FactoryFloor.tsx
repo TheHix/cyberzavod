@@ -39,6 +39,8 @@ interface Props {
   position: SeriesPosition | undefined;
   /** Level of the heading with the build name. */
   titleLevel: "h1" | "h2";
+  /** Content above the floor in its column, beside the HUD; the floor fits into the rest. */
+  children?: JSX.Element | undefined;
 }
 
 interface LaunchedFactory {
@@ -107,6 +109,7 @@ function fieldWithin(host: HTMLElement, field: HTMLElement): Frame {
  * @param {string | undefined} props.languageNote Note about the recording's original language.
  * @param {SeriesPosition | undefined} props.position Place of the build in its project's series.
  * @param {"h1" | "h2"} props.titleLevel Level of the heading with the build name.
+ * @param {JSX.Element} [props.children] Content above the floor in its column.
  * @returns {JSX.Element} The factory with the HUD.
  */
 export function FactoryFloor(props: Props): JSX.Element {
@@ -199,13 +202,16 @@ export function FactoryFloor(props: Props): JSX.Element {
             role="img"
             aria-label={UI_TEXT.factory.canvasLabel[locale](recording().data.title)}
           />
-          <div ref={(element) => (fieldElement = element)} class={styles.field}>
-            <Show when={status() === "loading"}>
-              <p class={styles.notice}>{UI_TEXT.factory.starting[locale]}</p>
-            </Show>
-            <Show when={status() === "failed"}>
-              <p class={styles.notice}>{UI_TEXT.factory.failed[locale]}</p>
-            </Show>
+          <div class={styles.column}>
+            {props.children}
+            <div ref={(element) => (fieldElement = element)} class={styles.field}>
+              <Show when={status() === "loading"}>
+                <p class={styles.notice}>{UI_TEXT.factory.starting[locale]}</p>
+              </Show>
+              <Show when={status() === "failed"}>
+                <p class={styles.notice}>{UI_TEXT.factory.failed[locale]}</p>
+              </Show>
+            </div>
           </div>
           <Hud
             project={props.project}

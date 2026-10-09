@@ -28,7 +28,7 @@ Guides: [Cyberzavod in 3 minutes](https://cyberzavod.com/guides/getting-started/
 
 ## The workflow
 
-**Plan → Implement → Review → Verify → Record.** You approve the plan; stage agents write the code, review it and verify it against the plan; the stop hook keeps the agent working while the project checks are red; at the end you get commits, and decisions go to the journal. Details are in [How it works](#how-it-works).
+**Plan → Code → Review → Verify → Record.** You approve the plan; stage agents write the code, review it and verify it against the plan; the stop hook keeps the agent working while the project checks are red; at the end you get commits, and decisions go to the journal. Details are in [How it works](#how-it-works).
 
 ## Current support
 
@@ -36,7 +36,7 @@ Cyberzavod is agent-agnostic by design. Claude Code is currently the first fully
 
 ## Privacy
 
-Cyberzavod is local-first. Nothing is shared unless you explicitly use sharing or publishing functionality: only the gallery commands (`login`, `share`, `unshare`, `gallery`) talk to the server. `init`, `sync`, `status`, `doctor` and the hooks send nothing anywhere; npx only downloads the `cyberzavod` package from npm when it is not cached. Raw session logs, which contain your prompts, stay in the journal's `capture/` directory, which `init` keeps out of git.
+Cyberzavod is local-first. Nothing is shared unless you explicitly use sharing or publishing functionality: only the gallery commands (`login`, `share`, `unshare`, `gallery`) use the network: GitHub to sign in and the cyberzavod.com server. `init`, `sync`, `status`, `doctor` and the hooks send nothing anywhere; npx only downloads the `cyberzavod` package from npm when it is not cached. Raw session logs, which contain your prompts, stay in the journal's `capture/` directory, which `init` keeps out of git.
 
 ## Removing it
 
@@ -73,7 +73,7 @@ Run every command as `npx cyberzavod <command>`.
 | Maintenance | `doctor` | Check the setup and say how to fix each problem |
 | Maintenance | `disconnect` | Remove Cyberzavod from the project: only what it added |
 
-`npx cyberzavod <command> --help` lists the flags of a command. The language is set by `--lang en|ru`, `CYBERZAVOD_LANG` or the system locale. To move to a newer release, run `npx cyberzavod@latest sync`: it rewrites the generated files and the hooks for the new version. `draft`, `publish` and `hook` are called by the skills and the hooks, not by you. For scripts and CI, `status --json`, `doctor --json` and `sync --check --json` print one JSON document with a `schemaVersion` and stable keys.
+`npx cyberzavod <command> --help` lists the flags of a command. The language is set by `--lang en|ru`, `CYBERZAVOD_LANG` or the system locale. To move to a newer release, run `npx cyberzavod@latest sync`: it rewrites the generated files and the hooks for the new version. `draft`, `publish` and `hook` are called by the skills and the hooks, not by you. For scripts and CI, `status --json`, `doctor --json`, `sync --check --json` and `sync --diff --json` print one JSON document with a `schemaVersion` and stable keys.
 
 ## If something doesn't work
 

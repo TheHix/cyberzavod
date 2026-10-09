@@ -17,9 +17,18 @@
   display: block;
 }
 
+/* The column left of the HUD: content above the floor, if any, and the field under it. */
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gutter);
+  min-height: 0;
+}
+
 /* The field: a transparent space between the menu and the HUD, the floor plan fits into it. */
 .field {
   position: relative;
+  flex: 1;
   min-height: 0;
 }
 

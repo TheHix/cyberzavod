@@ -13,6 +13,8 @@ interface Props {
   locale: Locale;
   /** Level of the heading with the build name; by default the main page heading. */
   titleLevel?: "h1" | "h2" | undefined;
+  /** Content above the floor in its column, beside the HUD. */
+  children?: JSX.Element | undefined;
 }
 
 /**
@@ -24,6 +26,7 @@ interface Props {
  * @param {readonly SeriesBuild[]} props.builds Series builds in playback order.
  * @param {Locale} props.locale Page language.
  * @param {"h1" | "h2"} [props.titleLevel] Level of the heading with the build name.
+ * @param {JSX.Element} [props.children] Content above the floor in its column.
  * @returns {JSX.Element} The factory with the HUD.
  */
 export function SeriesFactory(props: Props): JSX.Element {
@@ -45,6 +48,8 @@ export function SeriesFactory(props: Props): JSX.Element {
       languageNote={current().languageNote}
       position={current().position}
       titleLevel={props.titleLevel ?? "h1"}
-    />
+    >
+      {props.children}
+    </FactoryFloor>
   );
 }

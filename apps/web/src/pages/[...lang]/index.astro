@@ -3,6 +3,7 @@ import type { GetStaticPaths } from "astro";
 import GameLayout from "@/app/layouts/GameLayout.astro";
 import { SeriesFactory, seriesBuildsOf } from "@/widgets/factory";
 import { SeriesBuildJournal } from "@/widgets/build-journal";
+import { HomeIntro } from "@/widgets/home-intro";
 import { projectLinkOf, projectOf, publishedProjects } from "@/entities/project";
 import { projectSeriesOf, publishedRecordings } from "@/entities/recording";
 import { PANELS } from "@/shared/config/panels.ts";
@@ -39,7 +40,9 @@ const hasBuilds = seriesBuilds.length > 0;
   heading={UI_TEXT.pages.homeHeading[locale](site.name[locale])}
 >
   {hasBuilds ? (
-    <SeriesFactory client:load locale={locale} builds={seriesBuilds} titleLevel="h2" />
+    <SeriesFactory client:load locale={locale} builds={seriesBuilds} titleLevel="h2">
+      <HomeIntro locale={locale} />
+    </SeriesFactory>
   ) : (
     <Panel label={UI_TEXT.pages.floor[locale]}>
       <p>{UI_TEXT.lists.noRecordings[locale]}</p>

@@ -15,7 +15,7 @@
    git push origin vX.Y.Z
    ```
 
-   `.github/workflows/release.yml` проверяет, что тег совпадает с версией, гоняет `make check-web` и `pnpm smoke`, публикует пакет через npm Trusted Publishing (OIDC, без токена; npm сам подписывает происхождение — provenance) и ждёт, пока npm отдаёт новую версию как `latest`.
+   `.github/workflows/release.yml` проверяет, что тег совпадает с версией, гоняет `make check-web` и `pnpm smoke`, публикует пакет через npm Trusted Publishing (OIDC, без токена; npm сам подписывает происхождение — provenance) и ждёт до 10 минут, пока npm отдаёт новую версию как `latest`. Если этот последний шаг упал, а остальные зелёные, пакет уже опубликован: проверьте `npm view cyberzavod dist-tags.latest` и не перезапускайте выпуск — повторная публикация той же версии упадёт.
 
 6. Проверить руками одно: `npx cyberzavod@latest --version` в любом каталоге печатает `X.Y.Z`.
 

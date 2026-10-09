@@ -60,7 +60,7 @@ Run every command as `npx cyberzavod <command>`.
 - `doctor`: check the setup and say how to fix each problem.
 - `disconnect`: remove Cyberzavod from the project, see [Removing Cyberzavod](#removing-cyberzavod).
 
-For scripts and CI, `status --json`, `doctor --json` and `sync --check --json` print one JSON document without colors, with a `schemaVersion` and stable keys.
+For scripts and CI, `status --json`, `doctor --json`, `sync --check --json` and `sync --diff --json` print one JSON document without colors, with a `schemaVersion` and stable keys.
 
 `npx cyberzavod <command> --help` lists the flags of a command. The language is set by `--lang en|ru`, `CYBERZAVOD_LANG` or the system locale. To move to a newer release, run `npx cyberzavod@latest sync`: it rewrites the agent files and the hooks for the new version. `draft`, `publish` and `hook` are called by the skills and the hooks, not by you.
 
@@ -100,7 +100,7 @@ The factory has built three example projects from scratch. Each one started with
 
 ## How it works
 
-Cyberzavod is a harness: a ready-made set of process, roles, principles and checks. It does not write code itself and does not replace your agent. From the harness it generates the files your agent understands. Your stack may change, and so may the agent. The process stays the same. Cyberzavod is local-first. Nothing is shared unless you explicitly use sharing or publishing: only the gallery commands (`login`, `share`, `unshare`, `gallery`) talk to the server. `init`, `sync`, `status`, `doctor` and the hooks send nothing anywhere; npx only downloads the `cyberzavod` package from npm when it is not in the cache yet.
+Cyberzavod is a harness: a ready-made set of process, roles, principles and checks. It does not write code itself and does not replace your agent. From the harness it generates the files your agent understands. Your stack may change, and so may the agent. The process stays the same. Cyberzavod is local-first. Nothing is shared unless you explicitly use sharing or publishing: only the gallery commands (`login`, `share`, `unshare`, `gallery`) use the network: GitHub to sign in and the cyberzavod.com server. `init`, `sync`, `status`, `doctor` and the hooks send nothing anywhere; npx only downloads the `cyberzavod` package from npm when it is not in the cache yet.
 
 ### Stages and roles
 
