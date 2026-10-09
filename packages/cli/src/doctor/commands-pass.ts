@@ -1,11 +1,11 @@
-// Проверка команд проверок запуском (`doctor --run-checks`): каждая команда по отдельности
-// оболочкой системы в корне проекта.
+// Checks the check commands by running them (`doctor --run-checks`): each command separately,
+// with the system shell in the project root.
 
 import type { DoctorMessages } from "../messages/cli-messages.ts";
 import { failed, LIST_SEPARATOR, passed, type CommandRun, type ProjectCheck } from "./check.ts";
 import { noCommandsResult } from "./no-commands.ts";
 
-// Что сказать о неудавшемся запуске; undefined, если команда прошла.
+// What to say about a failed run; undefined if the command passed.
 function failureOf(command: string, run: CommandRun, doctor: DoctorMessages): string | undefined {
   switch (run.kind) {
     case "exited":
@@ -15,7 +15,7 @@ function failureOf(command: string, run: CommandRun, doctor: DoctorMessages): st
   }
 }
 
-/** Каждая из `verification.commands` завершается с кодом 0. */
+/** Each of the `verification.commands` exits with code 0. */
 export const commandsPassCheck: ProjectCheck = {
   id: "commands",
   run: async ({ project, messages, runCommand }) => {

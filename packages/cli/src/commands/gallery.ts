@@ -1,4 +1,5 @@
-// `cyberzavod gallery`: записи автора на сервере, открыта ли галерея, лимит; открыть и закрыть.
+// `cyberzavod gallery`: the author's recordings on the server, whether the gallery is public, the
+// limit; open and close it.
 
 import { CommandError } from "../errors.ts";
 import type { CliMessages } from "../messages/cli-messages.ts";
@@ -7,15 +8,15 @@ import { withToken } from "../sharing/authorization.ts";
 import { badgeMarkdown, galleryLink, recordingLink } from "../sharing/links.ts";
 import type { Sharing } from "../sharing/services.ts";
 
-/** Что делать с доступом к галерее: открыть, закрыть или только показать. */
+/** What to do with gallery access: open, close, or only show. */
 export type GalleryAccess = "public" | "private" | "keep";
 
 /**
- * Выбирает изменение доступа по флагам команды.
- * @param {boolean} isPublicRequested Указан `--public`.
- * @param {boolean} isPrivateRequested Указан `--private`.
- * @returns {GalleryAccess} Что делать с доступом.
- * @throws {CommandError} Если указаны оба флага.
+ * Picks the access change from the command flags.
+ * @param {boolean} isPublicRequested `--public` is given.
+ * @param {boolean} isPrivateRequested `--private` is given.
+ * @returns {GalleryAccess} What to do with access.
+ * @throws {CommandError} If both flags are given.
  */
 export function galleryAccessOf(
   isPublicRequested: boolean,
@@ -68,12 +69,12 @@ function describeGallery(sharing: Sharing, me: Me, messages: CliMessages): strin
 }
 
 /**
- * Показывает галерею автора; при необходимости сначала открывает или закрывает её.
- * @param {Sharing} sharing Зависимости команд публикации.
- * @param {GalleryAccess} access Что делать с доступом к галерее.
- * @param {CliMessages} messages Сообщения на выбранном языке.
- * @returns {Promise<void>} Готово, когда состояние галереи напечатано.
- * @throws {CommandError} Если нет входа.
+ * Shows the author's gallery; if needed, opens or closes it first.
+ * @param {Sharing} sharing Dependencies of the sharing commands.
+ * @param {GalleryAccess} access What to do with gallery access.
+ * @param {CliMessages} messages Messages in the chosen language.
+ * @returns {Promise<void>} Done when the gallery state is printed.
+ * @throws {CommandError} If not logged in.
  */
 export async function showGallery(
   sharing: Sharing,

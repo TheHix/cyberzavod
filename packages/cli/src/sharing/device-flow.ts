@@ -1,26 +1,26 @@
-// Ожидание подтверждения входа: опрос GitHub с интервалом из его ответа.
+// Waiting for login confirmation: polling GitHub at the interval from its response.
 
 import { CommandError } from "../errors.ts";
 import type { DeviceCode, GithubDeviceAuth } from "./github.ts";
 
-/** На сколько секунд GitHub просит увеличить интервал после `slow_down`. */
+/** How many seconds GitHub asks to add to the interval after `slow_down`. */
 const SLOW_DOWN_STEP_SECONDS = 5;
 const MILLISECONDS_IN_SECOND = 1000;
 
-/** Что нужно ожиданию входа. */
+/** What waiting for login needs. */
 export interface DeviceFlowOptions {
   auth: GithubDeviceAuth;
   clientId: string;
   code: DeviceCode;
-  /** Пауза между опросами; в тестах — мгновенная. */
+  /** Pause between polls; instant in tests. */
   sleep(milliseconds: number): Promise<void>;
 }
 
 /**
- * Опрашивает GitHub, пока человек не подтвердит код, и возвращает токен.
- * @param {DeviceFlowOptions} options Клиент GitHub, код устройства и пауза.
- * @returns {Promise<string>} Токен GitHub.
- * @throws {CommandError} Если код истёк или человек отказал.
+ * Polls GitHub until the human confirms the code, and returns the token.
+ * @param {DeviceFlowOptions} options GitHub client, device code and pause.
+ * @returns {Promise<string>} GitHub token.
+ * @throws {CommandError} If the code expired or the human declined.
  */
 export async function waitForAccessToken(options: DeviceFlowOptions): Promise<string> {
   const { auth, clientId, code, sleep } = options;

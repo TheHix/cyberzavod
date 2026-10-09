@@ -1,4 +1,4 @@
-// Поиск программы без запуска: так `doctor` отличает «программы нет» от «команда упала».
+// Program lookup without running it: this is how `doctor` tells "no program" from "command failed".
 
 import { access, constants, stat } from "node:fs/promises";
 import path from "node:path";
@@ -12,9 +12,9 @@ const WINDOWS_PATH_DELIMITER = ";";
 const POSIX_PATH_DELIMITER = ":";
 const DEFAULT_WINDOWS_EXTENSIONS = ".COM;.EXE;.BAT;.CMD";
 
-/** Что искать и где: имя, корень проекта, окружение и платформа. */
+/** What to look for and where: name, project root, environment and platform. */
 export interface ProgramLookup {
-  /** Имя в `PATH` или путь с `/` или `\` от корня проекта. */
+  /** A name in `PATH` or a path with `/` or `\` from the project root. */
   name: string;
   root: string;
   env: Environment;
@@ -22,9 +22,9 @@ export interface ProgramLookup {
 }
 
 /**
- * Программа команды: первое слово после присваиваний переменных (`CI=1 pnpm test` — `pnpm`).
- * @param {string} command Команда проверки целиком.
- * @returns {string | undefined} Первое слово или undefined, если в команде одни присваивания.
+ * The command's program: the first word after variable assignments (`CI=1 pnpm test` → `pnpm`).
+ * @param {string} command The whole check command.
+ * @returns {string | undefined} The first word, or undefined if the command has only assignments.
  */
 export function programOf(command: string): string | undefined {
   let rest = command.trim();
@@ -65,7 +65,7 @@ function pathDirectories({ env, platform }: ProgramLookup): string[] {
   return (value ?? "").split(delimiter).filter((directory) => directory !== "");
 }
 
-// На Windows программа находится и под своим именем, и с расширением из PATHEXT.
+// On Windows a program is found both under its own name and with an extension from PATHEXT.
 function fileNames({ name, env, platform }: ProgramLookup): string[] {
   if (platform !== "win32") return [name];
 
@@ -85,10 +85,10 @@ async function firstExecutable(files: string[], platform: NodeJS.Platform): Prom
 }
 
 /**
- * Есть ли программа: слово с `/` или `\` — файл от корня проекта, иначе поиск в `PATH`; найденное
- * должно быть файлом, на POSIX — исполняемым. Программа не запускается.
- * @param {ProgramLookup} lookup Имя, корень, окружение и платформа.
- * @returns {Promise<boolean>} true, если программа найдена.
+ * Whether the program exists: a word with `/` or `\` is a file from the project root, otherwise a
+ * `PATH` lookup; what is found must be a file, executable on POSIX. The program is not run.
+ * @param {ProgramLookup} lookup Name, root, environment and platform.
+ * @returns {Promise<boolean>} true if the program is found.
  */
 export async function isProgramAvailable(lookup: ProgramLookup): Promise<boolean> {
   const { name, root, platform } = lookup;

@@ -1,13 +1,14 @@
-// Машиночитаемый вывод команд чтения и проверки (`--json`): один JSON-документ в stdout, без
-// цветов и переводов. Ключи стабильны: их читают скрипты и CI, текст для человека — нет.
+// Machine-readable output of read and check commands (`--json`): one JSON document on stdout,
+// without colors or translations. Keys are stable: scripts and CI read them, text for the human is
+// not.
 
-/** Версия формата JSON-вывода; не путать с версией CLI и harness. */
+/** JSON output format version; not to be confused with the CLI and harness version. */
 export const JSON_OUTPUT_SCHEMA_VERSION = 1;
 
 /**
- * Печатает JSON-документ команды: версия формата, имя команды, затем поля команды.
- * @param {string} command Имя команды, например `doctor`.
- * @param {object} body Поля документа.
+ * Prints a command's JSON document: format version, command name, then the command's fields.
+ * @param {string} command Command name, for example `doctor`.
+ * @param {object} body Document fields.
  */
 export function printJson(command: string, body: object): void {
   const document = { schemaVersion: JSON_OUTPUT_SCHEMA_VERSION, command, ...body };

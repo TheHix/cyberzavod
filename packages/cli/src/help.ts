@@ -1,4 +1,4 @@
-// Справка CLI: общий список команд по разделам и справка одной команды.
+// CLI help: the general list of commands by section and the help of a single command.
 
 import { CLI_COMMAND } from "@cyberzavod/adapter-claude";
 import { INTERFACE_LANGUAGES } from "@cyberzavod/core";
@@ -11,10 +11,12 @@ import {
   type CommandSection,
 } from "./messages/cli-messages.ts";
 
-/** Где команда в справке: раздел списка или `service` — служебная, вне списка. */
+/**
+ * Where a command is in the help: a list section, or `service`, a service command outside the list.
+ */
 export type CommandPlacement = CommandSection | "service";
 
-/** Команда с её местом в справке. */
+/** A command with its place in the help. */
 export interface PlacedCommand {
   section: CommandPlacement;
 }
@@ -26,15 +28,15 @@ function columnWidth(names: readonly string[]): number {
   return Math.max(...names.map((name) => name.length));
 }
 
-// Строка вида `  <имя>  <описание>`: имя дополнено пробелами до ширины колонки.
+// A line like `  <name>  <description>`: the name is padded with spaces to the column width.
 function alignedRow({ name, description }: CommandParameter, width: number): string {
   return `${LIST_INDENT}${name.padEnd(width)}${COLUMN_GAP}${description}`;
 }
 
 /**
- * Имена команд, которые показывает общая справка: без служебных, в порядке `COMMAND_NAMES`.
- * @param {Readonly<Record<CommandName, PlacedCommand>>} commands Команды с их местом в справке.
- * @returns {CommandName[]} Видимые имена.
+ * Command names the general help shows: without service commands, in `COMMAND_NAMES` order.
+ * @param {Readonly<Record<CommandName, PlacedCommand>>} commands Commands and their help places.
+ * @returns {CommandName[]} Visible names.
  */
 export function listedCommandNames(
   commands: Readonly<Record<CommandName, PlacedCommand>>,
@@ -43,10 +45,10 @@ export function listedCommandNames(
 }
 
 /**
- * Общая справка: с чего начать, команды по разделам и как узнать подробности.
- * @param {CliMessages} messages Сообщения на выбранном языке.
- * @param {Readonly<Record<CommandName, PlacedCommand>>} commands Команды с их местом в справке.
- * @returns {string} Справка.
+ * General help: where to start, commands by section and how to learn more.
+ * @param {CliMessages} messages Messages in the chosen language.
+ * @param {Readonly<Record<CommandName, PlacedCommand>>} commands Commands and their help places.
+ * @returns {string} The help.
  */
 export function generalHelp(
   messages: CliMessages,
@@ -76,10 +78,10 @@ export function generalHelp(
 }
 
 /**
- * Справка одной команды: строка вызова, описание и параметры.
- * @param {CommandName} name Команда.
- * @param {CliMessages} messages Сообщения на выбранном языке.
- * @returns {string} Справка команды.
+ * Help of a single command: the usage line, description and parameters.
+ * @param {CommandName} name The command.
+ * @param {CliMessages} messages Messages in the chosen language.
+ * @returns {string} The command help.
  */
 export function commandHelp(name: CommandName, messages: CliMessages): string {
   const { usage, summary, parameters } = messages.commands[name];

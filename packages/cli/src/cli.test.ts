@@ -16,14 +16,15 @@ import { credentialsFile, FileCredentialsStore } from "./sharing/settings.ts";
 const SESSION_ID = "cli-test-hook-language";
 const EN_TITLE = "Cyberzavod — a local-first development harness for AI coding agents.";
 const RU_TITLE = "Cyberzavod — локальный harness разработки с ИИ-агентами.";
-// Справка должна помещаться в экран терминала по умолчанию.
+// The help must fit a default terminal screen.
 const SCREEN_ROWS = 24;
 const SCREEN_COLUMNS = 80;
 
-// Всё, что init кладёт в проект, пишется по-английски: язык человека выбирает только CLI.
+// Everything init puts into the project is written in English: only the CLI picks the human's
+// language.
 const CYRILLIC = /\p{Script=Cyrillic}/u;
 
-// Окружение без языковых переменных: язык сообщений — английский.
+// An environment without language variables: messages are in English.
 const NO_LOCALE: Environment = {};
 
 let workspace: string;
@@ -337,7 +338,7 @@ describe("runCli", () => {
   });
 
   describe("doctor", () => {
-    // Каталог настроек во временной папке: тесты не читают настоящий ~/.config.
+    // The settings directory is in a temporary folder: tests do not read the real ~/.config.
     function isolatedConfig(): string {
       return path.join(workspace, "config");
     }
@@ -524,7 +525,8 @@ describe("runCli", () => {
   });
 
   it("init пишет файлы без кириллицы", async () => {
-    // Без package.json проверки не найдены, и в AGENTS.md попадает заглушка starterRules.
+    // Without package.json no checks are found, and the starterRules placeholder goes into
+    // AGENTS.md.
     await rm(path.join(root, "package.json"));
 
     const code = await runCli(["init", "--yes"], root, { CYBERZAVOD_LANG: "ru" });

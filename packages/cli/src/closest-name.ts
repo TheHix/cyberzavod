@@ -1,13 +1,14 @@
-// Подсказка при опечатке: ближайшее по написанию имя из известных.
+// Typo hint: the known name closest in spelling.
 
-/** Наибольшее расстояние, на котором имя ещё считается опечаткой, а не другим словом. */
+/** The largest distance at which a name still counts as a typo rather than a different word. */
 export const MAX_SUGGESTION_DISTANCE = 2;
 
 /**
- * Расстояние Левенштейна: сколько вставок, удалений и замен превращают одну строку в другую.
- * @param {string} left Первая строка.
- * @param {string} right Вторая строка.
- * @returns {number} Число правок.
+ * Levenshtein distance: how many insertions, deletions and substitutions turn one string into
+ * another.
+ * @param {string} left First string.
+ * @param {string} right Second string.
+ * @returns {number} Number of edits.
  */
 export function editDistance(left: string, right: string): number {
   let previousRow = Array.from({ length: right.length + 1 }, (_cell, index) => index);
@@ -34,10 +35,10 @@ export function editDistance(left: string, right: string): number {
 }
 
 /**
- * Находит среди известных имён то, что ближе всего к введённому слову, без учёта регистра.
- * @param {string} word Введённое слово.
- * @param {readonly Name[]} candidates Известные имена; при равенстве расстояний выигрывает первое.
- * @returns {Name | undefined} Ближайшее имя или `undefined`, если все дальше порога.
+ * Finds the known name closest to the typed word, ignoring case.
+ * @param {string} word Typed word.
+ * @param {readonly Name[]} candidates Known names; on equal distances the first one wins.
+ * @returns {Name | undefined} The closest name, or `undefined` if all are beyond the threshold.
  */
 export function closestName<Name extends string>(
   word: string,

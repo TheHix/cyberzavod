@@ -1,10 +1,10 @@
-// Тексты CLI для человека: справка, сводки, подтверждение и ошибки. Значение — строка или
-// функция от того, что в неё подставляют; при двух и более параметрах — один объект с именованными
-// полями. Язык выбирает `languageOf`, наборы лежат в `en.ts` и `ru.ts`.
+// CLI texts for the human: help, summaries, confirmation and errors. A value is a string or a
+// function of what is substituted into it; with two or more parameters, one object with named
+// fields. `languageOf` picks the language; the sets live in `en.ts` and `ru.ts`.
 
 import type { RecordType } from "@cyberzavod/core";
 
-/** Команды CLI: у каждой есть справка в каталоге сообщений. */
+/** CLI commands: each has help in the message catalog. */
 export const COMMAND_NAMES = [
   "init",
   "sync",
@@ -23,24 +23,27 @@ export const COMMAND_NAMES = [
   "hook",
 ] as const;
 
-/** Имя команды CLI. */
+/** CLI command name. */
 export type CommandName = (typeof COMMAND_NAMES)[number];
 
-/** Разделы справки в порядке показа. Служебные команды в раздел не входят и в списке скрыты. */
+/**
+ * Help sections in display order. Service commands belong to no section and are hidden from the
+ * list.
+ */
 export const COMMAND_SECTIONS = ["start", "journal", "gallery", "maintenance"] as const;
 
-/** Раздел справки. */
+/** A help section. */
 export type CommandSection = (typeof COMMAND_SECTIONS)[number];
 
-/** Флаг, аргумент или переменная окружения команды и их описание. */
+/** A command flag, argument or environment variable and its description. */
 export interface CommandParameter {
   name: string;
   description: string;
 }
 
 /**
- * Справка по команде: строка вызова без имени программы, короткое описание для списка команд
- * (одна строка) и параметры для справки самой команды.
+ * Command help: the usage line without the program name, a short description for the command list
+ * (one line) and parameters for the command's own help.
  */
 export interface CommandHelp {
   usage: string;
@@ -48,45 +51,48 @@ export interface CommandHelp {
   parameters: readonly CommandParameter[];
 }
 
-/** Тексты справки. */
+/** Help texts. */
 export interface HelpMessages {
   title: string;
-  /** Строка «с чего начать» под заголовком. */
+  /** The "where to start" line under the title. */
   quickStart: string;
-  /** Заголовки разделов списка команд. */
+  /** Section titles of the command list. */
   sections: Readonly<Record<CommandSection, string>>;
 
-  /** Заголовок списка параметров в справке команды. */
+  /** Title of the parameter list in command help. */
   parametersTitle: string;
   /**
-   * Последняя строка справки: как узнать подробности команды и выбрать язык; `languages` —
-   * поддерживаемые коды через «|». Остальные способы выбрать язык — в справке и README.
+   * The last help line: how to learn a command's details and pick a language; `languages` are the
+   * supported codes separated by "|". Other ways to pick a language are in the help and README.
    */
   footer(languages: string): string;
 }
 
-/** Тексты команды `init`: сводка перед вопросом, вопрос и итог. Строки сводки — без отступа. */
+/**
+ * `init` command texts: the summary before the question, the question and the result. Summary lines
+ * have no indent.
+ */
 export interface InitMessages {
   summaryTitle: string;
   projectId(id: string): string;
-  /** Проверки, найденные или заданные флагом; `commands` — через запятую. */
+  /** Checks found or set by a flag; `commands` are comma-separated. */
   checks(commands: string): string;
-  /** Проверок нет; `file` — конфиг проекта, куда их можно вписать. */
+  /** No checks; `file` is the project config where they can be added. */
   checksMissing(file: string): string;
   rulesStarter(file: string): string;
   rulesMoved(params: { from: string; to: string }): string;
   rulesKept(file: string): string;
   journal(path: string): string;
-  /** Файлы, которые появятся; `paths` — через запятую. */
+  /** Files that will appear; `paths` are comma-separated. */
   files(paths: string): string;
   overrideHint: string;
   confirm: string;
   cancelled: string;
   done: string;
-  /** Что закоммитить; `paths` — через запятую. */
+  /** What to commit; `paths` are comma-separated. */
   commit(paths: string): string;
   nextSteps: string;
-  /** Повторный `init` в подключённом проекте. */
+  /** Repeated `init` in a connected project. */
   alreadyConnected: string;
   configValid: string;
   filesCurrent: string;
@@ -95,37 +101,37 @@ export interface InitMessages {
   runSync: string;
 }
 
-/** Тексты команды `sync`. */
+/** `sync` command texts. */
 export interface SyncMessages {
-  /** Заголовки списков после записи. */
+  /** List titles after writing. */
   added: string;
   updated: string;
   removed: string;
-  /** Заголовки списков предпросмотра. */
+  /** Preview list titles. */
   willAdd: string;
   willUpdate: string;
   willRemove: string;
-  /** Файлы человека на месте сгенерированных. */
+  /** The human's files in place of generated ones. */
   yours: string;
-  /** Сгенерированные файлы, исправленные руками. */
+  /** Generated files edited by hand. */
   edited: string;
-  /** Что sync не трогает никогда. */
+  /** What sync never touches. */
   neverTouched: string;
   upToDate: string;
   harnessMismatch(params: { file: string; configVersion: string; cliVersion: string }): string;
   filesOutdated: string;
-  /** Sync остановится на файлах человека: что делать. */
+  /** Sync will stop at the human's files: what to do. */
   blocked: string;
 }
 
 /**
- * Тексты команды `doctor`: подпись и подсказка на каждый исход каждой проверки. Подпись `passed` и
- * `notice` описывает найденное, `problem` — что не так; подсказка — одно действие.
+ * `doctor` command texts: a label and a hint for each outcome of each check. The `passed` and
+ * `notice` label describes what was found, `problem` what is wrong; a hint is one action.
  */
 export interface DoctorMessages {
-  /** Подсказка под строкой с ✗ без отступа; `text` — действие. */
+  /** Hint under a ✗ line, without indent; `text` is the action. */
   fix(text: string): string;
-  /** Подсказка под строкой с «–» без отступа; `text` — необязательное действие. */
+  /** Hint under a "–" line, without indent; `text` is an optional action. */
   hint(text: string): string;
   allPassed: string;
   problems(count: number): string;
@@ -184,7 +190,7 @@ export interface DoctorMessages {
     programsMissing(programs: string): string;
     fixPrograms(file: string): string;
     allPassed(count: number): string;
-    /** Команда в кавычках языка. */
+    /** A command in the language's quotation marks. */
     quoted(command: string): string;
     exited(params: { command: string; code: number }): string;
     notStarted(params: { command: string; reason: string }): string;
@@ -199,7 +205,7 @@ export interface DoctorMessages {
   };
 }
 
-/** Тексты команды `disconnect`: план, вопрос и итог. Строки плана — без отступа. */
+/** `disconnect` command texts: plan, question and result. Plan lines have no indent. */
 export interface DisconnectMessages {
   willRemove: string;
   willKeep: string;
@@ -212,12 +218,12 @@ export interface DisconnectMessages {
   editedFile(file: string): string;
   confirm: string;
   cancelled: string;
-  /** Запуск без терминала и без `--yes`: спросить негде. */
+  /** Run without a terminal and without `--yes`: there is nowhere to ask. */
   needsConfirmation: string;
   done(rulesFile: string): string;
 }
 
-/** Тексты команды `status`. */
+/** `status` command texts. */
 export interface StatusMessages {
   recordTypes: Readonly<Record<RecordType, string>>;
   foreman: string;
@@ -231,12 +237,12 @@ export interface StatusMessages {
   latestRecord(params: { timestamp: string; type: RecordType }): string;
 }
 
-/** Тексты команд `decision` и `note`. */
+/** `decision` and `note` command texts. */
 export interface JournalMessages {
   recorded(path: string): string;
 }
 
-/** Тексты команд `login` и `logout`. */
+/** `login` and `logout` command texts. */
 export interface LoginMessages {
   openVerification(params: { url: string; code: string }): string;
   waiting: string;
@@ -245,7 +251,7 @@ export interface LoginMessages {
   wasNotLoggedIn: string;
 }
 
-/** Тексты команд `share` и `unshare`. */
+/** `share` and `unshare` command texts. */
 export interface ShareMessages {
   sent(id: string): string;
   replaced(id: string): string;
@@ -257,7 +263,7 @@ export interface ShareMessages {
   freeUpSpace: string;
 }
 
-/** Тексты команды `gallery`. */
+/** `gallery` command texts. */
 export interface GalleryMessages {
   closed(login: string): string;
   open(login: string): string;
@@ -268,7 +274,7 @@ export interface GalleryMessages {
   badge(markdown: string): string;
 }
 
-/** Тексты ошибок для человека: то, что он исправляет сам. */
+/** Error texts for the human: things they fix themselves. */
 export interface ErrorMessages {
   missingDecisionText: string;
   missingNoteText: string;
@@ -282,7 +288,7 @@ export interface ErrorMessages {
   jsonNeedsPreview: string;
   packageJsonInvalid(params: { file: string; reason: string }): string;
   unexpected(reason: string): string;
-  /** Как увидеть трассу стека; `variable` — переменная окружения. */
+  /** How to see the stack trace; `variable` is the environment variable. */
   debugHint(variable: string): string;
   initBlocked(params: { files: string; rulesFile: string }): string;
   blankOption(option: string): string;
@@ -308,7 +314,7 @@ export interface ErrorMessages {
   serverStatus(status: number): string;
 }
 
-/** Все тексты CLI. */
+/** All CLI texts. */
 export interface CliMessages {
   help: HelpMessages;
   commands: Readonly<Record<CommandName, CommandHelp>>;

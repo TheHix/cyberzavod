@@ -1,6 +1,6 @@
-// Тексты установки, прочитанные из исходников: harness и шаблоны. Сборка CLI подменяет этот
-// модуль встроенными текстами (см. scripts/build.ts), поэтому собранному файлу не нужен
-// репозиторий Cyberzavod.
+// Installation texts read from the sources: harness and templates. The CLI build replaces this
+// module with embedded texts (see scripts/build.ts), so the built file does not need the
+// Cyberzavod repository.
 
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
@@ -27,8 +27,8 @@ async function readTemplates(): Promise<Record<string, string>> {
 }
 
 /**
- * Читает тексты установки из исходников.
- * @returns {Promise<Assets>} Harness и шаблоны.
+ * Reads installation texts from the sources.
+ * @returns {Promise<Assets>} Harness and templates.
  */
 export async function readAssets(): Promise<Assets> {
   return {

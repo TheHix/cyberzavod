@@ -1,8 +1,8 @@
-// Дымовая проверка настоящего npm-пакета: `npm pack`, установка архива во временный каталог и
-// путь человека в чистом проекте — init, status, doctor, sync --check, повторный init, хук записи,
-// решение в журнал, disconnect. После disconnect код и файлы человека на месте, файлы Cyberzavod
-// убраны, журнал остался. Запускается на Linux, macOS и Windows: только API Node, без оболочки,
-// кроме вызова npm, который на Windows — `npm.cmd`.
+// Smoke check of the real npm package: `npm pack`, installing the archive into a temporary
+// directory, and the human's path in a clean project: init, status, doctor, sync --check, repeated
+// init, the capture hook, a decision in the journal, disconnect. After disconnect the human's code
+// and files are in place, Cyberzavod files are removed, the journal stays. Runs on Linux, macOS
+// and Windows: Node API only, no shell, except the npm call, which on Windows is `npm.cmd`.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -13,11 +13,11 @@ import path from "node:path";
 
 const PACKAGE = path.resolve(import.meta.dirname, "..");
 const IS_WINDOWS = process.platform === "win32";
-// Пробел в пути проекта ловит команды, которые склеивают путь в строку без кавычек.
+// A space in the project path catches commands that join a path into a string without quotes.
 const PROJECT_NAME = "smoke project";
 const PUBLISHED_FILES = ["LICENSE", "README.md", "dist/cyberzavod.mjs", "package.json"];
 const SESSION_ID = "smoke-session";
-// С этого символа начинаются цвета и прочие управляющие последовательности терминала.
+// Colors and other terminal control sequences start with this character.
 const ESCAPE = "\u001b";
 const SUCCESS = 0;
 const FAILURE = 1;
@@ -71,8 +71,8 @@ function step(title: string): void {
   console.log(`✓ ${title}`);
 }
 
-// На Windows npm — пакетный файл `npm.cmd`, его запускает только оболочка. Аргументы npm здесь —
-// пути без пробелов и флаги, поэтому склейка их оболочкой безопасна.
+// On Windows npm is the batch file `npm.cmd`, which only a shell can run. The npm arguments here
+// are paths without spaces and flags, so letting the shell join them is safe.
 function npm(args: readonly string[], cwd: string): string {
   const result = spawnSync("npm", args, { cwd, encoding: "utf8", shell: IS_WINDOWS });
 
@@ -81,7 +81,7 @@ function npm(args: readonly string[], cwd: string): string {
   return result.stdout;
 }
 
-// INIT_CWD ставит pnpm, который запускает этот скрипт: CLI принял бы его за каталог проекта.
+// INIT_CWD is set by pnpm, which runs this script: the CLI would take it for the project directory.
 function childEnvironment(extra: Readonly<Record<string, string>>): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = { ...process.env, ...extra, CYBERZAVOD_LANG: "en" };
 
@@ -115,7 +115,7 @@ function jsonOf(run: Run, command: string): Record<string, unknown> {
   return JSON.parse(run.stdout) as Record<string, unknown>;
 }
 
-// Перед JSON npm может напечатать вывод скриптов сборки: документ начинается с первой `[`.
+// npm may print build script output before the JSON: the document starts at the first `[`.
 function packPackage(destination: string): PackedPackage {
   const output = npm(["pack", "--json", "--pack-destination", destination], PACKAGE);
   const [packed] = JSON.parse(output.slice(output.indexOf("["))) as PackedPackage[];
@@ -228,8 +228,9 @@ function checkStatus(workspace: Workspace): void {
   step("status, status --json");
 }
 
-// Код выхода doctor здесь не проверяется: заготовка AGENTS.md ждёт /setup, а Claude Code на
-// машине CI нет. Важно, что проект, хуки и файлы агента в порядке и JSON разбирается.
+// The doctor exit code is not checked here: the AGENTS.md starter waits for /setup, and the CI
+// machine has no Claude Code. What matters is that the project, hooks and agent files are fine and
+// the JSON parses.
 function checkDoctor(workspace: Workspace): void {
   const run = cyberzavod(workspace, ["doctor", "--json"]);
   const doctor = jsonOf(run, "doctor --json");

@@ -1,5 +1,5 @@
-// Сборка npm-пакета: CLI со всеми пакетами монорепозитория, harness и шаблонами — в один файл
-// без зависимостей. Файл публикует npm, а запускает npx.
+// Builds the npm package: the CLI with all monorepo packages, the harness and templates, into one
+// file without dependencies. npm publishes the file, and npx runs it.
 
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
@@ -17,11 +17,11 @@ const TEMPLATE_DIRECTORIES = [
   path.join(REPOSITORY, "adapters/claude/templates"),
 ];
 const ASSETS_NAMESPACE = "cyberzavod-assets";
-// Самая старая Node, которой ещё выходят обновления безопасности.
+// The oldest Node that still gets security updates.
 const NODE_TARGET = "node22";
 
-// Ключи по порядку: собранный файл не должен зависеть от порядка чтения каталога, иначе
-// `sync --check` увидит расхождение там, где его нет.
+// Keys in order: the built file must not depend on directory read order, otherwise
+// `sync --check` sees a difference where there is none.
 function sortedByName(texts: Readonly<Record<string, string>>): Record<string, string> {
   return Object.fromEntries(Object.entries(texts).sort(([a], [b]) => a.localeCompare(b)));
 }
@@ -57,8 +57,8 @@ const embeddedAssets: Plugin = {
   name: ASSETS_NAMESPACE,
   setup(builder) {
     builder.onResolve({ filter: /\/assets\.ts$/ }, (args) => {
-      // Путь в пространстве плагина — постоянный, а не путь на диске: он попадает в комментарий
-      // собранного файла, а файл должен совпадать байт в байт на любой машине.
+      // A plugin namespace path is constant, unlike a disk path: it ends up in a comment of the
+      // built file, and the file must match byte for byte on any machine.
       const resolved = path.resolve(args.resolveDir, args.path);
 
       return resolved === ASSETS_MODULE ? { path: "assets", namespace: ASSETS_NAMESPACE } : null;

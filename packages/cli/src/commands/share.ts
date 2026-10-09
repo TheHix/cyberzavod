@@ -1,4 +1,5 @@
-// `cyberzavod share` и `cyberzavod unshare`: отправка записи сессии в личную галерею и удаление.
+// `cyberzavod share` and `cyberzavod unshare`: sending a session recording to the personal gallery
+// and removing it.
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -38,7 +39,8 @@ async function readRecordText(project: ProjectAt, id: string): Promise<string> {
   }
 }
 
-// Формат записи проверяет ядро: сервер смотрит только на конверт, второго описания формата нет.
+// The core checks the recording format: the server only looks at the envelope, there is no second
+// format description.
 function parseSession(text: string, id: string): SessionRecord {
   const record = parseKnownRecord(text, id);
 
@@ -98,24 +100,24 @@ async function upload(
   }
 }
 
-/** Что отправить: проект, запись и язык сообщений. */
+/** What to send: project, recording and message language. */
 export interface ShareRecordingOptions {
-  /** Каталог внутри проекта. */
+  /** Directory inside the project. */
   directory: string;
-  /** Идентификатор записи сессии. */
+  /** Session recording id. */
   id: string;
-  /** Сообщения на выбранном языке. */
+  /** Messages in the chosen language. */
   messages: CliMessages;
 }
 
 /**
- * Отправляет запись сессии из журнала проекта в личную галерею автора.
- * @param {Sharing} sharing Зависимости команд публикации.
- * @param {ShareRecordingOptions} options Каталог проекта, идентификатор записи и сообщения.
- * @returns {Promise<void>} Готово, когда запись отправлена и ссылка напечатана.
- * @throws {CommandError} Если id некорректен, записи нет или она не прошла проверку, нет входа
- *   или достигнут лимит записей.
- * @throws {ApiError} Если сервер отклонил запись.
+ * Sends a session recording from the project journal to the author's personal gallery.
+ * @param {Sharing} sharing Dependencies of the sharing commands.
+ * @param {ShareRecordingOptions} options Project directory, recording id and messages.
+ * @returns {Promise<void>} Done when the recording is sent and the link is printed.
+ * @throws {CommandError} If the id is invalid, the recording is missing or fails validation, the
+ *   human is not logged in, or the recording limit is reached.
+ * @throws {ApiError} If the server rejected the recording.
  */
 export async function shareRecording(
   sharing: Sharing,
@@ -146,13 +148,13 @@ export async function shareRecording(
 }
 
 /**
- * Удаляет запись из галереи автора.
- * @param {Sharing} sharing Зависимости команд публикации.
- * @param {string} id Идентификатор записи.
- * @param {CliMessages} messages Сообщения на выбранном языке.
- * @returns {Promise<void>} Готово, когда сервер удалил запись.
- * @throws {CommandError} Если id некорректен или нет входа.
- * @throws {ApiError} Если такой записи в галерее нет.
+ * Removes a recording from the author's gallery.
+ * @param {Sharing} sharing Dependencies of the sharing commands.
+ * @param {string} id Recording id.
+ * @param {CliMessages} messages Messages in the chosen language.
+ * @returns {Promise<void>} Done when the server has removed the recording.
+ * @throws {CommandError} If the id is invalid or the human is not logged in.
+ * @throws {ApiError} If the gallery has no such recording.
  */
 export async function unshareRecording(
   sharing: Sharing,

@@ -1,9 +1,12 @@
-// Проверка `.gitignore`: рабочие файлы адаптеров с исходным текстом промптов не идут в git.
+// `.gitignore` check: adapter working files with the original prompt text do not go into git.
 
 import { captureIgnoreEntry, GITIGNORE_FILE, hasIgnoreEntry } from "../commands/gitignore.ts";
 import { failed, passed, type ProjectCheck } from "./check.ts";
 
-/** В `.gitignore` корня есть строка `captureIgnoreEntry(journal)`; журнал вне проекта — нечего. */
+/**
+ * The root `.gitignore` has the `captureIgnoreEntry(journal)` line; a journal outside the project
+ * needs nothing.
+ */
 export const gitignoreCheck: ProjectCheck = {
   id: "gitignore",
   run: async ({ project, messages }) => {

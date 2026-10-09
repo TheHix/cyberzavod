@@ -5,7 +5,7 @@ import { CLI_MESSAGES } from "./catalog.ts";
 
 type Catalog = Readonly<Record<string, unknown>>;
 
-// Пути ключей каталога: функция считается листом, как и строка.
+// Catalog key paths: a function counts as a leaf, just like a string.
 function pathsOf(messages: unknown, prefix = ""): string[] {
   if (typeof messages !== "object" || messages === null) return [prefix];
 

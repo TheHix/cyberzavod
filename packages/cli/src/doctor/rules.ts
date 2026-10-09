@@ -1,4 +1,4 @@
-// Проверка правил проекта: корневой AGENTS.md есть и заготовка `init` в нём заполнена.
+// Project rules check: the root AGENTS.md exists and the `init` starter in it is filled in.
 
 import path from "node:path";
 import { RULES_TODO_MARK } from "@cyberzavod/core";
@@ -6,7 +6,7 @@ import { RULES_FILE } from "../commands/init.ts";
 import { readOptionalText } from "../files.ts";
 import { failed, passed, type ProjectCheck } from "./check.ts";
 
-/** Корневой AGENTS.md существует и не несёт отметок заглушек `RULES_TODO_MARK`. */
+/** The root AGENTS.md exists and carries no `RULES_TODO_MARK` placeholder marks. */
 export const rulesCheck: ProjectCheck = {
   id: "rules",
   run: async ({ project, messages }) => {

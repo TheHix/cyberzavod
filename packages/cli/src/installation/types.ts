@@ -1,10 +1,10 @@
-// Что приносит с собой запущенная версия Cyberzavod.
+// What the running Cyberzavod version brings with it.
 
 import type { HarnessFiles } from "@cyberzavod/core";
 
-/** Тексты установки в том виде, в каком их встраивает сборка. */
+/** Installation texts in the form the build embeds them. */
 export interface Assets {
   harness: HarnessFiles;
-  /** Шаблоны по имени файла. */
+  /** Templates by file name. */
   templates: Readonly<Record<string, string>>;
 }

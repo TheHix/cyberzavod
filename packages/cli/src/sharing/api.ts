@@ -1,10 +1,11 @@
-// Сервер Cyberzavod: интерфейс, которым пользуются команды, и его реализация поверх HTTP.
-// Формат ответов — контракт API; всё, что пришло по сети, проверяется до того, как его получат команды.
+// The Cyberzavod server: the interface the commands use and its implementation over HTTP. The
+// response format is the API contract; everything from the network is validated before commands get
+// it.
 
 import { CommandError } from "../errors.ts";
 import { isObject, readJsonBody, sendRequest, type FetchFunction } from "./http.ts";
 
-/** Краткие сведения о записи автора на сервере. */
+/** Brief information about an author's recording on the server. */
 export interface RecordingSummary {
   id: string;
   slug: string;
@@ -15,7 +16,7 @@ export interface RecordingSummary {
   uploadedAt: string;
 }
 
-/** Автор, его галерея и записи. */
+/** An author, their gallery and recordings. */
 export interface Me {
   login: string;
   galleryPublic: boolean;
@@ -23,23 +24,24 @@ export interface Me {
   recordings: RecordingSummary[];
 }
 
-/** Итог отправки записи. */
+/** Result of sending a recording. */
 export interface UploadedRecording {
   recording: RecordingSummary;
-  /** Запись появилась впервые, а не заменила прежнюю. */
+  /** The recording appeared for the first time rather than replacing an earlier one. */
   isNew: boolean;
 }
 
-/** Ошибка сервера: код и текст из его ответа. */
+/** A server error: the code and text from its response. */
 export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
 
   /**
-   * Ошибка, о которой сообщил сервер.
-   * @param {string} message Текст ошибки из ответа сервера, как он пришёл: язык выбирает сервер.
-   * @param {string} code Код ошибки из ответа сервера, например `limit_reached`.
-   * @param {number} status HTTP-статус ответа.
+   * An error reported by the server.
+   * @param {string} message Error text from the server response, as it came: the server picks the
+   *   language.
+   * @param {string} code Error code from the server response, for example `limit_reached`.
+   * @param {number} status HTTP status of the response.
    */
   constructor(message: string, code: string, status: number) {
     super(message);
@@ -48,17 +50,17 @@ export class ApiError extends Error {
   }
 }
 
-/** Код ошибки сервера, когда он не принял токен. */
+/** Server error code when it did not accept the token. */
 export const UNAUTHORIZED_CODE = "unauthorized";
 
-/** Код ошибки сервера, когда у автора уже максимум записей. */
+/** Server error code when the author already has the maximum number of recordings. */
 export const LIMIT_REACHED_CODE = "limit_reached";
 
 const NEW_RECORDING_STATUS = 201;
 
-/** Что команды берут у сервера; запросы автора несут токен GitHub. */
+/** What the commands take from the server; author requests carry a GitHub token. */
 export interface CyberzavodApi {
-  /** Идентификатор приложения GitHub, через которое идёт вход. */
+  /** Id of the GitHub app used for login. */
   githubClientId(): Promise<string>;
   me(token: string): Promise<Me>;
   uploadRecording(token: string, id: string, record: unknown): Promise<UploadedRecording>;
@@ -72,12 +74,13 @@ function isString(value: unknown): value is string {
 
 const RESPONSE_BODY = "body";
 
-// Поле названо путём по JSON сервера: оно одинаково на любом языке сообщений.
+// The field is named by its path in the server JSON: it is the same in any message language.
 function invalidResponse(field: string): CommandError {
   return new CommandError((messages) => messages.errors.serverUnexpectedResponse(field));
 }
 
-// `where` — путь к записи в ответе: по нему видно, какое именно поле сервер не прислал.
+// `where` is the path to the value in the response: it shows exactly which field the server did not
+// send.
 function parseSummary(raw: unknown, where: string): RecordingSummary {
   if (!isObject(raw)) throw invalidResponse(where);
 
@@ -109,8 +112,8 @@ function parseMe(raw: unknown): Me {
   return { login, galleryPublic, limit, recordings: summaries };
 }
 
-// Сервер Cyberzavod отвечает ошибкой `{error, message}`; ответ без неё — не его ошибка, а сбой
-// по дороге, и текст о нём пишет CLI.
+// The Cyberzavod server responds with an `{error, message}` error; a response without it is not its
+// error but a failure along the way, and the CLI writes the text about it.
 function errorOf(body: unknown, status: number): ApiError | CommandError {
   if (isObject(body) && isString(body.error) && isString(body.message)) {
     return new ApiError(body.message, body.error, status);
@@ -131,15 +134,15 @@ interface Answer {
   body: unknown;
 }
 
-/** Сервер Cyberzavod по HTTP: JSON в обе стороны, токен — в заголовке `Authorization`. */
+/** The Cyberzavod server over HTTP: JSON both ways, the token in the `Authorization` header. */
 export class HttpCyberzavodApi implements CyberzavodApi {
   readonly #baseUrl: string;
   readonly #fetch: FetchFunction;
 
   /**
-   * Клиент сервера.
-   * @param {string} baseUrl Адрес сервера без завершающего «/».
-   * @param {FetchFunction} fetchImplementation Функция запроса; по умолчанию встроенный `fetch`.
+   * Server client.
+   * @param {string} baseUrl Server address without a trailing "/".
+   * @param {FetchFunction} fetchImplementation Request function; the built-in `fetch` by default.
    */
   constructor(baseUrl: string, fetchImplementation: FetchFunction = fetch) {
     this.#baseUrl = baseUrl;
@@ -147,10 +150,10 @@ export class HttpCyberzavodApi implements CyberzavodApi {
   }
 
   /**
-   * Спрашивает у сервера идентификатор приложения GitHub.
-   * @returns {Promise<string>} `clientId` для device flow.
-   * @throws {ApiError} Если вход на сервере недоступен.
-   * @throws {CommandError} Если ответ неожиданный.
+   * Asks the server for the GitHub app id.
+   * @returns {Promise<string>} `clientId` for the device flow.
+   * @throws {ApiError} If login is unavailable on the server.
+   * @throws {CommandError} If the response is unexpected.
    */
   async githubClientId(): Promise<string> {
     const { body } = await this.#call({ method: "GET", path: "/api/auth/github" });
@@ -161,11 +164,11 @@ export class HttpCyberzavodApi implements CyberzavodApi {
   }
 
   /**
-   * Возвращает автора, которому принадлежит токен.
-   * @param {string} token Токен GitHub.
-   * @returns {Promise<Me>} Автор с галереей и записями.
-   * @throws {ApiError} Если сервер не принял токен.
-   * @throws {CommandError} Если ответ неожиданный.
+   * Returns the author the token belongs to.
+   * @param {string} token GitHub token.
+   * @returns {Promise<Me>} The author with their gallery and recordings.
+   * @throws {ApiError} If the server did not accept the token.
+   * @throws {CommandError} If the response is unexpected.
    */
   async me(token: string): Promise<Me> {
     const { body } = await this.#call({ method: "GET", path: "/api/me", token });
@@ -174,13 +177,13 @@ export class HttpCyberzavodApi implements CyberzavodApi {
   }
 
   /**
-   * Отправляет запись в галерею автора.
-   * @param {string} token Токен GitHub.
-   * @param {string} id Идентификатор записи.
-   * @param {unknown} record Запись, прошедшая проверку ядра.
-   * @returns {Promise<UploadedRecording>} Сведения о записи на сервере.
-   * @throws {ApiError} Если сервер отклонил запись.
-   * @throws {CommandError} Если ответ неожиданный.
+   * Sends a recording to the author's gallery.
+   * @param {string} token GitHub token.
+   * @param {string} id Recording id.
+   * @param {unknown} record A record that passed the core's validation.
+   * @returns {Promise<UploadedRecording>} Information about the recording on the server.
+   * @throws {ApiError} If the server rejected the recording.
+   * @throws {CommandError} If the response is unexpected.
    */
   async uploadRecording(token: string, id: string, record: unknown): Promise<UploadedRecording> {
     const { status, body } = await this.#call({
@@ -199,11 +202,11 @@ export class HttpCyberzavodApi implements CyberzavodApi {
   }
 
   /**
-   * Удаляет запись из галереи автора.
-   * @param {string} token Токен GitHub.
-   * @param {string} id Идентификатор записи.
-   * @returns {Promise<void>} Готово, когда сервер удалил запись.
-   * @throws {ApiError} Если записи нет или сервер отказал.
+   * Removes a recording from the author's gallery.
+   * @param {string} token GitHub token.
+   * @param {string} id Recording id.
+   * @returns {Promise<void>} Done when the server has removed the recording.
+   * @throws {ApiError} If there is no such recording or the server refused.
    */
   async deleteRecording(token: string, id: string): Promise<void> {
     await this.#call({
@@ -214,11 +217,11 @@ export class HttpCyberzavodApi implements CyberzavodApi {
   }
 
   /**
-   * Открывает или закрывает галерею автора.
-   * @param {string} token Токен GitHub.
-   * @param {boolean} isPublic Показывать галерею в общем списке.
-   * @returns {Promise<void>} Готово, когда сервер применил выбор.
-   * @throws {ApiError} Если сервер отказал.
+   * Opens or closes the author's gallery.
+   * @param {string} token GitHub token.
+   * @param {boolean} isPublic Show the gallery in the public list.
+   * @returns {Promise<void>} Done when the server has applied the choice.
+   * @throws {ApiError} If the server refused.
    */
   async setGalleryPublic(token: string, isPublic: boolean): Promise<void> {
     await this.#call({ method: "PUT", path: "/api/me/gallery", token, body: { public: isPublic } });
@@ -244,10 +247,10 @@ export class HttpCyberzavodApi implements CyberzavodApi {
 }
 
 /**
- * Проверяет, что это ошибка сервера с заданным кодом.
- * @param {unknown} err Пойманная ошибка.
- * @param {string} code Код ошибки сервера.
- * @returns {err is ApiError} true, если это ошибка сервера с таким кодом.
+ * Checks that this is a server error with the given code.
+ * @param {unknown} err The caught error.
+ * @param {string} code Server error code.
+ * @returns {err is ApiError} true if this is a server error with that code.
  */
 export function isApiError(err: unknown, code: string): err is ApiError {
   return err instanceof ApiError && err.code === code;

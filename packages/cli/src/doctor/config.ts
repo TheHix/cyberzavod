@@ -1,5 +1,5 @@
-// Проверка конфига проекта: находит проект от каталога и читает `.cyberzavod/project.json`.
-// Это единственная проверка, от которой зависит, идут ли дальше проверки проекта.
+// Project config check: finds the project from the directory and reads `.cyberzavod/project.json`.
+// This is the only check that decides whether the project checks run further.
 
 import {
   findProjectRoot,
@@ -12,7 +12,7 @@ import type { ProjectAt } from "../commands/project.ts";
 import type { CliMessages } from "../messages/cli-messages.ts";
 import { failed, passed, type CheckResult } from "./check.ts";
 
-/** Итог проверки конфига: результат и проект, если он найден и прочитан. */
+/** Outcome of the config check: the result and the project, if it was found and read. */
 export interface ConfigCheckOutcome {
   result: CheckResult;
   project: ProjectAt | undefined;
@@ -37,11 +37,11 @@ function invalid(err: ProjectFileError, messages: CliMessages): ConfigCheckOutco
 }
 
 /**
- * Ищет проект от каталога и читает его конфиг.
- * @param {string} directory Каталог, из которого запущена команда.
- * @param {CliMessages} messages Сообщения на выбранном языке.
- * @returns {Promise<ConfigCheckOutcome>} Результат и найденный проект.
- * @throws {Error} Если путь не читается по другой причине, чем «нет файла».
+ * Looks for the project from the directory and reads its config.
+ * @param {string} directory Directory the command was run from.
+ * @param {CliMessages} messages Messages in the chosen language.
+ * @returns {Promise<ConfigCheckOutcome>} The result and the found project.
+ * @throws {Error} If the path cannot be read for a reason other than "no file".
  */
 export async function configCheck(
   directory: string,

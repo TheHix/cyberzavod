@@ -1,5 +1,6 @@
-// Проверка команд проверок без запуска: программа каждой команды есть. Make-цели и скрипты по
-// имени не проверяются, а команду, начатую со встроенной команды оболочки, не узнать.
+// Checks the check commands without running them: each command's program exists. Make targets and
+// scripts are not checked by name, and a command starting with a shell builtin cannot be
+// recognized.
 
 import { PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
 import { failed, LIST_SEPARATOR, passed, type ProjectCheck, type ProjectContext } from "./check.ts";
@@ -27,7 +28,7 @@ async function missingPrograms(
   return missing;
 }
 
-/** Программы всех `verification.commands` найдены; команды не запускаются. */
+/** The programs of all `verification.commands` are found; the commands are not run. */
 export const commandsFoundCheck: ProjectCheck = {
   id: "commands",
   run: async (context) => {

@@ -1,5 +1,5 @@
-// Проверка файлов агента: то, что сгенерировано в проекте, совпадает с тем, что соберёт
-// запущенный CLI, — так же, как `sync --check`.
+// Agent files check: what is generated in the project matches what the running CLI would build,
+// the same way as `sync --check`.
 
 import { ClaudeError } from "@cyberzavod/adapter-claude";
 import { PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
@@ -40,7 +40,7 @@ function resultOf(inspection: ProjectFilesInspection, doctor: DoctorMessages): C
   return passed(files.upToDate);
 }
 
-/** Файлы агента актуальны для запущенной версии; версии в конфиге и CLI не расходятся. */
+/** Agent files are current for the running version; the config and CLI versions agree. */
 export const freshnessCheck: ProjectCheck = {
   id: "files",
   run: async ({ project, installation, messages, claudeMessages }) => {

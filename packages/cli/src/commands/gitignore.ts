@@ -1,18 +1,19 @@
-// Рабочие файлы адаптеров (сырые журналы сессий и черновики) несут исходные тексты промптов:
-// в git проекта они не идут.
+// Adapter working files (raw session logs and drafts) carry the original prompt texts:
+// they do not go into the project's git.
 
 import { appendFile } from "node:fs/promises";
 import path from "node:path";
 import { CAPTURE_DIRECTORY } from "@cyberzavod/storage";
 import { readOptionalText } from "../files.ts";
 
-/** Файл git, куда `init` дописывает строку об игнорируемых рабочих файлах. */
+/** The git file where `init` appends a line about ignored working files. */
 export const GITIGNORE_FILE = ".gitignore";
 
 /**
- * Строка `.gitignore` для рабочих файлов адаптеров, если журнал лежит в проекте.
- * @param {string} journal Каталог журнала от корня проекта через `/`.
- * @returns {string | undefined} Строка или undefined, если журнал вне проекта и игнорировать нечего.
+ * The `.gitignore` line for adapter working files, if the journal is inside the project.
+ * @param {string} journal Journal directory from the project root, with `/` separators.
+ * @returns {string | undefined} The line, or undefined if the journal is outside the project and
+ *   there is nothing to ignore.
  */
 export function captureIgnoreEntry(journal: string): string | undefined {
   const relative = path.posix.normalize(journal);
@@ -27,10 +28,10 @@ function hasEntryIn(text: string | undefined, entry: string): boolean {
 }
 
 /**
- * Есть ли в `.gitignore` проекта точно такая строка.
- * @param {string} root Корень проекта.
- * @param {string} entry Строка для `.gitignore`.
- * @returns {Promise<boolean>} true, если строка есть; нет файла — false.
+ * Whether the project's `.gitignore` has exactly this line.
+ * @param {string} root Project root.
+ * @param {string} entry Line for `.gitignore`.
+ * @returns {Promise<boolean>} true if the line is there; no file means false.
  */
 export async function hasIgnoreEntry(root: string, entry: string): Promise<boolean> {
   const current = await readOptionalText(path.join(root, GITIGNORE_FILE));
@@ -39,10 +40,10 @@ export async function hasIgnoreEntry(root: string, entry: string): Promise<boole
 }
 
 /**
- * Дописывает строку в `.gitignore` проекта.
- * @param {string} root Корень проекта.
- * @param {string} entry Строка для `.gitignore`.
- * @returns {Promise<boolean>} true, если строка добавлена; false, если она там уже была.
+ * Appends a line to the project's `.gitignore`.
+ * @param {string} root Project root.
+ * @param {string} entry Line for `.gitignore`.
+ * @returns {Promise<boolean>} true if the line was added; false if it was already there.
  */
 export async function appendIgnoreEntry(root: string, entry: string): Promise<boolean> {
   const file = path.join(root, GITIGNORE_FILE);

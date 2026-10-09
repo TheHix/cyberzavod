@@ -1,11 +1,11 @@
-// Проверка Node: хуки и CLI требуют версию из `engines` пакета.
+// Node check: hooks and the CLI need the version from the package's `engines`.
 
 import { failed, passed, type MachineCheck } from "./check.ts";
 
-/** Наименьшая мажорная версия Node; совпадает с `engines.node` в `package.json` пакета. */
+/** The lowest major Node version; matches `engines.node` in the package's `package.json`. */
 export const MINIMUM_NODE_MAJOR = 22;
 
-/** Версия Node не ниже `MINIMUM_NODE_MAJOR`. */
+/** The Node version is not below `MINIMUM_NODE_MAJOR`. */
 export const nodeCheck: MachineCheck = {
   id: "node",
   run: async (machine, messages) => {
