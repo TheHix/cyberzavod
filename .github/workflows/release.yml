@@ -45,11 +45,12 @@ jobs:
       - name: Публикация
         working-directory: packages/cli
         run: npm publish --access public
-      # The registry serves the new version with a delay: wait until latest becomes the tag version.
+      # The registry serves the new version with a delay of up to several minutes (0.9.1 took more
+      # than two): wait until latest becomes the tag version, at most 10 minutes.
       - name: Версия видна в npm как latest
         run: |
           version=$(node -p 'require("./packages/cli/package.json").version')
-          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+          for attempt in $(seq 40); do
             latest=$(npm view cyberzavod dist-tags.latest)
             if [[ "$latest" == "$version" ]]; then exit 0; fi
             sleep 15
