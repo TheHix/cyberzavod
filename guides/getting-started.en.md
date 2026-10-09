@@ -1,6 +1,6 @@
 ---
 title: Cyberzavod in 3 minutes
-description: Connect a project, run one task through Plan → Implement → Review → Verify → Record, and remove Cyberzavod again if it is not for you.
+description: Connect a project, run one task through Plan → Code → Review → Verify → Record, and remove Cyberzavod again if it is not for you.
 order: 0
 ---
 
@@ -37,7 +37,7 @@ Cyberzavod gives the AI coding agent you already use a fixed development process
 
 Done. The task goes through the workflow:
 
-**Plan → Implement → Review → Verify → Record**
+**Plan → Code → Review → Verify → Record**
 
 You approve the plan. Agents write the code, review it and verify it against the plan. The checks must pass before the agent can stop, and at the end you get commits. If you want, `/publish-recording` turns the session into a recording you can replay on the site.
 

@@ -1,6 +1,6 @@
 # Cyberzavod
 
-Cyberzavod is a local-first development harness for AI coding agents. It does not write code and it is not an agent: it gives the agent you already use a fixed process (Plan → Implement → Review → Verify → Record), checks that must be green before the agent stops, and a journal of sessions and decisions next to your project.
+Cyberzavod is a local-first development harness for AI coding agents. It does not write code and it is not an agent: it gives the agent you already use a fixed process (Plan → Code → Review → Verify → Record), checks that must be green before the agent stops, and a journal of sessions and decisions next to your project.
 
 Cyberzavod is agent-agnostic by design. Claude Code is currently the first fully supported adapter.
 
@@ -17,6 +17,6 @@ If something doesn't work, run `npx cyberzavod doctor`: it checks the setup and 
 
 ## Privacy
 
-Cyberzavod is local-first. Nothing is shared unless you explicitly use sharing or publishing functionality (`login`, `share`, `unshare`, `gallery`). `init`, `sync`, `status`, `doctor` and the hooks send nothing anywhere.
+Cyberzavod is local-first. Nothing is shared unless you explicitly use sharing or publishing functionality: only the gallery commands (`login`, `share`, `unshare`, `gallery`) use the network. `init`, `sync`, `status`, `doctor` and the hooks send nothing anywhere.
 
 Guides: [Cyberzavod in 3 minutes](https://cyberzavod.com/guides/getting-started/) and the [full guide](https://cyberzavod.com/guides/connect-project/). Commands, the record format and the source: [github.com/bysavelii/cyberzavod](https://github.com/bysavelii/cyberzavod).
