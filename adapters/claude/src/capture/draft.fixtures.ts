@@ -1,19 +1,20 @@
-// Фабрики черновиков для тестов: сессия с двумя задачами в разных проектах по образцу реальной,
-// где запуски станций идут вперемешку, а между ними человек молчит.
+// Draft factories for tests: a session with two tasks in different projects, modeled on a real one,
+// where station runs interleave and the human stays silent between them.
 
 import type { Draft, DraftEvent, DraftIntervention, DraftMessage } from "./draft.ts";
 
-/** Идентификатор первой сборки черновика `interleavedDraft` — он же `id` самого черновика. */
+/** Id of the first build of the `interleavedDraft` draft, which is also the draft's own `id`. */
 export const FIRST_BUILD_ID = "2026-10-04-744e7547";
 
-/** Идентификатор второй сборки черновика `interleavedDraft`. */
+/** Id of the second build of the `interleavedDraft` draft. */
 export const SECOND_BUILD_ID = "2026-10-04-744e7547-2";
 
 /**
- * Реплика черновика с заполненными строкой и текстом; пустую делают поправкой `line` и `text`.
- * @param {Partial<DraftMessage> & Pick<DraftMessage, "t">} patch Поля реплики, которые отличаются
- *   от обычных; время обязательно.
- * @returns {DraftMessage} Новая реплика.
+ * A draft message with the line and text filled in; an empty one is made by overriding `line` and
+ * `text`.
+ * @param {Partial<DraftMessage> & Pick<DraftMessage, "t">} patch Message fields that differ
+ *   from the usual ones; the time is required.
+ * @returns {DraftMessage} New message.
  */
 export function message(patch: Partial<DraftMessage> & Pick<DraftMessage, "t">): DraftMessage {
   return {
@@ -29,11 +30,11 @@ export function message(patch: Partial<DraftMessage> & Pick<DraftMessage, "t">):
 }
 
 /**
- * Вмешательство черновика с заполненными строкой и текстом; пустое делают поправкой `line`
- * и `text`.
- * @param {Partial<DraftIntervention> & Pick<DraftIntervention, "t">} patch Поля вмешательства,
- *   которые отличаются от обычных; время обязательно.
- * @returns {DraftIntervention} Новое вмешательство.
+ * A draft intervention with the line and text filled in; an empty one is made by overriding `line`
+ * and `text`.
+ * @param {Partial<DraftIntervention> & Pick<DraftIntervention, "t">} patch Intervention fields
+ *   that differ from the usual ones; the time is required.
+ * @returns {DraftIntervention} New intervention.
  */
 export function intervention(
   patch: Partial<DraftIntervention> & Pick<DraftIntervention, "t">,
@@ -62,11 +63,11 @@ function window(
 }
 
 /**
- * Черновик двух задач из одной сессии: «Счётчик токенов» в `cyberzavod` и «Движок финансов»
- * в `personal-finance-lab`. Запуски станций идут вперемешку: постановка первой задачи
- * работает, пока стартует вторая. У первой задачи возврат по тестам и пауза ожидания
- * дольше `IDLE_GAP_MS`, у второй проверки пройдены. Токены: 822 у первой, 370 у второй.
- * @returns {Draft} Свежий черновик с заполненной редактурой; его можно менять.
+ * A draft of two tasks from one session: «Счётчик токенов» in `cyberzavod` and «Движок финансов» in
+ * `personal-finance-lab`. Station runs interleave: the plan of the first task is running while the
+ * second starts. The first task has a rework from tests and a waiting pause longer than
+ * `IDLE_GAP_MS`; the second passes checks. Tokens: 822 for the first, 370 for the second.
+ * @returns {Draft} Fresh draft with editing filled in; it can be changed.
  */
 export function interleavedDraft(): Draft {
   return {

@@ -62,7 +62,7 @@ function projectCheck(t: number, project: string): DraftEvent {
   return { t, type: "draft_check", ok: true, project };
 }
 
-// Две сборки проекта `a` вокруг сборки проекта `b`: первая по порядку — `first`.
+// Two builds of project `a` around a build of project `b`: the first in order is `first`.
 function projectDraftOf(events: DraftEvent[]): Draft {
   return {
     id: "first",

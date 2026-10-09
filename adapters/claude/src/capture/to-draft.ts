@@ -1,5 +1,6 @@
-// Сырой журнал Claude Code → черновик записи сборки.
-// Этапы выводятся из действий агента по таблицам ниже; новый признак этапа — новая строка в таблице.
+// Claude Code raw log → build recording draft.
+// Stages are inferred from the agent's actions by the tables below; a new stage sign is a new row
+// in a table.
 
 import path from "node:path";
 import {
@@ -28,7 +29,7 @@ import type {
   TranscriptText,
 } from "./transcript.ts";
 
-// Инструменты, по которым видно этап.
+// Tools that reveal the stage.
 const TOOL_STAGES: Readonly<Record<string, Stage>> = {
   Edit: "implementation",
   Write: "implementation",
@@ -37,13 +38,13 @@ const TOOL_STAGES: Readonly<Record<string, Stage>> = {
   ExitPlanMode: "planning",
 };
 
-// Путь одним аргументом оболочки: в двойных кавычках, в простых или без них. Общая часть `cd X`
-// и `git -C X`, чтобы путь с пробелом читался одинаково везде.
+// A path as one shell argument: in double quotes, in single quotes or without them. Shared by
+// `cd X` and `git -C X`, so that a path with a space reads the same everywhere.
 const PATH_ARGUMENT = String.raw`"[^"]*"|'[^']*'|\S+`;
 
-// Программы, по запуску которых видно этап. Сравнивается начало каждой команды в цепочке
-// (`cd apps/api && go test ./...`), а не любая подстрока: `cat eslint.config.js`
-// или `grep vitest` — не проверки.
+// Programs whose launch reveals the stage. The start of each command in the chain is compared
+// (`cd apps/api && go test ./...`), not any substring: `cat eslint.config.js`
+// or `grep vitest` are not checks.
 const COMMAND_STAGES: readonly { pattern: RegExp; stage: Stage }[] = [
   { pattern: /^make check\b/, stage: "verification" },
   { pattern: /^pnpm (?:-r |--filter \S+ )?(?:run )?(?:check|test|lint)\b/, stage: "verification" },
@@ -57,35 +58,36 @@ const COMMAND_STAGES: readonly { pattern: RegExp; stage: Stage }[] = [
   { pattern: new RegExp(`^git (?:-C (?:${PATH_ARGUMENT}) )?(?:commit|push)\\b`), stage: "record" },
 ];
 
-// Разделители команд в одном вызове Bash, включая перевод строки в многострочной команде.
+// Command separators in one Bash call, including the line break in a multiline command.
 const COMMAND_SEPARATOR = /\s*(?:&&|\|\||;|\||\n)\s*/;
-// Присваивания переменных перед командой: `CI=1 pnpm test`.
+// Variable assignments before a command: `CI=1 pnpm test`.
 const LEADING_ENV_ASSIGNMENTS = /^(?:\w+=\S*\s+)*/;
-// Смена каталога в цепочке: `cd X`, где X — единственный аргумент.
+// A directory change in the chain: `cd X`, where X is the only argument.
 const CHANGE_DIRECTORY = /^cd(?:\s|$)/;
 const CHANGE_DIRECTORY_TARGET = new RegExp(`^cd\\s+(${PATH_ARGUMENT})$`);
-// Подоболочка, `pushd` и составные команды меняют каталог так, что по тексту команды его не
-// проследить: `{ cd /b; }`, `if …; then cd /b; fi`, `do cd /b`, `command cd /b`. Слова
-// составных команд (`{`, `then`, `do`, `else`) и `command cd` стоят перед настоящей командой
-// сегмента, поэтому он целиком получает неизвестное место. Другие `command` (`command -v jq`)
-// каталог не меняют и место не трогают.
+// A subshell, `pushd` and compound commands change the directory in a way the command text cannot
+// trace: `{ cd /b; }`, `if …; then cd /b; fi`, `do cd /b`, `command cd /b`. Compound command
+// words (`{`, `then`, `do`, `else`) and `command cd` stand before the segment's real command,
+// so the whole segment gets an unknown place. Other `command` uses (`command -v jq`)
+// do not change the directory and leave the place alone.
 const UNTRACKABLE_DIRECTORY_CHANGE = /^(?:\(|(?:pushd|\{|then|do|else|command\s+cd)(?:\s|$))/;
-// Каталог одной команды git: `git -C X commit`.
+// Directory of a single git command: `git -C X commit`.
 const GIT_DIRECTORY_TARGET = new RegExp(`^git -C (${PATH_ARGUMENT})\\s`);
-// Каталог, который не вычислить без оболочки: домашний (`~`), переменная, подстановка команды.
+// A directory that cannot be computed without a shell: home (`~`), a variable, command
+// substitution.
 const UNRESOLVABLE_DIRECTORY = /[~$`]/;
-// Кавычки и обратная косая в пути после снятия внешних кавычек (`"/p/a"/sub`, `/a\ b`): оболочка
-// склеит или экранирует их по-своему, и путь, как он записан, уже не настоящий.
+// Quotes and a backslash in the path after removing the outer quotes (`"/p/a"/sub`, `/a\ b`): the
+// shell joins or escapes them its own way, and the path as written is no longer the real one.
 const LEFTOVER_QUOTING = /["'\\]/;
-// Текст в кавычках на одной строке: `'…'`, `"…"` и экранированный символ вне кавычек (`\"`).
-// Подстановка `$(…)` в двойных кавычках — часть текста, если закрыта на этой же строке и без
-// скобок и двойных кавычек внутри (`"$(pwd)"`). Незакрытая `$(` текстом не считается:
-// в `"$(cat <<'EOF'` оболочка начинает настоящий heredoc, и пропустить его значило бы разбирать
-// тело коммита как команды.
+// Quoted text on one line: `'…'`, `"…"` and an escaped character outside quotes (`\"`).
+// A `$(…)` substitution in double quotes is part of the text if closed on the same line and without
+// parentheses and double quotes inside (`"$(pwd)"`). An unclosed `$(` does not count as text:
+// in `"$(cat <<'EOF'` the shell starts a real heredoc, and skipping it would mean parsing
+// the commit body as commands.
 const QUOTED_TEXT = String.raw`'[^']*'|"(?:[^"\\$]|\\.|\$\([^()"]*\)|\$(?!\())*"|\\.`;
-// Начало heredoc: `<<EOF`, `<<-EOF`, `<<'EOF'`, `<<"EOF"`; `<<<` — строка, а не heredoc.
-// Строка читается слева направо за один проход, и текст в кавычках съедается целиком раньше, чем
-// в нём найдётся `<<`: `echo "a << b"` heredoc не начинает. У такого совпадения групп нет.
+// Heredoc start: `<<EOF`, `<<-EOF`, `<<'EOF'`, `<<"EOF"`; `<<<` is a string, not a heredoc.
+// The line is read left to right in one pass, and quoted text is consumed whole before
+// `<<` is found in it: `echo "a << b"` does not start a heredoc. Such a match has no groups.
 const HEREDOC_START_OR_QUOTED_TEXT = new RegExp(
   String.raw`(?<!<)<<(?!<)(-?)\s*(?:'([A-Za-z_]\w*)'|"([A-Za-z_]\w*)"|\\?([A-Za-z_]\w*))|${QUOTED_TEXT}`,
   "g",
@@ -95,8 +97,8 @@ const PREVIOUS_DIRECTORY = "-";
 const PARENT_SEGMENT = "..";
 const SURROUNDING_QUOTES = /^(["'])(.*)\1$/;
 
-// Сабагенты, по которым видно этап: встроенный Plan и станции пайплайна /feature
-// из .claude/agents/.
+// Subagents that reveal the stage: the built-in Plan and the /feature pipeline stations
+// from .claude/agents/.
 const AGENT_STAGES: Readonly<Record<string, Stage>> = {
   Plan: "planning",
   analyst: "planning",
@@ -105,16 +107,16 @@ const AGENT_STAGES: Readonly<Record<string, Stage>> = {
   reviewer: "review",
 };
 
-// Вердикты станций /feature — первая строка ответа агента, по агенту: чужое слово вердиктом
-// не считается (`NEEDS WORK` у тестировщика), а у агентов без таблицы (analyst, coder) первая
-// строка — просто начало отчёта. Отказ возвращает деталь с этапа агента, а последний вердикт,
-// как и последний запуск проверок, решает исход сборки.
+// /feature station verdicts are the first line of the agent's reply, per agent: another agent's
+// word is not a verdict (`NEEDS WORK` from the tester), and for agents without a table (analyst,
+// coder) the first line is just the start of the report. A rejection sends the part back to the
+// agent's stage, and the last verdict, like the last checks run, decides the build outcome.
 type Verdict = { passed: true } | { passed: false; reason: string };
 
 const TESTER_DEFECT_REASON = "the tester found a defect";
 const REVIEW_REWORK_REASON = "the review sent the work back for rework";
 
-// Русские вердикты — слова harness до 0.8.0 из старых сырых журналов.
+// Russian verdicts are harness words before 0.8.0 from old raw logs.
 const VERDICTS: Readonly<Record<string, Readonly<Record<string, Verdict>>>> = {
   tester: {
     "CHECKS PASSED": { passed: true },
@@ -132,9 +134,9 @@ const VERDICTS: Readonly<Record<string, Readonly<Record<string, Verdict>>>> = {
   },
 };
 
-// Станции, после которых автоматика ждёт человека, а не зовёт следующую: постановка уходит
-// на одобрение. Возврат станции (вердикт-отказ) тоже ждёт человека, но он берётся из `VERDICTS`.
-// По таблице видно причину вызова, текст промпта для этого не разбирается.
+// Stations after which automation waits for the human instead of calling the next one: the plan
+// goes for approval. A station rework (a rejecting verdict) also waits for the human, but it comes
+// from `VERDICTS`. The table shows the reason for the call; the prompt text is not parsed for it.
 const AGENT_HUMAN_CALLS: Readonly<Record<string, InterventionReason>> = {
   analyst: "plan_review",
 };
@@ -142,8 +144,8 @@ const REWORK_CALL: InterventionReason = "rework_limit";
 const ANSWER_CALL: InterventionReason = "question";
 const STOP_GATE_CALL: InterventionReason = "stop_gate";
 
-// Среда Claude Code доставляет отчёты сабагентов и уведомления тем же событием, что и
-// сообщения человека. По этим началам их отличаем: в записи — только промпты человека.
+// The Claude Code environment delivers subagent reports and notifications with the same event as
+// human messages. These openings tell them apart: the recording has only human prompts.
 const SERVICE_MESSAGE_PREFIXES: readonly string[] = [
   "[Subagent hand-back]",
   "[SYSTEM NOTIFICATION",
@@ -153,51 +155,52 @@ const SERVICE_MESSAGE_PREFIXES: readonly string[] = [
 ];
 
 const SHORT_SESSION_LENGTH = 8;
-// Длина дня `2026-10-04` в начале строки toISOString — по UTC, где бы ни собирали черновик.
+// Length of the day `2026-10-04` at the start of a toISOString string, in UTC wherever the draft is
+// built.
 const ISO_DATE_LENGTH = 10;
 const TEST_FAILURE_REASON = "checks failed";
-// Участок токенов до первой привязки сборки: ему нет события, после которого его вставить.
+// The token span before the first build anchor: there is no event to insert it after.
 const BEFORE_FIRST_ANCHOR = -1;
 
-/** Данные сборки, которых нет в журнале. */
+/** Build data that is not in the log. */
 export interface DraftMeta {
   sessionId: string;
-  /** Токены запусков сабагентов по `agentId`: каждый запуск несёт свой транскрипт. */
+  /** Subagent run tokens by `agentId`: each run carries its own transcript. */
   runTokens?: ReadonlyMap<string, number>;
-  /** Токены сообщений основной сессии: по ним они раскладываются между сборками. */
+  /** Main session message tokens: they are split between builds by these. */
   sessionUsages?: readonly TokenUsage[];
-  /** Ответы моделей из транскрипта сессии: по ним промпт узнаёт свою модель. */
+  /** Model replies from the session transcript: a prompt finds its model by them. */
   replies?: readonly ModelReply[];
-  /** Ответы модели из транскрипта сессии: из них берутся итоговые ответы человеку. */
+  /** Model replies from the session transcript: final replies to the human come from them. */
   answers?: readonly TranscriptText[];
-  /** Задания сабагентам из транскрипта сессии. */
+  /** Tasks for subagents from the session transcript. */
   assignments?: readonly AgentAssignment[];
-  /** Отчёты запусков сабагентов из их транскриптов. */
+  /** Subagent run reports from their transcripts. */
   reports?: readonly AgentReport[];
-  /** Идентификатор проекта по каталогу, где выполнялась команда: из конфига проекта. */
+  /** Project id by the directory the command ran in: from the project config. */
   projectsByDirectory?: ReadonlyMap<string, string>;
 }
 
-// Этап станции по имени агента; Object.hasOwn — чтобы «constructor» не нашёлся в прототипе.
+// Station stage by agent name; Object.hasOwn so that "constructor" is not found in the prototype.
 function stageOfAgent(agent: string | undefined): Stage | undefined {
   return agent !== undefined && Object.hasOwn(AGENT_STAGES, agent)
     ? AGENT_STAGES[agent]
     : undefined;
 }
 
-// Промпт получила модель, которая первой ответила после него.
+// A prompt was received by the model that replied first after it.
 function modelAnswering(replies: readonly ModelReply[], promptTs: number): string | undefined {
   return replies.find((reply) => reply.ts >= promptTs)?.model;
 }
 
-// Место, где выполнялся инструмент: от него зависит, к какому проекту относится вызов.
-// `session` — старый журнал без `cwd`: каталог сессии, а значит, проект из `session_start`.
+// Where a tool ran: it decides which project the call belongs to. `session` is an old log without
+// `cwd`: the session directory, and so the project from `session_start`.
 type ToolPlace = { in: "directory"; directory: string } | { in: "session" } | { in: "unknown" };
 
 const SESSION_PLACE: ToolPlace = { in: "session" };
 const UNKNOWN_PLACE: ToolPlace = { in: "unknown" };
 
-// Этап с местом, где он пройден.
+// A stage with the place where it was passed.
 interface PlacedStage {
   stage: Stage;
   place: ToolPlace;
@@ -207,8 +210,8 @@ function withoutQuotes(word: string): string {
   return SURROUNDING_QUOTES.exec(word)?.[2] ?? word;
 }
 
-// Место после перехода в `directory`. Относительный путь от каталога сессии остаётся каталогом
-// сессии, пока не выходит за её пределы: выше неё проект уже не угадать.
+// Place after moving to `directory`. A path relative to the session directory stays the session
+// directory while it does not leave it: above it the project can no longer be guessed.
 function placeAfterMove(place: ToolPlace, directory: string): ToolPlace {
   const isUnresolvable =
     directory === "" || directory === PREVIOUS_DIRECTORY || UNRESOLVABLE_DIRECTORY.test(directory);
@@ -230,35 +233,37 @@ function placeAfterMove(place: ToolPlace, directory: string): ToolPlace {
   }
 }
 
-// Место после перехода в каталог, записанный словом оболочки: внешние кавычки снимаются, а путь,
-// в котором после этого остались кавычки или обратная косая, не вычислить.
+// Place after moving to a directory written as a shell word: outer quotes are removed, and a path
+// that still has quotes or a backslash after that cannot be computed.
 function placeAfterShellMove(place: ToolPlace, word: string): ToolPlace {
   const directory = withoutQuotes(word);
 
   return LEFTOVER_QUOTING.test(directory) ? UNKNOWN_PLACE : placeAfterMove(place, directory);
 }
 
-// Начальное место вызова: каталог из `cwd` хука, а без него (старый журнал) — каталог сессии.
+// Initial place of a call: the directory from the hook's `cwd`, and without it (old log), the
+// session directory.
 function startPlaceOf(cwd: string | undefined): ToolPlace {
   return cwd === undefined ? SESSION_PLACE : placeAfterMove(UNKNOWN_PLACE, cwd);
 }
 
-// Место команды `cd`: без аргумента или с лишними ключами оболочка идёт туда, куда не угадать.
+// Place of a `cd` command: without an argument or with extra flags the shell goes somewhere
+// unguessable.
 function placeAfterChangeDirectory(program: string, place: ToolPlace): ToolPlace {
   const target = CHANGE_DIRECTORY_TARGET.exec(program)?.[1];
 
   return target === undefined ? UNKNOWN_PLACE : placeAfterShellMove(place, target);
 }
 
-// `git -C X` задаёт каталог только своей команде, а не всей цепочке.
+// `git -C X` sets the directory only for its own command, not for the whole chain.
 function placeOfProgram(program: string, place: ToolPlace): ToolPlace {
   const target = GIT_DIRECTORY_TARGET.exec(program)?.[1];
 
   return target === undefined ? place : placeAfterShellMove(place, target);
 }
 
-// Конец heredoc, которого ждёт оболочка: строка из одного ограничителя, у `<<-` — с отступом
-// из табуляций.
+// The heredoc end the shell waits for: a line of just the delimiter, for `<<-` with an indent
+// of tabs.
 interface HeredocEnd {
   delimiter: string;
   indented: boolean;
@@ -278,8 +283,8 @@ function endsHeredoc(line: string, end: HeredocEnd): boolean {
   return (end.indented ? line.replace(LEADING_TABS, "") : line) === end.delimiter;
 }
 
-// Тело heredoc — данные для команды, а не команды цепочки: `cat <<'EOF'` с `make check` внутри
-// проверок не запускает. Строка с `<<EOF` остаётся: она сама команда.
+// A heredoc body is data for a command, not chain commands: `cat <<'EOF'` with `make check` inside
+// does not run checks. The line with `<<EOF` stays: it is a command itself.
 function withoutHeredocBodies(command: string): string {
   const kept: string[] = [];
   const awaited: HeredocEnd[] = [];
@@ -298,8 +303,8 @@ function withoutHeredocBodies(command: string): string {
   return kept.join("\n");
 }
 
-// Этапы распознанных команд цепочки по порядку, каждый — с местом: `make check && git commit` —
-// проверки, затем выпуск. Место сегмента — по последнему `cd` перед ним.
+// Stages of the recognized chain commands in order, each with a place: `make check && git commit`
+// is checks, then release. A segment's place comes from the last `cd` before it.
 function stagesOfCommand(command: string, start: ToolPlace): PlacedStage[] {
   const placed: PlacedStage[] = [];
   let place = start;
@@ -328,10 +333,10 @@ function stagesOfCommand(command: string, start: ToolPlace): PlacedStage[] {
 
 type ToolEvent = Extract<RawEvent, { kind: "tool" }>;
 
-// Пройденные вызовом этапы с местами. Успешная цепочка прошла все свои этапы. Упавшая — только
-// первый: дальше первой распознанной команды выполнение, скорее всего, не дошло, и её падение —
-// причина неудачи всей цепочки. Файл есть только у инструментов правки: их место — каталог
-// файла, у остальных — каталог запуска.
+// Stages passed by a call, with places. A successful chain passed all its stages. A failed one,
+// only the first: execution most likely did not get past the first recognized command, and its
+// failure is the cause of the whole chain's failure. Only edit tools have a file: their place is
+// the file's directory; for the others it is the launch directory.
 function stagesReachedByTool(event: ToolEvent): PlacedStage[] {
   const start = startPlaceOf(event.cwd);
   const byTool = TOOL_STAGES[event.tool];
@@ -350,9 +355,9 @@ function stagesReachedByTool(event: ToolEvent): PlacedStage[] {
 }
 
 /**
- * Отличает сообщение человека от служебного сообщения среды Claude Code.
- * @param {string} text Текст события UserPromptSubmit.
- * @returns {boolean} true, если сообщение написал человек.
+ * Tells a human message from a Claude Code environment service message.
+ * @param {string} text UserPromptSubmit event text.
+ * @returns {boolean} true if the message was written by a human.
  */
 export function isHumanPrompt(text: string): boolean {
   const start = text.trimStart();
@@ -360,13 +365,13 @@ export function isHumanPrompt(text: string): boolean {
   return !SERVICE_MESSAGE_PREFIXES.some((prefix) => start.startsWith(prefix));
 }
 
-// Причина вызова человека после остановки станции; Object.hasOwn — как в stageOfAgent.
+// Reason for calling the human after a station stops; Object.hasOwn as in stageOfAgent.
 function humanCallOfAgent(agent: string): InterventionReason | undefined {
   return Object.hasOwn(AGENT_HUMAN_CALLS, agent) ? AGENT_HUMAN_CALLS[agent] : undefined;
 }
 
-// Вердикт агента по строке из журнала; Object.hasOwn на обоих уровнях — чтобы «constructor»
-// не нашёлся в прототипе.
+// Agent verdict by the line from the log; Object.hasOwn on both levels so that "constructor"
+// is not found in the prototype.
 function verdictFor(agent: string, line: string | undefined): Verdict | undefined {
   if (line === undefined || !Object.hasOwn(VERDICTS, agent)) return undefined;
 
@@ -381,16 +386,16 @@ function agentWindowKey(
   return event.agentId ?? event.agent;
 }
 
-// Окна станций с этапом. Инструменты сабагента приходят в той же сессии; пока работает сабагент
-// со своим этапом, этап задаёт он: make check внутри ревьюера — часть ревью, а не возврат
-// к тестам. Окна ведутся по agentId; остановка без парного старта (служебные сабагенты
-// Claude Code) ничего не закрывает.
+// Station windows with a stage. Subagent tools come in the same session; while a subagent with its
+// own stage works, it sets the stage: make check inside the reviewer is part of review, not a
+// return to tests. Windows are tracked by agentId; a stop without a matching start (Claude Code
+// service subagents) closes nothing.
 interface StationWindows {
-  // Учитывает старт или остановку станции; true, если набор работающих станций изменился.
+  // Records a station start or stop; true if the set of working stations changed.
   observe(event: RawEvent): boolean;
-  // Вызов сабагента со станцией приходит с его agentId, вызов основной сессии — без agentId, но
-  // с cwd. В старом журнале нет ни того, ни другого, и отличить их нельзя: пока работает
-  // станция, все вызовы считаются её.
+  // A subagent call with a station comes with its agentId, a main session call without agentId but
+  // with cwd. An old log has neither, and they cannot be told apart: while a station works,
+  // all calls count as its own.
   isStationCall(event: ToolEvent): boolean;
 }
 
@@ -421,7 +426,8 @@ function stationWindows(): StationWindows {
   };
 }
 
-// Этап в момент t — этап последнего входа на станцию; до первого входа деталь у постановки.
+// The stage at moment t is the stage of the last station entry; before the first entry the part is
+// at the plan.
 function stageAt(events: readonly DraftEvent[], t: number): Stage {
   let stage: Stage = STAGES[0];
 
@@ -433,7 +439,7 @@ function stageAt(events: readonly DraftEvent[], t: number): Stage {
   return stage;
 }
 
-// Агенты запусков по id: из старта сабагента видно, чей отчёт или чьё сообщение это было.
+// Run agents by id: a subagent start shows whose report or message it was.
 function agentsByIdOf(events: readonly RawEvent[]): Map<string, string> {
   const agents = new Map<string, string>();
 
@@ -446,9 +452,9 @@ function agentsByIdOf(events: readonly RawEvent[]): Map<string, string> {
   return agents;
 }
 
-// Ремарка — всё, что прозвучало в сессии, ещё без адресата: его даёт ход, в котором она стоит.
-// `stage` — станция, чьё слово это: у задания и отчёта — станция агента, у ответа — этап
-// в момент ответа. `run` — запуск станции, о котором речь.
+// A remark is anything said in the session, still without an addressee: the turn it is in gives
+// one. `stage` is the station whose word it is: for a task and a report, the agent's station; for a
+// reply, the stage at the moment of the reply. `run` is the station run in question.
 interface Remark {
   kind: MessageSource;
   t: number;
@@ -461,7 +467,7 @@ function runMark(run: string | undefined): { run?: string } {
   return run === undefined ? {} : { run };
 }
 
-// Адресата расставит routeMessages: ему нужны события уже собранного черновика.
+// routeMessages sets the addressee: it needs the events of an already built draft.
 function messageOfRemark({ kind, t, stage, said, run }: Remark): DraftMessage {
   return {
     t,
@@ -476,7 +482,7 @@ function messageOfRemark({ kind, t, stage, said, run }: Remark): DraftMessage {
   };
 }
 
-// Задание станции: рабочий агента принимает его. Агенты не из AGENT_STAGES пропускаются.
+// A station task: the agent's worker accepts it. Agents not in AGENT_STAGES are skipped.
 function assignmentRemarks(
   assignments: readonly AgentAssignment[],
   agentsById: ReadonlyMap<string, string>,
@@ -501,7 +507,7 @@ function assignmentRemarks(
   });
 }
 
-// Отчёт станции: рабочий этапа сдаёт работу.
+// A station report: the stage's worker hands over the work.
 function reportRemarks(
   reports: readonly AgentReport[],
   agentsById: ReadonlyMap<string, string>,
@@ -516,9 +522,10 @@ function reportRemarks(
   });
 }
 
-// Ход — от промпта человека (в том числе ставшего вмешательством) до следующего промпта человека
-// или до конца журнала. Ответ на вопрос модели ход не начинает: вопрос задан внутри хода, и модель
-// продолжает его. То же правило у `startsTurn` для черновика.
+// A turn runs from a human prompt (including one that became an intervention) to the next human
+// prompt or to the end of the log. An answer to a model question does not start a turn: the
+// question was asked inside the turn, and the model continues it. `startsTurn` has the same rule
+// for the draft.
 interface Turn {
   from: number;
   to: number;
@@ -532,7 +539,8 @@ function turnsOf(events: readonly RawEvent[]): Turn[] {
   return starts.map((from, index) => ({ from, to: starts[index + 1] ?? Number.POSITIVE_INFINITY }));
 }
 
-// Итоговый ответ хода — последний текст модели в нём; говорит его рабочий этапа в момент ответа.
+// A turn's final reply is the last model text in it; the stage's worker at the moment of the reply
+// says it.
 function answerRemarks(
   events: readonly RawEvent[],
   answers: readonly TranscriptText[],
@@ -550,8 +558,8 @@ function answerRemarks(
   });
 }
 
-// С кем говорит рабочий, сдавая работу или отвечая: следующему по заданию, а если после него
-// никого — мастеру. Задание той же станции не в счёт: это дополнение к её же работе.
+// Whom a worker talks to when handing over work or replying: the next one by task, and if nobody
+// follows, the foreman. A task for the same station does not count: it adds to its own work.
 function recipientOfReport(remarks: readonly Remark[], index: number, stage: Stage): Speaker {
   for (const next of remarks.slice(index + 1)) {
     if (next.kind === "answer") return FOREMAN;
@@ -561,8 +569,8 @@ function recipientOfReport(remarks: readonly Remark[], index: number, stage: Sta
   return FOREMAN;
 }
 
-// От кого рабочий получил задание: от станции, сдавшей работу последней (не его самого),
-// а если такой нет — от мастера, который только что поставил задачу.
+// Whom a worker got the task from: the station that handed over work last (not itself),
+// and if there is none, the foreman who just set the task.
 function giverOfAssignment(remarks: readonly Remark[], index: number, stage: Stage): Speaker {
   const report = remarks
     .slice(0, index)
@@ -571,8 +579,8 @@ function giverOfAssignment(remarks: readonly Remark[], index: number, stage: Sta
   return report?.stage ?? FOREMAN;
 }
 
-// Маршрут ремарки: говорит рабочий станции. Задание принимает принимающий («Принял, изучу»),
-// отчёт говорит сдающий («Держи»), ответ — мастеру.
+// Remark route: the station's worker speaks. A task is said by the one accepting it ("Got it, I'll
+// look"), a report by the one handing over ("Here you go"), a reply to the foreman.
 function routeOf(
   remark: Remark,
   remarks: readonly Remark[],
@@ -592,8 +600,8 @@ function routeOf(
   }
 }
 
-// Ход начинает промпт человека, в том числе ставший вмешательством, кроме ответа на вопрос
-// модели: тот же ход, что у `turnsOf` по сырому журналу.
+// A turn starts with a human prompt, including one that became an intervention, except an answer to
+// a model question: the same turn as in `turnsOf` over the raw log.
 function startsTurn(event: DraftEvent): boolean {
   return (
     event.type === "draft_prompt" ||
@@ -601,8 +609,8 @@ function startsTurn(event: DraftEvent): boolean {
   );
 }
 
-// Ремарки делятся на ходы по промптам человека: ход длится от промпта до следующего, а то,
-// что прозвучало до первого промпта, образует свой ход.
+// Remarks are split into turns by human prompts: a turn lasts from a prompt to the next one, and
+// what was said before the first prompt forms its own turn.
 function splitIntoTurns<T extends { remark: Remark }>(
   items: readonly T[],
   promptTimes: readonly number[],
@@ -618,7 +626,7 @@ function splitIntoTurns<T extends { remark: Remark }>(
   return turns;
 }
 
-// Реплики встают после событий с тем же t: сначала происходит событие, потом о нём говорят.
+// Messages go after events with the same t: first the event happens, then it is talked about.
 function mergeMessages(events: readonly DraftEvent[], messages: readonly DraftMessage[]) {
   const merged: DraftEvent[] = [];
   let pending = [...messages].sort((a, b) => a.t - b.t);
@@ -633,8 +641,8 @@ function mergeMessages(events: readonly DraftEvent[], messages: readonly DraftMe
   return [...merged, ...pending];
 }
 
-// Ремарка реплики черновика: у ответа этап — этап сборки в момент ответа, у остальных — тот,
-// кто говорит.
+// Remark of a draft message: for a reply the stage is the build's stage at the moment of the reply,
+// for the others, the speaker's.
 function remarkOfMessage(message: DraftMessage, buildEvents: readonly DraftEvent[]): Remark {
   const { source, t, from, said } = message;
 
@@ -646,21 +654,21 @@ function remarkOfMessage(message: DraftMessage, buildEvents: readonly DraftEvent
   };
 }
 
-// Говорящий в реплике станции — всегда рабочий этапа: мастер сам ремарок не даёт.
+// The speaker in a station message is always the stage's worker: the foreman gives no remarks.
 function stageOfSpeaker(speaker: Speaker): Stage {
   return speaker === FOREMAN ? STAGES[0] : speaker;
 }
 
 /**
- * Пересчитывает маршруты реплик: кому говорит каждая и от чьего этапа звучит ответ. Каждая
- * сборка считается отдельно: ходы делят только её промпты, этап берётся из её событий, поэтому
- * отчёт станции одной задачи не адресуется станции другой.
- * Задание станции X говорит X тому, кто сдал работу последним (отчёт другой станции раньше
- * в ходе), а если такого нет — мастеру. Отчёт станции X говорит X тому, чьё задание идёт
- * следом (другая станция), а если раньше ответ человеку или ход кончился — мастеру. Ответ
- * говорит рабочий этапа в момент ответа мастеру.
- * @param {Draft} draft Черновик с репликами и расставленными сборками.
- * @returns {Draft} Тот же черновик, у реплик которого пересчитаны `from` и `to`.
+ * Recalculates message routes: whom each one addresses and from whose stage a reply sounds. Each
+ * build is counted separately: only its prompts divide turns, the stage comes from its events, so a
+ * station report of one task is not addressed to a station of another. A task of station X is said
+ * by X to whoever handed over work last (another station's report earlier in the turn), and if
+ * there is none, to the foreman. A report of station X is said by X to whoever's task comes next
+ * (another station), and if a reply to the human came earlier or the turn ended, to the foreman. A
+ * reply is said by the stage's worker at the moment of the reply to the foreman.
+ * @param {Draft} draft Draft with messages and builds assigned.
+ * @returns {Draft} The same draft with `from` and `to` of its messages recalculated.
  */
 export function routeMessages(draft: Draft): Draft {
   const owners = eventBuilds(draft);
@@ -675,7 +683,7 @@ export function routeMessages(draft: Draft): Draft {
   return { ...draft, events };
 }
 
-// Реплики одной сборки с пересчитанным маршрутом и их места в событиях черновика.
+// Messages of one build with a recalculated route and their positions in the draft events.
 function routedMessagesOfBuild(
   draft: Draft,
   owners: readonly string[],
@@ -702,8 +710,8 @@ function routedMessagesOfBuild(
   });
 }
 
-// Проект, версия harness и процесс — из первого начала сессии, где они есть: сессию могли
-// подключить к хукам посреди работы, и тогда первое начало без проекта.
+// Project, harness version and workflow come from the first session start that has them: the
+// session could have been connected to the hooks mid-work, and then the first start has no project.
 function projectOf(
   events: readonly RawEvent[],
 ): Pick<DraftBuild, "project" | "harness" | "workflow"> {
@@ -720,8 +728,9 @@ function projectOf(
   return { project: "", harness: "", workflow: "" };
 }
 
-// Проект места: у каталога — по карте, у сессии — проект из `session_start`, а где место
-// неизвестно или проект не нашёлся, пометки нет и событие достаётся сборке по времени.
+// Project of a place: for a directory, by the map; for the session, the project from
+// `session_start`; where the place is unknown or the project was not found, there is no tag and the
+// event goes to a build by time.
 function projectOfPlace(
   place: ToolPlace,
   sessionProject: string,
@@ -739,8 +748,9 @@ function projectOfPlace(
   }
 }
 
-// Каталог вызова, который известен, но не принадлежит ни одному проекту (черновики в /tmp):
-// его этап ничей, и по времени он достался бы чужой сборке. Без карты проектов судить не о чем.
+// A call directory that is known but belongs to no project (drafts in /tmp): its stage belongs to
+// no one, and by time it would go to someone else's build. Without a projects map there is nothing
+// to judge.
 function directoryOutsideProjects(
   place: ToolPlace,
   projectsByDirectory: ReadonlyMap<string, string> | undefined,
@@ -754,8 +764,8 @@ function projectMark(project: string | undefined): { project?: string } {
   return project === undefined ? {} : { project };
 }
 
-// Событие привязывает сборку к своему месту в черновике: промпт или вмешательство человека
-// или событие запуска.
+// An event anchors a build to its place in the draft: a human prompt or intervention
+// or a run event.
 function isBuildAnchor(event: DraftEvent): boolean {
   return (
     event.type === "draft_prompt" || event.type === "draft_intervention" || event.run !== undefined
@@ -766,9 +776,9 @@ function draftIntervention(t: number, reason: InterventionReason, said: string):
   return { t, type: "draft_intervention", reason, said, line: "", text: "" };
 }
 
-// Токены основной сессии ложатся в черновик по участкам между соседними привязками сборки:
-// сообщения участка суммируются в одно `usage` на время первой привязки, а значит, достаются
-// той же сборке. Сообщения до первой привязки идут в начало черновика, к первой сборке.
+// Main session tokens land in the draft by spans between neighboring build anchors: a span's
+// messages are summed into one `usage` at the time of the first anchor, and so go to the same
+// build. Messages before the first anchor go to the start of the draft, to the first build.
 function withSessionUsages(
   events: readonly DraftEvent[],
   usages: readonly TokenUsage[],
@@ -797,7 +807,7 @@ function withSessionUsages(
 
 type SubagentStopEvent = Extract<RawEvent, { kind: "subagent_stop" }>;
 
-// Вердикт станции по строке ответа агента.
+// Station verdict by the line of the agent's reply.
 interface Judgement {
   agent: string;
   run: string;
@@ -805,28 +815,28 @@ interface Judgement {
   ts: number;
 }
 
-// Идёт по событиям журнала и накапливает события черновика: промпты, вмешательства, этапы, окна
-// запусков, исходы проверок и токены станций. Реплики и токены основной сессии добавляет toDraft.
+// Walks the log events and accumulates draft events: prompts, interventions, stages, run
+// windows, checks outcomes and station tokens. toDraft adds messages and main session tokens.
 class DraftEventCollector {
   private readonly draftEvents: DraftEvent[] = [];
   private readonly windows = stationWindows();
-  // Этап, на котором инструменты основной сессии оставили сборку каждого проекта: правок много,
-  // а этап один. Проект без пометки — тоже ключ. Станция сбрасывает этапы: после неё первая
-  // команда снова входит на свой этап.
+  // The stage at which main session tools left each project's build: many edits, one stage. A
+  // project without a tag is a key too. A station resets the stages: after it the first command
+  // enters its stage again.
   private readonly stagesByProject = new Map<string | undefined, Stage>();
-  // Окно запуска станции тянется до конца журнала, пока не пришла остановка.
+  // A station run window stretches to the end of the log until a stop comes.
   private readonly openRuns = new Map<string, DraftRun>();
-  // Вердикт станции приходит с её остановкой (терминальный Claude Code) или отдельным
-  // отчётом по agent_id (десктопное приложение). Каждый запуск судится один раз; повторный
-  // запуск того же агента после SendMessage — новый запуск со своим вердиктом.
+  // A station verdict comes with its stop (Claude Code terminal) or as a separate
+  // report by agent_id (desktop app). Each run is judged once; a repeated
+  // run of the same agent after SendMessage is a new run with its own verdict.
   private readonly agentsStarted = new Map<string, string>();
   private readonly judgedRuns = new Set<string>();
-  // Токены запуска ставятся на его последнюю остановку: транскрипт один на все его старты.
+  // Run tokens are placed at its last stop: there is one transcript for all its starts.
   private readonly lastStops = new Map<string, RawEvent>();
   private readonly sessionProject: string;
-  // Что остановило автоматику (`pendingCall`) и чего она теперь ждёт от человека
-  // (`awaitingHuman`): остановка основной сессии делает первое вторым, старт станции сбрасывает
-  // оба, промпт человека забирает.
+  // What stopped automation (`pendingCall`) and what it now awaits from the human
+  // (`awaitingHuman`): a main session stop turns the first into the second, a station start resets
+  // both, a human prompt takes them.
   private pendingCall: InterventionReason | undefined;
   private awaitingHuman: InterventionReason | undefined;
 
@@ -1046,7 +1056,8 @@ class DraftEventCollector {
   }
 }
 
-// Реплики станций и ответы человеку, ещё без `line` и `text`: их заполняет редактор.
+// Station messages and replies to the human, still without `line` and `text`: the editor fills them
+// in.
 function messagesOf(
   events: readonly RawEvent[],
   meta: DraftMeta,
@@ -1065,27 +1076,27 @@ function messagesOf(
 }
 
 /**
- * Собирает черновик записи из сырого журнала: промпты человека, реплики (задания, отчёты и
- * итоговые ответы, если переданы их тексты), этапы, окна запусков станций, исходы проверок
- * и токены. Заголовок, чистовые версии промптов и `line` с `text` у реплик остаются пустыми —
- * их заполняет редактор. В черновике одна сборка с `id` черновика; проект и версия harness
- * берутся из первого начала сессии, где они есть, без них остаются пустыми. Другие сборки
- * добавляет редактор. События основной сессии из инструментов получают пометку `project`
- * по каталогу команды, если он есть в `meta.projectsByDirectory`. Этап вызова из известного
- * каталога, которого в этой карте нет (вне любого проекта), в черновик не попадает, в том числе
- * проверки: они не влияют на исход сборки. Какие каталоги отброшены, говорит
- * `directoriesOutsideProjects`. Без карты проектов этапы не отбрасываются.
- * @param {RawEvent[]} rawEvents События журнала в любом порядке.
- * @param {DraftMeta} meta Данные сборки, которых нет в журнале.
- * @returns {Draft} Черновик с id вида `2026-10-04-744e7547`: день начала по UTC и начало
- *   id сессии.
+ * Builds a recording draft from the raw log: human prompts, messages (tasks, reports and final
+ * replies, if their texts are passed), stages, station run windows, checks outcomes and tokens. The
+ * title, clean prompt versions and `line` with `text` of messages stay empty; the editor fills them
+ * in. The draft has one build with the draft `id`; the project and harness version come from the
+ * first session start that has them, and stay empty without them. The editor adds other builds.
+ * Main session events from tools get a `project` tag by the command directory if it is in
+ * `meta.projectsByDirectory`. The stage of a call from a known directory missing from this map
+ * (outside any project) does not get into the draft, including checks: they do not affect the build
+ * outcome. `directoriesOutsideProjects` tells which directories were dropped. Without a projects
+ * map no stages are dropped.
+ * @param {RawEvent[]} rawEvents Log events in any order.
+ * @param {DraftMeta} meta Build data that is not in the log.
+ * @returns {Draft} Draft with an id like `2026-10-04-744e7547`: the start day in UTC and the start
+ *   of the session id.
  */
 export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
   const events = [...rawEvents].sort((a, b) => a.ts - b.ts);
   const startTs = events[0]?.ts ?? 0;
   const endTs = events.at(-1)?.ts ?? startTs;
   const at = (ts: number) => ts - startTs;
-  // Время из транскрипта может выйти за журнал: реплика не должна оказаться после конца сборки.
+  // Transcript time can fall outside the log: a message must not end up after the end of the build.
   const atWithinBuild = (ts: number) => Math.min(Math.max(at(ts), 0), at(endTs));
   const draftEvents = new DraftEventCollector(events, meta, at, endTs).collect();
   const messages = messagesOf(events, meta, draftEvents, atWithinBuild);
@@ -1105,10 +1116,10 @@ export function toDraft(rawEvents: RawEvent[], meta: DraftMeta): Draft {
 }
 
 /**
- * Собирает пути к транскриптам самой сессии без повторов: по ним считаются токены основной
- * сессии.
- * @param {RawEvent[]} events События журнала.
- * @returns {string[]} Пути к транскриптам остановок сессии, без сабагентов.
+ * Collects paths to the session's own transcripts without repeats: main session tokens are
+ * counted from them.
+ * @param {RawEvent[]} events Log events.
+ * @returns {string[]} Paths to transcripts of session stops, without subagents.
  */
 export function sessionTranscriptPaths(events: RawEvent[]): string[] {
   const paths = new Set<string>();
@@ -1123,11 +1134,11 @@ export function sessionTranscriptPaths(events: RawEvent[]): string[] {
 }
 
 /**
- * Собирает каталоги, где выполнялись инструменты с этапом: по ним находятся проекты команд.
- * Каталог выводится из `cwd`, `cd` и `git -C` в команде и пути правимого файла.
- * @param {RawEvent[]} events События журнала.
- * @returns {string[]} Каталоги без повторов по порядку журнала; места, которых не определить,
- *   не попадают.
+ * Collects directories where tools with a stage ran: command projects are found by them. The
+ * directory is inferred from `cwd`, `cd` and `git -C` in the command and the edited file's path.
+ * @param {RawEvent[]} events Log events.
+ * @returns {string[]} Directories without repeats in log order; places that cannot be determined
+ *   are left out.
  */
 export function toolDirectories(events: RawEvent[]): string[] {
   const directories = events
@@ -1139,14 +1150,14 @@ export function toolDirectories(events: RawEvent[]): string[] {
 }
 
 /**
- * Находит каталоги, этапы вызовов из которых `toDraft` отбрасывает: каталог известен, но не
- * принадлежит проекту (другой путь, dev-контейнер, битый или отсутствующий конфиг). Вместе
- * с этапом пропадают и проверки, а они решают исход сборки, поэтому о таких каталогах
- * предупреждают. Вызовы станций не учитываются: их `toDraft` пропускает по другой причине.
- * @param {RawEvent[]} rawEvents События журнала в любом порядке.
- * @param {ReadonlyMap<string, string>} projectsByDirectory Проект по каталогу, как его получает
- *   `toDraft`.
- * @returns {string[]} Каталоги без повторов по порядку журнала.
+ * Finds directories whose call stages `toDraft` drops: the directory is known but does not
+ * belong to a project (another path, a dev container, a broken or missing config). Checks
+ * disappear together with the stage, and they decide the build outcome, so such directories
+ * get a warning. Station calls are not counted: `toDraft` skips them for another reason.
+ * @param {RawEvent[]} rawEvents Log events in any order.
+ * @param {ReadonlyMap<string, string>} projectsByDirectory Project by directory, as
+ *   `toDraft` receives it.
+ * @returns {string[]} Directories without repeats in log order.
  */
 export function directoriesOutsideProjects(
   rawEvents: RawEvent[],
@@ -1175,10 +1186,10 @@ export function directoriesOutsideProjects(
 }
 
 /**
- * Находит транскрипты запусков сабагентов: по ним считаются токены каждого запуска.
- * @param {RawEvent[]} events События журнала.
- * @returns {Map<string, string>} Путь к транскрипту по `agentId` запуска; у запуска, который
- *   останавливался не раз, последний.
+ * Finds subagent run transcripts: the tokens of each run are counted from them.
+ * @param {RawEvent[]} events Log events.
+ * @returns {Map<string, string>} Transcript path by run `agentId`; for a run that
+ *   stopped more than once, the last one.
  */
 export function runTranscriptPaths(events: RawEvent[]): Map<string, string> {
   const paths = new Map<string, string>();
@@ -1197,10 +1208,10 @@ export function runTranscriptPaths(events: RawEvent[]): Map<string, string> {
 }
 
 /**
- * Находит транскрипт самой сессии, без сабагентов: промпты человека получает она.
- * @param {RawEvent[]} events События журнала.
- * @returns {string | undefined} Путь к транскрипту или undefined, если сессия ещё не
- *   останавливалась.
+ * Finds the session's own transcript, without subagents: it receives the human prompts.
+ * @param {RawEvent[]} events Log events.
+ * @returns {string | undefined} Transcript path, or undefined if the session has not
+ *   stopped yet.
  */
 export function sessionTranscriptPath(events: RawEvent[]): string | undefined {
   let transcriptPath: string | undefined;
@@ -1215,10 +1226,10 @@ export function sessionTranscriptPath(events: RawEvent[]): string | undefined {
 }
 
 /**
- * Находит транскрипты станций пайплайна /feature: из них берутся отчёты.
- * @param {RawEvent[]} events События журнала.
- * @returns {string[]} Пути к транскриптам остановленных станций без повторов; служебные
- *   сабагенты, которых нет среди станций, не попадают.
+ * Finds the /feature pipeline station transcripts: reports come from them.
+ * @param {RawEvent[]} events Log events.
+ * @returns {string[]} Paths to transcripts of stopped stations without repeats; service
+ *   subagents that are not among the stations are left out.
  */
 export function stationTranscriptPaths(events: RawEvent[]): string[] {
   const paths = new Set<string>();

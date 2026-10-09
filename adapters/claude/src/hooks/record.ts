@@ -1,6 +1,6 @@
-// Хук записи: дописывает событие Claude Code строкой в сырой журнал сессии
-// `capture/claude/raw/<session_id>.jsonl` журнала проекта. Запускается асинхронно и работу агента
-// не тормозит. Проект без маркера Cyberzavod не записывается.
+// Capture hook: appends a Claude Code event as a line to the session's raw log
+// `capture/claude/raw/<session_id>.jsonl` in the project journal. It runs asynchronously and does
+// not slow the agent down. A project without the Cyberzavod marker is not captured.
 
 import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -17,15 +17,15 @@ import { captureDirectories, locateProject, type LocatedProject } from "../paths
 import { SILENT_EXIT, type HookContext, type HookOutcome } from "./hook.ts";
 import { claimHumanCallMarker } from "./state.ts";
 
-/** Ошибка записи: полезная нагрузка хука не годится для имени журнала. */
+/** Capture error: the hook payload is not fit for a log file name. */
 export class RecordHookError extends Error {}
 
 function withProject(event: RawEvent, project: LocatedProject): RawEvent {
   return event.kind === "session_start" ? stampProject(event, project.config) : event;
 }
 
-// Отметку оставляет хук остановки, когда сдался; забирает её промпт человека. Служебное
-// сообщение среды отметку не забирает: человек в нём не говорит.
+// The stop hook leaves the marker when it gives up; the human's prompt claims it. A service
+// message from the environment does not claim the marker: the human does not speak in it.
 async function withStopGateMark(
   event: RawEvent,
   sessionId: string,
@@ -39,11 +39,11 @@ async function withStopGateMark(
 }
 
 /**
- * Записывает событие сессии в сырой журнал проекта. Битый конфиг не роняет хук: сессия не
- * пишется, а хук предупреждает.
- * @param {HookContext} context Вызов хука.
- * @returns {Promise<HookOutcome>} Молчаливый выход или предупреждение в stderr.
- * @throws {RecordHookError} Если `session_id` не годится для имени файла.
+ * Writes a session event to the project's raw log. A broken config does not crash the hook: the
+ * session is not captured, and the hook warns.
+ * @param {HookContext} context Hook call.
+ * @returns {Promise<HookOutcome>} A silent exit or a warning on stderr.
+ * @throws {RecordHookError} If `session_id` is not fit for a file name.
  */
 export async function recordEvent(context: HookContext): Promise<HookOutcome> {
   const payload: unknown = JSON.parse(context.payload);

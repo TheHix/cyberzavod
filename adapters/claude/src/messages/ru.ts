@@ -1,9 +1,9 @@
-// Русские тексты адаптера Claude Code.
+// Russian texts of the Claude Code adapter.
 
 import { CLI_COMMAND } from "../cli-command.ts";
 import type { ClaudeMessages } from "./claude-messages.ts";
 
-/** Тексты адаптера на русском. */
+/** Adapter texts in Russian. */
 export const ru: ClaudeMessages = {
   stop: {
     configUnreadable: ({ file, reason }) =>

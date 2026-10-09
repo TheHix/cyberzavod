@@ -1,20 +1,20 @@
-// Отпечаток кода для хуков: по нему хук остановки понимает, менял ли агент код в этом ходе.
+// Code fingerprint for hooks: it tells the stop hook whether the agent changed code in this turn.
 
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-/** Ошибка git: его нет или он не смог выполнить команду. */
+/** Git error: git is missing or could not run the command. */
 export class GitError extends Error {}
 
 const FINGERPRINT_ALGORITHM = "sha256";
-// Дифф большого репозитория не влезает в буфер spawnSync по умолчанию.
+// The diff of a large repository does not fit into spawnSync's default buffer.
 const GIT_OUTPUT_LIMIT_BYTES = 256 * 1024 * 1024;
 const NUL = "\0";
 
-// Код выхода не проверяется: в репозитории без коммитов `rev-parse HEAD` и `diff HEAD` падают,
-// но и тогда их вывод одинаков между вызовами, а отпечатку этого достаточно.
+// The exit code is not checked: in a repository without commits `rev-parse HEAD` and `diff HEAD`
+// fail, but even then their output is the same between calls, which is enough for a fingerprint.
 function gitOutput(root: string, args: string[]): string {
   const result = spawnSync("git", args, {
     cwd: root,
@@ -43,12 +43,13 @@ function untrackedFiles(root: string, paths: string[]): string[] {
 }
 
 /**
- * Отпечаток кода в каталогах: текущий коммит, незакоммиченные правки и содержимое новых файлов.
- * Коммит входит в отпечаток, чтобы правки, закоммиченные внутри хода, тоже считались изменением.
- * @param {string} root Корень репозитория.
- * @param {string[]} paths Каталоги с кодом относительно корня.
- * @returns {string} Отпечаток.
- * @throws {GitError} Если git не запускается.
+ * Fingerprint of the code in the directories: the current commit, uncommitted changes and the
+ * contents of new files. The commit is included so that changes committed within the turn also
+ * count as a change.
+ * @param {string} root Repository root.
+ * @param {string[]} paths Code directories relative to the root.
+ * @returns {string} The fingerprint.
+ * @throws {GitError} If git does not start.
  */
 export function codeFingerprint(root: string, paths: string[]): string {
   const hash = createHash(FINGERPRINT_ALGORITHM);
@@ -65,11 +66,11 @@ export function codeFingerprint(root: string, paths: string[]): string {
 }
 
 /**
- * Есть ли в каталогах незакоммиченные правки или новые файлы.
- * @param {string} root Корень репозитория.
- * @param {string[]} paths Каталоги с кодом относительно корня.
- * @returns {boolean} true, если рабочая копия в каталогах не чистая.
- * @throws {GitError} Если git не запускается.
+ * Whether the directories have uncommitted changes or new files.
+ * @param {string} root Repository root.
+ * @param {string[]} paths Code directories relative to the root.
+ * @returns {boolean} true if the working copy in the directories is not clean.
+ * @throws {GitError} If git does not start.
  */
 export function hasUncommittedChanges(root: string, paths: string[]): boolean {
   return gitOutput(root, ["status", "--porcelain", "--", ...paths]).trim() !== "";

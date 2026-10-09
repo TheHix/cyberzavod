@@ -1,13 +1,13 @@
-// Тексты адаптера Claude Code для человека и агента: хук остановки (его stderr агент читает как
-// задание), хук записи, черновик и публикация записей, ошибки. Значение — строка или функция;
-// при двух и более параметрах — один объект с именованными полями. Наборы лежат в `en.ts`
-// и `ru.ts`, язык выбирает CLI.
+// Claude Code adapter texts for the human and the agent: the stop hook (the agent reads its stderr
+// as a task), the capture hook, drafting and publishing recordings, errors. A value is a string or
+// a function; with two or more parameters, one object with named fields. The sets live in `en.ts`
+// and `ru.ts`; the CLI picks the language.
 
 import type { InterventionReason } from "@cyberzavod/core";
 import type { HeaderField } from "../capture/draft.ts";
 import type { LeakKind } from "../capture/leaks.ts";
 
-/** Тексты хука остановки: агент получает их как сообщение хука. */
+/** Stop hook texts: the agent receives them as the hook's message. */
 export interface StopMessages {
   configUnreadable(params: { file: string; reason: string }): string;
   gitUnavailable(reason: string): string;
@@ -22,20 +22,20 @@ export interface StopMessages {
   markerNotSaved: string;
 }
 
-/** Тексты хука записи сессии. */
+/** Session capture hook texts. */
 export interface RecordMessages {
   sessionNotRecorded(reason: string): string;
   markerNotClaimed(params: { file: string; reason: string }): string;
 }
 
-/** Тексты команды `draft`. */
+/** Texts of the `draft` command. */
 export interface DraftMessages {
   configNotRead(reason: string): string;
   transcriptNotRead(params: { file: string; reason: string }): string;
   transcriptsMissing(count: number): string;
   sessionTranscriptNotRead(reason: string): string;
   stationTranscriptsMissing(count: number): string;
-  /** Подпись вмешательства в предупреждениях и списке ожидающих редактуры. */
+  /** Intervention label in warnings and in the list awaiting editing. */
   intervention(params: { reason: InterventionReason; text: string }): string;
   editNotCarried(title: string): string;
   assignmentNotFound: string;
@@ -59,14 +59,14 @@ export interface DraftMessages {
   reroutedMessage(params: { line: string; from: string; to: string }): string;
 }
 
-/** Тексты команды `publish`. */
+/** Texts of the `publish` command. */
 export interface PublishMessages {
   published(file: string): string;
   notReady(params: { file: string; problems: string }): string;
   buildProblem(params: { buildId: string; reason: string }): string;
 }
 
-/** Тексты ошибок адаптера: то, что человек исправляет сам. */
+/** Adapter error texts: what the human fixes themselves. */
 export interface ClaudeErrorMessages {
   unsupportedAgent(params: { stage: string; requested: string; supported: string }): string;
   fileConflicts(files: string): string;
@@ -84,15 +84,15 @@ export interface ClaudeErrorMessages {
   leakIn(params: { kind: string; text: string }): string;
 }
 
-/** Все тексты адаптера Claude Code. */
+/** All texts of the Claude Code adapter. */
 export interface ClaudeMessages {
   stop: StopMessages;
   record: RecordMessages;
   draft: DraftMessages;
   publish: PublishMessages;
   errors: ClaudeErrorMessages;
-  /** Названия видов того, что нельзя публиковать: для сообщения об утечке. */
+  /** Names of the kinds of content that must not be published: for the leak message. */
   leakKinds: Readonly<Record<LeakKind, string>>;
-  /** Названия полей шапки сборки: что редактор ещё не заполнил. */
+  /** Names of the build header fields: what the editor has not filled in yet. */
   headerFields: Readonly<Record<HeaderField, string>>;
 }

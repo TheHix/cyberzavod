@@ -168,7 +168,7 @@ const toolUse = (name: string, input: Record<string, unknown>, id?: string) => (
   ...(id === undefined ? {} : { id }),
 });
 
-// Ответ среды на вызов инструмента: запись user с блоком tool_result и результатом инструмента.
+// Environment response to a tool call: a user entry with a tool_result block and the tool result.
 function toolResultEntry(uuid: string, second: number, callId: string, result: unknown): string {
   return JSON.stringify({
     type: "user",

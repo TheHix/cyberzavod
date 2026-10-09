@@ -1,7 +1,7 @@
-// Черновик записи из сырого журнала сессии. Без пути журнала берётся самый свежий. Черновик
-// кладётся в `capture/claude/drafts/` журнала проекта (вне git); редактура из прошлого черновика
-// той же сессии переносится, включая сборки и их запуски, пустыми остаются новые промпты
-// и реплики. Маршруты реплик пересчитываются по сборкам.
+// Recording draft from a raw session log. Without a log path the most recent one is taken. The
+// draft goes into the project journal's `capture/claude/drafts/` (outside git); edits from a
+// previous draft of the same session carry over, builds and their runs included, and only new
+// prompts and messages stay empty. Message routes are recomputed from the builds.
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -50,7 +50,7 @@ import { captureDirectories, findProjectId, newestFile, requireProject } from ".
 type TranscriptRead =
   { status: "read"; text: string } | { status: "missing" } | { status: "failed" };
 
-// Непрочитанный транскрипт — предупреждение, а не ошибка; отсутствующий считает вызывающий.
+// An unreadable transcript is a warning, not an error; the caller counts missing ones.
 async function readTranscript(
   transcriptPath: string,
   messages: ClaudeMessages,
@@ -66,9 +66,9 @@ async function readTranscript(
   }
 }
 
-// Транскрипты читаются по одному: непрочитанный — предупреждение, а не ошибка, черновик полезен
-// и без счётчика токенов. Транскрипты служебных сабагентов Claude Code не сохраняет — о них
-// одна строка, а не по строке на каждый.
+// Transcripts are read one by one: an unreadable one is a warning, not an error, since the draft is
+// useful without token counts. Claude Code does not keep transcripts of its service subagents, so
+// they get one line rather than a line each.
 async function readTranscripts(
   paths: Iterable<string>,
   messages: ClaudeMessages,
@@ -88,7 +88,7 @@ async function readTranscripts(
   return transcripts;
 }
 
-// Токены каждого запуска сабагента по его транскрипту.
+// Tokens of each subagent run from its transcript.
 async function tokensOfRuns(
   paths: ReadonlyMap<string, string>,
   messages: ClaudeMessages,
@@ -105,22 +105,23 @@ async function tokensOfRuns(
   return tokens;
 }
 
-// Токены основной сессии по сообщениям: так их можно разложить по сборкам.
+// Main session tokens per message, so they can be split across builds.
 async function usagesOfSession(paths: string[], messages: ClaudeMessages): Promise<TokenUsage[]> {
   const transcripts = await readTranscripts(paths, messages);
 
   return [...transcripts.values()].flatMap(tokenUsages);
 }
 
-// Что берётся из транскрипта сессии: модели промптов, ответы человеку и задания станциям.
+// What is taken from the session transcript: prompt models, replies to the human, and station
+// assignments.
 interface SessionTexts {
   replies: ModelReply[];
   answers: TranscriptText[];
   assignments: AgentAssignment[];
 }
 
-// Без транскрипта черновик всё равно собирается — у промптов не будет модели, а реплик от
-// сессии не будет вовсе.
+// Without a transcript the draft is still built: prompts will have no model, and there will be no
+// messages from the session at all.
 async function textsFromSessionTranscript(
   transcriptPath: string | undefined,
   messages: ClaudeMessages,
@@ -144,7 +145,7 @@ async function textsFromSessionTranscript(
   }
 }
 
-// Отчёты станций лежат в их транскриптах. Транскрипты, которых уже нет, — одно предупреждение.
+// Station reports live in their transcripts. Transcripts that are gone give one warning.
 async function reportsFromStationTranscripts(
   paths: string[],
   messages: ClaudeMessages,
@@ -164,8 +165,9 @@ async function reportsFromStationTranscripts(
   return reports;
 }
 
-// Проект каждого каталога, где шли команды. Проект ищется здесь, а не в хуке: так он находится
-// и для старых журналов, где пути уже лежат в командах, а хук остаётся лёгким.
+// Project of each directory where commands ran. The project is looked up here rather than in the
+// hook, so it is found even for old logs whose commands already hold the paths, and the hook stays
+// light.
 async function projectsOfDirectories(
   directories: string[],
   messages: ClaudeMessages,
@@ -181,8 +183,8 @@ async function projectsOfDirectories(
   return projects;
 }
 
-// Как назвать правку в предупреждении: у промпта — цель, у реплики — строка, у вмешательства —
-// причина и строка.
+// How to name an edit in a warning: a prompt by its goal, a message by its line, an intervention by
+// its reason and line.
 function titleOf(edit: EditableDraftEvent, messages: ClaudeMessages): string {
   switch (edit.type) {
     case "draft_prompt":
@@ -196,7 +198,7 @@ function titleOf(edit: EditableDraftEvent, messages: ClaudeMessages): string {
   }
 }
 
-// Битый прошлый черновик не перезаписывается молча: в нём может быть несохранённая редактура.
+// A broken previous draft is not silently overwritten: it may hold unsaved edits.
 async function readEarlierDraft(draftPath: string, shown: string): Promise<Draft | undefined> {
   let earlier: string;
 
@@ -231,8 +233,8 @@ function withEarlierEdits(
   return carryOverEdits(previous, fresh);
 }
 
-// Что ещё ждёт редактуры: промпт без чистовой версии (склеенный её не требует), реплика
-// и вмешательство, у которых не заполнена строка или текст: публикации нужны оба поля.
+// What still awaits editing: a prompt without a clean version (a merged one needs none), and a
+// message or intervention with an empty line or text: publishing needs both fields.
 function awaitsEditing(event: DraftEvent): event is EditableDraftEvent {
   switch (event.type) {
     case "draft_prompt":
@@ -265,7 +267,7 @@ const MS_PER_SECOND = 1000;
 const SECONDS_PER_MINUTE = 60;
 const MAX_ASSIGNMENT_LINE = 100;
 
-// Время от начала журнала, как его видит человек: минуты и секунды.
+// Time since the start of the log as the human sees it: minutes and seconds.
 function clockOf(t: number): string {
   const seconds = Math.floor(t / MS_PER_SECOND);
   const minutes = Math.floor(seconds / SECONDS_PER_MINUTE);
@@ -273,7 +275,7 @@ function clockOf(t: number): string {
   return `${minutes}:${String(seconds % SECONDS_PER_MINUTE).padStart(2, "0")}`;
 }
 
-// По первой строке задания редактор узнаёт, к какой задаче относится запуск.
+// The first line of the assignment tells the editor which task the run belongs to.
 function assignmentLineOf(draft: Draft, run: DraftRun, messages: ClaudeMessages): string {
   const assignment = draft.events.find(
     (event) =>
@@ -294,7 +296,7 @@ interface RawSession {
   messages: ClaudeMessages;
 }
 
-// Черновик только из журнала и транскриптов, ещё без редактуры прошлого черновика.
+// Draft from the log and transcripts only, without the previous draft's edits yet.
 async function freshDraftOf(session: RawSession): Promise<Draft> {
   const { rawPath, rawEvents, projectsByDirectory, messages } = session;
 
@@ -410,7 +412,7 @@ function warnAboutEarlierDraft(
   }
 }
 
-// Сводка для редактора: что в черновике и что ещё ждёт редактуры.
+// Summary for the editor: what is in the draft and what still awaits editing.
 function reportDraft(report: DraftReport) {
   const { draft, previous, rawEvents, projectsByDirectory, shownPath, messages } = report;
 
@@ -423,21 +425,21 @@ function reportDraft(report: DraftReport) {
   warnAboutEarlierDraft(draft, previous, messages);
 }
 
-/** Что собрать в черновик: проект и, если нужно, конкретный сырой журнал. */
+/** What to build the draft from: the project and, if needed, a specific raw log. */
 export interface DraftSessionOptions {
-  /** Каталог внутри проекта. */
+  /** Directory inside the project. */
   projectDirectory: string;
-  /** Сырой журнал сессии; без него берётся самый свежий. */
+  /** Raw session log; without it the most recent one is taken. */
   rawPath?: string;
-  /** Сообщения на выбранном языке. */
+  /** Messages in the chosen language. */
   messages: ClaudeMessages;
 }
 
 /**
- * Собирает черновик записи из сырого журнала сессии и печатает, что ещё ждёт редактуры.
- * @param {DraftSessionOptions} options Проект и сырой журнал.
- * @returns {Promise<string>} Путь записанного черновика.
- * @throws {ClaudeError} Если проекта нет, журналов ещё нет или прошлый черновик битый.
+ * Builds a recording draft from a raw session log and prints what still awaits editing.
+ * @param {DraftSessionOptions} options Project and raw log.
+ * @returns {Promise<string>} Path of the written draft.
+ * @throws {ClaudeError} If there is no project, no logs yet, or the previous draft is broken.
  */
 export async function draftSession(options: DraftSessionOptions): Promise<string> {
   const { messages } = options;

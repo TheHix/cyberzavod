@@ -1,6 +1,6 @@
-// Где адаптер держит свои файлы: сырые журналы сессий и черновики лежат в `capture/` журнала
-// проекта. Каталог журнала задаёт конфиг проекта, поэтому журнал может лежать и в репозитории,
-// и рядом с ним.
+// Where the adapter keeps its files: raw session logs and drafts live in the project journal's
+// `capture/`. The project config sets the journal directory, so the journal can live inside the
+// repository or next to it.
 
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
@@ -16,16 +16,16 @@ import type { ProjectConfig } from "@cyberzavod/core";
 import { ClaudeError } from "./errors.ts";
 import type { ClaudeMessages } from "./messages/claude-messages.ts";
 
-/** Каталоги адаптера в журнале проекта: сырые журналы сессий и черновики записей. */
+/** Adapter directories in the project journal: raw session logs and recording drafts. */
 export interface CaptureDirectories {
   raw: string;
   drafts: string;
 }
 
 /**
- * Каталоги адаптера в журнале проекта.
- * @param {string} journal Абсолютный путь журнала проекта.
- * @returns {CaptureDirectories} Каталоги сырых журналов и черновиков.
+ * Adapter directories in the project journal.
+ * @param {string} journal Absolute path of the project journal.
+ * @returns {CaptureDirectories} Directories of raw logs and drafts.
  */
 export function captureDirectories(journal: string): CaptureDirectories {
   const capture = path.join(journal, CAPTURE_DIRECTORY, "claude");
@@ -33,7 +33,7 @@ export function captureDirectories(journal: string): CaptureDirectories {
   return { raw: path.join(capture, "raw"), drafts: path.join(capture, "drafts") };
 }
 
-/** Проект, найденный на диске: корень, конфиг и журнал. */
+/** Project found on disk: root, config and journal. */
 export interface LocatedProject {
   root: string;
   config: ProjectConfig;
@@ -41,10 +41,10 @@ export interface LocatedProject {
 }
 
 /**
- * Находит проект каталога и его журнал.
- * @param {string} directory Каталог внутри проекта.
- * @returns {Promise<LocatedProject | undefined>} Проект или undefined, если маркера нет.
- * @throws {ProjectFileError} Если конфиг проекта битый.
+ * Finds the directory's project and its journal.
+ * @param {string} directory Directory inside the project.
+ * @returns {Promise<LocatedProject | undefined>} The project, or undefined if there is no marker.
+ * @throws {ProjectFileError} If the project config is broken.
  */
 export async function locateProject(directory: string): Promise<LocatedProject | undefined> {
   const root = await findProjectRoot(directory);
@@ -59,11 +59,11 @@ export async function locateProject(directory: string): Promise<LocatedProject |
 }
 
 /**
- * Находит проект каталога для команды, которой без проекта делать нечего.
- * @param {string} directory Каталог внутри проекта.
- * @returns {Promise<LocatedProject>} Проект.
- * @throws {ClaudeError} Если маркера нет на всём пути вверх.
- * @throws {ProjectFileError} Если конфиг проекта битый.
+ * Finds the directory's project for a command that has nothing to do without one.
+ * @param {string} directory Directory inside the project.
+ * @returns {Promise<LocatedProject>} The project.
+ * @throws {ClaudeError} If there is no marker anywhere up the path.
+ * @throws {ProjectFileError} If the project config is broken.
  */
 export async function requireProject(directory: string): Promise<LocatedProject> {
   const project = await locateProject(directory);
@@ -76,11 +76,11 @@ export async function requireProject(directory: string): Promise<LocatedProject>
 }
 
 /**
- * Находит проект каталога: поднимается от него вверх до первого маркера. Нет маркера на всём
- * пути — каталог не принадлежит проекту, битый конфиг — предупреждение.
- * @param {string} directory Абсолютный путь каталога; может уже не существовать.
- * @param {ClaudeMessages} messages Сообщения на выбранном языке.
- * @returns {Promise<string | undefined>} `projectId` или undefined, если проекта нет.
+ * Finds the directory's project: walks up from it to the first marker. No marker anywhere up the
+ * path means the directory belongs to no project; a broken config means a warning.
+ * @param {string} directory Absolute path of the directory; it may no longer exist.
+ * @param {ClaudeMessages} messages Messages in the chosen language.
+ * @returns {Promise<string | undefined>} `projectId`, or undefined if there is no project.
  */
 export async function findProjectId(
   directory: string,
@@ -97,7 +97,7 @@ export async function findProjectId(
   }
 }
 
-// Каталога ещё нет — значит, и файлов в нём нет; другие ошибки не глотаются.
+// No directory yet means no files in it either; other errors are not swallowed.
 async function filesIn(dir: string): Promise<string[]> {
   try {
     return await readdir(dir);
@@ -115,10 +115,10 @@ async function modifiedAt(file: string): Promise<number> {
 }
 
 /**
- * Находит в каталоге самый свежий по времени изменения файл с расширением.
- * @param {string} dir Каталог; если его нет, файлов в нём тоже нет.
- * @param {string} extension Расширение с точкой: `.jsonl`.
- * @returns {Promise<string | undefined>} Путь к файлу или undefined, если подходящих нет.
+ * Finds the most recently modified file with the extension in a directory.
+ * @param {string} dir Directory; if it does not exist, it has no files either.
+ * @param {string} extension Extension with the dot: `.jsonl`.
+ * @returns {Promise<string | undefined>} Path to the file, or undefined if none matches.
  */
 export async function newestFile(dir: string, extension: string): Promise<string | undefined> {
   const names = (await filesIn(dir)).filter((name) => name.endsWith(extension));

@@ -1,6 +1,6 @@
-// Синхронизация файлов Claude Code проекта с harness и конфигом: что сгенерировано заново,
-// перезаписывается; что сгенерировано раньше и больше не нужно, удаляется; написанное человеком
-// не трогается без явного разрешения.
+// Syncs the project's Claude Code files with the harness and config: what is generated anew is
+// overwritten; what was generated earlier and is no longer needed is deleted; what the human wrote
+// is not touched without explicit permission.
 
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -40,34 +40,34 @@ const ENTRYPOINT_FILE = "CLAUDE.md";
 const GENERATED_DIRECTORIES = [".claude/agents", ".claude/skills"];
 const SKIPPED_DIRECTORIES = new Set(["node_modules"]);
 
-/** Из чего генерировать: harness и шаблоны той версии Cyberzavod, что запущена. */
+/** What to generate from: the harness and templates of the running Cyberzavod version. */
 export interface ClaudeInstallation {
   harness: Harness;
   templates: ClaudeTemplates;
 }
 
-/** Что делать: только сравнить или записать, и можно ли перезаписать написанное человеком. */
+/** What to do: only compare or write, and whether what the human wrote may be overwritten. */
 export interface SyncOptions {
-  /** Каталог внутри проекта. */
+  /** Directory inside the project. */
   projectDirectory: string;
   installation: ClaudeInstallation;
-  /** Только сравнить файлы на диске со сгенерированными, ничего не записывая. */
+  /** Only compare the files on disk with the generated ones, writing nothing. */
   check?: boolean;
-  /** Перезаписать файлы, которые написал человек, а не генератор. */
+  /** Overwrite files written by the human rather than the generator. */
   force?: boolean;
 }
 
-/** Итог синхронизации: пути от корня проекта через `/`. */
+/** Sync outcome: paths from the project root with `/`. */
 export interface SyncReport {
-  /** Файлы, которых не было и которые записаны (или, при проверке, появятся). */
+  /** Files that did not exist and were written (or, in a check, will appear). */
   added: string[];
-  /** Сгенерированные файлы, которые перезаписаны (или, при проверке, устарели). */
+  /** Generated files that were overwritten (or, in a check, are outdated). */
   updated: string[];
-  /** Сгенерированные раньше файлы, которые удалены (или, при проверке, лишние). */
+  /** Previously generated files that were deleted (or, in a check, are extra). */
   removed: string[];
-  /** Файлы, написанные человеком, на месте которых генератор пишет свои. */
+  /** Files written by the human where the generator writes its own. */
   conflicts: string[];
-  /** Сгенерированные файлы, исправленные руками: без `force` генератор их не трогает. */
+  /** Generated files edited by hand: without `force` the generator leaves them alone. */
   edited: string[];
 }
 
@@ -80,20 +80,20 @@ function relativeTo(root: string, target: string): string {
 }
 
 /**
- * Путь файла на диске по пути от корня проекта через `/`.
- * @param {string} root Корень проекта.
- * @param {string} relative Путь от корня через `/`.
- * @returns {string} Путь на диске.
+ * Path of a file on disk from its path from the project root with `/`.
+ * @param {string} root Project root.
+ * @param {string} relative Path from the root with `/`.
+ * @returns {string} Path on disk.
  */
 export function fileAt(root: string, relative: string): string {
   return path.join(root, ...relative.split("/"));
 }
 
 /**
- * Читает текстовый файл, если он есть.
- * @param {string} file Путь на диске.
- * @returns {Promise<string | undefined>} Содержимое или undefined, если файла нет.
- * @throws {Error} Если файл не читается по другой причине.
+ * Reads a text file if it exists.
+ * @param {string} file Path on disk.
+ * @returns {Promise<string | undefined>} The contents, or undefined if there is no file.
+ * @throws {Error} If the file cannot be read for another reason.
  */
 export async function readOptional(file: string): Promise<string | undefined> {
   try {
@@ -105,8 +105,8 @@ export async function readOptional(file: string): Promise<string | undefined> {
   }
 }
 
-// Каталоги, где лежит файл с этим именем; скрытые каталоги, зависимости и журнал проекта
-// не просматриваются.
+// Directories containing a file with this name; hidden directories, dependencies and the project
+// journal are not scanned.
 async function directoriesWith(root: string, fileName: string, skipped: string): Promise<string[]> {
   const found: string[] = [];
   const visit = async (directory: string): Promise<void> => {
@@ -177,7 +177,7 @@ function settingsFile(current: Settings, version: string): GeneratedFile {
   };
 }
 
-// Перевод строк при выписке из git на Windows не делает файл устаревшим.
+// Line ending conversion on git checkout on Windows does not make a file outdated.
 function sameText(left: string, right: string): boolean {
   return withUnixNewlines(left) === withUnixNewlines(right);
 }
@@ -191,18 +191,18 @@ function isGenerated(text: string): boolean {
 }
 
 /**
- * Чей файл на месте сгенерированного: его нет; он сгенерирован и не тронут; сгенерирован, но
- * исправлен руками; написан человеком. Отпечаток в манифесте главнее отметки: отметку правка
- * руками не снимает.
+ * Whose file is in place of a generated one: there is none; generated and untouched; generated but
+ * edited by hand; written by the human. The manifest fingerprint outranks the mark: a hand edit
+ * does not remove the mark.
  */
 export type Ownership = "missing" | "generated" | "edited" | "human";
 
 /**
- * Чей файл на месте сгенерированного.
- * @param {string} file Путь от корня через `/`.
- * @param {string | undefined} text Содержимое; undefined, если файла нет.
- * @param {Manifest} manifest Манифест сгенерированного.
- * @returns {Ownership} Нет файла, сгенерирован, исправлен руками или написан человеком.
+ * Whose file is in place of a generated one.
+ * @param {string} file Path from the root with `/`.
+ * @param {string | undefined} text Contents; undefined if there is no file.
+ * @param {Manifest} manifest Manifest of generated output.
+ * @returns {Ownership} No file, generated, edited by hand, or written by the human.
  */
 export function ownershipOf(file: string, text: string | undefined, manifest: Manifest): Ownership {
   if (text === undefined) return "missing";
@@ -230,10 +230,10 @@ async function markdownFilesUnder(root: string, directory: string): Promise<stri
 }
 
 /**
- * Файлы, которые генератор записал раньше: с отметкой генерации или из манифеста.
- * @param {LocatedProject} project Проект.
- * @param {Manifest} manifest Манифест сгенерированного.
- * @returns {Promise<string[]>} Пути от корня через `/`; файла по пути может уже не быть.
+ * Files the generator wrote earlier: with the generated mark or from the manifest.
+ * @param {LocatedProject} project Project.
+ * @param {Manifest} manifest Manifest of generated output.
+ * @returns {Promise<string[]>} Paths from the root with `/`; the file at a path may be gone.
  */
 export async function generatedCandidates(
   project: LocatedProject,
@@ -251,7 +251,7 @@ export async function generatedCandidates(
   return [...new Set([...entrypoints, ...generatedFiles.flat(), ...Object.keys(manifest.files)])];
 }
 
-/** Файл на месте сгенерированного и чей он. */
+/** File in place of a generated one, and whose it is. */
 interface FileOnDisk {
   path: string;
   ownership: Ownership;
@@ -271,13 +271,13 @@ async function filesOnDisk(
   );
 }
 
-/** Что генератор сделает с файлами проекта, без записи. */
+/** What the generator will do with the project files, without writing. */
 interface SyncPlan {
   report: SyncReport;
   files: GeneratedFile[];
 }
 
-/** Что генератор делает с файлом, который хочет записать. */
+/** What the generator does with a file it wants to write. */
 type WriteOutcome = "added" | "updated" | "conflict" | "edited";
 
 function writeOutcomeOf(ownership: Ownership, force: boolean): WriteOutcome {
@@ -295,7 +295,8 @@ function writeOutcomeOf(ownership: Ownership, force: boolean): WriteOutcome {
   }
 }
 
-// Настройки и манифест общие: настройки генератор правит только в своей части, манифест — его.
+// Settings and manifest are shared: the generator edits only its part of the settings; the
+// manifest is its own.
 const SHARED_FILES: ReadonlySet<string> = new Set([SETTINGS_FILE, MANIFEST_FILE]);
 
 async function planWrites(
@@ -352,20 +353,20 @@ function manifestOf(files: GeneratedFile[], deny: readonly string[]): Manifest {
 }
 
 /**
- * Читает манифест сгенерированного из проекта.
- * @param {string} root Корень проекта.
- * @returns {Promise<Manifest>} Манифест; пустой, если файла нет.
- * @throws {GenerateError} Если манифест не разобран.
+ * Reads the manifest of generated output from the project.
+ * @param {string} root Project root.
+ * @returns {Promise<Manifest>} The manifest; empty if there is no file.
+ * @throws {GenerateError} If the manifest cannot be parsed.
  */
 export async function readManifest(root: string): Promise<Manifest> {
   return parseManifest(await readOptional(fileAt(root, MANIFEST_FILE)));
 }
 
 /**
- * Читает настройки Claude Code проекта.
- * @param {string} root Корень проекта.
- * @returns {Promise<Settings>} Настройки; пустой объект, если файла нет.
- * @throws {GenerateError} Если файл не JSON или не объект.
+ * Reads the project's Claude Code settings.
+ * @param {string} root Project root.
+ * @returns {Promise<Settings>} The settings; an empty object if there is no file.
+ * @throws {GenerateError} If the file is not JSON or not an object.
  */
 export async function readSettings(root: string): Promise<Settings> {
   return parseSettings(await readOptional(fileAt(root, SETTINGS_FILE)), SETTINGS_FILE);
@@ -419,10 +420,10 @@ async function writeFiles(root: string, files: GeneratedFile[], paths: string[])
 }
 
 /**
- * Проверяет, что генератор может записать всё по отчёту: на месте его файлов нет файлов человека
- * и исправленных руками.
- * @param {SyncReport} report Отчёт сравнения.
- * @throws {GenerateError} Если такие файлы есть: их список — в сообщении.
+ * Checks that the generator can write everything in the report: no human-written or hand-edited
+ * files stand where its files go.
+ * @param {SyncReport} report Comparison report.
+ * @throws {GenerateError} If there are such files: the message lists them.
  */
 export function requireWritable(report: SyncReport): void {
   const blocked = [...report.conflicts, ...report.edited];
@@ -443,12 +444,13 @@ async function applySync(project: LocatedProject, plan: SyncPlan): Promise<void>
 }
 
 /**
- * Приводит файлы Claude Code проекта к harness и конфигу: CLAUDE.md рядом с каждым AGENTS.md,
- * агенты ролей, скиллы, хуки в настройках и манифест сгенерированного.
- * @param {SyncOptions} options Проект и режим.
- * @returns {Promise<SyncReport>} Что записано и удалено или, при проверке, что устарело.
- * @throws {GenerateError} Если генератор пишет поверх файлов человека или исправленных руками
- *   без `force`, конфиг отдаёт этап чужому агенту или настройки проекта не разобраны.
+ * Brings the project's Claude Code files in line with the harness and config: CLAUDE.md next to
+ * each AGENTS.md, role agents, skills, hooks in the settings, and the manifest of generated output.
+ * @param {SyncOptions} options Project and mode.
+ * @returns {Promise<SyncReport>} What was written and deleted or, in a check, what is outdated.
+ * @throws {GenerateError} If the generator would write over human-written or hand-edited files
+ *   without `force`, the config assigns a stage to another agent, or the project settings cannot
+ *   be parsed.
  */
 export async function syncClaude(options: SyncOptions): Promise<SyncReport> {
   const project = await requireProject(options.projectDirectory);
@@ -459,19 +461,20 @@ export async function syncClaude(options: SyncOptions): Promise<SyncReport> {
   return plan.report;
 }
 
-/** Проект, которого ещё нет на диске: корень и конфиг, который `init` только собирается записать. */
+/** Project not yet on disk: the root and the config that `init` is about to write. */
 export interface PlannedProject {
   root: string;
   config: ProjectConfig;
 }
 
 /**
- * Что генератор сделает в проекте с этим конфигом, ничего не записывая: так `init` до первой
- * записи узнаёт, не придётся ли писать поверх файлов человека.
- * @param {PlannedProject} planned Корень и конфиг будущего проекта.
- * @param {ClaudeInstallation} installation Harness и шаблоны запущенной версии.
- * @returns {Promise<SyncReport>} Что появится, обновится и с чем конфликт.
- * @throws {GenerateError} Если конфиг отдаёт этап чужому агенту или настройки проекта не разобраны.
+ * What the generator will do in the project with this config, writing nothing: this way `init`
+ * learns before its first write whether it would have to write over the human's files.
+ * @param {PlannedProject} planned Root and config of the future project.
+ * @param {ClaudeInstallation} installation Harness and templates of the running version.
+ * @returns {Promise<SyncReport>} What will appear, what will be updated, and what conflicts.
+ * @throws {GenerateError} If the config assigns a stage to another agent or the project settings
+ *   cannot be parsed.
  */
 export async function previewClaude(
   planned: PlannedProject,

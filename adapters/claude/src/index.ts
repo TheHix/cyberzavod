@@ -1,5 +1,5 @@
-// Адаптер Claude Code: файлы агента из harness, запись сессий в журнал проекта и публикация
-// записей из черновика.
+// Claude Code adapter: agent files from the harness, session capture into the project journal, and
+// publishing recordings from a draft.
 
 export { CLI_COMMAND, PACKAGE_NAME, pinnedCliCommand } from "./cli-command.ts";
 export { draftSession, type DraftSessionOptions } from "./commands/draft.ts";

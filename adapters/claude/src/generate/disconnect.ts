@@ -1,6 +1,6 @@
-// Отключение адаптера: убрать из проекта то, что записал генератор, и ничего больше. Свой
-// нетронутый файл удаляется, свой, но исправленный руками, остаётся; из настроек уходят только
-// свои хуки и запреты, которые генератор дописал сам.
+// Disconnecting the adapter: remove from the project what the generator wrote, and nothing else.
+// Its own untouched file is deleted, its own hand-edited file stays; only its own hooks and the
+// deny rules the generator added itself leave the settings.
 
 import { rm, rmdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -25,25 +25,25 @@ import {
 const CLAUDE_DIRECTORY = ".claude";
 
 /**
- * Что станет с настройками Claude Code: их нет или адаптера в них нет (`unchanged`), в них
- * остаётся чужое (`updated`), в них не остаётся ничего (`removed`).
+ * What happens to the Claude Code settings: there are none or the adapter is not in them
+ * (`unchanged`), someone else's entries remain (`updated`), nothing remains (`removed`).
  */
 export type SettingsOutcome = "unchanged" | "updated" | "removed";
 
-/** Что адаптер убирает из проекта: пути от корня через `/`. */
+/** What the adapter removes from the project: paths from the root with `/`. */
 export interface DisconnectPlan {
-  /** Сгенерированные и не тронутые руками файлы, в том числе манифест: они удаляются. */
+  /** Generated files not touched by hand, the manifest included: they are deleted. */
   removed: string[];
-  /** Сгенерированные, но исправленные руками файлы: они остаются. */
+  /** Generated but hand-edited files: they stay. */
   edited: string[];
   settings: SettingsOutcome;
 }
 
-/** Что отключить и как: только посмотреть план или выполнить его. */
+/** What to disconnect and how: only view the plan or carry it out. */
 export interface DisconnectOptions {
-  /** Каталог внутри проекта. */
+  /** Directory inside the project. */
   projectDirectory: string;
-  /** Только составить план, ничего не меняя. */
+  /** Only draw up the plan without changing anything. */
   check?: boolean;
 }
 
@@ -74,8 +74,8 @@ function settingsOutcomeOf(text: string | undefined, cleaned: Settings): Setting
   return isSame ? "unchanged" : "updated";
 }
 
-// Удаляет опустевшие каталоги от файла вверх, но не выше `.claude/`: rmdir не трогает каталог,
-// где что-то осталось.
+// Removes emptied directories from the file upward, but not above `.claude/`: rmdir leaves alone a
+// directory where something remains.
 async function removeEmptyParents(root: string, file: string): Promise<void> {
   const boundary = fileAt(root, CLAUDE_DIRECTORY);
   const isInside = (directory: string) =>
@@ -95,12 +95,12 @@ async function removeEmptyParents(root: string, file: string): Promise<void> {
 }
 
 /**
- * Убирает из проекта файлы и настройки адаптера или, с `check`, только говорит, что уберёт.
- * Исправленные руками файлы, чужие хуки и запреты, `AGENTS.md` и журнал остаются.
- * @param {DisconnectOptions} options Проект и режим.
- * @returns {Promise<DisconnectPlan>} Что удалено или будет удалено и что останется.
- * @throws {Error} Если проекта нет.
- * @throws {Error} Если настройки или манифест не разобраны: тогда ничего не меняется.
+ * Removes the adapter's files and settings from the project or, with `check`, only says what it
+ * will remove. Hand-edited files, other hooks and deny rules, `AGENTS.md` and the journal stay.
+ * @param {DisconnectOptions} options Project and mode.
+ * @returns {Promise<DisconnectPlan>} What was or will be deleted, and what will stay.
+ * @throws {Error} If there is no project.
+ * @throws {Error} If the settings or the manifest cannot be parsed: then nothing changes.
  */
 export async function disconnectClaude(options: DisconnectOptions): Promise<DisconnectPlan> {
   const project = await requireProject(options.projectDirectory);

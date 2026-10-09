@@ -1,19 +1,19 @@
-// Сырой журнал сборки: компактное событие на каждый хук Claude Code.
-// Из полезной нагрузки хука берётся только то, что нужно для записи, — без содержимого
-// файлов и ответов инструментов, чтобы в журнал не попадало лишнее.
+// Build raw log: a compact event for each Claude Code hook.
+// Only what the recording needs is taken from the hook payload, without the contents
+// of files and tool responses, so nothing extra gets into the log.
 
 import type { ProjectConfig } from "@cyberzavod/core";
 
-/** Событие сырого журнала сборки; `ts` — время по часам машины в миллисекундах. */
+/** A build raw log event; `ts` is the machine clock time in milliseconds. */
 export type RawEvent =
   | {
       ts: number;
       kind: "session_start";
-      /** Идентификатор проекта из `.cyberzavod/project.json`; приходит вместе с `harness` и `workflow`. */
+      /** Project id from `.cyberzavod/project.json`; comes with `harness` and `workflow`. */
       project?: string;
-      /** Версия harness из `.cyberzavod/project.json`; приходит вместе с `project`. */
+      /** Harness version from `.cyberzavod/project.json`; comes together with `project`. */
       harness?: string;
-      /** Процесс разработки из `.cyberzavod/project.json`; приходит вместе с `project`. */
+      /** Development workflow from `.cyberzavod/project.json`; comes together with `project`. */
       workflow?: string;
     }
   | {
@@ -21,15 +21,15 @@ export type RawEvent =
       kind: "prompt";
       text: string;
       /**
-       * Хук остановки сдался перед этим промптом и позвал человека: промпт — вызов хуком
-       * остановки. Ставит `markAfterStopGate`, когда находит отметку хука.
+       * The stop hook gave up before this prompt and called the human: the prompt is a call by
+       * the stop hook. Set by `markAfterStopGate` when it finds the hook's mark.
        */
       afterStopGate?: true;
     }
   | {
       ts: number;
       kind: "question_answer";
-      /** Ответы человека на вопросы модели строками «вопрос — ответ». */
+      /** The human's answers to the model's questions as "question — answer" lines. */
       text: string;
       agentId?: string;
     }
@@ -40,9 +40,9 @@ export type RawEvent =
       ok: boolean;
       command?: string;
       file?: string;
-      /** Каталог, в котором шла сессия или сабагент в момент вызова инструмента. */
+      /** Directory the session or subagent was in when the tool was called. */
       cwd?: string;
-      /** Сабагент, вызвавший инструмент; у вызова основной сессии поля нет. */
+      /** Subagent that called the tool; a main session call has no such field. */
       agentId?: string;
     }
   | { ts: number; kind: "subagent_start"; agent: string; agentId?: string }
@@ -52,39 +52,40 @@ export type RawEvent =
       agent: string;
       agentId?: string;
       transcriptPath?: string;
-      /** Первая строка ответа сабагента: у станций пайплайна /feature это вердикт. */
+      /** First line of the subagent's reply: for /feature pipeline stations it is the verdict. */
       verdict?: string;
     }
   | { ts: number; kind: "subagent_report"; agentId: string; verdict?: string }
   | { ts: number; kind: "stop"; transcriptPath?: string };
 
-/** Промпт человека в журнале сборки. */
+/** A human prompt in the build log. */
 export type PromptRawEvent = Extract<RawEvent, { kind: "prompt" }>;
 
-/** Начало сессии в журнале сборки. */
+/** A session start in the build log. */
 export type SessionStartEvent = Extract<RawEvent, { kind: "session_start" }>;
 
-/** Ошибка формата журнала: разобранная строка не похожа на событие. */
+/** Log format error: a parsed line does not look like an event. */
 export class RawLogError extends Error {}
 
-// Команды Bash обрезаются: для записи важно, что запускалось, а не полный текст.
+// Bash commands are truncated: the recording needs what was run, not the full text.
 const MAX_COMMAND_LENGTH = 200;
 const UNKNOWN = "unknown";
-// Вердикт — короткая строка вроде «NEEDS WORK»; длинная первая строка — уже сам отчёт.
+// A verdict is a short line like "NEEDS WORK"; a long first line is already the report itself.
 const MAX_VERDICT_LENGTH = 40;
-// Оформление вокруг вердикта: **APPROVED**, `DEFECT`, # APPROVED, «NEEDS WORK.».
+// Decoration around a verdict: **APPROVED**, `DEFECT`, # APPROVED, "NEEDS WORK.".
 const VERDICT_MARKUP = /[*_`#]/g;
 const TRAILING_PUNCTUATION = /[.:!]+$/;
-// Пометки среды Claude Code перед отчётом сабагента — в квадратных скобках, это не вердикт.
+// Claude Code environment marks before a subagent report are in square brackets; they are not a
+// verdict.
 const HARNESS_NOTE_START = "[";
-// В десктопном приложении сабагент сдаёт работу инструментом SubagentHandback без текста
-// ответа, и отчёт приходит в сессию сообщением: <agent-message from="<agent_id>">
-// [Subagent hand-back] … The report follows: <отчёт с отступом>.
+// In the desktop app a subagent hands back work with the SubagentHandback tool without reply
+// text, and the report comes into the session as a message: <agent-message from="<agent_id>">
+// [Subagent hand-back] … The report follows: <indented report>.
 const SUBAGENT_REPORT = /^<agent-message from="([^"]+)">\s*\[Subagent hand-back\]/;
 const REPORT_START = "The report follows:";
-// session_id уходит в имя файла журнала — пропускаются только безопасные символы.
+// session_id goes into the log file name, so only safe characters are allowed.
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
-// Вопросы человеку задаёт этот инструмент; его ответы — текст человека, как промпт.
+// This tool asks the human questions; its answers are the human's text, like a prompt.
 const QUESTION_TOOL = "AskUserQuestion";
 const ANSWER_SEPARATOR = " — ";
 
@@ -100,8 +101,8 @@ function stringField(payload: HookPayload, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-// Инструменты сабагентов приходят в той же сессии: по `agentId` вызов сабагента отличается
-// от вызова основной сессии, а по `cwd` находится проект, в котором шла команда.
+// Subagent tools come in the same session: `agentId` tells a subagent call from
+// a main session call, and `cwd` gives the project the command ran in.
 function toolEvent(payload: HookPayload, ts: number, ok: boolean): RawEvent {
   const input = isPayload(payload.tool_input) ? payload.tool_input : {};
   const command = stringField(input, "command");
@@ -122,9 +123,10 @@ function toolEvent(payload: HookPayload, ts: number, ok: boolean): RawEvent {
   );
 }
 
-// Ответы на вопросы: объект «вопрос → ответ». Формат ответа инструмента в документации хуков
-// не описан (там `answers` стоит во входе), поэтому ищем и в ответе, и во входе; не объект
-// и не строки — нет ответов. Разбор терпимый: лишнее и непонятное пропускается.
+// Answers to questions: a "question → answer" object. The hook docs do not describe the tool
+// response format (`answers` is in the input there), so we look in both the response and the input;
+// not an object of strings means no answers. Parsing is lenient: extra and unknown parts are
+// skipped.
 function answersOf(payload: HookPayload): [string, string][] {
   for (const source of [payload.tool_response, payload.tool_input]) {
     const answers = isPayload(source) ? source.answers : undefined;
@@ -141,8 +143,8 @@ function answersOf(payload: HookPayload): [string, string][] {
   return [];
 }
 
-// Вызов AskUserQuestion с ответами человека — текст человека, а не вызов инструмента. Без ответов
-// (отказ, отмена, незнакомый формат) остаётся вызов инструмента.
+// An AskUserQuestion call with the human's answers is the human's text, not a tool call. Without
+// answers (refusal, cancellation, unknown format) it stays a tool call.
 function questionAnswerEvent(payload: HookPayload, ts: number): RawEvent | undefined {
   if (stringField(payload, "tool_name") !== QUESTION_TOOL) return undefined;
 
@@ -162,8 +164,8 @@ function withoutVerdictMarkup(line: string): string {
   return line.replace(VERDICT_MARKUP, "").trim().replace(TRAILING_PUNCTUATION, "");
 }
 
-// Из ответа сабагента в журнал идёт только первая строка: станции пайплайна начинают
-// с неё вердикт, а остальной отчёт для записи не нужен.
+// Only the first line of a subagent's reply goes into the log: pipeline stations start
+// with the verdict, and the rest of the report is not needed for the recording.
 function verdictOf(reply: string | undefined): string | undefined {
   const lines = reply?.split("\n").map(withoutVerdictMarkup);
   const firstLine = lines?.find((line) => line !== "" && !line.startsWith(HARNESS_NOTE_START));
@@ -171,21 +173,21 @@ function verdictOf(reply: string | undefined): string | undefined {
   return firstLine !== undefined && firstLine.length <= MAX_VERDICT_LENGTH ? firstLine : undefined;
 }
 
-// Служебные сабагенты Claude Code приходят с пустым agent_type.
+// Claude Code service subagents come with an empty agent_type.
 function agentName(payload: HookPayload): string {
   return stringField(payload, "agent_type") || UNKNOWN;
 }
 
-// Необязательные поля добавляются, только если они есть: в журнале не копятся undefined.
-// Partial<T> — опечатка в имени поля не скомпилируется.
+// Optional fields are added only when present, so undefined does not pile up in the log.
+// Partial<T>: a typo in a field name does not compile.
 function withOptional<T extends object>(event: T, fields: Partial<T>): T {
   const present = Object.entries(fields).filter(([, value]) => value !== undefined);
 
   return { ...event, ...Object.fromEntries(present) };
 }
 
-// Отчёт сабагента, пришедший сообщением в сессию, — не промпт человека: из него в журнал
-// идут только id агента и вердикт.
+// A subagent report that came into the session as a message is not a human prompt: only the
+// agent id and the verdict go from it into the log.
 function subagentReport(text: string, ts: number): RawEvent | undefined {
   const agentId = SUBAGENT_REPORT.exec(text)?.[1];
 
@@ -201,10 +203,10 @@ function subagentReport(text: string, ts: number): RawEvent | undefined {
 }
 
 /**
- * Превращает полезную нагрузку хука Claude Code в событие журнала.
- * @param {unknown} payload JSON, который хук получил на stdin.
- * @param {number} ts Время события в миллисекундах.
- * @returns {RawEvent | null} Событие журнала или null, если хук для записи не нужен.
+ * Turns a Claude Code hook payload into a log event.
+ * @param {unknown} payload JSON the hook received on stdin.
+ * @param {number} ts Event time in milliseconds.
+ * @returns {RawEvent | null} Log event, or null if the hook is not needed for the recording.
  */
 export function fromHookPayload(payload: unknown, ts: number): RawEvent | null {
   if (!isPayload(payload)) return null;
@@ -250,10 +252,10 @@ export function fromHookPayload(payload: unknown, ts: number): RawEvent | null {
 }
 
 /**
- * Помечает начало сессии проектом, версией harness и процессом из конфига проекта.
- * @param {SessionStartEvent} event Начало сессии.
- * @param {ProjectConfig} config Конфиг проекта, в котором идёт сессия.
- * @returns {SessionStartEvent} Новое событие с `project`, `harness` и `workflow`.
+ * Tags a session start with the project, harness version and workflow from the project config.
+ * @param {SessionStartEvent} event Session start.
+ * @param {ProjectConfig} config Config of the project the session runs in.
+ * @returns {SessionStartEvent} New event with `project`, `harness` and `workflow`.
  */
 export function stampProject(event: SessionStartEvent, config: ProjectConfig): SessionStartEvent {
   return {
@@ -265,24 +267,25 @@ export function stampProject(event: SessionStartEvent, config: ProjectConfig): S
 }
 
 /**
- * Помечает промпт вызовом хуком остановки: хук сдался перед ним и позвал человека.
- * @param {PromptRawEvent} event Промпт человека.
- * @returns {PromptRawEvent} Новый промпт с `afterStopGate`.
+ * Marks a prompt as a call by the stop hook: the hook gave up before it and called the human.
+ * @param {PromptRawEvent} event Human prompt.
+ * @returns {PromptRawEvent} New prompt with `afterStopGate`.
  */
 export function markAfterStopGate(event: PromptRawEvent): PromptRawEvent {
   return { ...event, afterStopGate: true };
 }
 
 /**
- * Проверяет, что id сессии можно использовать в имени файла журнала.
- * @param {unknown} value Значение session_id из полезной нагрузки хука.
- * @returns {value is string} true, если id можно подставить в имя файла журнала.
+ * Checks that a session id can be used in the log file name.
+ * @param {unknown} value session_id value from the hook payload.
+ * @returns {value is string} true if the id can go into the log file name.
  */
 export function isSafeSessionId(value: unknown): value is string {
   return typeof value === "string" && SESSION_ID_PATTERN.test(value);
 }
 
-// Начало сессии несёт проект, версию harness и процесс только вместе, а без маркера проекта — ни один.
+// A session start carries the project, harness version and workflow only together, and none without
+// a project marker.
 function isUnstamped(value: HookPayload): boolean {
   return value.project === undefined && value.harness === undefined && value.workflow === undefined;
 }
@@ -295,8 +298,8 @@ function isStamped(value: HookPayload): boolean {
   );
 }
 
-// Проверка обязательных полей каждого вида события. Тип требует запись для каждого вида:
-// новый вид в RawEvent не скомпилируется, пока здесь не опишут его проверку.
+// Required fields check for each event kind. The type requires an entry for each kind:
+// a new kind in RawEvent does not compile until its check is described here.
 const RAW_EVENT_SHAPES: Record<RawEvent["kind"], (value: HookPayload) => boolean> = {
   session_start: (value) => isUnstamped(value) || isStamped(value),
   prompt: (value) =>
@@ -323,11 +326,11 @@ function isRawEvent(value: unknown): value is RawEvent {
 }
 
 /**
- * Читает журнал сборки. Строка, которая не разбирается как JSON, — оборванная асинхронная
- * запись, она пропускается.
- * @param {string} content Содержимое журнала в формате JSONL.
- * @returns {RawEvent[]} События журнала по порядку строк.
- * @throws {RawLogError} Если разобранная строка не является событием журнала.
+ * Reads a build log. A line that does not parse as JSON is a cut-off asynchronous
+ * write and is skipped.
+ * @param {string} content Log contents in JSONL format.
+ * @returns {RawEvent[]} Log events in line order.
+ * @throws {RawLogError} If a parsed line is not a log event.
  */
 export function parseRawLog(content: string): RawEvent[] {
   const events: RawEvent[] = [];

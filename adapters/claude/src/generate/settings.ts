@@ -1,13 +1,13 @@
-// Хуки адаптера в `.claude/settings.json` проекта. Настройки принадлежат проекту: адаптер
-// заменяет только свои обработчики — их команда запускает пакет через npx той версии, что
-// записана в конфиге, — и дописывает свои запреты, остальное оставляет как есть.
+// Adapter hooks in the project's `.claude/settings.json`. The settings belong to the project: the
+// adapter replaces only its own handlers (their command runs, via npx, the package version recorded
+// in the config) and adds its own deny rules, leaving the rest as is.
 
 import { LEGACY_TOOL_FILE } from "@cyberzavod/storage";
 import { PACKAGE_NAME } from "../cli-command.ts";
 import type { HookName } from "../hooks/index.ts";
 import { GenerateError } from "./claude.ts";
 
-/** Обработчик хука Claude Code. */
+/** Claude Code hook handler. */
 export interface HookHandler {
   type: "command";
   command: string;
@@ -16,25 +16,25 @@ export interface HookHandler {
   statusMessage?: string;
 }
 
-/** Группа обработчиков одного события хука. */
+/** Group of handlers for one hook event. */
 export interface HookGroup {
   matcher?: string;
   hooks: HookHandler[];
 }
 
-/** Настройки Claude Code: разобранный JSON, адаптер читает из него только свои части. */
+/** Claude Code settings: parsed JSON; the adapter reads only its own parts of it. */
 export type Settings = Record<string, unknown>;
 
-/** Ошибка настроек: файл проекта не того вида, чтобы в него встроить хуки. */
+/** Settings error: the project file has the wrong shape to install hooks into. */
 export class SettingsError extends Error {}
 
-/** Путь настроек Claude Code относительно корня проекта. */
+/** Path of the Claude Code settings relative to the project root. */
 export const SETTINGS_FILE = ".claude/settings.json";
 
 /**
- * Ошибка адаптера из диагностики настроек не того вида: текст формата, рамку даёт каталог.
- * @param {SettingsError} err Диагностика `hooks` или `permissions` не того вида.
- * @returns {GenerateError} Ошибка, которую CLI печатает одной строкой.
+ * Adapter error from a diagnostic of malformed settings: the format text, framed by the catalog.
+ * @param {SettingsError} err Diagnostic of malformed `hooks` or `permissions`.
+ * @returns {GenerateError} Error the CLI prints as one line.
  */
 export function unparsedSettings(err: SettingsError): GenerateError {
   const reason = err.message;
@@ -58,11 +58,11 @@ function parseJson(text: string, file: string): unknown {
 }
 
 /**
- * Разбирает текст настроек проекта.
- * @param {string | undefined} text Содержимое файла; undefined, если файла нет.
- * @param {string} file Путь файла для сообщения об ошибке.
- * @returns {Settings} Настройки; пустой объект, если файла нет.
- * @throws {GenerateError} Если текст не JSON или это не объект.
+ * Parses the project settings text.
+ * @param {string | undefined} text File contents; undefined if there is no file.
+ * @param {string} file File path for the error message.
+ * @returns {Settings} The settings; an empty object if there is no file.
+ * @throws {GenerateError} If the text is not JSON or not an object.
  */
 export function parseSettings(text: string | undefined, file: string): Settings {
   if (text === undefined) return {};
@@ -76,13 +76,13 @@ export function parseSettings(text: string | undefined, file: string): Settings 
   return parsed as Settings;
 }
 
-/** Обработчики адаптера по событиям хуков. */
+/** Adapter handlers by hook event. */
 export type AdapterHooks = Readonly<Record<string, HookGroup[]>>;
 
 const TURN_START_TIMEOUT_SECONDS = 30;
 const STOP_GATE_TIMEOUT_SECONDS = 180;
 
-/** Запреты адаптера: секреты не читаются и не правятся, сырые журналы сессий не правятся. */
+/** Adapter deny rules: secrets are neither read nor edited, raw session logs are not edited. */
 export const ADAPTER_DENY = [
   "Read(**/.env)",
   "Read(**/.env.*)",
@@ -91,17 +91,18 @@ export const ADAPTER_DENY = [
   "Edit(**/capture/claude/raw/**)",
 ] as const;
 
-// --prefer-offline и --fetch-retries=0: пакет в кэше npm берётся без обращения к registry, а без
-// сети и кэша npx падает сразу, а не через минуты. --prefix от $CLAUDE_PROJECT_DIR, а не от
-// текущего каталога (сессия могла сделать cd): пакет из node_modules проекта найдётся из любого
-// подкаталога. Кавычки — ради пробелов в пути.
+// --prefer-offline and --fetch-retries=0: a package in the npm cache is taken without contacting
+// the registry, and without network or cache npx fails at once rather than after minutes. --prefix
+// is $CLAUDE_PROJECT_DIR, not the current directory (the session may have run cd), so the package
+// in the project's node_modules is found from any subdirectory. The quotes allow spaces in the
+// path.
 const HOOK_RUNNER = 'npx -y --prefer-offline --fetch-retries=0 --prefix "$CLAUDE_PROJECT_DIR"';
 
-// Запись и начало хода без сети молча пропускаются.
+// Without network, capture and turn start are silently skipped.
 const SKIP_ON_FAILURE = "true";
 
-// Запасной путь срабатывает и когда хук остановки упал внутри, поэтому текст не обещает причину.
-// Без апострофов: команда лежит в одинарных кавычках.
+// The fallback also fires when the stop hook failed internally, so the text does not promise a
+// cause. No apostrophes: the command sits in single quotes.
 const STOP_FAILURE_MESSAGE =
   "Cyberzavod: the stop hook failed or could not start (for example, npx without network). Project checks were skipped.";
 
@@ -109,12 +110,12 @@ function stopFailureCommand(): string {
   return `echo '${JSON.stringify({ systemMessage: STOP_FAILURE_MESSAGE })}'`;
 }
 
-// Флаги npx между `npx` и пакетом в следующих версиях могут измениться: хуки прежних версий
-// узнаются по пакету и имени хука, а не по полному началу команды.
+// The npx flags between `npx` and the package may change in later versions: hooks of earlier
+// versions are recognized by the package and hook name, not by the full command prefix.
 const NPX_HANDLER_PATTERN = new RegExp(`^npx\\s.*\\s${PACKAGE_NAME}@(\\S+) hook `);
 
-// Версия, на которую ссылается свой обработчик; у прежнего CLI в проекте версии нет, он узнаётся
-// по имени файла. Чужой обработчик — undefined.
+// Version referenced by an own handler; the former in-project CLI has no version and is recognized
+// by file name. Someone else's handler gives undefined.
 function ownVersionOf(handler: HookHandler): string | undefined {
   const [, npxVersion] = NPX_HANDLER_PATTERN.exec(handler.command) ?? [];
 
@@ -127,18 +128,18 @@ function isOwnHandler(handler: HookHandler): boolean {
   return ownVersionOf(handler) !== undefined;
 }
 
-// `|| …` срабатывает на любой ненулевой код, поэтому запасной путь — только для «npx не
-// запустился»: остановка блокирует JSON-решением с кодом 0, а не кодом 2. Синтаксис POSIX: на
-// Windows Claude Code запускает хуки через Git Bash, PowerShell не поддерживается.
+// `|| …` fires on any non-zero code, so the fallback is only for "npx did not start": the stop hook
+// blocks with a JSON decision and code 0, not code 2. POSIX syntax: on Windows Claude Code runs
+// hooks through Git Bash; PowerShell is not supported.
 function hookCommand(version: string, hook: HookName, onFailure: string): string {
   return `${HOOK_RUNNER} ${PACKAGE_NAME}@${version} hook ${hook} || ${onFailure}`;
 }
 
 /**
- * Обработчики адаптера для версии Cyberzavod из конфига проекта: запись сессии на каждом событии,
- * начало хода и проверки при остановке.
- * @param {string} version Версия Cyberzavod из конфига проекта.
- * @returns {AdapterHooks} Обработчики по событиям.
+ * Adapter handlers for the Cyberzavod version from the project config: session capture on every
+ * event, turn start, and checks on stop.
+ * @param {string} version Cyberzavod version from the project config.
+ * @returns {AdapterHooks} Handlers by event.
  */
 export function adapterHooks(version: string): AdapterHooks {
   const record: HookHandler = {
@@ -233,12 +234,12 @@ function mergedPermissions(existing: unknown): Record<string, unknown> {
 }
 
 /**
- * Встраивает хуки и запреты адаптера в настройки проекта: прежние обработчики адаптера
- * заменяются, чужие обработчики, запреты и прочие настройки остаются.
- * @param {Settings} settings Настройки проекта; пустой объект, если файла нет.
- * @param {AdapterHooks} hooks Обработчики адаптера.
- * @returns {Settings} Новые настройки.
- * @throws {SettingsError} Если `hooks` или `permissions` в настройках не того вида.
+ * Installs the adapter hooks and deny rules into the project settings: earlier adapter handlers are
+ * replaced; other handlers, deny rules and other settings stay.
+ * @param {Settings} settings Project settings; an empty object if there is no file.
+ * @param {AdapterHooks} hooks Adapter handlers.
+ * @returns {Settings} The new settings.
+ * @throws {SettingsError} If `hooks` or `permissions` in the settings have the wrong shape.
  */
 export function mergeSettings(settings: Settings, hooks: AdapterHooks): Settings {
   return {
@@ -249,9 +250,9 @@ export function mergeSettings(settings: Settings, hooks: AdapterHooks): Settings
 }
 
 /**
- * Хуки адаптера в настройках проекта: все на месте (`installed`), своих нет (`missing`), свои
- * ссылаются на другие версии (`otherVersion`; прежний CLI в проекте называется как
- * `LEGACY_TOOL_FILE`) или у событий `events` нет какого-то обработчика этой версии (`incomplete`).
+ * Adapter hooks in the project settings: all in place (`installed`), none of its own (`missing`),
+ * its own refer to other versions (`otherVersion`; the former in-project CLI is named as
+ * `LEGACY_TOOL_FILE`), or the `events` lack some handler of this version (`incomplete`).
  */
 export type HooksInspection =
   | { kind: "installed" }
@@ -285,12 +286,12 @@ function isEventComplete(event: string, groups: HookGroup[], own: OwnHandler[]):
 }
 
 /**
- * Сверяет хуки в настройках проекта с теми, что адаптер ставит для версии из конфига. Чужие
- * обработчики и прочие настройки в расчёт не идут.
- * @param {Settings} settings Настройки проекта; пустой объект, если файла нет.
- * @param {string} version Версия Cyberzavod из конфига проекта.
- * @returns {HooksInspection} Состояние хуков.
- * @throws {SettingsError} Если `hooks` в настройках не того вида.
+ * Compares the hooks in the project settings with those the adapter installs for the config
+ * version. Other handlers and other settings are not taken into account.
+ * @param {Settings} settings Project settings; an empty object if there is no file.
+ * @param {string} version Cyberzavod version from the project config.
+ * @returns {HooksInspection} Hook state.
+ * @throws {SettingsError} If `hooks` in the settings has the wrong shape.
  */
 export function inspectHooks(settings: Settings, version: string): HooksInspection {
   if (settings.hooks !== undefined && !isObject(settings.hooks)) {
@@ -328,10 +329,10 @@ function denyOf(permissions: unknown): string[] {
 }
 
 /**
- * Запреты адаптера, которых в настройках проекта ещё нет: их допишет sync.
- * @param {Settings} settings Настройки проекта; пустой объект, если файла нет.
- * @returns {string[]} Недостающие запреты по порядку `ADAPTER_DENY`.
- * @throws {SettingsError} Если `permissions` в настройках не того вида.
+ * Adapter deny rules not yet in the project settings: sync will add them.
+ * @param {Settings} settings Project settings; an empty object if there is no file.
+ * @returns {string[]} Missing deny rules in `ADAPTER_DENY` order.
+ * @throws {SettingsError} If `permissions` in the settings has the wrong shape.
  */
 export function missingAdapterDeny(settings: Settings): string[] {
   const deny = denyOf(settings.permissions);
@@ -367,13 +368,13 @@ function isEmptyObject(value: unknown): boolean {
 }
 
 /**
- * Убирает из настроек проекта то, что поставил адаптер: свои обработчики хуков и перечисленные
- * запреты. Чужие обработчики, запреты и прочие настройки остаются; опустевшие `hooks` и
- * `permissions` убираются.
- * @param {Settings} settings Настройки проекта.
- * @param {readonly string[]} deny Запреты, которые дописал адаптер.
- * @returns {Settings} Настройки без адаптера; пустой объект, если в них больше ничего нет.
- * @throws {SettingsError} Если `hooks` или `permissions` в настройках не того вида.
+ * Removes from the project settings what the adapter installed: its own hook handlers and the
+ * listed deny rules. Other handlers, deny rules and other settings stay; emptied `hooks` and
+ * `permissions` are removed.
+ * @param {Settings} settings Project settings.
+ * @param {readonly string[]} deny Deny rules the adapter added.
+ * @returns {Settings} Settings without the adapter; an empty object if nothing else remains.
+ * @throws {SettingsError} If `hooks` or `permissions` in the settings have the wrong shape.
  */
 export function withoutAdapterSettings(settings: Settings, deny: readonly string[]): Settings {
   const { hooks, permissions, ...rest } = settings;
