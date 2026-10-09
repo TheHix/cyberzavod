@@ -17,6 +17,7 @@ function failureOf(command: string, run: CommandRun, doctor: DoctorMessages): st
 
 /** Каждая из `verification.commands` завершается с кодом 0. */
 export const commandsPassCheck: ProjectCheck = {
+  id: "commands",
   run: async ({ project, messages, runCommand }) => {
     const { commands } = messages.doctor;
     const configured = project.config.verification.commands;

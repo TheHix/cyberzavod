@@ -7,6 +7,7 @@ export const MINIMUM_NODE_MAJOR = 22;
 
 /** Версия Node не ниже `MINIMUM_NODE_MAJOR`. */
 export const nodeCheck: MachineCheck = {
+  id: "node",
   run: async (machine, messages) => {
     const major = Number.parseInt(machine.nodeVersion, 10);
     const isSupported = major >= MINIMUM_NODE_MAJOR;

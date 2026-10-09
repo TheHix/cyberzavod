@@ -8,6 +8,7 @@ import { failed, passed, type ProjectCheck } from "./check.ts";
 
 /** Корневой AGENTS.md существует и не несёт отметок заглушек `RULES_TODO_MARK`. */
 export const rulesCheck: ProjectCheck = {
+  id: "rules",
   run: async ({ project, messages }) => {
     const { rules } = messages.doctor;
     const text = await readOptionalText(path.join(project.root, RULES_FILE));

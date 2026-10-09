@@ -16,6 +16,7 @@ async function optionsWith(
     machine?: Machine;
     commandsCheck?: ProjectCheck;
     runCommand?: CommandRunner;
+    isJson?: boolean;
   } = {},
 ): Promise<DoctorOptions> {
   const runCommand: CommandRunner = patch.runCommand ?? (() => ({ kind: "exited", code: 0 }));
@@ -27,6 +28,7 @@ async function optionsWith(
     installation: await readInstallation(),
     messages,
     claudeMessages: CLAUDE_MESSAGES.en,
+    isJson: patch.isJson ?? false,
   };
 }
 
@@ -65,12 +67,12 @@ describe("runDoctor", () => {
     }).toEqual({
       isHealthy: true,
       summary: "All good.",
-      resultSigns: Array<string>(9).fill("✓"),
-      resultCount: 9,
+      resultSigns: Array<string>(10).fill("✓"),
+      resultCount: 10,
     });
   });
 
-  it("печатает пункты в порядке: Node, git, галерея, конфиг, хуки, файлы агента, правила, команды, .gitignore", async () => {
+  it("печатает пункты в порядке: Node, git, Claude Code, галерея, конфиг, хуки, файлы агента, правила, команды, .gitignore", async () => {
     const project = await connectedProject();
     const options = await optionsWith();
 
@@ -83,6 +85,7 @@ describe("runDoctor", () => {
     expect(lines.slice(0, -1).map((line) => line.slice(2, 14))).toEqual([
       "Node.js 22.1",
       "git is insta",
+      "Claude Code ",
       "gallery: sig",
       ".cyberzavod/",
       "agent hooks ",
@@ -116,6 +119,7 @@ describe("runDoctor", () => {
       lines: [
         "✓ Node.js 22.1.0",
         "✓ git is installed",
+        "✓ Claude Code is installed",
         "✓ gallery: signed in",
         `✗ no Cyberzavod project found from ${directory}`,
         "    How to fix: run npx cyberzavod init in the project root",
@@ -153,7 +157,7 @@ describe("runDoctor", () => {
 
     const lines = printedLines();
 
-    expect({ isHealthy, notice: lines[2], last: lines.at(-1) }).toEqual({
+    expect({ isHealthy, notice: lines[3], last: lines.at(-1) }).toEqual({
       isHealthy: true,
       notice: "– gallery: not signed in (needed only to publish recordings)",
       last: "All good.",
@@ -192,5 +196,46 @@ describe("runDoctor", () => {
     await runDoctor(project.root, options);
 
     expect(runCommand).toHaveBeenCalledWith("make check", project.root);
+  });
+
+  it("с isJson печатает один JSON-документ с кодами проверок", async () => {
+    const project = await connectedProject();
+    const options = await optionsWith({ isJson: true });
+
+    vi.mocked(console.log).mockClear();
+
+    const isHealthy = await runDoctor(project.root, options);
+
+    const document = JSON.parse(printedLines().join("\n")) as {
+      schemaVersion: number;
+      command: string;
+      status: string;
+      checks: { id: string }[];
+    };
+
+    expect({
+      isHealthy,
+      schemaVersion: document.schemaVersion,
+      command: document.command,
+      status: document.status,
+      ids: document.checks.map((check) => check.id),
+    }).toEqual({
+      isHealthy: true,
+      schemaVersion: 1,
+      command: "doctor",
+      status: "ok",
+      ids: [
+        "node",
+        "git",
+        "claude-code",
+        "gallery",
+        "config",
+        "hooks",
+        "files",
+        "rules",
+        "commands",
+        "gitignore",
+      ],
+    });
   });
 });

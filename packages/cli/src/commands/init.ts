@@ -4,7 +4,7 @@
 
 import { rename, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { syncClaude } from "@cyberzavod/adapter-claude";
+import { previewClaude, syncClaude } from "@cyberzavod/adapter-claude";
 import { RULES_TODO_MARK, type ProjectConfig } from "@cyberzavod/core";
 import { PROJECT_CONFIG_FILE, readProjectConfig, writeProjectConfig } from "@cyberzavod/storage";
 import type { Confirmation } from "../confirmation.ts";
@@ -15,6 +15,8 @@ import { initialConfigOf, type InitOverrides } from "../initial-config.ts";
 import type { Installation } from "../installation/installation.ts";
 import type { CliMessages } from "../messages/cli-messages.ts";
 import { appendIgnoreEntry, captureIgnoreEntry, GITIGNORE_FILE } from "./gitignore.ts";
+import { requireProjectAt } from "./project.ts";
+import { filesStatusOf, inspectProjectFiles } from "./sync.ts";
 
 /** Файл правил проекта для агентов в его корне. */
 export const RULES_FILE = "AGENTS.md";
@@ -185,26 +187,67 @@ export interface InitOptions {
   messages: CliMessages;
 }
 
+// Уже подключённый проект `init` не меняет, а говорит, в порядке ли он и что делать дальше.
+async function reportConnected(root: string, options: InitOptions): Promise<boolean> {
+  const { installation, messages } = options;
+  const project = await requireProjectAt(root);
+  const { report, isHarnessOutdated } = await inspectProjectFiles(project, installation);
+  const status = filesStatusOf(report);
+  const isCurrent = status === "current" && !isHarnessOutdated;
+
+  console.log(messages.init.alreadyConnected);
+  console.log(messages.init.configValid);
+  console.log(isCurrent ? messages.init.filesCurrent : messages.init.filesOutdated);
+  console.log(isCurrent ? messages.init.nothingToDo : messages.init.runSync);
+
+  return isCurrent;
+}
+
+// Файлы, на месте которых генератор написал бы свои, ищутся до первой записи: так отказ
+// оставляет проект нетронутым. Рукописный CLAUDE.md, который станет AGENTS.md, не мешает.
+async function blockingFiles(
+  root: string,
+  config: ProjectConfig,
+  rulesPlan: RulesPlan,
+  installation: Installation,
+): Promise<string[]> {
+  const claudeInstallation = {
+    harness: installation.harness,
+    templates: installation.claudeTemplates,
+  };
+  const report = await previewClaude({ root, config }, claudeInstallation);
+  const blocked = [...report.conflicts, ...report.edited];
+
+  return rulesPlan === "moved" ? blocked.filter((file) => file !== LEGACY_ENTRYPOINT) : blocked;
+}
+
 /**
  * Подключает проект: показывает найденное, спрашивает «Продолжить?», пишет конфиг и файлы
- * агента. После отказа ничего не пишет.
+ * агента. После отказа ничего не пишет. Уже подключённый проект не меняет, а проверяет.
  * @param {string} root Корень проекта — каталог, из которого запущена команда.
  * @param {InitOptions} options Подтверждение, флаги, версия Cyberzavod, сообщения.
- * @returns {Promise<void>} Готово, когда всё записано или человек отказался.
- * @throws {CommandError} Если проект уже подключён или флаг задан неверно.
+ * @returns {Promise<boolean>} true, если проект подключён и его файлы актуальны или человек
+ *   отказался; false, если подключённому проекту нужен sync.
+ * @throws {CommandError} Если флаг задан неверно или файлы человека мешают подключению: тогда
+ *   ничего не записано.
  */
-export async function initProject(root: string, options: InitOptions): Promise<void> {
+export async function initProject(root: string, options: InitOptions): Promise<boolean> {
   const { confirm, overrides, installation, messages } = options;
   const isConnected = (await readProjectConfig(root)) !== undefined;
 
-  if (isConnected) {
-    throw new CommandError((m) => m.errors.alreadyConnected(PROJECT_CONFIG_FILE));
-  }
+  if (isConnected) return reportConnected(root, options);
 
   const detected = await detectProject(root);
   const config = initialConfigOf({ detected, harness: installation.harness, overrides });
   const rulesPlan = await planRules(root);
   const ignoreEntry = captureIgnoreEntry(config.journal);
+  const blocked = await blockingFiles(root, config, rulesPlan, installation);
+
+  if (blocked.length > 0) {
+    const files = blocked.join(LIST_SEPARATOR);
+
+    throw new CommandError((m) => m.errors.initBlocked({ files, rulesFile: RULES_FILE }));
+  }
 
   printSummary({ config, rulesPlan, ignoreEntry, messages });
 
@@ -213,7 +256,7 @@ export async function initProject(root: string, options: InitOptions): Promise<v
   if (!isConfirmed) {
     console.log(messages.init.cancelled);
 
-    return;
+    return true;
   }
 
   await writeProjectConfig(root, config);
@@ -233,9 +276,11 @@ export async function initProject(root: string, options: InitOptions): Promise<v
   });
 
   printDone({
-    changed: report.changed,
+    changed: [...report.added, ...report.updated],
     isRulesFileWritten: rulesPlan !== "kept",
     isIgnoreEntryAdded,
     messages,
   });
+
+  return true;
 }

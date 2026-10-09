@@ -1,4 +1,4 @@
-import { appendFile, writeFile } from "node:fs/promises";
+import { appendFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { writeProjectConfig } from "@cyberzavod/storage";
@@ -17,7 +17,7 @@ describe("freshnessCheck", () => {
   it("считает устаревшие файлы и зовёт sync", async () => {
     const project = await connectedProject();
 
-    await appendFile(path.join(project.root, "CLAUDE.md"), "\nstale\n");
+    await rm(path.join(project.root, ".claude/agents/coder.md"));
 
     const result = await freshnessCheck.run(await projectContext(project));
 
@@ -54,7 +54,7 @@ describe("freshnessCheck", () => {
 
     expect(result).toEqual({
       status: "failed",
-      problem: "agent files written by a human: CLAUDE.md",
+      problem: "agent files that are yours or edited by hand: CLAUDE.md",
       fix: "move your edits to AGENTS.md and run npx cyberzavod sync --force",
     });
   });

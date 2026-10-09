@@ -2,11 +2,13 @@ import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promise
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { parseProjectConfig } from "@cyberzavod/core";
 import { loadHarness, PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
 import { ClaudeError } from "../errors.ts";
 import { CLAUDE_MESSAGES } from "../messages/catalog.ts";
 import { GENERATED_MARK, LEGACY_GENERATED_MARK } from "./files.ts";
-import { syncClaude, type ClaudeInstallation, type SyncOptions } from "./sync.ts";
+import { MANIFEST_FILE } from "./manifest.ts";
+import { previewClaude, syncClaude, type ClaudeInstallation, type SyncOptions } from "./sync.ts";
 
 const REPOSITORY = path.resolve(import.meta.dirname, "../../../..");
 const TEMPLATES = path.join(REPOSITORY, "adapters/claude/templates");
@@ -27,16 +29,18 @@ async function exists(relative: string): Promise<boolean> {
   );
 }
 
-async function newProject(): Promise<void> {
-  const config = {
+function newConfig() {
+  return {
     projectId: "lab",
     harness: "0.3.0",
     workflow: "default",
     journal: ".cyberzavod/journal",
     verification: { commands: ["npm test"], paths: [] },
   };
+}
 
-  await writeProjectFile(PROJECT_CONFIG_FILE, JSON.stringify(config));
+async function newProject(): Promise<void> {
+  await writeProjectFile(PROJECT_CONFIG_FILE, JSON.stringify(newConfig()));
   await writeProjectFile("AGENTS.md", "# Правила\n");
   await writeProjectFile("src/AGENTS.md", "# Правила src\n");
 }
@@ -72,7 +76,7 @@ describe("syncClaude", () => {
     const settings = await readFile(path.join(root, ".claude/settings.json"), "utf8");
 
     expect({
-      changed: report.changed.includes("src/CLAUDE.md"),
+      changed: report.added.includes("src/CLAUDE.md"),
       agent: await exists(".claude/agents/coder.md"),
       hook: settings.includes("cyberzavod@0.3.0 hook record"),
     }).toEqual({ changed: true, agent: true, hook: true });
@@ -114,7 +118,7 @@ describe("syncClaude", () => {
   it("в режиме проверки ничего не пишет и называет устаревшие файлы", async () => {
     const report = await sync({ check: true });
 
-    expect({ claudeMd: await exists("CLAUDE.md"), changed: report.changed.length > 0 }).toEqual({
+    expect({ claudeMd: await exists("CLAUDE.md"), changed: report.added.length > 0 }).toEqual({
       claudeMd: false,
       changed: true,
     });
@@ -125,7 +129,7 @@ describe("syncClaude", () => {
 
     const report = await sync({ check: true });
 
-    expect(report).toEqual({ changed: [], removed: [], conflicts: [] });
+    expect(report).toEqual({ added: [], updated: [], removed: [], conflicts: [], edited: [] });
   });
 
   it("не пишет поверх файла человека и не меняет ничего", async () => {
@@ -194,6 +198,100 @@ describe("syncClaude", () => {
     expect({ removed: report.removed, old: await exists(".claude/agents/old-role.md") }).toEqual({
       removed: [".claude/agents/old-role.md"],
       old: false,
+    });
+  });
+
+  it("пишет манифест с отпечатками сгенерированных файлов", async () => {
+    await sync();
+
+    const manifest = JSON.parse(await readFile(path.join(root, MANIFEST_FILE), "utf8"));
+
+    expect({
+      schemaVersion: manifest.schemaVersion,
+      claudeMd: typeof manifest.files["CLAUDE.md"],
+      settings: manifest.files[".claude/settings.json"],
+      deny: manifest.settings.deny.length > 0,
+    }).toEqual({ schemaVersion: 1, claudeMd: "string", settings: undefined, deny: true });
+  });
+
+  it("не перезаписывает сгенерированный файл, исправленный руками", async () => {
+    await sync();
+    const coder = path.join(root, ".claude/agents/coder.md");
+
+    await writeFile(coder, `${await readFile(coder, "utf8")}\nМоя правка\n`);
+    await writeProjectFile(
+      PROJECT_CONFIG_FILE,
+      JSON.stringify({ ...newConfig(), harness: "0.4.0" }),
+    );
+
+    const act = () => sync();
+    const error = await act().then(
+      () => undefined,
+      (err: unknown) => err,
+    );
+
+    expect(error).toBeInstanceOf(ClaudeError);
+    expect(await readFile(coder, "utf8")).toContain("Моя правка");
+  });
+
+  it("в режиме проверки называет исправленный руками файл отдельно", async () => {
+    await sync();
+    await writeFile(path.join(root, "CLAUDE.md"), `<!-- ${GENERATED_MARK} -->\nМоё\n`);
+
+    const report = await sync({ check: true });
+
+    expect({ edited: report.edited, conflicts: report.conflicts }).toEqual({
+      edited: ["CLAUDE.md"],
+      conflicts: [],
+    });
+  });
+
+  it("не считает исправлением перевод строк Windows", async () => {
+    await sync();
+    const coder = path.join(root, ".claude/agents/coder.md");
+
+    await writeFile(coder, (await readFile(coder, "utf8")).replace(/\n/g, "\r\n"));
+
+    const report = await sync({ check: true });
+
+    expect(report.edited).toEqual([]);
+  });
+
+  it("помнит в манифесте только те запреты, которых не было до него", async () => {
+    await writeProjectFile(
+      ".claude/settings.json",
+      JSON.stringify({ permissions: { deny: ["Read(**/.env)"] } }),
+    );
+
+    await sync();
+
+    const manifest = JSON.parse(await readFile(path.join(root, MANIFEST_FILE), "utf8"));
+
+    expect(manifest.settings.deny).not.toContain("Read(**/.env)");
+  });
+});
+
+describe("previewClaude", () => {
+  beforeEach(async () => {
+    root = path.join(await mkdtemp(path.join(tmpdir(), "cyberzavod-preview-")), "lab");
+    await writeProjectFile("AGENTS.md", "# Правила\n");
+  });
+
+  afterEach(async () => {
+    await rm(path.dirname(root), { recursive: true, force: true });
+  });
+
+  it("находит файл человека до того, как конфиг записан, и ничего не пишет", async () => {
+    await writeProjectFile("CLAUDE.md", "Мои правила\n");
+
+    const report = await previewClaude(
+      { root, config: parseProjectConfig(newConfig()) },
+      await installation(),
+    );
+
+    expect({ conflicts: report.conflicts, settings: await exists(".claude") }).toEqual({
+      conflicts: ["CLAUDE.md"],
+      settings: false,
     });
   });
 });

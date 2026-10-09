@@ -78,10 +78,14 @@ export interface ProjectContext {
 
 /** Проверка машины: не зависит от проекта. */
 export interface MachineCheck {
+  /** Код проверки в JSON-выводе: стабилен между версиями. */
+  id: string;
   run(machine: Machine, messages: CliMessages): Promise<CheckResult>;
 }
 
 /** Проверка подключённого проекта. */
 export interface ProjectCheck {
+  /** Код проверки в JSON-выводе: стабилен между версиями. */
+  id: string;
   run(context: ProjectContext): Promise<CheckResult>;
 }

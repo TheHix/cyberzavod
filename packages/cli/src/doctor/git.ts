@@ -6,6 +6,7 @@ const GIT_PROGRAM = "git";
 
 /** git найден в `PATH`. */
 export const gitCheck: MachineCheck = {
+  id: "git",
   run: async (machine, messages) => {
     const isInstalled = await machine.isProgramAvailable(GIT_PROGRAM);
 

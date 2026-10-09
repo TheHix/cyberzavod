@@ -5,6 +5,7 @@ import { failed, passed, type ProjectCheck } from "./check.ts";
 
 /** В `.gitignore` корня есть строка `captureIgnoreEntry(journal)`; журнал вне проекта — нечего. */
 export const gitignoreCheck: ProjectCheck = {
+  id: "gitignore",
   run: async ({ project, messages }) => {
     const { gitignore } = messages.doctor;
     const entry = captureIgnoreEntry(project.config.journal);

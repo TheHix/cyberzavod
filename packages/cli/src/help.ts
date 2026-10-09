@@ -63,7 +63,7 @@ export function generalHelp(
 
     return [messages.help.sections[section], ...lines].join("\n");
   });
-  const languageOption = messages.help.languageOption(INTERFACE_LANGUAGES.join("|"));
+  const footer = messages.help.footer(INTERFACE_LANGUAGES.join("|"));
 
   return [
     messages.help.title,
@@ -71,8 +71,7 @@ export function generalHelp(
     "",
     sections.join("\n\n"),
     "",
-    messages.help.commandHelpHint,
-    languageOption,
+    footer,
   ].join("\n");
 }
 

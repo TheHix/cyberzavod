@@ -6,6 +6,7 @@ import { failed, notice, passed, type MachineCheck } from "./check.ts";
 
 /** Токен галереи сохранён; нет файла — заметка, битый файл — ошибка. Токен не печатается. */
 export const galleryCheck: MachineCheck = {
+  id: "gallery",
   run: async (machine, messages) => {
     const { gallery } = messages.doctor;
 

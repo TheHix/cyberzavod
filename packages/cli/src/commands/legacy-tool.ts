@@ -1,29 +1,13 @@
 // Собранный CLI прежних версий: до 0.8.0 `init` и `sync` клали его в проект, а хуки запускали
 // оттуда. Теперь хуки идут через npx, и `sync` убирает этот файл.
 
-import { rm, rmdir, stat } from "node:fs/promises";
+import { rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { isNotFound, LEGACY_TOOL_FILE } from "@cyberzavod/storage";
-
-// `rmdir` отвечает по-разному на непустой каталог: ENOTEMPTY (Linux, macOS), EEXIST (часть ОС).
-const DIRECTORY_NOT_EMPTY_CODES = new Set(["ENOTEMPTY", "EEXIST"]);
+import { removeDirectoryIfEmpty } from "../files.ts";
 
 function legacyToolPath(root: string): string {
   return path.join(root, ...LEGACY_TOOL_FILE.split("/"));
-}
-
-function isDirectoryNotEmpty(err: unknown): boolean {
-  return err instanceof Error && "code" in err && DIRECTORY_NOT_EMPTY_CODES.has(String(err.code));
-}
-
-async function removeDirectoryIfEmpty(directory: string): Promise<void> {
-  try {
-    await rmdir(directory);
-  } catch (err) {
-    if (isNotFound(err) || isDirectoryNotEmpty(err)) return;
-
-    throw err;
-  }
 }
 
 /**

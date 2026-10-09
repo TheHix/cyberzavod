@@ -7,7 +7,7 @@ import type { CliMessages } from "./cli-messages.ts";
 /** Тексты CLI на английском. */
 export const en: CliMessages = {
   help: {
-    title: "Cyberzavod — an AI-agent development process, local-first.",
+    title: "Cyberzavod — a local-first development harness for AI coding agents.",
     quickStart: `Start here: ${CLI_COMMAND} init, then /setup and /feature <task> in Claude Code.`,
     sections: {
       start: "Getting started",
@@ -15,10 +15,9 @@ export const en: CliMessages = {
       gallery: "Gallery",
       maintenance: "Maintenance",
     },
-    commandHelpHint: `Command details: ${CLI_COMMAND} <command> --help`,
     parametersTitle: "Parameters:",
-    languageOption: (languages) =>
-      `Language: --lang ${languages}, CYBERZAVOD_LANG or the system locale.`,
+    footer: (languages) =>
+      `Command details: ${CLI_COMMAND} <command> --help · language: --lang ${languages}`,
   },
   commands: {
     init: {
@@ -35,27 +34,38 @@ export const en: CliMessages = {
       ],
     },
     sync: {
-      usage: "sync [--check] [--force]",
+      usage: "sync [--check | --diff] [--json] [--force]",
       summary: "detect the stack again and rebuild the agent files",
       parameters: [
-        { name: "--check", description: "only report what is outdated; exit 1 if anything is" },
-        { name: "--force", description: "overwrite files written by a human" },
+        { name: "--check", description: "only show what would change; exit 1 if anything would" },
+        { name: "--diff", description: "only show what would change; exit 0" },
+        { name: "--json", description: "with --check or --diff: print JSON for scripts" },
+        {
+          name: "--force",
+          description: "overwrite your files and generated files you edited by hand",
+        },
       ],
     },
     doctor: {
-      usage: "doctor [--run-checks]",
+      usage: "doctor [--run-checks] [--json]",
       summary: "check the setup and say how to fix each problem",
       parameters: [
         {
           name: "--run-checks",
           description: "run the check commands instead of only looking for them",
         },
+        { name: "--json", description: "print JSON for scripts" },
       ],
     },
+    disconnect: {
+      usage: "disconnect [--yes]",
+      summary: "remove Cyberzavod from the project; code, AGENTS.md, journal stay",
+      parameters: [{ name: "--yes, -y", description: "do not ask for confirmation" }],
+    },
     status: {
-      usage: "status",
+      usage: "status [--json]",
       summary: "project, workflow, stage agents, checks and the journal",
-      parameters: [],
+      parameters: [{ name: "--json", description: "print JSON for scripts" }],
     },
     decision: {
       usage: 'decision "<what was decided>" [--why "<why>"]',
@@ -143,16 +153,29 @@ export const en: CliMessages = {
     done: "Done: the project is set up.",
     commit: (paths) => `Commit: ${paths}`,
     nextSteps: "Next: open Claude Code and run /setup, then /feature <task>.",
+    alreadyConnected: "Cyberzavod is already initialized in this project.",
+    configValid: "✓ Configuration valid",
+    filesCurrent: "✓ Generated files current",
+    filesOutdated: "✗ Generated files are out of date",
+    nothingToDo: "Nothing to do.",
+    runSync: `Run:\n  ${CLI_COMMAND} sync`,
   },
   sync: {
-    written: "written",
-    removed: "removed",
-    writtenByHuman: "written by a human",
-    outdated: "outdated",
-    extra: "extra",
+    added: "Added",
+    updated: "Updated",
+    removed: "Removed",
+    willAdd: "Will add",
+    willUpdate: "Will update",
+    willRemove: "Will remove",
+    yours: "Will NOT touch (your files where generated ones go)",
+    edited: "Will NOT touch (generated files you edited by hand)",
+    neverTouched:
+      "Never touched: AGENTS.md, your own Claude Code settings and hooks, the journal, your code.",
+    upToDate: "Up to date: nothing to change.",
     harnessMismatch: ({ file, configVersion, cliVersion }) =>
       `${file}: harness ${configVersion}, but the CLI is ${cliVersion}`,
-    filesOutdated: `Agent files are outdated: run ${CLI_COMMAND} sync`,
+    filesOutdated: `Out of date. Run:\n  ${CLI_COMMAND} sync`,
+    blocked: `sync will stop on the files above and change nothing. Fix: move your edits to AGENTS.md and delete those files, or overwrite them:\n  ${CLI_COMMAND} sync --force`,
   },
   doctor: {
     fix: (text) => `How to fix: ${text}`,
@@ -169,6 +192,12 @@ export const en: CliMessages = {
       passed: "git is installed",
       missing: "git was not found in PATH",
       install: "install git and make sure it is in PATH",
+    },
+    claudeCode: {
+      passed: "Claude Code is installed",
+      missing:
+        "Claude Code (claude) was not found in PATH: fine if you use the desktop app or an IDE extension",
+      install: "install Claude Code: https://claude.com/claude-code",
     },
     gallery: {
       signedIn: "gallery: signed in",
@@ -202,7 +231,7 @@ export const en: CliMessages = {
         `run ${CLI_COMMAND} sync, or run ${CLI_COMMAND}@${configVersion} doctor`,
       outdated: (count) => `agent files are outdated or extra: ${count}`,
       sync: `run ${CLI_COMMAND} sync (${CLI_COMMAND} sync --check lists the files)`,
-      writtenByHuman: (files) => `agent files written by a human: ${files}`,
+      writtenByHuman: (files) => `agent files that are yours or edited by hand: ${files}`,
       moveToRules: (rulesFile) =>
         `move your edits to ${rulesFile} and run ${CLI_COMMAND} sync --force`,
       cannotCheck: (reason) => `agent files cannot be checked: ${reason}`,
@@ -236,6 +265,23 @@ export const en: CliMessages = {
       missing: (entry) => `.gitignore has no line ${entry}: raw session logs may get committed`,
       add: ({ entry, file }) => `add the line ${entry} to ${file}`,
     },
+  },
+  disconnect: {
+    willRemove: "Cyberzavod will remove:",
+    willKeep: "Will keep:",
+    settingsUpdated: (file) =>
+      `Cyberzavod hooks and permission rules in ${file} (the rest of the file stays)`,
+    settingsRemoved: (file) => `${file} (it holds only Cyberzavod hooks and rules)`,
+    keepSource: "your project source",
+    keepJournal: (path) => `the journal: ${path} (sessions, decisions, notes)`,
+    keepIgnoreEntry: (entry) => `the .gitignore line ${entry} (keeps raw session logs out of git)`,
+    keepSettings: "your own Claude Code settings, hooks and permission rules",
+    editedFile: (file) => `${file} (generated, but you edited it by hand)`,
+    confirm: "Continue? [Y/n]",
+    cancelled: "Cancelled: nothing was changed.",
+    needsConfirmation: `Nothing was changed: there is no terminal to ask in. To remove without asking, run:\n  ${CLI_COMMAND} disconnect --yes`,
+    done: (rulesFile) =>
+      `Done: Cyberzavod was removed from this project. Review and commit the changes.\nClaude Code reads CLAUDE.md: to keep your ${rulesFile} rules in Claude Code, create CLAUDE.md with the single line @${rulesFile}.`,
   },
   status: {
     recordTypes: { session: "sessions", decision: "decisions", note: "notes" },
@@ -292,7 +338,14 @@ export const en: CliMessages = {
       `language “${value}” is not supported: available are ${supported}`,
     projectNotFound: (directory) =>
       `${directory} is not in a Cyberzavod project: run ${CLI_COMMAND} init first`,
-    alreadyConnected: (file) => `${file} already exists: the project is set up, use sync`,
+    unexpected: (reason) => `unexpected error: ${reason}`,
+    debugHint: (variable) =>
+      `Run ${CLI_COMMAND} doctor to check the setup. For the full trace, run again with ${variable}=1 and report it at https://github.com/bysavelii/cyberzavod/issues`,
+    packageJsonInvalid: ({ file, reason }) =>
+      `${file} is not valid JSON (${reason}). Nothing was changed. Fix ${file} and run the command again`,
+    jsonNeedsPreview: `--json works only with --check or --diff: ${CLI_COMMAND} sync --check --json`,
+    initBlocked: ({ files, rulesFile }) =>
+      `could not initialize this project.\n\nThese files already exist and are not managed by Cyberzavod: ${files}\n\nNothing was changed.\n\nFix: move their content into ${rulesFile}, delete them, then run again:\n  ${CLI_COMMAND} init`,
     blankOption: (option) => `${option} is empty: give a value`,
     journalIsProjectRoot: (path) =>
       `--journal ${path} is the project root: give a directory for the journal, for example .cyberzavod/journal`,

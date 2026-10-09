@@ -9,6 +9,7 @@ import type {
   ProjectCheck,
   ProjectContext,
 } from "../doctor/check.ts";
+import { claudeCodeCheck } from "../doctor/claude-code.ts";
 import { configCheck } from "../doctor/config.ts";
 import { freshnessCheck } from "../doctor/freshness.ts";
 import { galleryCheck } from "../doctor/gallery.ts";
@@ -18,6 +19,7 @@ import { hooksCheck } from "../doctor/hooks.ts";
 import { nodeCheck } from "../doctor/node.ts";
 import { rulesCheck } from "../doctor/rules.ts";
 import type { Installation } from "../installation/installation.ts";
+import { printJson } from "../json-output.ts";
 import type { CliMessages } from "../messages/cli-messages.ts";
 
 const PASSED_SIGN = "✓";
@@ -26,7 +28,13 @@ const NOTICE_SIGN = "–";
 const HINT_INDENT = "    ";
 
 /** Проверки машины в порядке показа: идут до проверок проекта и не зависят от него. */
-const MACHINE_CHECKS: readonly MachineCheck[] = [nodeCheck, gitCheck, galleryCheck];
+const MACHINE_CHECKS: readonly MachineCheck[] = [
+  nodeCheck,
+  gitCheck,
+  claudeCodeCheck,
+  galleryCheck,
+];
+const CONFIG_CHECK_ID = "config";
 
 /** Что нужно проверкам проекта от внешнего мира: поиск программ и запуск команд. */
 export type ProjectTools = Pick<ProjectContext, "isProgramAvailable" | "runCommand">;
@@ -41,6 +49,14 @@ export interface DoctorOptions {
   installation: Installation;
   messages: CliMessages;
   claudeMessages: ClaudeMessages;
+  /** Напечатать итог одним JSON-документом, а не строками для человека. */
+  isJson: boolean;
+}
+
+/** Результат проверки с её кодом. */
+interface IdentifiedResult {
+  id: string;
+  result: CheckResult;
 }
 
 /**
@@ -81,14 +97,19 @@ function isProblem(result: CheckResult): boolean {
 }
 
 // Результаты по одному, в порядке показа: долгие проверки не держат уже готовые пункты.
-async function* resultsOf(directory: string, options: DoctorOptions): AsyncGenerator<CheckResult> {
+async function* resultsOf(
+  directory: string,
+  options: DoctorOptions,
+): AsyncGenerator<IdentifiedResult> {
   const { machine, messages, installation, claudeMessages, projectTools } = options;
 
-  for (const check of MACHINE_CHECKS) yield await check.run(machine, messages);
+  for (const check of MACHINE_CHECKS) {
+    yield { id: check.id, result: await check.run(machine, messages) };
+  }
 
   const { result, project } = await configCheck(directory, messages);
 
-  yield result;
+  yield { id: CONFIG_CHECK_ID, result };
 
   if (project === undefined) return;
 
@@ -100,30 +121,52 @@ async function* resultsOf(directory: string, options: DoctorOptions): AsyncGener
     ...projectTools,
   };
 
-  for (const check of options.projectChecks) yield await check.run(context);
+  for (const check of options.projectChecks) {
+    yield { id: check.id, result: await check.run(context) };
+  }
+}
+
+function jsonOf({ id, result }: IdentifiedResult) {
+  switch (result.status) {
+    case "passed":
+      return { id, status: result.status, message: result.summary };
+    case "failed":
+      return { id, status: result.status, message: result.problem, fix: result.fix };
+    case "notice":
+      return { id, status: result.status, message: result.summary, hint: result.hint };
+  }
 }
 
 /**
  * Проверяет машину, подключение проекта и файлы агента и печатает строку на пункт: ✓, ✗ или –,
- * а под ✗ — как починить. Вне проекта печатает проверки машины и ошибку конфига.
+ * а под ✗ — как починить; с `isJson` — один JSON-документ. Вне проекта печатает проверки машины
+ * и ошибку конфига.
  * @param {string} directory Каталог, из которого запущена команда.
  * @param {DoctorOptions} options Машина, проверки проекта, поиск программ и запуск команд
- *   (`projectTools`), версия CLI, тексты.
+ *   (`projectTools`), версия CLI, тексты, вид вывода.
  * @returns {Promise<boolean>} true, если ни одна проверка не провалилась.
  */
 export async function runDoctor(directory: string, options: DoctorOptions): Promise<boolean> {
-  const { messages } = options;
-  let problemCount = 0;
+  const { messages, isJson } = options;
+  const results: IdentifiedResult[] = [];
 
-  for await (const result of resultsOf(directory, options)) {
-    console.log(linesOf(result, messages).join("\n"));
+  for await (const identified of resultsOf(directory, options)) {
+    results.push(identified);
 
-    if (isProblem(result)) problemCount += 1;
+    if (!isJson) console.log(linesOf(identified.result, messages).join("\n"));
   }
 
-  console.log(
-    problemCount === 0 ? messages.doctor.allPassed : messages.doctor.problems(problemCount),
-  );
+  const problemCount = results.filter(({ result }) => isProblem(result)).length;
+
+  if (isJson) {
+    const status = problemCount === 0 ? "ok" : "problems";
+
+    printJson("doctor", { status, problems: problemCount, checks: results.map(jsonOf) });
+  } else {
+    console.log(
+      problemCount === 0 ? messages.doctor.allPassed : messages.doctor.problems(problemCount),
+    );
+  }
 
   return problemCount === 0;
 }

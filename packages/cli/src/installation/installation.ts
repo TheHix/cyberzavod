@@ -5,7 +5,7 @@ import { parseHarness, type Harness, type HarnessError } from "@cyberzavod/core"
 import { readAssets } from "./assets.ts";
 
 /** Версия Cyberzavod: её ставит в конфиг проекта этот CLI, она же — версия npm-пакета. */
-export const HARNESS_VERSION = "0.8.0";
+export const HARNESS_VERSION = "0.9.0";
 
 const RULES_TEMPLATE = "rules.md";
 

@@ -21,14 +21,15 @@ import { recordDecision, recordNote } from "./commands/journal.ts";
 import { login, logout } from "./commands/login.ts";
 import { shareRecording, unshareRecording } from "./commands/share.ts";
 import { printStatus } from "./commands/status.ts";
-import { checkProject, syncProject } from "./commands/sync.ts";
+import { previewProject, syncProject } from "./commands/sync.ts";
+import { disconnectProject } from "./commands/disconnect.ts";
 import type { ProjectCheck } from "./doctor/check.ts";
 import { commandsFoundCheck } from "./doctor/commands-found.ts";
 import { commandsPassCheck } from "./doctor/commands-pass.ts";
 import { isProgramAvailable } from "./doctor/programs.ts";
 import { runCommandInShell } from "./doctor/run-command.ts";
 import { closestName } from "./closest-name.ts";
-import { confirmWithoutAsking, terminalConfirmation } from "./confirmation.ts";
+import { confirmWithoutAsking, terminalConfirmation, type Confirmation } from "./confirmation.ts";
 import { CommandError } from "./errors.ts";
 import { commandHelp, generalHelp, listedCommandNames, type CommandPlacement } from "./help.ts";
 import type { InitOverrides } from "./initial-config.ts";
@@ -45,6 +46,7 @@ const FAILURE = 1;
 const GENERAL_HELP_REQUESTS: readonly string[] = ["help", "--help", "-h"];
 const COMMAND_HELP_FLAGS: readonly string[] = ["--help", "-h"];
 const OPTIONS_END = "--";
+const DEBUG_VARIABLE = "CYBERZAVOD_DEBUG";
 
 /**
  * Как запущена команда: её аргументы, каталог, из которого её вызвали, окружение и тексты на
@@ -88,7 +90,7 @@ function doctorOptionsOf(
   invocation: Pick<Invocation, "directory" | "env" | "messages" | "claudeMessages">,
   installation: Installation,
   commandsCheck: ProjectCheck,
-): DoctorOptions {
+): Omit<DoctorOptions, "isJson"> {
   const { directory, env, messages, claudeMessages } = invocation;
   const platform = process.platform;
   const credentials = new FileCredentialsStore(
@@ -109,6 +111,17 @@ function doctorOptionsOf(
     installation,
     messages,
     claudeMessages,
+  };
+}
+
+// Без терминала disconnect не удаляет без явного `--yes`: необратимое — только с согласия.
+function refuseWithoutTerminal(isConfirmed: boolean, messages: CliMessages): Confirmation {
+  if (isConfirmed) return confirmWithoutAsking;
+
+  return () => {
+    console.log(messages.disconnect.needsConfirmation);
+
+    return Promise.resolve(false);
   };
 }
 
@@ -144,14 +157,14 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
         ? terminalConfirmation({ input: process.stdin, output: process.stdout })
         : confirmWithoutAsking;
 
-      await initProject(directory, {
+      const isReady = await initProject(directory, {
         confirm,
         overrides: initOverridesOf(values),
         installation: await readInstallation(),
         messages,
       });
 
-      return SUCCESS;
+      return isReady ? SUCCESS : FAILURE;
     },
   },
   sync: {
@@ -159,15 +172,25 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
     run: async ({ args, directory, messages }) => {
       const { values } = parseArgs({
         args,
-        options: { check: { type: "boolean" }, force: { type: "boolean" } },
+        options: {
+          check: { type: "boolean" },
+          diff: { type: "boolean" },
+          json: { type: "boolean" },
+          force: { type: "boolean" },
+        },
       });
       const installation = await readInstallation();
+      const isPreview = values.check === true || values.diff === true;
 
-      if (values.check === true) {
-        const isUpToDate = await checkProject(directory, installation, messages);
+      if (isPreview) {
+        const isJson = values.json === true;
+        const isUpToDate = await previewProject(directory, { installation, messages, isJson });
+        const isCheckFailed = values.check === true && !isUpToDate;
 
-        return isUpToDate ? SUCCESS : FAILURE;
+        return isCheckFailed ? FAILURE : SUCCESS;
       }
+
+      if (values.json === true) throw new CommandError((m) => m.errors.jsonNeedsPreview);
 
       await syncProject(directory, { force: values.force === true, installation, messages });
 
@@ -179,19 +202,40 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
     run: async (invocation) => {
       const { values } = parseArgs({
         args: invocation.args,
-        options: { "run-checks": { type: "boolean" } },
+        options: { "run-checks": { type: "boolean" }, json: { type: "boolean" } },
       });
       const commandsCheck = values["run-checks"] === true ? commandsPassCheck : commandsFoundCheck;
-      const options = doctorOptionsOf(invocation, await readInstallation(), commandsCheck);
+      const options = {
+        ...doctorOptionsOf(invocation, await readInstallation(), commandsCheck),
+        isJson: values.json === true,
+      };
       const isHealthy = await runDoctor(invocation.directory, options);
 
       return isHealthy ? SUCCESS : FAILURE;
     },
   },
+  disconnect: {
+    section: "maintenance",
+    run: async ({ args, directory, messages }) => {
+      const { values } = parseArgs({ args, options: { yes: { type: "boolean", short: "y" } } });
+      const isTerminal = process.stdin.isTTY === true;
+      const canAsk = values.yes !== true && isTerminal;
+      const confirm = canAsk
+        ? terminalConfirmation({ input: process.stdin, output: process.stdout })
+        : refuseWithoutTerminal(values.yes === true, messages);
+      const outcome = await disconnectProject(directory, { confirm, messages });
+      const isRefused = outcome === "cancelled" && !canAsk;
+
+      return isRefused ? FAILURE : SUCCESS;
+    },
+  },
   status: {
     section: "start",
-    run: async ({ directory, messages }) => {
-      await printStatus(directory, await readInstallation(), messages);
+    run: async ({ args, directory, messages }) => {
+      const { values } = parseArgs({ args, options: { json: { type: "boolean" } } });
+      const installation = await readInstallation();
+
+      await printStatus(directory, { installation, messages, isJson: values.json === true });
 
       return SUCCESS;
     },
@@ -369,6 +413,27 @@ function expectedErrorText(
   return err.message;
 }
 
+interface UnexpectedError {
+  name: CommandName;
+  err: unknown;
+  env: Environment;
+  messages: CliMessages;
+}
+
+// Ошибка, которой человек не ждёт, — тоже без трассы стека: что случилось и где взять
+// подробности. Трасса — только с CYBERZAVOD_DEBUG.
+function printUnexpectedError({ name, err, env, messages }: UnexpectedError): number {
+  const reason = err instanceof Error ? err.message : String(err);
+  const isDebug = Boolean(env[DEBUG_VARIABLE]);
+
+  console.error(`cyberzavod ${name}: ${messages.errors.unexpected(reason)}`);
+
+  if (isDebug && err instanceof Error && err.stack !== undefined) console.error(err.stack);
+  else console.error(messages.errors.debugHint(DEBUG_VARIABLE));
+
+  return FAILURE;
+}
+
 function isCommandName(name: string): name is CommandName {
   return (COMMAND_NAMES as readonly string[]).includes(name);
 }
@@ -453,7 +518,7 @@ export async function runCli(argv: string[], directory: string, env: Environment
   try {
     return await COMMANDS[name].run({ args, directory, env, messages, claudeMessages });
   } catch (err) {
-    if (!isExpected(err)) throw err;
+    if (!isExpected(err)) return printUnexpectedError({ name, err, env, messages });
 
     console.error(`cyberzavod ${name}: ${expectedErrorText(err, messages, claudeMessages)}`);
 

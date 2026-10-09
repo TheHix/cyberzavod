@@ -4,8 +4,8 @@
 
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { Harness } from "@cyberzavod/core";
-import { isNotFound, workflowOf } from "@cyberzavod/storage";
+import type { Harness, ProjectConfig } from "@cyberzavod/core";
+import { isNotFound, journalDirectory, workflowOf } from "@cyberzavod/storage";
 import { pinnedCliCommand } from "../cli-command.ts";
 import { captureDirectories, requireProject, type LocatedProject } from "../paths.ts";
 import { GenerateError } from "./claude.ts";
@@ -18,8 +18,16 @@ import {
   type GeneratedFile,
 } from "./files.ts";
 import {
+  contentHash,
+  MANIFEST_FILE,
+  manifestText,
+  parseManifest,
+  type Manifest,
+} from "./manifest.ts";
+import {
   adapterHooks,
   mergeSettings,
+  missingAdapterDeny,
   parseSettings,
   SETTINGS_FILE,
   SettingsError,
@@ -51,12 +59,16 @@ export interface SyncOptions {
 
 /** Итог синхронизации: пути от корня проекта через `/`. */
 export interface SyncReport {
-  /** Файлы, которые записаны (или, при проверке, устарели). */
-  changed: string[];
+  /** Файлы, которых не было и которые записаны (или, при проверке, появятся). */
+  added: string[];
+  /** Сгенерированные файлы, которые перезаписаны (или, при проверке, устарели). */
+  updated: string[];
   /** Сгенерированные раньше файлы, которые удалены (или, при проверке, лишние). */
   removed: string[];
   /** Файлы, написанные человеком, на месте которых генератор пишет свои. */
   conflicts: string[];
+  /** Сгенерированные файлы, исправленные руками: без `force` генератор их не трогает. */
+  edited: string[];
 }
 
 function toPosix(relative: string): string {
@@ -67,12 +79,23 @@ function relativeTo(root: string, target: string): string {
   return toPosix(path.relative(root, target));
 }
 
-// Путь файла на диске по пути от корня проекта через `/`.
-function fileAt(root: string, relative: string): string {
+/**
+ * Путь файла на диске по пути от корня проекта через `/`.
+ * @param {string} root Корень проекта.
+ * @param {string} relative Путь от корня через `/`.
+ * @returns {string} Путь на диске.
+ */
+export function fileAt(root: string, relative: string): string {
   return path.join(root, ...relative.split("/"));
 }
 
-async function readOptional(file: string): Promise<string | undefined> {
+/**
+ * Читает текстовый файл, если он есть.
+ * @param {string} file Путь на диске.
+ * @returns {Promise<string | undefined>} Содержимое или undefined, если файла нет.
+ * @throws {Error} Если файл не читается по другой причине.
+ */
+export async function readOptional(file: string): Promise<string | undefined> {
   try {
     return await readFile(file, "utf8");
   } catch (err) {
@@ -147,9 +170,7 @@ function settingsWithAdapterHooks(current: Settings, version: string): Settings 
   }
 }
 
-async function settingsFile(root: string, version: string): Promise<GeneratedFile> {
-  const current = parseSettings(await readOptional(path.join(root, SETTINGS_FILE)), SETTINGS_FILE);
-
+function settingsFile(current: Settings, version: string): GeneratedFile {
   return {
     path: SETTINGS_FILE,
     content: settingsText(settingsWithAdapterHooks(current, version)),
@@ -169,6 +190,30 @@ function isGenerated(text: string): boolean {
   return text.includes(GENERATED_MARK) || text.includes(LEGACY_GENERATED_MARK);
 }
 
+/**
+ * Чей файл на месте сгенерированного: его нет; он сгенерирован и не тронут; сгенерирован, но
+ * исправлен руками; написан человеком. Отпечаток в манифесте главнее отметки: отметку правка
+ * руками не снимает.
+ */
+export type Ownership = "missing" | "generated" | "edited" | "human";
+
+/**
+ * Чей файл на месте сгенерированного.
+ * @param {string} file Путь от корня через `/`.
+ * @param {string | undefined} text Содержимое; undefined, если файла нет.
+ * @param {Manifest} manifest Манифест сгенерированного.
+ * @returns {Ownership} Нет файла, сгенерирован, исправлен руками или написан человеком.
+ */
+export function ownershipOf(file: string, text: string | undefined, manifest: Manifest): Ownership {
+  if (text === undefined) return "missing";
+
+  const recorded = manifest.files[file];
+
+  if (recorded !== undefined) return contentHash(text) === recorded ? "generated" : "edited";
+
+  return isGenerated(text) ? "generated" : "human";
+}
+
 function ignoreMissing(err: unknown): string[] {
   if (isNotFound(err)) return [];
 
@@ -184,7 +229,17 @@ async function markdownFilesUnder(root: string, directory: string): Promise<stri
   return markdown.map((entry) => `${directory}/${toPosix(entry)}`);
 }
 
-async function generatedOnDisk(root: string, journal: string): Promise<string[]> {
+/**
+ * Файлы, которые генератор записал раньше: с отметкой генерации или из манифеста.
+ * @param {LocatedProject} project Проект.
+ * @param {Manifest} manifest Манифест сгенерированного.
+ * @returns {Promise<string[]>} Пути от корня через `/`; файла по пути может уже не быть.
+ */
+export async function generatedCandidates(
+  project: LocatedProject,
+  manifest: Manifest,
+): Promise<string[]> {
+  const { root, journal } = project;
   const entrypointDirectories = await directoriesWith(root, ENTRYPOINT_FILE, journal);
   const entrypoints = entrypointDirectories.map((directory) =>
     inDirectory(directory, ENTRYPOINT_FILE),
@@ -192,35 +247,166 @@ async function generatedOnDisk(root: string, journal: string): Promise<string[]>
   const generatedFiles = await Promise.all(
     GENERATED_DIRECTORIES.map((directory) => markdownFilesUnder(root, directory)),
   );
-  const candidates = [...entrypoints, ...generatedFiles.flat()];
-  const generated: string[] = [];
 
-  for (const candidate of candidates) {
-    const text = await readOptional(fileAt(root, candidate));
-
-    if (text !== undefined && isGenerated(text)) generated.push(candidate);
-  }
-
-  return generated;
+  return [...new Set([...entrypoints, ...generatedFiles.flat(), ...Object.keys(manifest.files)])];
 }
 
-async function compare(root: string, files: GeneratedFile[], force: boolean) {
-  const changed: string[] = [];
-  const conflicts: string[] = [];
+/** Файл на месте сгенерированного и чей он. */
+interface FileOnDisk {
+  path: string;
+  ownership: Ownership;
+}
+
+async function filesOnDisk(
+  root: string,
+  paths: string[],
+  manifest: Manifest,
+): Promise<FileOnDisk[]> {
+  return Promise.all(
+    paths.map(async (file) => {
+      const text = await readOptional(fileAt(root, file));
+
+      return { path: file, ownership: ownershipOf(file, text, manifest) };
+    }),
+  );
+}
+
+/** Что генератор сделает с файлами проекта, без записи. */
+interface SyncPlan {
+  report: SyncReport;
+  files: GeneratedFile[];
+}
+
+/** Что генератор делает с файлом, который хочет записать. */
+type WriteOutcome = "added" | "updated" | "conflict" | "edited";
+
+function writeOutcomeOf(ownership: Ownership, force: boolean): WriteOutcome {
+  switch (ownership) {
+    case "missing":
+      return "added";
+    case "generated":
+      return "updated";
+    case "edited":
+      return force ? "updated" : "edited";
+    case "human":
+      return force ? "updated" : "conflict";
+    default:
+      return ownership satisfies never;
+  }
+}
+
+// Настройки и манифест общие: настройки генератор правит только в своей части, манифест — его.
+const SHARED_FILES: ReadonlySet<string> = new Set([SETTINGS_FILE, MANIFEST_FILE]);
+
+async function planWrites(
+  root: string,
+  files: GeneratedFile[],
+  manifest: Manifest,
+  force: boolean,
+) {
+  const outcomes: Record<WriteOutcome, string[]> = {
+    added: [],
+    updated: [],
+    conflict: [],
+    edited: [],
+  };
 
   for (const file of files) {
     const current = await readOptional(fileAt(root, file.path));
 
     if (current !== undefined && sameText(current, file.content)) continue;
 
-    const ownedByGenerator =
-      current === undefined || isGenerated(current) || file.path === SETTINGS_FILE;
+    const isSharedPresent = SHARED_FILES.has(file.path) && current !== undefined;
+    const ownership = isSharedPresent ? "generated" : ownershipOf(file.path, current, manifest);
 
-    if (ownedByGenerator || force) changed.push(file.path);
-    else conflicts.push(file.path);
+    outcomes[writeOutcomeOf(ownership, force)].push(file.path);
   }
 
-  return { changed, conflicts };
+  return outcomes;
+}
+
+async function planRemovals(
+  project: LocatedProject,
+  wanted: Set<string>,
+  manifest: Manifest,
+  force: boolean,
+) {
+  const candidates = await generatedCandidates(project, manifest);
+  const obsolete = candidates.filter((file) => !wanted.has(file));
+  const onDisk = await filesOnDisk(project.root, obsolete, manifest);
+  const removed = onDisk
+    .filter(({ ownership }) => ownership === "generated" || (ownership === "edited" && force))
+    .map((file) => file.path);
+  const edited = onDisk
+    .filter(({ ownership }) => ownership === "edited" && !force)
+    .map((file) => file.path);
+
+  return { removed: removed.sort(), edited };
+}
+
+function manifestOf(files: GeneratedFile[], deny: readonly string[]): Manifest {
+  const owned = files.filter((file) => file.path !== SETTINGS_FILE);
+  const hashes = owned.map((file) => [file.path, contentHash(file.content)] as const);
+
+  return { files: Object.fromEntries(hashes), deny };
+}
+
+/**
+ * Читает манифест сгенерированного из проекта.
+ * @param {string} root Корень проекта.
+ * @returns {Promise<Manifest>} Манифест; пустой, если файла нет.
+ * @throws {GenerateError} Если манифест не разобран.
+ */
+export async function readManifest(root: string): Promise<Manifest> {
+  return parseManifest(await readOptional(fileAt(root, MANIFEST_FILE)));
+}
+
+/**
+ * Читает настройки Claude Code проекта.
+ * @param {string} root Корень проекта.
+ * @returns {Promise<Settings>} Настройки; пустой объект, если файла нет.
+ * @throws {GenerateError} Если файл не JSON или не объект.
+ */
+export async function readSettings(root: string): Promise<Settings> {
+  return parseSettings(await readOptional(fileAt(root, SETTINGS_FILE)), SETTINGS_FILE);
+}
+
+function addedDeny(settings: Settings): string[] {
+  try {
+    return missingAdapterDeny(settings);
+  } catch (err) {
+    if (err instanceof SettingsError) throw unparsedSettings(err);
+
+    throw err;
+  }
+}
+
+async function planSync(
+  project: LocatedProject,
+  installation: ClaudeInstallation,
+  force: boolean,
+): Promise<SyncPlan> {
+  const claudeProject = await claudeProjectOf(project, installation);
+  const manifest = await readManifest(project.root);
+  const settings = await readSettings(project.root);
+  const deny = [...new Set([...manifest.deny, ...addedDeny(settings)])];
+  const generated = [...claudeFiles(claudeProject), settingsFile(settings, project.config.harness)];
+  const files = [
+    ...generated,
+    { path: MANIFEST_FILE, content: manifestText(manifestOf(generated, deny)) },
+  ];
+  const writes = await planWrites(project.root, files, manifest, force);
+  const wanted = new Set(files.map(({ path: filePath }) => filePath));
+  const removals = await planRemovals(project, wanted, manifest, force);
+  const report: SyncReport = {
+    added: writes.added,
+    updated: writes.updated,
+    removed: removals.removed,
+    conflicts: writes.conflict,
+    edited: [...writes.edited, ...removals.edited],
+  };
+
+  return { report, files };
 }
 
 async function writeFiles(root: string, files: GeneratedFile[], paths: string[]): Promise<void> {
@@ -233,35 +419,66 @@ async function writeFiles(root: string, files: GeneratedFile[], paths: string[])
 }
 
 /**
+ * Проверяет, что генератор может записать всё по отчёту: на месте его файлов нет файлов человека
+ * и исправленных руками.
+ * @param {SyncReport} report Отчёт сравнения.
+ * @throws {GenerateError} Если такие файлы есть: их список — в сообщении.
+ */
+export function requireWritable(report: SyncReport): void {
+  const blocked = [...report.conflicts, ...report.edited];
+
+  if (blocked.length === 0) return;
+
+  const list = blocked.join(", ");
+
+  throw new GenerateError((messages) => messages.errors.fileConflicts(list));
+}
+
+async function applySync(project: LocatedProject, plan: SyncPlan): Promise<void> {
+  const { report, files } = plan;
+
+  requireWritable(report);
+  await writeFiles(project.root, files, [...report.added, ...report.updated]);
+  for (const filePath of report.removed) await rm(fileAt(project.root, filePath));
+}
+
+/**
  * Приводит файлы Claude Code проекта к harness и конфигу: CLAUDE.md рядом с каждым AGENTS.md,
- * агенты ролей, скиллы, хуки в настройках.
+ * агенты ролей, скиллы, хуки в настройках и манифест сгенерированного.
  * @param {SyncOptions} options Проект и режим.
  * @returns {Promise<SyncReport>} Что записано и удалено или, при проверке, что устарело.
- * @throws {GenerateError} Если генератор пишет поверх файлов человека без `force`, конфиг
- *   отдаёт этап чужому агенту или настройки проекта не разобраны.
+ * @throws {GenerateError} Если генератор пишет поверх файлов человека или исправленных руками
+ *   без `force`, конфиг отдаёт этап чужому агенту или настройки проекта не разобраны.
  */
 export async function syncClaude(options: SyncOptions): Promise<SyncReport> {
   const project = await requireProject(options.projectDirectory);
-  const claudeProject = await claudeProjectOf(project, options.installation);
-  const files = [
-    ...claudeFiles(claudeProject),
-    await settingsFile(project.root, project.config.harness),
-  ];
-  const { changed, conflicts } = await compare(project.root, files, options.force === true);
-  const wanted = new Set(files.map(({ path: filePath }) => filePath));
-  const onDisk = await generatedOnDisk(project.root, project.journal);
-  const removed = onDisk.filter((filePath) => !wanted.has(filePath));
-  const report = { changed, removed, conflicts };
+  const plan = await planSync(project, options.installation, options.force === true);
 
-  if (options.check === true) return report;
-  if (conflicts.length > 0) {
-    const files = conflicts.join(", ");
+  if (options.check !== true) await applySync(project, plan);
 
-    throw new GenerateError((messages) => messages.errors.fileConflicts(files));
-  }
+  return plan.report;
+}
 
-  await writeFiles(project.root, files, changed);
-  for (const filePath of removed) await rm(fileAt(project.root, filePath));
+/** Проект, которого ещё нет на диске: корень и конфиг, который `init` только собирается записать. */
+export interface PlannedProject {
+  root: string;
+  config: ProjectConfig;
+}
 
-  return report;
+/**
+ * Что генератор сделает в проекте с этим конфигом, ничего не записывая: так `init` до первой
+ * записи узнаёт, не придётся ли писать поверх файлов человека.
+ * @param {PlannedProject} planned Корень и конфиг будущего проекта.
+ * @param {ClaudeInstallation} installation Harness и шаблоны запущенной версии.
+ * @returns {Promise<SyncReport>} Что появится, обновится и с чем конфликт.
+ * @throws {GenerateError} Если конфиг отдаёт этап чужому агенту или настройки проекта не разобраны.
+ */
+export async function previewClaude(
+  planned: PlannedProject,
+  installation: ClaudeInstallation,
+): Promise<SyncReport> {
+  const project = { ...planned, journal: journalDirectory(planned.root, planned.config) };
+  const plan = await planSync(project, installation, false);
+
+  return plan.report;
 }
