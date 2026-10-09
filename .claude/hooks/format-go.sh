@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Хук PostToolUse: Go-файл после правки агентом приводится к стилю проекта — gofumpt
-# и goimports через golangci-lint fmt, как в make check-api. Без этого правка проходила бы
-# хук, но валила проверку в stop-gate и отнимала у агента попытку.
+# PostToolUse hook: after the agent edits a Go file, it is brought to the project style — gofumpt
+# and goimports via golangci-lint fmt, as in make check-api. Without this the edit would pass the
+# hook but fail the check in stop-gate and cost the agent an attempt.
 #
-# Синтаксис проверяется отдельно через gofmt -e: golangci-lint fmt на сломанном файле
-# только предупреждает и выходит с кодом 0, а агенту надо узнать об ошибке сразу.
+# Syntax is checked separately with gofmt -e: on a broken file golangci-lint fmt
+# only warns and exits with code 0, but the agent needs to learn about the error right away.
 set -uo pipefail
 
 readonly SHOW_TO_AGENT_EXIT_CODE=2
@@ -26,7 +26,7 @@ if ! command -v golangci-lint > /dev/null; then
   exit "$SHOW_TO_USER_EXIT_CODE"
 fi
 
-# Конфиг .golangci.yml ищется от каталога файла вверх — поэтому запускаем рядом с ним.
+# The .golangci.yml config is looked up from the file's directory upwards, so we run next to it.
 if ! (cd "$(dirname "$file")" && golangci-lint fmt "$(basename "$file")"); then
   echo "golangci-lint fmt не смог отформатировать $file" >&2
   exit "$SHOW_TO_USER_EXIT_CODE"

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Хук SessionStart: готовит облачную сессию Claude Code к make check-web check-api, иначе
-# stop-gate не отпустит агента. Образ облака не знает о проекте: в нём нет зависимостей pnpm,
-# а golangci-lint бывает собран Go старше, чем в apps/api/go.mod, и тогда отказывается
-# проверять модуль. Локально и в dev-контейнере хук ничего не делает: там окружение собирают
-# человек и Dockerfile.
+# SessionStart hook: prepares a Claude Code cloud session for make check-web check-api, otherwise
+# stop-gate will not release the agent. The cloud image knows nothing about the project: it has no
+# pnpm dependencies, and golangci-lint may be built with a Go older than in apps/api/go.mod, and
+# then refuses to check the module. Locally and in the dev container the hook does nothing: there
+# the environment is set up by the human and the Dockerfile.
 #
-# Версия линтера берётся из dev-контейнера, Go — из go.mod, чтобы не заводить ещё одну копию.
-# Вывод установок уходит в stderr: stdout хука SessionStart попадает в контекст агента.
+# The linter version comes from the dev container, Go from go.mod, to avoid yet another copy.
+# Install output goes to stderr: a SessionStart hook's stdout ends up in the agent's context.
 set -euo pipefail
 
 readonly LINTER_MODULE=github.com/golangci/golangci-lint/v2/cmd/golangci-lint
@@ -29,7 +29,7 @@ linter_matches_project() {
   golangci-lint version 2> /dev/null | grep -qF "version $linter_version built with go$go_version"
 }
 
-# Новый линтер встаёт на место найденного в PATH, чтобы старый его не заслонял.
+# The new linter replaces the one found in PATH, so that the old one does not shadow it.
 install_linter() {
   local current target_dir
   current=$(command -v golangci-lint || true)

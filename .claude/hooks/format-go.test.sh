@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Сценарии хука format-go.sh на временном Go-модуле с конфигом golangci-lint проекта.
-# Запускается из `make check-api`: там есть Go и golangci-lint, которые нужны хуку.
+# Scenarios for the format-go.sh hook on a temporary Go module with the project's lint config.
+# Run from `make check-api`: it has Go and golangci-lint, which the hook needs.
 set -uo pipefail
 
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)

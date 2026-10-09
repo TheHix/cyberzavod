@@ -1,7 +1,7 @@
-# Проверки на каждый push и pull request; на main после них — сборка образов и деплой.
+# Checks on every push and pull request; on main they are followed by image builds and deploy.
 #
-# CI вызывает те же make-цели, что `make check` локально, поэтому агенты и люди
-# проверяют одно и то же. Сверху CI только ставит зависимости строго по lock-файлу.
+# CI calls the same make targets as `make check` locally, so agents and humans
+# check the same thing. On top of that CI only installs dependencies strictly by the lock file.
 name: CI
 
 on:
@@ -30,7 +30,7 @@ jobs:
 
   api:
     runs-on: ubuntu-latest
-    # Хранилище галерей проверяется на настоящем Postgres: без TEST_DATABASE_URL его тесты пропускаются.
+    # Gallery store is tested on a real Postgres: without TEST_DATABASE_URL its tests are skipped.
     services:
       postgres:
         image: postgres:18.6-alpine
@@ -51,16 +51,16 @@ jobs:
         with:
           go-version-file: apps/api/go.mod
           cache-dependency-path: apps/api/go.sum
-      # Только установка: сам линтер запускает make check-api, как и локально.
+      # Install only: make check-api runs the linter itself, as it does locally.
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.14.0
           install-only: true
       - run: make check-api check-docker
 
-  # Настоящий npm-пакет на трёх ОС и двух Node: npm pack, установка архива и путь человека в
-  # проекте с пробелом в пути (packages/cli/scripts/smoke.ts). Зависимости ставит Node 24 —
-  # её требует workspace, — а сам пакет проверяется и на самой старой поддерживаемой Node.
+  # The real npm package on three OSes and two Nodes: npm pack, archive install and the human's
+  # path in a project with a space in its path (packages/cli/scripts/smoke.ts). Node 24 installs
+  # dependencies, as the workspace requires; the package is also checked on the oldest Node.
   package:
     name: package (${{ matrix.os }}, Node ${{ matrix.node }})
     strategy:
@@ -88,10 +88,10 @@ jobs:
       - uses: actions/checkout@v7
       - run: make check-scripts
 
-  # Образы помечаются полным sha коммита: по нему версия деплоится и откатывается.
-  # Сторонние actions с правом записи в реестр закреплены по sha коммита, а не по тегу.
+  # Images are tagged with the full commit sha: by it a version is deployed and rolled back.
+  # Third-party actions with write access to the registry are pinned by commit sha, not by tag.
   images:
-    # Без имени GitHub перечисляет в нём все значения матрицы, вместе с «.» контекста сайта.
+    # Without a name GitHub lists all matrix values in it, including the "." of the site context.
     name: images (${{ matrix.image }})
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [web, api, scripts, package]
@@ -127,12 +127,13 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 
-  # Ключ deploy на сервере умеет только одно: выкатить образы указанного sha.
+  # The deploy key on the server can do only one thing: roll out the images of the given sha.
   deploy:
     needs: images
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # packages: read — временный токен job'а скачивает приватные образы на сервере и умирает вместе с job.
+    # packages: read — the job's temporary token pulls private images on the server
+    # and dies with the job.
     permissions:
       contents: read
       packages: read
@@ -143,9 +144,9 @@ jobs:
       group: production
       cancel-in-progress: false
     steps:
-      # Выкатки встают в очередь, но не в порядке коммитов: если за время сборки в main
-      # уже пришёл более новый коммит, этот выкатывать нельзя — он вернул бы старую версию.
-      # Ошибка при чтении main должна ронять job, а не выглядеть как «есть коммит новее».
+      # Deploys are queued, but not in commit order: if a newer commit reached main during
+      # the build, this one must not be deployed, since it would bring back the old version.
+      # An error reading main must fail the job, not look like "there is a newer commit".
       - name: Коммит всё ещё последний в main
         id: freshness
         shell: bash
@@ -173,7 +174,7 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
           chmod 600 ~/.ssh/deploy
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-      # Токен идёт на stdin, а не в аргументах: их видно в ps и журналах сервера.
+      # The token goes on stdin, not in arguments: those are visible in ps and the server logs.
       - name: Выкатка
         if: steps.freshness.outputs.latest == 'true'
         env:

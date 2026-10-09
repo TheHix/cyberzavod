@@ -1,5 +1,5 @@
-# Выпуск npm-пакета `cyberzavod` по тегу vX.Y.Z: те же проверки, что в CI, затем публикация
-# собранного CLI. Тег должен совпадать с версией пакета, иначе выпуск останавливается.
+# Release of the npm package `cyberzavod` on a vX.Y.Z tag: the same checks as in CI, then publishing
+# the built CLI. The tag must match the package version, otherwise the release stops.
 name: Release
 
 on:
@@ -14,8 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # Trusted Publishing: npm принимает публикацию по OIDC-токену job'а вместо секрета
-      # и сам подписывает происхождение пакета (provenance).
+      # Trusted Publishing: npm accepts publishing with the job's OIDC token instead of a secret
+      # and signs the package provenance itself.
       id-token: write
     steps:
       - uses: actions/checkout@v7
@@ -34,18 +34,18 @@ jobs:
             exit 1
           fi
       - run: make check-web
-      # Тот же путь человека на архиве, который уйдёт в npm, — до публикации.
+      # The same human path on the archive that will go to npm, before publishing.
       - run: pnpm smoke
-      # Пакеты монорепозитория уже собраны внутрь dist/cyberzavod.mjs, а версий у них нет:
-      # подставить их вместо workspace:* нельзя.
-      # Пользователю пакета devDependencies не нужны, поэтому из публикуемого манифеста они убраны.
+      # The monorepo packages are already bundled into dist/cyberzavod.mjs and have no versions:
+      # they cannot be substituted for workspace:*.
+      # The package user needs no devDependencies, so they are removed from the published manifest.
       - name: Манифест пакета без зависимостей сборки
         working-directory: packages/cli
         run: npm pkg delete devDependencies
       - name: Публикация
         working-directory: packages/cli
         run: npm publish --access public
-      # Реестр отдаёт новую версию не сразу: ждём, пока latest станет версией тега.
+      # The registry serves the new version with a delay: wait until latest becomes the tag version.
       - name: Версия видна в npm как latest
         run: |
           version=$(node -p 'require("./packages/cli/package.json").version')
