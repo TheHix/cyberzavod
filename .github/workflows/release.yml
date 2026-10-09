@@ -45,3 +45,14 @@ jobs:
       - name: Публикация
         working-directory: packages/cli
         run: npm publish --access public
+      # Реестр отдаёт новую версию не сразу: ждём, пока latest станет версией тега.
+      - name: Версия видна в npm как latest
+        run: |
+          version=$(node -p 'require("./packages/cli/package.json").version')
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            latest=$(npm view cyberzavod dist-tags.latest)
+            if [[ "$latest" == "$version" ]]; then exit 0; fi
+            sleep 15
+          done
+          echo "npm отдаёт latest $latest, а выпущена $version" >&2
+          exit 1
