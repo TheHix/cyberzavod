@@ -6,7 +6,9 @@ import { guideUrl } from "@/entities/guide";
 import { STAGE_LABELS } from "@/shared/config/stages.ts";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
-import { ButtonLink, Panel } from "@/shared/ui";
+import { Button, ButtonLink, Panel } from "@/shared/ui";
+import X from "lucide-solid/icons/x";
+import { INTRO_DISMISSED_ATTRIBUTE, INTRO_DISMISSED_KEY } from "../model/dismissal.ts";
 
 interface Props {
   /** Page language. */
@@ -15,10 +17,22 @@ interface Props {
 
 /** The short guide a first visitor starts from: `guides/getting-started.<language>.md`. */
 const GETTING_STARTED_GUIDE_ID = "getting-started";
+/** Stroke of the close icon, as on the drawers. */
+const ICON_STROKE = 3;
 
 const { locale } = Astro.props;
 const stageLabels = STAGES.map((stage) => STAGE_LABELS[stage][locale]);
 ---
+
+<!-- Runs while the page is parsed, before the block is painted: a visitor who dismissed it never
+     sees it flash. The module script below cannot, it runs after the first paint. -->
+<script is:inline define:vars={{ key: INTRO_DISMISSED_KEY, attribute: INTRO_DISMISSED_ATTRIBUTE }}>
+  try {
+    if (localStorage.getItem(key) !== null) document.documentElement.setAttribute(attribute, "");
+  } catch {
+    // Storage blocked by the browser: the intro is shown, as for a first visit.
+  }
+</script>
 
 <div class="host">
   <Panel>
@@ -34,12 +48,45 @@ const stageLabels = STAGES.map((stage) => STAGE_LABELS[stage][locale]);
           ))}
         </ol>
       </div>
-      <ButtonLink variant="primary" href={guideUrl(GETTING_STARTED_GUIDE_ID, locale)}>
-        {UI_TEXT.intro.gettingStarted[locale]}
-      </ButtonLink>
+      <div class="actions">
+        <ButtonLink
+          variant="primary"
+          href={guideUrl(GETTING_STARTED_GUIDE_ID, locale)}
+          data-home-intro-start
+        >
+          {UI_TEXT.intro.gettingStarted[locale]}
+        </ButtonLink>
+        <Button
+          layout="icon"
+          variant="ghost"
+          aria-label={UI_TEXT.intro.close[locale]}
+          data-home-intro-close
+        >
+          <X stroke-width={ICON_STROKE} />
+        </Button>
+      </div>
     </div>
   </Panel>
 </div>
+
+<script>
+  import { INTRO_DISMISSED_ATTRIBUTE, rememberIntroDismissed } from "../model/dismissal.ts";
+
+  // Listened on the document: the block is static HTML in the floor island's slot, with no
+  // component of its own to hold the handlers.
+  document.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) return;
+
+    const isStart = event.target.closest("[data-home-intro-start]") !== null;
+    const isClose = event.target.closest("[data-home-intro-close]") !== null;
+
+    if (!isStart && !isClose) return;
+
+    rememberIntroDismissed(localStorage);
+
+    if (isClose) document.documentElement.setAttribute(INTRO_DISMISSED_ATTRIBUTE, "");
+  });
+</script>
 
 <style>
   /* Above the floor canvas and the speech bubbles (.overlay in Factory.module.css, z-index 2), like
@@ -49,12 +96,23 @@ const stageLabels = STAGES.map((stage) => STAGE_LABELS[stage][locale]);
     z-index: 3;
   }
 
+  /* INTRO_DISMISSED_ATTRIBUTE: set before the first paint or by the close button. */
+  :global(html[data-home-intro-dismissed]) .host {
+    display: none;
+  }
+
   .intro {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-s) var(--space-l);
     align-items: center;
     justify-content: space-between;
+  }
+
+  .actions {
+    display: flex;
+    gap: var(--space-xs);
+    align-items: center;
   }
 
   .text {
