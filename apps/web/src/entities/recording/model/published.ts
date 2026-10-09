@@ -1,9 +1,9 @@
 import { parseRecord, type JournalRecord, type SessionRecord } from "@cyberzavod/core";
 import { newestFirst } from "./order.ts";
 
-// Записи читаются при сборке сайта: битая запись роняет сборку, а не страницу у зрителя.
-// Ровно один уровень каталогов (`.cyberzavod/journal/<коллекция>/<id>.json`): рабочие файлы адаптеров
-// лежат глубже, в `capture/…`, и на сайт попадать не должны.
+// Recordings are read at site build time: a broken recording fails the build, not a viewer's page.
+// Exactly one directory level (`.cyberzavod/journal/<collection>/<id>.json`): adapter work files
+// live deeper, in `capture/…`, and must not reach the site.
 const files = import.meta.glob<unknown>("@journal/*/*.json", { eager: true, import: "default" });
 
 function parsePublished([file, raw]: [string, unknown]): JournalRecord {
@@ -18,7 +18,7 @@ function isSession(record: JournalRecord): record is SessionRecord {
   return record.type === "session";
 }
 
-/** Опубликованные сессии сборок из журнала проекта, новые первыми. */
+/** Published build sessions from the project journal, newest first. */
 export const publishedRecordings: readonly SessionRecord[] = Object.entries(files)
   .map(parsePublished)
   .filter(isSession)

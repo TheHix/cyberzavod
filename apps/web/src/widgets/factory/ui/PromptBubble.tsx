@@ -9,19 +9,20 @@ import { useFactoryModel } from "./model-context.ts";
 import { SpeechBubble } from "./SpeechBubble.tsx";
 
 interface Props {
-  /** Графика цеха — переводит место рабочего в координаты пола; нет, пока не загрузилась. */
+  /** Factory graphics: converts the worker's spot to floor coordinates; absent until loaded. */
   graphics: FactoryGraphics | undefined;
-  /** Поле цеха, свободное от меню и HUD: пузырь не выходит за его края. */
+  /** Floor field free of the menu and HUD: the bubble does not go past its edges. */
   field: Frame;
 }
 
 /**
- * Промпт над рабочим, который его получил: кому, главное указание и раскрываемые уточнения. Длинные
- * уточнения прокручиваются внутри пузыря вместе с указанием, а «свернуть» остаётся под ними.
- * @param {Props} props Свойства компонента.
- * @param {FactoryGraphics | undefined} props.graphics Графика цеха, если уже загружена.
- * @param {Frame} props.field Поле цеха, свободное от меню и HUD.
- * @returns {JSX.Element} Пузырь промпта или ничего, если промпта нет.
+ * A prompt above the worker who received it: to whom, the main instruction and expandable details.
+ * Long details scroll inside the bubble together with the instruction, while "collapse" stays
+ * below them.
+ * @param {Props} props Component props.
+ * @param {FactoryGraphics | undefined} props.graphics Factory graphics, if already loaded.
+ * @param {Frame} props.field Floor field free of the menu and HUD.
+ * @returns {JSX.Element} The prompt bubble, or nothing if there is no prompt.
  */
 export function PromptBubble(props: Props): JSX.Element {
   const model = useFactoryModel();

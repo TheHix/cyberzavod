@@ -17,7 +17,7 @@ describe("parseAgentConfig", () => {
   });
 
   it.each([
-    ["не объект", "claude", /объектом/],
+    ["не объект", "claude", /object/],
     ["пустая модель", { model: "" }, /model/],
     ["провайдер не строкой", { provider: 1 }, /provider/],
   ])("отклоняет агента: %s", (_name, raw, message) => {

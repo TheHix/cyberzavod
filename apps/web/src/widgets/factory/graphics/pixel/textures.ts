@@ -2,11 +2,11 @@ import { CanvasSource, Texture } from "pixi.js";
 import type { PixelImage } from "./art.ts";
 
 /**
- * Превращает картинку в текстуру PixiJS с выборкой ближайшего пикселя: при любом целом
- * масштабе края остаются резкими. Единственное место графики, где создаётся DOM-холст.
- * @param {PixelImage} image Готовая картинка.
- * @returns {Texture} Текстура; её уничтожает тот, кто владеет спрайтом.
- * @throws {Error} Если у холста нет 2d-контекста.
+ * Turns an image into a PixiJS texture with nearest-pixel sampling: at any whole scale the edges
+ * stay sharp. The only place in the graphics where a DOM canvas is created.
+ * @param {PixelImage} image Ready image.
+ * @returns {Texture} Texture; whoever owns the sprite destroys it.
+ * @throws {Error} If the canvas has no 2d context.
  */
 export function textureOf(image: PixelImage): Texture {
   const canvas = document.createElement("canvas");

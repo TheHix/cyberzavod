@@ -3,6 +3,6 @@ packages:
   - packages/*
   - adapters/*
 
-# Установочные скрипты пакетов разрешены только явно перечисленным зависимостям.
+# Package install scripts are allowed only for explicitly listed dependencies.
 onlyBuiltDependencies:
   - esbuild

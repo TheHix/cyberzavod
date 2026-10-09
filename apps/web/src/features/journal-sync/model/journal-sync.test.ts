@@ -16,7 +16,7 @@ const FIRST_INTERVENTION: Speech = { kind: "intervention", index: 0 };
 const RECORDING_ID = "2026-10-07-79fd668f";
 const NEXT_RECORDING_ID = "2026-10-07-79fd668f-2";
 
-// Сцена-заглушка: запись и речь задаёт тест, а перемотку он видит по вызовам.
+// Stub scene: the test sets the recording and speech, and sees seeking through the calls.
 function stubScene(speech: Speech | null = null, recordingId = RECORDING_ID) {
   const $recordingId = atom(recordingId);
   const $speech = atom<Speech | null>(speech);
@@ -28,7 +28,8 @@ function stubScene(speech: Speech | null = null, recordingId = RECORDING_ID) {
 
 const disconnects: (() => void)[] = [];
 
-// Подключает сцену и запоминает отключение: стор модульный, тесты не должны делить сцену.
+// Connects a scene and remembers the disconnect: the store is module-level, tests must not share
+// a scene.
 function connect(scene: JournalScene): () => void {
   const disconnect = connectScene(scene);
 

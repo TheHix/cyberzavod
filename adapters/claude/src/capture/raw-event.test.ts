@@ -406,7 +406,7 @@ describe("parseRawLog", () => {
 
     const act = () => parseRawLog(log);
 
-    expect(act).toThrow(new RawLogError("строка 2: не событие журнала"));
+    expect(act).toThrow(new RawLogError("line 2: not a log event"));
   });
 
   it("отклоняет событие без обязательного поля своего вида", () => {

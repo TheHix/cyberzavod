@@ -27,11 +27,11 @@ function humanInputItemOf(totals: RecordingTotals, locale: Locale): StatItem {
 }
 
 /**
- * Готовит итоги проекта к показу счётчиками: сборки, время всего и в среднем на сборку, токены,
- * возвраты со сборками без них и участие человека.
- * @param {RecordingTotals} totals Итоги сборок проекта.
- * @param {Locale} locale Язык страницы: на нём подписи, числа и длительность.
- * @returns {StatItem[]} Счётчики по порядку.
+ * Prepares project totals for display as counters: builds, time in total and on average per build,
+ * tokens, rework with builds without it, and human involvement.
+ * @param {RecordingTotals} totals Totals of the project builds.
+ * @param {Locale} locale Page language: captions, numbers and duration are in it.
+ * @returns {StatItem[]} Counters in order.
  */
 export function projectTotalsOf(totals: RecordingTotals, locale: Locale): StatItem[] {
   const durationPerBuild = averagePerBuild(totals, "durationMs");

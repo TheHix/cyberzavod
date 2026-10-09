@@ -1,16 +1,17 @@
-// Цвета токенов оформления числами 0xRRGGBB: так их берёт графика цеха (PixiJS) и так их
-// затемняют и осветляют для объёма, а картинки сайта (иконки, превью ссылок) — снова строкой CSS.
+// Design token colors as 0xRRGGBB numbers: that is how the factory floor graphics (PixiJS) take
+// them and how they are darkened and lightened for depth; site images (icons, link previews) take
+// them back as CSS strings.
 
 const HEX_COLOR = /^#([\da-f]{6})$/i;
-// Сборка сжимает CSS: `#ffffff` в токенах доходит до браузера как `#fff`.
+// The build minifies CSS: `#ffffff` in the tokens reaches the browser as `#fff`.
 const SHORT_HEX_COLOR = /^#([\da-f]{3})$/i;
 const HEX_BASE = 16;
 
 /**
- * Переводит цвет CSS вида `#rrggbb` или `#rgb` в число 0xRRGGBB.
- * @param {string} value Цвет из токена оформления.
- * @returns {number} Цвет 0xRRGGBB.
- * @throws {Error} Если это не цвет вида `#rrggbb` или `#rgb`.
+ * Converts a CSS color of the form `#rrggbb` or `#rgb` to a 0xRRGGBB number.
+ * @param {string} value Color from a design token.
+ * @returns {number} 0xRRGGBB color.
+ * @throws {Error} If it is not a color of the form `#rrggbb` or `#rgb`.
  */
 export function parseColor(value: string): number {
   const color = value.trim();
@@ -31,9 +32,9 @@ function doubledDigits(hex: string): string {
 const COLOR_DIGITS = 6;
 
 /**
- * Записывает цвет 0xRRGGBB строкой CSS — для картинок, которые собираются из токенов.
- * @param {number} color Цвет 0xRRGGBB.
- * @returns {string} Цвет вида `#rrggbb`.
+ * Writes a 0xRRGGBB color as a CSS string, for images built from the tokens.
+ * @param {number} color 0xRRGGBB color.
+ * @returns {string} Color of the form `#rrggbb`.
  */
 export function formatColor(color: number): string {
   return `#${color.toString(HEX_BASE).padStart(COLOR_DIGITS, "0")}`;
@@ -42,10 +43,10 @@ export function formatColor(color: number): string {
 const CHANNEL = 0xff;
 
 /**
- * Делает цвет темнее или светлее — для объёма: тёмная грань станка, светлый блик.
- * @param {number} color Цвет 0xRRGGBB.
- * @param {number} amount От −1 (чёрный) через 0 (без изменений) до 1 (белый).
- * @returns {number} Новый цвет 0xRRGGBB.
+ * Makes a color darker or lighter, for depth: a machine's dark side, a light highlight.
+ * @param {number} color 0xRRGGBB color.
+ * @param {number} amount From −1 (black) through 0 (unchanged) to 1 (white).
+ * @returns {number} New 0xRRGGBB color.
  */
 export function shade(color: number, amount: number): number {
   const target = amount < 0 ? 0 : CHANNEL;

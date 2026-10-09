@@ -1,21 +1,21 @@
 import { ApiRequestError, ApiResponseError } from "./errors.ts";
 
-/** Запрос к API: в браузере — `fetch`, в тестах — подмена без сети. */
+/** An API request: `fetch` in the browser, a network-free stub in tests. */
 export type ApiRequest = (path: string, init?: RequestInit) => Promise<Response>;
 
-/** Запрос к API, который меняет данные: метод, путь и тело, если оно есть. */
+/** An API request that changes data: the method, the path and the body, if any. */
 export interface ApiCommand {
   readonly method: "PUT" | "POST" | "DELETE";
-  /** Путь от корня сайта: `/api/me/gallery`. */
+  /** Path from the site root: `/api/me/gallery`. */
   readonly path: string;
-  /** Тело запроса: уходит в JSON. */
+  /** Request body: sent as JSON. */
   readonly body?: unknown;
 }
 
-/** Код ошибки, когда тело ответа с ошибкой не JSON, например страница прокси. */
+/** Error code when an error response body is not JSON, for example a proxy page. */
 const UNKNOWN_ERROR_CODE = "unknown";
 
-// Кука входа уходит только на свой сайт: API и сайт — один адрес.
+// The sign-in cookie goes only to our own site: the API and the site share one address.
 const browserRequest: ApiRequest = (path, init) =>
   fetch(path, { ...init, credentials: "same-origin" });
 
@@ -29,8 +29,8 @@ function errorCodeOf(body: unknown): string {
 }
 
 async function requestErrorOf(response: Response, path: string): Promise<ApiRequestError> {
-  // Ответ с ошибкой может прийти не от API, а от прокси перед ним — тогда тела JSON нет, и
-  // остаётся только статус.
+  // An error response may come from the proxy in front of the API rather than the API itself;
+  // then there is no JSON body and only the status remains.
   const body: unknown = await response.json().catch(() => undefined);
 
   return new ApiRequestError(
@@ -41,12 +41,12 @@ async function requestErrorOf(response: Response, path: string): Promise<ApiRequ
 }
 
 /**
- * Читает ответ API в JSON. Разбор ответа по контракту — дело того, кто запрашивает.
- * @param {string} path Путь от корня сайта: `/api/stats`.
- * @param {ApiRequest} [request] Запрос; по умолчанию `fetch` браузера.
- * @returns {Promise<unknown>} Тело ответа.
- * @throws {ApiRequestError} Если API ответил ошибкой.
- * @throws {ApiResponseError} Если тело успешного ответа не JSON.
+ * Reads an API response as JSON. Parsing it against the contract is up to the caller.
+ * @param {string} path Path from the site root: `/api/stats`.
+ * @param {ApiRequest} [request] Request; the browser's `fetch` by default.
+ * @returns {Promise<unknown>} Response body.
+ * @throws {ApiRequestError} If the API responded with an error.
+ * @throws {ApiResponseError} If the body of a successful response is not JSON.
  */
 export async function getJson(
   path: string,
@@ -70,12 +70,12 @@ function requestInitOf(command: ApiCommand): RequestInit {
 }
 
 /**
- * Шлёт API запрос, который меняет данные. Ответ не читается: страница после изменения заново
- * спрашивает API, что получилось.
- * @param {ApiCommand} command Метод, путь и тело запроса.
- * @param {ApiRequest} [request] Запрос; по умолчанию `fetch` браузера.
- * @returns {Promise<void>} Когда API ответил успехом.
- * @throws {ApiRequestError} Если API ответил ошибкой.
+ * Sends the API a request that changes data. The response is not read: after the change the page
+ * asks the API again what came of it.
+ * @param {ApiCommand} command Request method, path and body.
+ * @param {ApiRequest} [request] Request; the browser's `fetch` by default.
+ * @returns {Promise<void>} When the API responded with success.
+ * @throws {ApiRequestError} If the API responded with an error.
  */
 export async function sendCommand(
   command: ApiCommand,

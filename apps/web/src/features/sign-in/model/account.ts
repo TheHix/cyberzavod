@@ -1,13 +1,14 @@
-// Кто вошёл на сайт: это нужно меню на каждой странице и кабинету. Ответ `GET /api/me` один на
-// страницу, острова читают общий стор; после выхода или правки галереи его спрашивают заново.
+// Who is signed in to the site: the menu on every page and the account page need it. There is one
+// `GET /api/me` response per page, islands read a shared store; after sign-out or a gallery edit
+// it is asked again.
 
 import { atom, type ReadableAtom } from "nanostores";
 import { fetchOwnGallery, type OwnGallery } from "@/entities/gallery";
 import { settle, type Remote } from "@/shared/api/remote.ts";
 
 /**
- * Кто смотрит страницу: ещё неизвестно, гость (никто не вошёл), автор со своей галереей, или
- * узнать не удалось — ответ битый или запрос не прошёл.
+ * Who is viewing the page: not yet known, a guest (nobody signed in), an author with their gallery,
+ * or it could not be found out: the response is broken or the request failed.
  */
 export type Account =
   | { readonly status: "loading" }
@@ -16,21 +17,22 @@ export type Account =
   | { readonly status: "broken" }
   | { readonly status: "failed" };
 
-/** Состояние «узнать не удалось» и «ещё грузится»: для них есть общие сообщения `Remote`. */
+/** The "could not find out" and "still loading" states: shared `Remote` messages cover them. */
 export type UnknownAccount = Extract<Account, { status: "loading" | "broken" | "failed" }>;
 
-/** Модель входа: кто смотрит страницу и действия, которые это узнают. */
+/** Sign-in model: who is viewing the page and the actions that find it out. */
 export interface AccountModel {
   readonly $account: ReadableAtom<Account>;
   /**
-   * Узнаёт, кто вошёл. Повторный вызов не шлёт второй запрос: острова страницы делят ответ.
-   * @returns {Promise<void>} Когда ответ получен или стало ясно, почему его нет.
+   * Finds out who is signed in. A repeated call sends no second request: page islands share the
+   * response.
+   * @returns {Promise<void>} When the response is received or it is clear why it is missing.
    */
   load(): Promise<void>;
   /**
-   * Спрашивает заново — после выхода или правки галереи. Пока ответа нет, остаётся прежнее
-   * состояние: меню и кабинет не мигают загрузкой.
-   * @returns {Promise<void>} Когда ответ получен или стало ясно, почему его нет.
+   * Asks again, after sign-out or a gallery edit. Until the response arrives the previous state
+   * stays: the menu and the account page do not flash a loading state.
+   * @returns {Promise<void>} When the response is received or it is clear why it is missing.
    */
   reload(): Promise<void>;
 }
@@ -43,7 +45,7 @@ function accountOf(state: Remote<OwnGallery | undefined>): Account {
   switch (state.status) {
     case "ready":
       return state.value === undefined ? GUEST : { status: "author", gallery: state.value };
-    // На /api/me API отвечает всегда: 404 значит, что ответил не он.
+    // The API always answers /api/me: a 404 means something else answered.
     case "missing":
       return FAILED;
     default:
@@ -52,10 +54,10 @@ function accountOf(state: Remote<OwnGallery | undefined>): Account {
 }
 
 /**
- * Создаёт модель входа.
- * @param {() => Promise<OwnGallery | undefined>} fetchAccount Запрос своей галереи; `undefined` —
- * никто не вошёл.
- * @returns {AccountModel} Модель с начальным состоянием «грузится».
+ * Creates the sign-in model.
+ * @param {() => Promise<OwnGallery | undefined>} fetchAccount Request for one's own gallery;
+ * `undefined` means nobody is signed in.
+ * @returns {AccountModel} A model with the initial "loading" state.
  */
 export function createAccountModel(
   fetchAccount: () => Promise<OwnGallery | undefined>,
@@ -82,20 +84,20 @@ export function createAccountModel(
 
 const account = createAccountModel(() => fetchOwnGallery());
 
-/** Кто смотрит страницу: общий для меню и кабинета. */
+/** Who is viewing the page: shared by the menu and the account page. */
 export const $account = account.$account;
 
 /**
- * Узнаёт, кто вошёл; второй остров страницы не шлёт второй запрос.
- * @returns {Promise<void>} Когда ответ получен или стало ясно, почему его нет.
+ * Finds out who is signed in; a second island on the page sends no second request.
+ * @returns {Promise<void>} When the response is received or it is clear why it is missing.
  */
 export function loadAccount(): Promise<void> {
   return account.load();
 }
 
 /**
- * Спрашивает заново, кто вошёл: после выхода или правки галереи.
- * @returns {Promise<void>} Когда ответ получен или стало ясно, почему его нет.
+ * Asks again who is signed in: after sign-out or a gallery edit.
+ * @returns {Promise<void>} When the response is received or it is clear why it is missing.
  */
 export function reloadAccount(): Promise<void> {
   return account.reload();

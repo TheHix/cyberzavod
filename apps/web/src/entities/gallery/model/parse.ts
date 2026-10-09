@@ -35,7 +35,7 @@ function listingOf(raw: unknown): GalleryListing {
   };
 }
 
-// Формат записи проверяет только ядро: второго описания формата у сайта нет.
+// Only the core checks the recording format: the site has no second description of the format.
 function checkedRecord(raw: unknown): JournalRecord {
   try {
     return parseRecord(raw);
@@ -55,10 +55,10 @@ function sessionOf(raw: unknown): SessionRecord {
 }
 
 /**
- * Разбирает ответ `GET /api/galleries`.
- * @param {unknown} raw Тело ответа.
- * @returns {readonly GalleryListing[]} Открытые галереи в порядке API — свежие сверху.
- * @throws {ApiResponseError} Если ответ не того вида.
+ * Parses the `GET /api/galleries` response.
+ * @param {unknown} raw Response body.
+ * @returns {readonly GalleryListing[]} Public galleries in API order, newest first.
+ * @throws {ApiResponseError} If the response has the wrong shape.
  */
 export function parseGalleries(raw: unknown): readonly GalleryListing[] {
   const place = "ответ /api/galleries";
@@ -68,10 +68,10 @@ export function parseGalleries(raw: unknown): readonly GalleryListing[] {
 }
 
 /**
- * Разбирает ответ `GET /api/galleries/{login}`.
- * @param {unknown} raw Тело ответа.
- * @returns {Gallery} Галерея автора с записями в порядке API — свежие сверху.
- * @throws {ApiResponseError} Если ответ не того вида.
+ * Parses the `GET /api/galleries/{login}` response.
+ * @param {unknown} raw Response body.
+ * @returns {Gallery} The author's gallery with recordings in API order, newest first.
+ * @throws {ApiResponseError} If the response has the wrong shape.
  */
 export function parseGallery(raw: unknown): Gallery {
   const place = "ответ /api/galleries/{login}";
@@ -84,11 +84,12 @@ export function parseGallery(raw: unknown): Gallery {
 }
 
 /**
- * Разбирает ответ `GET /api/recordings/{slug}`: запись проходит `parseRecord` ядра, как
- * записи из журнала при сборке сайта.
- * @param {unknown} raw Тело ответа.
- * @returns {SharedRecording} Сессия, её автор и открыта ли его галерея.
- * @throws {ApiResponseError} Если ответ не того вида или запись не сессия либо битая.
+ * Parses the `GET /api/recordings/{slug}` response: the recording goes through the core's
+ * `parseRecord`, like journal recordings at site build time.
+ * @param {unknown} raw Response body.
+ * @returns {SharedRecording} The session, its author and whether their gallery is public.
+ * @throws {ApiResponseError} If the response has the wrong shape or the recording is broken or not
+ *   a session.
  */
 export function parseSharedRecording(raw: unknown): SharedRecording {
   const place = "ответ /api/recordings/{slug}";
@@ -102,10 +103,10 @@ export function parseSharedRecording(raw: unknown): SharedRecording {
 }
 
 /**
- * Разбирает ответ `GET /api/me`: своя галерея вошедшего автора.
- * @param {unknown} raw Тело ответа.
- * @returns {OwnGallery} Галерея с записями в порядке API — свежие сверху.
- * @throws {ApiResponseError} Если ответ не того вида.
+ * Parses the `GET /api/me` response: the signed-in author's own gallery.
+ * @param {unknown} raw Response body.
+ * @returns {OwnGallery} The gallery with recordings in API order, newest first.
+ * @throws {ApiResponseError} If the response has the wrong shape.
  */
 export function parseOwnGallery(raw: unknown): OwnGallery {
   const place = "ответ /api/me";

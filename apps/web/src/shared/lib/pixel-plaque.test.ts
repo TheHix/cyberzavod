@@ -5,7 +5,7 @@ import { LOCALES } from "@/shared/i18n/locale.ts";
 import { PLAQUE_GLYPHS, PLAQUE_INKS, plaqueArt, plaqueRuns } from "./pixel-plaque.ts";
 
 const GLYPH_HEIGHT = 5;
-// Латинские буквы того же вида, что кириллические: пары (латиница, кириллица).
+// Latin letters that look like Cyrillic ones: pairs of (Latin, Cyrillic).
 const LATIN_TWINS: readonly (readonly [string, string])[] = [
   ["A", "А"],
   ["B", "В"],
@@ -18,7 +18,7 @@ const LATIN_TWINS: readonly (readonly [string, string])[] = [
   ["T", "Т"],
 ];
 
-// Все надписи, которые рисуют таблички цеха и логотип, на каждом языке.
+// Every label drawn by the factory floor plaques and the logo, in each language.
 const LABEL_CASES = LOCALES.flatMap((locale) =>
   [
     ...Object.values(STAGE_LABELS).map((label) => [label[locale]]),

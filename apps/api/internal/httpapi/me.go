@@ -12,13 +12,13 @@ import (
 
 const (
 	bytesPerMiB = 1 << 20
-	// maxRecordBytes — предел тела записи: 2 МиБ с запасом вмещают сессию с полными текстами.
+	// maxRecordBytes is the recording body limit: 2 MiB comfortably fits a session with full texts.
 	maxRecordBytes = 2 * bytesPerMiB
-	// maxGallerySettingsBytes — предел тела {"public": bool}.
+	// maxGallerySettingsBytes is the limit for the {"public": bool} body.
 	maxGallerySettingsBytes = 1 << 10
 )
 
-// accountResponse — ответ GET /api/me.
+// accountResponse is the GET /api/me response.
 type accountResponse struct {
 	Login         string            `json:"login"`
 	GalleryPublic bool              `json:"galleryPublic"`
@@ -26,12 +26,12 @@ type accountResponse struct {
 	Recordings    []gallery.Summary `json:"recordings"`
 }
 
-// recordingResponse — ответ на загрузку записи.
+// recordingResponse is the response to a recording upload.
 type recordingResponse struct {
 	Recording gallery.Summary `json:"recording"`
 }
 
-// gallerySettings — тело PUT /api/me/gallery и ответ на него.
+// gallerySettings is the body of PUT /api/me/gallery and the response to it.
 type gallerySettings struct {
 	Public *bool `json:"public"`
 }
@@ -40,7 +40,7 @@ type galleryVisibility struct {
 	GalleryPublic bool `json:"galleryPublic"`
 }
 
-// me отдаёт автору его галерею: открыта ли она, предел и записи.
+// me gives the author their gallery: whether it is public, the limit and the recordings.
 func (a *api) me(w http.ResponseWriter, r *http.Request, user gallery.User) {
 	account, err := a.deps.Galleries.Account(r.Context(), user.GitHubID)
 	if err != nil {
@@ -56,7 +56,7 @@ func (a *api) me(w http.ResponseWriter, r *http.Request, user gallery.User) {
 	})
 }
 
-// putRecording кладёт запись в галерею автора или заменяет запись с тем же id.
+// putRecording puts a recording into the author's gallery or replaces the one with the same id.
 func (a *api) putRecording(w http.ResponseWriter, r *http.Request, user gallery.User) {
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxRecordBytes))
 	if err != nil {
@@ -105,7 +105,7 @@ func savedStatus(isNew bool) int {
 	return http.StatusOK
 }
 
-// writeBodyError отвечает на тело, которое не удалось прочитать: слишком большое или оборванное.
+// writeBodyError responds to a body that could not be read: too large or truncated.
 func (a *api) writeBodyError(w http.ResponseWriter, r *http.Request, err error) {
 	var tooLarge *http.MaxBytesError
 	if errors.As(err, &tooLarge) {
@@ -127,7 +127,7 @@ func (a *api) writeRecordError(w http.ResponseWriter, r *http.Request, err error
 	a.failInternal(w, r, err)
 }
 
-// deleteRecording убирает запись из галереи автора.
+// deleteRecording removes a recording from the author's gallery.
 func (a *api) deleteRecording(w http.ResponseWriter, r *http.Request, user gallery.User) {
 	err := a.deps.Galleries.DeleteRecording(r.Context(), user.GitHubID, r.PathValue("id"))
 	if errors.Is(err, gallery.ErrNotFound) {
@@ -143,7 +143,7 @@ func (a *api) deleteRecording(w http.ResponseWriter, r *http.Request, user galle
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// putGallery открывает или закрывает галерею автора.
+// putGallery makes the author's gallery public or private.
 func (a *api) putGallery(w http.ResponseWriter, r *http.Request, user gallery.User) {
 	var settings gallerySettings
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxGallerySettingsBytes))

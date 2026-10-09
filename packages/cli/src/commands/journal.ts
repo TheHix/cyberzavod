@@ -1,4 +1,5 @@
-// `cyberzavod decision` и `cyberzavod note`: решения и заметки человека в журнале проекта.
+// `cyberzavod decision` and `cyberzavod note`: the human's decisions and notes in the project
+// journal.
 
 import { randomUUID } from "node:crypto";
 import path from "node:path";
@@ -20,10 +21,10 @@ const DATE_LENGTH = "2026-01-01".length;
 const ID_SUFFIX_LENGTH = 8;
 
 /**
- * Шапка записи человека: идентификатор из даты и случайного хвоста, время сейчас.
- * @param {string} projectId Проект записи.
- * @param {Date} now Время записи.
- * @returns {RecordHeader} Шапка ручной записи.
+ * Header of a human's record: an id from the date and a random tail, the current time.
+ * @param {string} projectId Project of the record.
+ * @param {Date} now Record time.
+ * @returns {RecordHeader} Header of a manual record.
  */
 export function manualHeader(projectId: string, now: Date): RecordHeader {
   const timestamp = now.toISOString();
@@ -38,7 +39,7 @@ export function manualHeader(projectId: string, now: Date): RecordHeader {
   };
 }
 
-// Запись проверяется ядром до того, как попасть на диск: заголовок в одну строку, непустой текст.
+// The core validates the record before it reaches the disk: a one-line title, non-empty text.
 async function writeRecord(
   directory: string,
   build: (projectId: string) => JournalRecord,
@@ -52,24 +53,24 @@ async function writeRecord(
   console.log(messages.journal.recorded(path.relative(project.root, store.pathOf(record))));
 }
 
-/** Решение для записи: где писать, что решили и язык сообщений. */
+/** A decision to record: where to write, what was decided and the message language. */
 export interface RecordDecisionOptions {
-  /** Каталог внутри проекта. */
+  /** Directory inside the project. */
   directory: string;
-  /** Что решили, одной строкой. */
+  /** What was decided, in one line. */
   title: string;
-  /** Почему и что из этого следует; может быть пустым. */
+  /** Why, and what follows from it; may be empty. */
   description: string;
-  /** Сообщения на выбранном языке. */
+  /** Messages in the chosen language. */
   messages: CliMessages;
 }
 
 /**
- * Записывает решение в журнал проекта.
- * @param {RecordDecisionOptions} options Каталог проекта, решение и сообщения.
- * @returns {Promise<void>} Готово, когда запись на диске.
- * @throws {CommandError} Если каталог не в проекте.
- * @throws {RecordError} Если заголовок пуст или в несколько строк.
+ * Writes a decision to the project journal.
+ * @param {RecordDecisionOptions} options Project directory, decision and messages.
+ * @returns {Promise<void>} Done when the record is on disk.
+ * @throws {CommandError} If the directory is not in a project.
+ * @throws {RecordError} If the title is empty or spans several lines.
  */
 export async function recordDecision(options: RecordDecisionOptions): Promise<void> {
   const { directory, title, description, messages } = options;
@@ -83,13 +84,13 @@ export async function recordDecision(options: RecordDecisionOptions): Promise<vo
 }
 
 /**
- * Записывает заметку в журнал проекта.
- * @param {string} directory Каталог внутри проекта.
- * @param {string} text Текст заметки.
- * @param {CliMessages} messages Сообщения на выбранном языке.
- * @returns {Promise<void>} Готово, когда запись на диске.
- * @throws {CommandError} Если каталог не в проекте.
- * @throws {RecordError} Если текст пуст.
+ * Writes a note to the project journal.
+ * @param {string} directory Directory inside the project.
+ * @param {string} text Note text.
+ * @param {CliMessages} messages Messages in the chosen language.
+ * @returns {Promise<void>} Done when the record is on disk.
+ * @throws {CommandError} If the directory is not in a project.
+ * @throws {RecordError} If the text is empty.
  */
 export async function recordNote(
   directory: string,

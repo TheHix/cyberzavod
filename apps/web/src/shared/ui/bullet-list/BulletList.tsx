@@ -5,17 +5,17 @@ import styles from "./BulletList.module.css";
 interface Props {
   items: readonly string[];
   class?: string | undefined;
-  /** Язык пунктов, если он не совпадает с языком страницы. */
+  /** Language of the items when it differs from the page language. */
   lang?: string | undefined;
 }
 
 /**
- * Список ui-kit с яркими маркерами: уточнения промпта и подобные перечни.
- * @param {Props} props Свойства компонента.
- * @param {readonly string[]} props.items Пункты по порядку.
- * @param {string} [props.class] Дополнительный класс для раскладки снаружи.
- * @param {string} [props.lang] Язык пунктов, если он не совпадает с языком страницы.
- * @returns {JSX.Element} Маркированный список.
+ * ui-kit list with bright bullets: prompt refinements and similar lists.
+ * @param {Props} props Component props.
+ * @param {readonly string[]} props.items Items in order.
+ * @param {string} [props.class] Extra class for layout from outside.
+ * @param {string} [props.lang] Language of the items when it differs from the page language.
+ * @returns {JSX.Element} Bulleted list.
  */
 export function BulletList(props: Props): JSX.Element {
   return (

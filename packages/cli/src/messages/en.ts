@@ -1,10 +1,10 @@
-// Английские тексты CLI.
+// English CLI texts.
 
 import { CLI_COMMAND, HOOK_NAMES } from "@cyberzavod/adapter-claude";
 import { API_URL_VARIABLE, DEFAULT_API_URL } from "../sharing/services.ts";
 import type { CliMessages } from "./cli-messages.ts";
 
-/** Тексты CLI на английском. */
+/** CLI texts in English. */
 export const en: CliMessages = {
   help: {
     title: "Cyberzavod — a local-first development harness for AI coding agents.",

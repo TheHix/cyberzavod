@@ -24,7 +24,8 @@ function recording(): SessionRecord {
   };
 }
 
-// Браузер без браузера: кадры, «экран», вкладка и часы performance переключаются тестом.
+// A browser without a browser: the test switches frames, the "screen", the tab and the performance
+// clock.
 function fakeBrowser() {
   const frames = new Map<number, FrameRequestCallback>();
   let nextId = 1;

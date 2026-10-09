@@ -9,8 +9,8 @@ import { PIXELS_PER_UNIT } from "./units.ts";
 
 type FacingTextures = ActorTextures["foreman"];
 
-// Текстуры той же формы, что у `bakeActorTextures`, но без DOM-холста; холсты видны тесту.
-// Позы берутся по ключам `ACTOR_ART`: новая поза попадает сюда сама.
+// Textures of the same shape as from `bakeActorTextures`, but without a DOM canvas; the test sees
+// the canvases. Poses are taken by the keys of `ACTOR_ART`: a new pose gets here by itself.
 function bakedTextures(): { textures: ActorTextures; sources: TextureSource[] } {
   const sources: TextureSource[] = [];
   const texture = () => {

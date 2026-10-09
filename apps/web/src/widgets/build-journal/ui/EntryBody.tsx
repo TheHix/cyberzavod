@@ -10,9 +10,9 @@ import styles from "./EntryBody.module.css";
 
 interface Props {
   entry: TimelineEntry;
-  /** Язык записи: тексты не переводятся и несут свой `lang`. */
+  /** Recording language: texts are not translated and carry their own `lang`. */
   language: string;
-  /** Язык страницы: на нём подсказка «подробнее». */
+  /** Page language: the "more" hint is in it. */
   locale: Locale;
 }
 
@@ -24,8 +24,8 @@ interface PromptProps {
   locale: Locale;
 }
 
-// Промпт — как сообщение модели, которая его получила: главное указание видно сразу, уточнения
-// раскрываются без JS через <details>.
+// A prompt looks like a message to the model that received it: the main instruction is visible at
+// once, the details expand without JS via <details>.
 function PromptBody(props: PromptProps): JSX.Element {
   const goal = () => (
     <Title as="span" lang={props.language}>
@@ -51,7 +51,7 @@ function PromptBody(props: PromptProps): JSX.Element {
   );
 }
 
-// Вмешательство и реплика выглядят одинаково: строка из цеха и полный текст.
+// An intervention and a message look the same: the line from the floor and the full text.
 function spokenOf(entry: TimelineEntry): SpokenEvent | undefined {
   switch (entry.kind) {
     case "prompt":
@@ -61,7 +61,7 @@ function spokenOf(entry: TimelineEntry): SpokenEvent | undefined {
     case "message":
       return entry.message;
     default:
-      // Новый вид записи журнала не скомпилируется, пока здесь не решат, как он выглядит.
+      // A new kind of journal entry will not compile until it is decided here how it looks.
       return entry satisfies never;
   }
 }
@@ -71,14 +71,14 @@ function promptOf(entry: TimelineEntry): PromptEvent | undefined {
 }
 
 /**
- * Тело записи журнала: промпт с раскрываемыми уточнениями, вмешательство или реплика — строкой
- * из цеха и полным текстом. Без своего состояния: на странице записи это статичная разметка
- * в слоте острова `JournalEntry`.
- * @param {Props} props Свойства компонента.
- * @param {TimelineEntry} props.entry Запись журнала.
- * @param {string} props.language Язык записи.
- * @param {Locale} props.locale Язык страницы.
- * @returns {JSX.Element} Тело записи.
+ * Journal entry body: a prompt with expandable details, or an intervention or message as the line
+ * from the floor and the full text. Has no state of its own: on the recording page it is static
+ * markup in the slot of the `JournalEntry` island.
+ * @param {Props} props Component props.
+ * @param {TimelineEntry} props.entry Journal entry.
+ * @param {string} props.language Recording language.
+ * @param {Locale} props.locale Page language.
+ * @returns {JSX.Element} Entry body.
  */
 export function EntryBody(props: Props): JSX.Element {
   return (

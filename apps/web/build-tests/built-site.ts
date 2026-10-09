@@ -1,28 +1,28 @@
-// Проверки собранного сайта: страницы, ссылки между ними, языковые версии и карта сайта. Читают
-// готовый `dist/`, поэтому ловят то, чего не видно в исходниках: страницу, которой нет на одном из
-// языков, ссылку мимо языка, страницу вне карты сайта.
+// Checks of the built site: pages, links between them, language versions and the sitemap. They read
+// the finished `dist/`, so they catch what is not visible in the sources: a page missing in one
+// of the languages, a link that leaves the language, a page outside the sitemap.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_LOCALE, LOCALES, type Locale } from "../src/shared/i18n/locale.ts";
 import { localizedPath, pathWithoutLocale } from "../src/shared/i18n/path.ts";
 
-/** Собранный сайт: страницы, остальные файлы и карта сайта. */
+/** The built site: pages, other files and the sitemap. */
 export interface BuiltSite {
-  /** Адрес сайта без слэша на конце: по нему внутренние ссылки отличаются от внешних. */
+  /** Site address without a trailing slash: it tells internal links from external ones. */
   readonly origin: string;
-  /** Страницы: адрес вида `/ru/recordings/x/` → HTML. */
+  /** Pages: an address like `/ru/recordings/x/` → HTML. */
   readonly pages: ReadonlyMap<string, string>;
-  /** Адреса всех файлов сайта, включая файлы страниц: `/_astro/x.css`, `/sitemap-0.xml`. */
+  /** Addresses of all site files, including page files: `/_astro/x.css`, `/sitemap-0.xml`. */
   readonly files: ReadonlySet<string>;
-  /** XML всех файлов карты сайта, одним текстом. */
+  /** XML of all sitemap files, as one text. */
   readonly sitemap: string;
 }
 
 const HTML_EXTENSION = ".html";
 const PAGE_FILE = "index.html";
 const SITEMAP_FILE = /^sitemap-\d+\.xml$/;
-// Атрибуты тега: `имя="значение"`, `имя='значение'`, `имя=значение` или одно имя.
+// Tag attributes: `name="value"`, `name='value'`, `name=value` or just a name.
 const ATTRIBUTE = /([^\s=/>"']+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
 const SITEMAP_LOCATION = /<loc>([^<]+)<\/loc>/g;
 
@@ -33,9 +33,10 @@ function urlOfFile(relativePath: string): string {
 }
 
 /**
- * Адрес страницы по адресу её файла: `index.html` каталога — сам каталог, другой HTML — как есть.
- * @param {string} fileUrl Адрес файла от корня сайта: `/ru/404/index.html`, `/404.html`.
- * @returns {string | undefined} Адрес страницы: `/ru/404/`, `/404.html`; `undefined`, если это не HTML.
+ * Page address from its file address: a directory's `index.html` is the directory itself, other
+ * HTML as is.
+ * @param {string} fileUrl File address from the site root: `/ru/404/index.html`, `/404.html`.
+ * @returns {string | undefined} Page address: `/ru/404/`, `/404.html`; `undefined` if not HTML.
  */
 export function pageUrlOf(fileUrl: string): string | undefined {
   if (fileUrl.endsWith(`/${PAGE_FILE}`)) return fileUrl.slice(0, -PAGE_FILE.length);
@@ -44,10 +45,10 @@ export function pageUrlOf(fileUrl: string): string | undefined {
 }
 
 /**
- * Читает собранный сайт из каталога сборки.
- * @param {string} distDir Каталог сборки, например `dist`.
- * @param {string} origin Адрес сайта: `https://cyberzavod.com`.
- * @returns {BuiltSite} Страницы, файлы и карта сайта.
+ * Reads the built site from the build directory.
+ * @param {string} distDir Build directory, e.g. `dist`.
+ * @param {string} origin Site address: `https://cyberzavod.com`.
+ * @returns {BuiltSite} Pages, files and the sitemap.
  */
 export function readBuiltSite(distDir: string, origin: string): BuiltSite {
   const fileUrls = readdirSync(distDir, { recursive: true, encoding: "utf8" })
@@ -78,7 +79,7 @@ function attributesOf(attributes: string): Tag {
   return Object.fromEntries(entries);
 }
 
-// Теги с таким именем со всеми их атрибутами; значение без `=` — пустая строка.
+// Tags with this name with all their attributes; a value without `=` is an empty string.
 function tagsOf(html: string, name: string): Tag[] {
   const opening = new RegExp(`<${name}(?=[\\s/>])([^>]*)>`, "gi");
 
@@ -92,19 +93,20 @@ function isNoindexTag(tag: Tag): boolean {
 }
 
 /**
- * Проверяет, открыта ли страница поисковикам: страница с `<meta name="robots" content="noindex">`
- * (например, «не найдено») не входит в карту сайта и не имеет своего адреса для `canonical`.
- * @param {string} html Разметка страницы.
- * @returns {boolean} `true`, если у страницы нет `noindex`.
+ * Checks whether a page is open to search engines: a page with
+ * `<meta name="robots" content="noindex">`
+ * (e.g. "not found") is not in the sitemap and has no address of its own for `canonical`.
+ * @param {string} html Page markup.
+ * @returns {boolean} `true` if the page has no `noindex`.
  */
 export function isIndexed(html: string): boolean {
   return !tagsOf(html, "meta").some(isNoindexTag);
 }
 
 /**
- * Определяет язык страницы по её адресу.
- * @param {string} pageUrl Адрес страницы: `/recordings/x/` или `/ru/recordings/x/`.
- * @returns {Locale | undefined} Язык страницы или `undefined`, если адрес не принадлежит ни одному языку.
+ * Determines a page's language from its address.
+ * @param {string} pageUrl Page address: `/recordings/x/` or `/ru/recordings/x/`.
+ * @returns {Locale | undefined} Page language, or `undefined` if the address has no language.
  */
 export function localeOfPage(pageUrl: string): Locale | undefined {
   const bare = pathWithoutLocale(pageUrl);
@@ -112,8 +114,8 @@ export function localeOfPage(pageUrl: string): Locale | undefined {
   return LOCALES.find((locale) => localizedPath(locale, bare) === pageUrl);
 }
 
-// Путь, на который ведёт ссылка со страницы; `undefined` — ссылка не на этот сайт (внешний адрес,
-// `mailto:`). Ссылка-якорь ведёт на саму страницу.
+// The path a link on a page leads to; `undefined` means the link is not to this site (an external
+// address, `mailto:`). An anchor link leads to the page itself.
 function internalTarget(site: BuiltSite, pageUrl: string, href: string): string | undefined {
   const url = new URL(href, `${site.origin}${pageUrl}`);
 
@@ -147,9 +149,9 @@ function exists(site: BuiltSite, target: string): boolean {
 }
 
 /**
- * Находит внутренние ссылки (`<a href>` и `<link href>`), которые никуда не ведут.
- * @param {BuiltSite} site Собранный сайт.
- * @returns {string[]} Описания сломанных ссылок; пусто, если все ведут на страницы или файлы.
+ * Finds internal links (`<a href>` and `<link href>`) that lead nowhere.
+ * @param {BuiltSite} site The built site.
+ * @returns {string[]} Descriptions of broken links; empty if all lead to pages or files.
  */
 export function brokenLinks(site: BuiltSite): string[] {
   return internalLinks(site)
@@ -223,22 +225,23 @@ function missingAlternatesOf(site: BuiltSite, pageUrl: string, html: string): st
 }
 
 /**
- * Находит страницы без правильной языковой разметки: `<html lang>`, `canonical` на саму себя
- * и `hreflang` на каждый язык и `x-default`, ведущие на существующие страницы. Страница без
- * версии на другом языке тоже попадает сюда: её `hreflang` ведёт в пустоту. У страницы
- * с `noindex` проверяется только `<html lang>`: своего адреса у неё нет.
- * @param {BuiltSite} site Собранный сайт.
- * @returns {string[]} Описания недостающей или неверной разметки; пусто, если всё на месте.
+ * Finds pages without correct language markup: `<html lang>`, a `canonical` to itself
+ * and an `hreflang` for each language and `x-default`, leading to existing pages. A page without
+ * a version in another language also lands here: its `hreflang` leads nowhere. For a page
+ * with `noindex` only `<html lang>` is checked: it has no address of its own.
+ * @param {BuiltSite} site The built site.
+ * @returns {string[]} Descriptions of missing or wrong markup; empty if everything is in place.
  */
 export function missingAlternates(site: BuiltSite): string[] {
   return [...site.pages].flatMap(([pageUrl, html]) => missingAlternatesOf(site, pageUrl, html));
 }
 
 /**
- * Находит ссылки без `hreflang`, которые уводят страницу на другой язык: со страницы языка они
- * должны вести на страницы того же языка. Ссылки на файлы (стили, картинки) от языка не зависят.
- * @param {BuiltSite} site Собранный сайт.
- * @returns {string[]} Описания ссылок мимо языка; пусто, если все остаются в своём языке.
+ * Finds links without `hreflang` that take a page to another language: from a language's page they
+ * must lead to pages of the same language. Links to files (styles, images) do not depend on
+ * language.
+ * @param {BuiltSite} site The built site.
+ * @returns {string[]} Descriptions of links that leave the language; empty if all stay in it.
  */
 export function foreignLocaleLinks(site: BuiltSite): string[] {
   return internalLinks(site)
@@ -260,9 +263,9 @@ function sitemapPaths(site: BuiltSite): Set<string> {
 }
 
 /**
- * Находит открытые поисковикам страницы, которых нет в карте сайта.
- * @param {BuiltSite} site Собранный сайт.
- * @returns {string[]} Адреса страниц вне карты сайта; пусто, если в ней есть все страницы.
+ * Finds pages open to search engines that are missing from the sitemap.
+ * @param {BuiltSite} site The built site.
+ * @returns {string[]} Addresses of pages outside the sitemap; empty if it has all the pages.
  */
 export function pagesMissingFromSitemap(site: BuiltSite): string[] {
   const listed = sitemapPaths(site);
@@ -273,9 +276,9 @@ export function pagesMissingFromSitemap(site: BuiltSite): string[] {
 }
 
 /**
- * Находит в карте сайта страницы с `noindex`: поисковику незачем идти туда, где его не ждут.
- * @param {BuiltSite} site Собранный сайт.
- * @returns {string[]} Адреса закрытых страниц в карте сайта; пусто, если их там нет.
+ * Finds `noindex` pages in the sitemap: a search engine has no reason to go where it is not wanted.
+ * @param {BuiltSite} site The built site.
+ * @returns {string[]} Addresses of closed pages in the sitemap; empty if there are none.
  */
 export function unindexedPagesInSitemap(site: BuiltSite): string[] {
   const listed = sitemapPaths(site);

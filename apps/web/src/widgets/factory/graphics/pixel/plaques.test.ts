@@ -86,7 +86,7 @@ interface PlanCase {
   readonly height: number;
 }
 
-// Каждый план цеха на каждом языке: от языка зависит ширина табличек.
+// Every floor plan in every language: plaque width depends on the language.
 const PLAN_CASES: readonly PlanCase[] = LOCALES.flatMap((locale) =>
   FACTORY_LAYOUTS.map((layout) => ({
     locale,
@@ -96,11 +96,12 @@ const PLAN_CASES: readonly PlanCase[] = LOCALES.flatMap((locale) =>
   })),
 );
 
-// Просвет между фигурами в ряду — такая доля ширины таблички: она туда не влезает.
+// The gap between figures in a row is this fraction of the plaque width: the plaque does not fit
+// there.
 const NARROWER_THAN_PLAQUE = 0.9;
 
-// Места мастера у всех станков — в ряд на табличке этапа, просветы чуть уже таблички: сдвиг
-// от одной фигуры упирает её в соседнюю, и она мечется между ними.
+// Foreman spots at all machines are in a row on the stage plaque, gaps slightly narrower than the
+// plaque: moving off one figure pushes it into the next, and it jumps between them.
 function rowOfFiguresOnPlaque(layout: FactoryLayout, stage: Stage, locale: Locale): FactoryLayout {
   const plaque = plaquePlacements(layout, locale)[STAGES.indexOf(stage)];
 

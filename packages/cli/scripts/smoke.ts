@@ -1,8 +1,8 @@
-// Дымовая проверка настоящего npm-пакета: `npm pack`, установка архива во временный каталог и
-// путь человека в чистом проекте — init, status, doctor, sync --check, повторный init, хук записи,
-// решение в журнал, disconnect. После disconnect код и файлы человека на месте, файлы Cyberzavod
-// убраны, журнал остался. Запускается на Linux, macOS и Windows: только API Node, без оболочки,
-// кроме вызова npm, который на Windows — `npm.cmd`.
+// Smoke check of the real npm package: `npm pack`, installing the archive into a temporary
+// directory, and the human's path in a clean project: init, status, doctor, sync --check, repeated
+// init, the capture hook, a decision in the journal, disconnect. After disconnect the human's code
+// and files are in place, Cyberzavod files are removed, the journal stays. Runs on Linux, macOS
+// and Windows: Node API only, no shell, except the npm call, which on Windows is `npm.cmd`.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -13,11 +13,11 @@ import path from "node:path";
 
 const PACKAGE = path.resolve(import.meta.dirname, "..");
 const IS_WINDOWS = process.platform === "win32";
-// Пробел в пути проекта ловит команды, которые склеивают путь в строку без кавычек.
+// A space in the project path catches commands that join a path into a string without quotes.
 const PROJECT_NAME = "smoke project";
 const PUBLISHED_FILES = ["LICENSE", "README.md", "dist/cyberzavod.mjs", "package.json"];
 const SESSION_ID = "smoke-session";
-// С этого символа начинаются цвета и прочие управляющие последовательности терминала.
+// Colors and other terminal control sequences start with this character.
 const ESCAPE = "\u001b";
 const SUCCESS = 0;
 const FAILURE = 1;
@@ -71,8 +71,8 @@ function step(title: string): void {
   console.log(`✓ ${title}`);
 }
 
-// На Windows npm — пакетный файл `npm.cmd`, его запускает только оболочка. Аргументы npm здесь —
-// пути без пробелов и флаги, поэтому склейка их оболочкой безопасна.
+// On Windows npm is the batch file `npm.cmd`, which only a shell can run. The npm arguments here
+// are paths without spaces and flags, so letting the shell join them is safe.
 function npm(args: readonly string[], cwd: string): string {
   const result = spawnSync("npm", args, { cwd, encoding: "utf8", shell: IS_WINDOWS });
 
@@ -81,7 +81,7 @@ function npm(args: readonly string[], cwd: string): string {
   return result.stdout;
 }
 
-// INIT_CWD ставит pnpm, который запускает этот скрипт: CLI принял бы его за каталог проекта.
+// INIT_CWD is set by pnpm, which runs this script: the CLI would take it for the project directory.
 function childEnvironment(extra: Readonly<Record<string, string>>): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = { ...process.env, ...extra, CYBERZAVOD_LANG: "en" };
 
@@ -110,21 +110,21 @@ function expectExit(run: Run, status: number, command: string): void {
 }
 
 function jsonOf(run: Run, command: string): Record<string, unknown> {
-  assert.ok(!run.stdout.includes(ESCAPE), `${command}: управляющие символы терминала в JSON`);
+  assert.ok(!run.stdout.includes(ESCAPE), `${command}: terminal control characters in JSON`);
 
   return JSON.parse(run.stdout) as Record<string, unknown>;
 }
 
-// Перед JSON npm может напечатать вывод скриптов сборки: документ начинается с первой `[`.
+// npm may print build script output before the JSON: the document starts at the first `[`.
 function packPackage(destination: string): PackedPackage {
   const output = npm(["pack", "--json", "--pack-destination", destination], PACKAGE);
   const [packed] = JSON.parse(output.slice(output.indexOf("["))) as PackedPackage[];
 
-  assert.ok(packed, "npm pack не вернул архив");
+  assert.ok(packed, "npm pack returned no archive");
 
   const packedFiles = packed.files.map((file) => file.path).sort();
 
-  assert.deepEqual(packedFiles, PUBLISHED_FILES, "в архиве лишние или недостающие файлы");
+  assert.deepEqual(packedFiles, PUBLISHED_FILES, "archive has extra or missing files");
   console.log(
     `  ${packed.filename}: ${packed.size} B packed, ${packed.unpackedSize} B unpacked, ` +
       `${packedFiles.length} files`,
@@ -144,9 +144,12 @@ async function installPackage(tool: string, packed: PackedPackage): Promise<stri
   const binName = IS_WINDOWS ? "cyberzavod.cmd" : "cyberzavod";
   const entry = manifest.bin.cyberzavod;
 
-  assert.equal(manifest.dependencies, undefined, "у пакета не должно быть зависимостей");
-  assert.ok(entry, "в package.json нет bin cyberzavod");
-  assert.ok(existsSync(path.join(tool, "node_modules", ".bin", binName)), "npm не создал bin");
+  assert.equal(manifest.dependencies, undefined, "package must have no dependencies");
+  assert.ok(entry, "package.json has no cyberzavod bin");
+  assert.ok(
+    existsSync(path.join(tool, "node_modules", ".bin", binName)),
+    "npm did not create the bin",
+  );
 
   return path.join(installed, entry);
 }
@@ -186,7 +189,7 @@ function checkVersion(workspace: Workspace, packed: PackedPackage): void {
   const run = cyberzavod(workspace, ["--version"]);
 
   expectExit(run, SUCCESS, "--version");
-  assert.equal(run.stdout.trim(), packed.version, "--version не совпадает с версией пакета");
+  assert.equal(run.stdout.trim(), packed.version, "--version does not match the package version");
   step(`--version: ${packed.version}`);
 }
 
@@ -196,13 +199,17 @@ async function checkInit(workspace: Workspace): Promise<void> {
   expectExit(run, SUCCESS, "init --yes");
 
   for (const file of [...GENERATED_PATHS, "AGENTS.md"]) {
-    assert.ok(existsSync(path.join(workspace.project, file)), `init не создал ${file}`);
+    assert.ok(existsSync(path.join(workspace.project, file)), `init did not create ${file}`);
   }
 
   const settings = await readText(workspace.project, ".claude/settings.json");
 
-  assert.match(settings, /echo user-hook/, "init потерял хук человека");
-  assert.match(settings, /cyberzavod@\d+\.\d+\.\d+ hook stop/, "init не поставил хук остановки");
+  assert.match(settings, /echo user-hook/, "init lost the user's hook");
+  assert.match(
+    settings,
+    /cyberzavod@\d+\.\d+\.\d+ hook stop/,
+    "init did not install the stop hook",
+  );
   step("init --yes");
 }
 
@@ -221,8 +228,9 @@ function checkStatus(workspace: Workspace): void {
   step("status, status --json");
 }
 
-// Код выхода doctor здесь не проверяется: заготовка AGENTS.md ждёт /setup, а Claude Code на
-// машине CI нет. Важно, что проект, хуки и файлы агента в порядке и JSON разбирается.
+// The doctor exit code is not checked here: the AGENTS.md starter waits for /setup, and the CI
+// machine has no Claude Code. What matters is that the project, hooks and agent files are fine and
+// the JSON parses.
 function checkDoctor(workspace: Workspace): void {
   const run = cyberzavod(workspace, ["doctor", "--json"]);
   const doctor = jsonOf(run, "doctor --json");
@@ -232,7 +240,7 @@ function checkDoctor(workspace: Workspace): void {
   assert.equal(doctor.schemaVersion, 1);
 
   for (const id of ["node", "config", "hooks", "files", "gitignore"]) {
-    assert.equal(statusOf(id), "passed", `doctor: проверка ${id}\n${run.stdout}`);
+    assert.equal(statusOf(id), "passed", `doctor: check ${id}\n${run.stdout}`);
   }
 
   step("doctor --json");
@@ -252,15 +260,15 @@ async function checkRepeatedInit(workspace: Workspace): Promise<void> {
   const settingsBefore = await readText(workspace.project, ".claude/settings.json");
   const run = cyberzavod(workspace, ["init", "--yes"]);
 
-  expectExit(run, SUCCESS, "повторный init");
+  expectExit(run, SUCCESS, "repeated init");
   assert.match(run.stdout, /Nothing to do/);
 
   const settingsAfter = await readText(workspace.project, ".claude/settings.json");
   const gitignore = await readText(workspace.project, ".gitignore");
 
-  assert.equal(settingsAfter, settingsBefore, "повторный init изменил настройки");
-  assert.equal(countLines(gitignore, CAPTURE_IGNORE_ENTRY), 1, "повтор строки .gitignore");
-  step("повторный init ничего не меняет");
+  assert.equal(settingsAfter, settingsBefore, "repeated init changed the settings");
+  assert.equal(countLines(gitignore, CAPTURE_IGNORE_ENTRY), 1, "duplicate .gitignore line");
+  step("repeated init changes nothing");
 }
 
 function checkJournal(workspace: Workspace): void {
@@ -280,7 +288,7 @@ function checkJournal(workspace: Workspace): void {
   );
 
   expectExit(hook, SUCCESS, "hook record");
-  assert.ok(existsSync(rawLog), "хук записи не создал сырой журнал");
+  assert.ok(existsSync(rawLog), "capture hook did not create the raw log");
   expectExit(cyberzavod(workspace, ["decision", "Smoke decision"]), SUCCESS, "decision");
   step("hook record, decision");
 }
@@ -294,24 +302,31 @@ async function checkDisconnect(workspace: Workspace): Promise<void> {
   const keptFiles = [...Object.keys(SOURCE_FILES), "AGENTS.md"];
   const before = await snapshot(project, keptFiles);
 
-  expectExit(cyberzavod(workspace, ["disconnect"]), FAILURE, "disconnect без терминала");
-  assert.ok(existsSync(path.join(project, ".cyberzavod/project.json")), "отказ всё же удалил");
+  expectExit(cyberzavod(workspace, ["disconnect"]), FAILURE, "disconnect without a terminal");
+  assert.ok(
+    existsSync(path.join(project, ".cyberzavod/project.json")),
+    "refusal still deleted files",
+  );
   expectExit(cyberzavod(workspace, ["disconnect", "--yes"]), SUCCESS, "disconnect --yes");
 
   for (const file of GENERATED_PATHS) {
-    assert.ok(!existsSync(path.join(project, file)), `disconnect оставил ${file}`);
+    assert.ok(!existsSync(path.join(project, file)), `disconnect left ${file}`);
   }
 
   const settings = JSON.parse(await readText(project, ".claude/settings.json")) as unknown;
   const decisions = await readdir(path.join(project, ".cyberzavod/journal/decisions"));
   const gitignore = await readText(project, ".gitignore");
 
-  assert.deepEqual(await snapshot(project, keptFiles), before, "disconnect изменил файлы человека");
-  assert.deepEqual(settings, USER_SETTINGS, "disconnect не вернул настройки человека");
-  assert.equal(decisions.length, 1, "disconnect тронул журнал");
-  assert.ok(gitignore.startsWith(USER_GITIGNORE), "disconnect изменил .gitignore человека");
-  expectExit(cyberzavod(workspace, ["status"]), FAILURE, "status после disconnect");
-  step("disconnect: код, AGENTS.md, журнал и настройки человека на месте");
+  assert.deepEqual(
+    await snapshot(project, keptFiles),
+    before,
+    "disconnect changed the user's files",
+  );
+  assert.deepEqual(settings, USER_SETTINGS, "disconnect did not restore the user's settings");
+  assert.equal(decisions.length, 1, "disconnect touched the journal");
+  assert.ok(gitignore.startsWith(USER_GITIGNORE), "disconnect changed the user's .gitignore");
+  expectExit(cyberzavod(workspace, ["status"]), FAILURE, "status after disconnect");
+  step("disconnect: the user's code, AGENTS.md, journal and settings are intact");
 }
 
 async function main(): Promise<void> {
@@ -326,7 +341,7 @@ async function main(): Promise<void> {
     const packed = packPackage(tool);
     const workspace: Workspace = { tool, project, cli: await installPackage(tool, packed) };
 
-    step(`npm pack и установка ${packed.filename}`);
+    step(`npm pack and install ${packed.filename}`);
     checkVersion(workspace, packed);
     await checkInit(workspace);
     checkStatus(workspace);

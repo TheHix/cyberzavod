@@ -1,7 +1,7 @@
 /**
- * Якорь реплики в журнале: по нему «подробнее» над цехом находит нужную запись.
- * @param {number} index Номер реплики в записи, с нуля.
- * @returns {string} id элемента журнала, например `message-1` для первой реплики.
+ * Message anchor in the journal: "more" above the factory floor finds the entry by it.
+ * @param {number} index Message number in the recording, from zero.
+ * @returns {string} Journal element id, e.g. `message-1` for the first message.
  */
 export function messageAnchor(index: number): string {
   return `message-${index + 1}`;

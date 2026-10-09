@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Сценарии хука session-start.sh на временном проекте с подставными pnpm, go и golangci-lint:
-# заглушки пишут свои вызовы в журнал и, как настоящие команды, печатают в stdout. Сеть и
-# настоящие установки не нужны.
-# Запускается из `make check-scripts`.
+# Scenarios for session-start.sh on a temporary project with fake pnpm, go and golangci-lint:
+# the stubs write their calls to a log and, like the real commands, print to stdout. No network and
+# no real installs are needed.
+# Run from `make check-scripts`.
 set -uo pipefail
 
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)
@@ -34,16 +34,16 @@ STUB
   echo "$project"
 }
 
-# Кладёт в bin проекта исполняемую заглушку команды; тело заглушки — на stdin.
+# Puts an executable command stub into the project's bin; the stub body comes on stdin.
 make_stub() {
   local project="$1" name="$2"
   { echo '#!/usr/bin/env bash'; cat; } > "$project/bin/$name"
   chmod +x "$project/bin/$name"
 }
 
-# Запускает хук в проекте: remote — значение CLAUDE_CODE_REMOTE, linter — что печатает
-# заглушка golangci-lint. Stdout хука — в $project/stdout, вызовы заглушек — в $project/calls.
-# PATH только системный: настоящие go и golangci-lint машины не должны подменять заглушки.
+# Runs the hook in the project: remote is the value of CLAUDE_CODE_REMOTE, linter is what the
+# golangci-lint stub prints. Hook stdout goes to $project/stdout, stub calls to $project/calls.
+# System PATH only: the machine's real go and golangci-lint must not replace the stubs.
 run_hook() {
   local project="$1" remote="$2" linter="$3"
   CLAUDE_CODE_REMOTE="$remote" CLAUDE_PROJECT_DIR="$project" STUB_LOG="$project/calls" \

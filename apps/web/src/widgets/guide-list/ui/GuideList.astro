@@ -1,5 +1,5 @@
 ---
-// Список гайдов: название-ссылка и описание каждого.
+// The list of guides: a title link and a description for each.
 import { guideUrl, type PublishedGuide } from "@/entities/guide";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
@@ -7,7 +7,7 @@ import { Card, Title } from "@/shared/ui";
 
 interface Props {
   guides: readonly PublishedGuide[];
-  /** Язык страницы: на нём список и сами гайды. */
+  /** Page language: the list and the guides themselves are in it. */
   locale: Locale;
 }
 

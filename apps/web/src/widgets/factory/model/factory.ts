@@ -1,5 +1,5 @@
-// Модель цеха на Nano Stores: состояние проигрывания и всё, что из него следует. Без Solid
-// и DOM — компоненты только читают сторы и вызывают действия, кадр сцены считает ядро.
+// Factory model on Nano Stores: playback state and everything that follows from it. Without Solid
+// and DOM: components only read stores and call actions, the core computes the scene frame.
 
 import { FOREMAN, summarize, type BriefSessionRecord, type BuildStats } from "@cyberzavod/core";
 import {
@@ -28,10 +28,11 @@ import {
   type Speed,
 } from "./playback.ts";
 
-/** Готова ли графика цеха: пока она грузится, проигрывать нечем. */
+/** Whether the factory graphics are ready: while they load, there is nothing to play with. */
 export type GraphicsStatus = "loading" | "ready" | "failed";
 
-// Всё, что меняется при смене плана или записи, одним значением: его записывают целиком.
+// Everything that changes when the plan or the recording changes, as one value: it is written
+// whole.
 interface ProductionState {
   readonly recording: BriefSessionRecord;
   readonly layout: FactoryLayout;
@@ -40,86 +41,98 @@ interface ProductionState {
 }
 
 /**
- * Модель цеха: сторы состояния (имена с `$`) и действия над ним. Журналу сборки она подходит
- * как `JournalScene`: `$recordingId`, `$speech` и `seekToSpeech`.
+ * Factory model: state stores (names with `$`) and actions on it. It fits the build journal as
+ * `JournalScene`: `$recordingId`, `$speech` and `seekToSpeech`.
  */
 export interface FactoryModel extends JournalScene {
-  /** Запись, которую проигрывает цех; меняет её `load`. */
+  /** The recording the floor plays; `load` changes it. */
   readonly $recording: ReadableAtom<BriefSessionRecord>;
-  /** Сценарий цеха текущей записи на текущем плане; со сменой плана или записи заменяется. */
+  /**
+   * Floor script of the current recording on the current plan; replaced when the plan or recording
+   * changes.
+   */
   readonly $script: ReadableAtom<FactoryScript>;
-  /** План цеха, по которому построен сценарий. Сравнивается по ссылке: у сценария своя копия. */
+  /** Floor plan the script is built on. Compared by reference: the script has its own copy. */
   readonly $layout: ReadableAtom<FactoryLayout>;
-  /** Итоги всей сборки текущей записи: время, токены, промпты, возвраты, вмешательства. */
+  /**
+   * Totals of the whole build of the current recording: time, tokens, prompts, rework,
+   * interventions.
+   */
   readonly $summary: ReadableAtom<BuildStats>;
   readonly $status: ReadableAtom<GraphicsStatus>;
   readonly $playback: ReadableAtom<Playback>;
-  /** Идёт ли сцена; меняется только при пуске и остановке — на него подписаны часы. */
+  /** Whether the scene is running; changes only on start and stop, the clock subscribes to it. */
   readonly $playing: ReadableAtom<boolean>;
   readonly $scene: ReadableAtom<Scene>;
-  /** Момент записи, мс от начала сборки. */
+  /** Recording moment, ms from the start of the build. */
   readonly $recordingTime: ReadableAtom<number>;
-  /** Промпт, который сейчас говорит мастер рабочему станции. */
+  /** The prompt the foreman is saying to the station worker now. */
   readonly $prompt: ReadableAtom<PromptCue | null>;
-  /** Где мастер, говорящий висящий промпт, — точка плана, над которой висит пузырь. */
+  /** Where the foreman saying the shown prompt is: the plan point the bubble hangs over. */
   readonly $promptPosition: ReadableAtom<Point | null>;
-  /** Вмешательство человека, которое сейчас говорит мастер: станция стоит до его решения. */
+  /** The human intervention the foreman is saying now: the station waits for the decision. */
   readonly $intervention: ReadableAtom<InterventionCue | null>;
-  /** Где мастер, говорящий вмешательство, — точка плана, над которой висит пузырь. */
+  /** Where the foreman saying the intervention is: the plan point the bubble hangs over. */
   readonly $interventionPosition: ReadableAtom<Point | null>;
-  /** Реплика, которая сейчас висит над говорящим. */
+  /** The message shown above the speaker now. */
   readonly $message: ReadableAtom<MessageCue | null>;
-  /** Где говорящий — мастер или рабочий, — точка плана, над которой висит реплика. */
+  /** Where the speaker, the foreman or a worker, is: the plan point the message hangs over. */
   readonly $messagePosition: ReadableAtom<Point | null>;
-  /** Последний промпт, вмешательство или реплика, начавшиеся к этому моменту: их подсвечивает журнал. */
+  /**
+   * The last prompt, intervention or message started by this moment: the journal highlights it.
+   */
   readonly $speech: ReadableAtom<Speech | null>;
-  /** Раскрыты ли уточнения висящего промпта; со сменой промпта закрываются. */
+  /** Whether the details of the shown prompt are expanded; they close when the prompt changes. */
   readonly $promptDetailsOpen: ReadableAtom<boolean>;
-  /** Графика готова; сцена сразу идёт, если `autoplay`. */
+  /** Graphics are ready; the scene runs at once if `autoplay`. */
   start(autoplay: boolean): void;
-  /** Графика не запустилась. */
+  /** Graphics failed to start. */
   fail(): void;
-  /** Сдвигает сцену на прошедшие мс, если она идёт. */
+  /** Advances the scene by the elapsed ms if it is running. */
   advance(elapsedMs: number): void;
-  /** Пауза или продолжение; досмотренную сцену запускает с начала. */
+  /** Pause or resume; a finished scene restarts from the beginning. */
   toggle(): void;
-  /** Продолжает сцену, если она стоит; досмотренную запускает с начала. */
+  /** Resumes the scene if it is stopped; a finished one restarts from the beginning. */
   play(): void;
   pause(): void;
-  /** Перематывает в момент сцены, мс. */
+  /** Rewinds to a scene moment, ms. */
   seek(position: number): void;
   setSpeed(speed: Speed): void;
-  /** Раскрывает или сворачивает уточнения висящего промпта; раскрытие ставит паузу. */
+  /** Expands or collapses the details of the shown prompt; expanding pauses. */
   togglePromptDetails(): void;
-  /** Перематывает к началу пузыря промпта, вмешательства или реплики; «идёт или пауза» не меняется. */
+  /**
+   * Rewinds to the start of a prompt, intervention or message bubble; "running or paused" does not
+   * change.
+   */
   seekToSpeech(speech: Speech): void;
   /**
-   * Переносит цех на другой план: сценарий строится заново, а момент записи, «идёт или пауза»
-   * и скорость остаются. Тот же план — ничего не меняет.
+   * Moves the floor to another plan: the script is rebuilt, while the recording moment, "running or
+   * paused" and the speed stay. The same plan changes nothing.
    */
   setLayout(layout: FactoryLayout): void;
   /**
-   * Ставит в цех другую запись: сценарий строится на текущем плане, сцена встаёт в начало,
-   * скорость и «идёт или пауза» остаются, уточнения промпта закрываются. Графика та же.
+   * Puts another recording on the floor: the script is built on the current plan, the scene goes
+   * to the start, the speed and "running or paused" stay, the prompt details close. The graphics
+   * stay the same.
    */
   load(recording: BriefSessionRecord): void;
 }
 
 /**
- * Создаёт модель цеха для записи: сценарий, сторы и действия. На каждый цех на странице —
- * своя модель.
- * @param {BriefSessionRecord} recording Первая запись сборки без полных текстов реплик и
- *   вмешательств: они цеху не нужны. Потом запись меняет `load`.
- * @param {FactoryLayout} layout План цеха в начале; потом его меняет `setLayout`.
- * @returns {FactoryModel} Модель, ещё не запущенная: ждёт готовности графики.
+ * Creates the factory model for a recording: script, stores and actions. Each floor on the page
+ * has its own model.
+ * @param {BriefSessionRecord} recording The first build recording without full message and
+ *   intervention texts: the floor does not need them. Later `load` changes the recording.
+ * @param {FactoryLayout} layout Floor plan at the start; later `setLayout` changes it.
+ * @returns {FactoryModel} A model not started yet: it waits for the graphics to be ready.
  */
 export function createFactoryModel(
   recording: BriefSessionRecord,
   layout: FactoryLayout = WIDE_LAYOUT,
 ): FactoryModel {
   const firstScript = buildScript(recording, layout);
-  // Запись, план, сценарий и проигрывание меняются вместе: отдельными атомами подписчики увидели
-  // бы новый сценарий со старым моментом.
+  // The recording, plan, script and playback change together: with separate atoms subscribers would
+  // see a new script with an old moment.
   const $state = atom<ProductionState>({
     recording,
     layout,
@@ -138,19 +151,21 @@ export function createFactoryModel(
   const $scene = computed($state, ({ script, playback }) => sceneAt(script, playback.position));
   const $recordingTime = computed($scene, (scene) => scene.recordingTime);
   const $prompt = computed($scene, (scene) => scene.prompt?.cue ?? null);
-  // Промпт говорит мастер, и пузырь висит над ним, там, где он стоит у станка.
+  // The foreman says the prompt, and the bubble hangs over them, where they stand at the machine.
   const $promptPosition = computed($scene, (scene) =>
     scene.prompt === null ? null : scene.foreman.position,
   );
 
   const $intervention = computed($scene, (scene) => scene.intervention?.cue ?? null);
-  // Вмешательство, как промпт, говорит мастер: пузырь висит над ним у станции, где стоит работа.
+  // Like a prompt, the foreman says an intervention: the bubble hangs over them at the station
+  // where work waits.
   const $interventionPosition = computed($scene, (scene) =>
     scene.intervention === null ? null : scene.foreman.position,
   );
 
   const $message = computed($scene, (scene) => scene.message?.cue ?? null);
-  // Мастер говорит там, где он сейчас, рабочий — где стоит: у своего станка или у места встречи.
+  // The foreman speaks where they are now, a worker where they stand: at their machine or at the
+  // meeting spot.
   const $messagePosition = computed($scene, (scene) => {
     const cue = scene.message?.cue;
 
@@ -165,7 +180,7 @@ export function createFactoryModel(
     speechAt(timeline, scene.time),
   );
 
-  // Промпты разных сценариев — разные объекты, поэтому «тот же промпт» — по номеру.
+  // Prompts of different scripts are different objects, so "the same prompt" is by number.
   const closingDetailsOnNewPrompt = (change: () => void) => {
     const promptBefore = $prompt.get()?.index;
 
@@ -221,7 +236,7 @@ export function createFactoryModel(
       const open = !$promptDetailsOpen.get();
 
       $promptDetailsOpen.set(open);
-      // Чтобы прочитать уточнения, сцену останавливаем.
+      // To read the details, the scene is stopped.
       if (open) pause();
     },
     seekToSpeech: (speech) => {
@@ -249,7 +264,7 @@ export function createFactoryModel(
       const script = buildScript(next, state.layout);
       const fromStart = withDuration(state.playback, script.duration, 0);
 
-      // Промпт новой записи может совпасть с прежним по номеру — уточнения закрываются всегда.
+      // A prompt of the new recording may match the old one by number, so the details always close.
       $promptDetailsOpen.set(false);
       $state.set({ ...state, recording: next, script, playback: fromStart });
     },

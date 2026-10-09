@@ -17,17 +17,19 @@ import { Button, ButtonLink, GithubMark, PixelPlaque } from "@/shared/ui";
 import styles from "./Sidebar.module.css";
 
 interface Props {
-  /** Есть ли на странице журнал сборки — тогда в меню его кнопка. */
+  /** Whether the page has a build journal; then the menu has its button. */
   journal: boolean;
-  /** Есть ли на странице карточка проекта — тогда в меню кнопка «Проект». */
+  /** Whether the page has a project card; then the menu has a "Project" button. */
   project: boolean;
-  /** Язык страницы: на нём подписи меню. */
+  /** Page language: menu captions are in it. */
   locale: Locale;
-  /** Путь страницы без языка: по нему переключатель ведёт на ту же страницу на другом языке. */
+  /**
+   * Page path without the language: by it the switch leads to the same page in another language.
+   */
   path: string;
   /**
-   * Вход через GitHub — остров, который ставит страница: меню рисуется без JS. На узком и низком
-   * экране его нет — он в панели записей.
+   * GitHub sign-in is an island placed by the page: the menu renders without JS. On a narrow and
+   * short screen it is absent, being in the recordings panel.
    */
   account?: JSX.Element;
 }
@@ -35,16 +37,16 @@ interface Props {
 const ICON_STROKE = 2.5;
 
 /**
- * Меню сайта слева: логотип, цех, панели записей, журнала сборки, проекта, гайдов и «о заводе»,
- * вход через GitHub, ссылка на код и переключатель языка.
- * Работает без JavaScript: панели открываются нативным popover.
- * @param {Props} props Свойства компонента.
- * @param {boolean} props.journal Показывать ли кнопку журнала сборки.
- * @param {boolean} props.project Показывать ли кнопку проекта.
- * @param {Locale} props.locale Язык страницы.
- * @param {string} props.path Путь страницы без языка.
- * @param {JSX.Element} [props.account] Вход через GitHub.
- * @returns {JSX.Element} Боковое меню.
+ * The site menu on the left: the logo, the floor, the recordings, build journal, project, guides
+ * and "about" panels, GitHub sign-in, the code link and the language switch.
+ * Works without JavaScript: panels open with native popover.
+ * @param {Props} props Component props.
+ * @param {boolean} props.journal Whether to show the build journal button.
+ * @param {boolean} props.project Whether to show the project button.
+ * @param {Locale} props.locale Page language.
+ * @param {string} props.path Page path without the language.
+ * @param {JSX.Element} [props.account] GitHub sign-in.
+ * @returns {JSX.Element} Side menu.
  */
 export function Sidebar(props: Props): JSX.Element {
   return (

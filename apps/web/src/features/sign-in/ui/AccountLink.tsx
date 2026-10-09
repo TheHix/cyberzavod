@@ -8,25 +8,27 @@ import { $account, loadAccount } from "../model/account.ts";
 import styles from "./AccountLink.module.css";
 
 interface Props {
-  /** Язык страницы: на нём подписи. */
+  /** Page language: labels are in it. */
   locale: Locale;
-  /** Раскладка кнопки: плитка в меню или кнопка с текстом в панели записей. */
+  /** Button layout: a tile in the menu or a text button in the recordings panel. */
   layout: "tile" | "text";
 }
 
 /**
- * Вход на сайт: гостю — «Войти через GitHub» (в плитке меню — короче, «Войти») с возвратом на эту
- * же страницу, автору — его аватар
- * и логин со ссылкой в личный кабинет. Пока неизвестно, кто смотрит, ничего не показывает, чтобы
- * вошедший автор не видел мелькания кнопки входа; если узнать не удалось, показывает вход.
- * @param {Props} props Свойства компонента.
- * @param {Locale} props.locale Язык страницы.
- * @param {"tile" | "text"} props.layout Раскладка кнопки.
- * @returns {JSX.Element} Ссылка на вход или в кабинет.
+ * Site sign-in: a guest sees "Sign in with GitHub" (shorter in the menu tile, "Sign in") returning
+ * to this same page, an author sees their avatar
+ * and login linking to the account page. While it is unknown who is viewing, shows nothing, so a
+ * signed-in author does not see the sign-in button flash; if that cannot be found out, shows
+ * sign-in.
+ * @param {Props} props Component props.
+ * @param {Locale} props.locale Page language.
+ * @param {"tile" | "text"} props.layout Button layout.
+ * @returns {JSX.Element} A link to sign in or to the account page.
  */
 export function AccountLink(props: Props): JSX.Element {
   const account = useStoreValue($account);
-  // Путь возврата известен только в браузере: страница собрана заранее и параметров не знает.
+  // The return path is known only in the browser: the page is built ahead of time and does not
+  // know the parameters.
   const [returnPath, setReturnPath] = createSignal("/");
   const author = () => {
     const current = account();

@@ -1,8 +1,10 @@
-/* Табличка в пикселях рисунка: размер пикселя (`--plaque-pixel`) и цвет бумаги (`--plaque-face`,
-   по умолчанию как у табличек цеха) задаёт тот, кто ставит табличку, на ней или на её предке. */
+/* A plaque in art pixels: the pixel size (`--plaque-pixel`) and paper color (`--plaque-face`,
+   by default as on the factory floor plaques) are set by whoever places the plaque, on it or on
+   its ancestor. */
 .plaque {
   --plaque-pixel-size: var(--plaque-pixel, 3px);
-  /* Тень бумаги — та же ступень, что у табличек цеха (`PLAQUE_PAPER_SHADE` в `pixel-plaque.ts`). */
+  /* Paper shade: the same step as on the factory floor plaques (`PLAQUE_PAPER_SHADE` in
+     `pixel-plaque.ts`). */
   --plaque-paper-shade: color-mix(in srgb, var(--plaque-face, var(--paper)) 88%, black);
 
   display: block;

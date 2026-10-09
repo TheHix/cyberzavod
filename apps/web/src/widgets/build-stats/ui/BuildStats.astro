@@ -1,6 +1,6 @@
 ---
-// Страница аналитики: заголовок и пояснение — в разметке, числа и диаграммы открытых галерей
-// приходят из API в браузере.
+// Analytics page: the title and explanation are in the markup; the numbers and charts of public
+// galleries come from the API in the browser.
 import { galleriesUrl } from "@/entities/gallery";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
@@ -8,7 +8,7 @@ import { ButtonLink, Panel, Title } from "@/shared/ui";
 import { StatsBoard } from "./StatsBoard.tsx";
 
 interface Props {
-  /** Язык страницы. */
+  /** Page language. */
   locale: Locale;
 }
 

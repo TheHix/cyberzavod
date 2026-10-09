@@ -1,5 +1,5 @@
 /**
- * Пикселей рисунка на единицу плана. Целая клетка в 16 пикселей даёт чёткий множитель экрана
- * на любой ширине: на 1440 точках — ×4, на телефоне — ×3.
+ * Sprite pixels per plan unit. A whole 16-pixel cell gives a clean screen multiplier at any width:
+ * ×4 at 1440 points, ×3 on a phone.
  */
 export const PIXELS_PER_UNIT = 16;

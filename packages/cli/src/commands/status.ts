@@ -1,4 +1,4 @@
-// `cyberzavod status`: что за проект, по какому процессу он идёт и что лежит в журнале.
+// `cyberzavod status`: what the project is, which workflow it follows and what is in the journal.
 
 import path from "node:path";
 import {
@@ -123,7 +123,7 @@ function printStatusJson(project: ProjectAt, records: JournalRecord[], harness: 
   });
 }
 
-/** Как показать сводку: текстом для человека или JSON для скриптов. */
+/** How to show the summary: as text for the human or as JSON for scripts. */
 export interface StatusOptions {
   installation: Installation;
   messages: CliMessages;
@@ -131,11 +131,11 @@ export interface StatusOptions {
 }
 
 /**
- * Печатает сводку проекта: конфиг, процесс, агенты этапов, проверки и журнал.
- * @param {string} directory Каталог внутри проекта.
- * @param {StatusOptions} options Версия Cyberzavod, сообщения и вид вывода.
- * @returns {Promise<void>} Готово, когда сводка напечатана.
- * @throws {CommandError} Если каталог не в проекте.
+ * Prints the project summary: config, workflow, stage agents, checks and journal.
+ * @param {string} directory Directory inside the project.
+ * @param {StatusOptions} options Cyberzavod version, messages and output format.
+ * @returns {Promise<void>} Done when the summary is printed.
+ * @throws {CommandError} If the directory is not in a project.
  */
 export async function printStatus(directory: string, options: StatusOptions): Promise<void> {
   const { installation, messages, isJson } = options;

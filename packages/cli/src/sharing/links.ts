@@ -1,33 +1,33 @@
-// Ссылки на страницы сайта, которые CLI показывает человеку.
+// Links to site pages the CLI shows to the human.
 
-// Подпись бейджа — та же, что в строке Markdown на странице галереи на сайте.
+// The badge label is the same as in the Markdown line on the gallery page of the site.
 const BADGE_ALT = "Built at Cyberzavod";
 
 /**
- * Секретная ссылка на запись: работает и в закрытой галерее.
- * @param {string} siteUrl Адрес сервера без завершающего «/».
- * @param {string} slug Случайный идентификатор записи на сервере.
- * @returns {string} Ссылка на страницу записи.
+ * Secret link to a recording: works in a private gallery too.
+ * @param {string} siteUrl Server address without a trailing "/".
+ * @param {string} slug Random recording id on the server.
+ * @returns {string} Link to the recording page.
  */
 export function recordingLink(siteUrl: string, slug: string): string {
   return `${siteUrl}/r/?id=${encodeURIComponent(slug)}`;
 }
 
 /**
- * Страница галереи автора.
- * @param {string} siteUrl Адрес сервера без завершающего «/».
- * @param {string} login Логин автора на GitHub.
- * @returns {string} Ссылка на галерею.
+ * The author's gallery page.
+ * @param {string} siteUrl Server address without a trailing "/".
+ * @param {string} login The author's GitHub login.
+ * @returns {string} Link to the gallery.
  */
 export function galleryLink(siteUrl: string, login: string): string {
   return `${siteUrl}/gallery/?user=${encodeURIComponent(login)}`;
 }
 
 /**
- * Бейдж галереи для README в разметке Markdown: картинка со ссылкой на галерею.
- * @param {string} siteUrl Адрес сервера без завершающего «/».
- * @param {string} login Логин автора на GitHub.
- * @returns {string} Строка Markdown.
+ * Gallery badge for a README in Markdown: an image linking to the gallery.
+ * @param {string} siteUrl Server address without a trailing "/".
+ * @param {string} login The author's GitHub login.
+ * @returns {string} A Markdown line.
  */
 export function badgeMarkdown(siteUrl: string, login: string): string {
   const badge = `${siteUrl}/api/badges/${encodeURIComponent(login)}.svg`;

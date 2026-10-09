@@ -11,16 +11,16 @@ type TextFunction = (...parameters: string[]) => unknown;
 interface TextLeaf {
   readonly path: string;
   readonly text: string;
-  /** Пробы, подставленные в параметры: каждая должна дойти до текста. */
+  /** Probes passed as parameters: each must reach the text. */
   readonly probes: readonly string[];
 }
 
-// На каждый параметр функции своя проба: по ним видно, какой параметр текст не использует.
+// Each function parameter gets its own probe: they show which parameter the text does not use.
 function probesOf(textFunction: TextFunction): string[] {
   return Array.from({ length: textFunction.length }, (_, index) => `probe-${index + 1}`);
 }
 
-// Все строки дерева; функции вызываются с пробами, чтобы проверить и результат.
+// All strings in the tree; functions are called with probes so their result is checked too.
 function textLeaves(value: unknown, path: string): TextLeaf[] {
   if (typeof value === "string") return [{ path, text: value, probes: [] }];
   if (typeof value === "function") {

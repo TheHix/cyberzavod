@@ -8,7 +8,9 @@ import { formatNumber, formatTokens } from "@/shared/lib/format.ts";
 import type { BarItem, StatItem } from "@/shared/ui";
 import { barOf } from "./bars.ts";
 
-/** Что показывает страница аналитики: заглушку, пока сборок нет, или числа и диаграммы. */
+/**
+ * What the analytics page shows: a placeholder while there are no builds, or numbers and charts.
+ */
 export type StatsView =
   | { readonly kind: "empty" }
   | {
@@ -23,7 +25,7 @@ function isInterventionReason(key: string): key is InterventionReason {
   return (INTERVENTION_REASONS as readonly string[]).includes(key);
 }
 
-// Значения из записей не фильтруются: незнакомый сайту этап или причина подписаны как есть.
+// Values from recordings are not filtered: a stage or reason unknown to the site is labeled as is.
 function stageLabel(key: string, locale: Locale): string {
   return isStage(key) ? STAGE_LABELS[key][locale] : key;
 }
@@ -32,7 +34,7 @@ function reasonLabel(key: string, locale: Locale): string {
   return isInterventionReason(key) ? INTERVENTION_LABELS[key][locale] : key;
 }
 
-// Самые частые — сверху: диаграмма отвечает, где процесс буксует сильнее всего.
+// The most frequent on top: the chart answers where the process stalls the most.
 function mostFirst(a: BarItem, b: BarItem): number {
   return b.value - a.value || a.label.localeCompare(b.label);
 }
@@ -63,11 +65,11 @@ function totalsOf(stats: BuildStats, locale: Locale): StatItem[] {
 }
 
 /**
- * Готовит аналитику к показу: числа, диаграммы возвратов по этапам, вмешательств по причинам и
- * исходов сборок с подписями на языке страницы.
- * @param {BuildStats} stats Ответ API.
- * @param {Locale} locale Язык страницы.
- * @returns {StatsView} Заглушка, если сборок нет, иначе числа и строки диаграмм.
+ * Prepares analytics for display: numbers and charts of rework by stage, interventions by reason
+ * and build outcomes, labeled in the page language.
+ * @param {BuildStats} stats API response.
+ * @param {Locale} locale Page language.
+ * @returns {StatsView} A placeholder if there are no builds, otherwise numbers and chart rows.
  */
 export function statsViewOf(stats: BuildStats, locale: Locale): StatsView {
   if (stats.recordings === 0) return { kind: "empty" };

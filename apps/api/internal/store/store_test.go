@@ -16,17 +16,17 @@ import (
 	"github.com/bysavelii/cyberzavod/apps/api/internal/gallery"
 )
 
-// newTestStore — newLimitedTestStore с рабочим потолком хранилища.
+// newTestStore is newLimitedTestStore with the production storage cap.
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
 
 	return newLimitedTestStore(t, gallery.StorageLimitBytes)
 }
 
-// newLimitedTestStore подключается к Postgres из TEST_DATABASE_URL, применяет миграции,
-// очищает таблицы галерей и сессий и возвращает хранилище с потолком storageLimitBytes.
-// Без переменной тест пропускается: хранилище проверяется только на настоящем Postgres,
-// подделка не поймала бы ни SQL, ни гонку за предел.
+// newLimitedTestStore connects to Postgres from TEST_DATABASE_URL, applies migrations,
+// clears the gallery and session tables and returns a store with the cap storageLimitBytes.
+// Without the variable the test is skipped: the store is tested only against a real Postgres,
+// a fake would catch neither the SQL nor the race for the limit.
 func newLimitedTestStore(t *testing.T, storageLimitBytes int64) *Store {
 	t.Helper()
 
@@ -52,11 +52,11 @@ func newLimitedTestStore(t *testing.T, storageLimitBytes int64) *Store {
 	return New(pool, storageLimitBytes)
 }
 
-// sessionStart — начало первой тестовой сессии; следующие начинаются на час позже.
+// sessionStart is the start of the first test session; the next ones start an hour later.
 var sessionStart = time.Date(2026, 10, 5, 8, 0, 0, 0, time.UTC)
 
-// testRecording собирает запись сессии с событиями events (JSON-массив) и началом через
-// hour часов после sessionStart.
+// testRecording builds a session recording with events events (a JSON array) starting
+// hour hours after sessionStart.
 func testRecording(t *testing.T, id string, hour int, events string) gallery.Recording {
 	t.Helper()
 
@@ -74,7 +74,7 @@ func testRecording(t *testing.T, id string, hour int, events string) gallery.Rec
 	return recording
 }
 
-// saveAuthor заводит автора с count записями и открывает или закрывает его галерею.
+// saveAuthor creates an author with count recordings and makes their gallery public or private.
 func saveAuthor(t *testing.T, store *Store, user gallery.User, isPublic bool, count int) {
 	t.Helper()
 
@@ -159,17 +159,17 @@ func TestSaveRecordingKeepsSlug(t *testing.T) {
 	}
 }
 
-// parallelUploads — сколько новых записей грузится одновременно в галерею с одним свободным
-// местом; raceRounds — сколько раз гонка повторяется на разных авторах. Пересечение загрузок
-// не гарантировано, поэтому без блокировки тест ловит лишние записи не в каждом раунде,
-// но почти наверняка хотя бы в одном.
+// parallelUploads is how many new recordings are uploaded at once to a gallery with one free
+// slot; raceRounds is how many times the race is repeated on different authors. Overlapping uploads
+// are not guaranteed, so without the lock the test catches extra recordings not in every round,
+// but almost certainly in at least one.
 const (
 	parallelUploads = 8
 	raceRounds      = 5
 )
 
-// warmPool открывает все соединения пула заранее. Иначе каждая параллельная загрузка сначала
-// подключается к базе, загрузки расходятся во времени и не пересекаются.
+// warmPool opens all pool connections in advance. Otherwise each concurrent upload first
+// connects to the database, the uploads spread out in time and do not overlap.
 func warmPool(t *testing.T, store *Store) {
 	t.Helper()
 
@@ -188,7 +188,7 @@ func warmPool(t *testing.T, store *Store) {
 	}
 }
 
-// uploadInParallel грузит parallelUploads новых записей автора одновременно.
+// uploadInParallel uploads parallelUploads new recordings of an author at once.
 func uploadInParallel(t *testing.T, store *Store, owner gallery.User) []error {
 	t.Helper()
 
@@ -408,7 +408,7 @@ func TestEmptyListsAreNotNil(t *testing.T) {
 	}
 }
 
-// storedBytes возвращает, сколько байт тело записи займёт в хранилище.
+// storedBytes returns how many bytes the recording body will take in the store.
 func storedBytes(t *testing.T, store *Store, recording gallery.Recording) int64 {
 	t.Helper()
 

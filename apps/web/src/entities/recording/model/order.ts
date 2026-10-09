@@ -1,21 +1,21 @@
 import type { SessionRecord } from "@cyberzavod/core";
 
 /**
- * Порядок записей в списке: начатые позже — первыми.
- * @param {SessionRecord} a Первая запись.
- * @param {SessionRecord} b Вторая запись.
- * @returns {number} Отрицательное число, если `a` идёт раньше `b`.
+ * Recording order in a list: latest started first.
+ * @param {SessionRecord} a First recording.
+ * @param {SessionRecord} b Second recording.
+ * @returns {number} A negative number if `a` comes before `b`.
  */
 export function newestFirst(a: SessionRecord, b: SessionRecord): number {
-  // Время в ISO 8601 по UTC сравнивается как строка; при равном времени порядок задаёт id.
+  // ISO 8601 UTC times compare as strings; on equal times the id decides the order.
   return b.timestamp.localeCompare(a.timestamp) || b.id.localeCompare(a.id);
 }
 
 /**
- * Порядок задач внутри проекта: начатые раньше — первыми, как их и делали.
- * @param {SessionRecord} a Первая запись.
- * @param {SessionRecord} b Вторая запись.
- * @returns {number} Отрицательное число, если `a` идёт раньше `b`.
+ * Task order within a project: earliest started first, the order they were done in.
+ * @param {SessionRecord} a First recording.
+ * @param {SessionRecord} b Second recording.
+ * @returns {number} A negative number if `a` comes before `b`.
  */
 export function oldestFirst(a: SessionRecord, b: SessionRecord): number {
   return newestFirst(b, a);

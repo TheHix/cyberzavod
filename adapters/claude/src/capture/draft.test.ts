@@ -163,7 +163,7 @@ describe("parseDraft", () => {
 
     const act = () => parseDraft(raw);
 
-    expect(act).toThrow(/project должен быть строкой/);
+    expect(act).toThrow(/project must be a string/);
   });
 
   it("называет id и startedAt, когда их нет у черновика", () => {
@@ -171,7 +171,7 @@ describe("parseDraft", () => {
 
     const act = () => parseDraft(raw);
 
-    expect(act).toThrow("у черновика должны быть id и startedAt");
+    expect(act).toThrow("draft must have id and startedAt");
   });
 
   it("отклоняет черновик без сборок", () => {
@@ -179,7 +179,7 @@ describe("parseDraft", () => {
 
     const act = () => parseDraft(raw);
 
-    expect(act).toThrow(/хотя бы одна сборка/);
+    expect(act).toThrow(/at least one build/);
   });
 
   it("отклоняет id сборки, который не подходит в имя файла", () => {
@@ -196,7 +196,7 @@ describe("parseDraft", () => {
 
     const act = () => parseDraft(raw);
 
-    expect(act).toThrow(/дважды/);
+    expect(act).toThrow(/twice/);
   });
 
   it("отклоняет запуск, указанный в двух сборках", () => {
@@ -211,7 +211,7 @@ describe("parseDraft", () => {
 
     const act = () => parseDraft(raw);
 
-    expect(act).toThrow(/a1.*двух сборках/);
+    expect(act).toThrow(/a1.*two builds/);
   });
 
   it("отклоняет runs не списком строк", () => {
@@ -230,7 +230,7 @@ describe("parseDraft", () => {
 
     const act = () => parseDraft(raw);
 
-    expect(act).toThrow(/неизвестная сборка unknown/);
+    expect(act).toThrow(/unknown build unknown/);
   });
 
   it("принимает промпт и реплику со ссылкой на сборку черновика", () => {
@@ -367,7 +367,7 @@ describe("parseDraft", () => {
   );
 
   it.each([
-    ["неизвестная причина", { reason: "approval" }, /причина approval/],
+    ["неизвестная причина", { reason: "approval" }, /reason approval/],
     ["без исходного текста", { said: undefined }, /said/],
     ["строка не строкой", { line: 5 }, /line/],
     ["сборка не строкой", { build: 1 }, /build/],
@@ -384,7 +384,7 @@ describe("parseDraft", () => {
 
     const act = () => parseDraft({ ...uneditedDraft(), events: [event] });
 
-    expect(act).toThrow(/неизвестная сборка/);
+    expect(act).toThrow(/unknown build/);
   });
 
   it("отклоняет событие цеха не по формату ядра", () => {
@@ -1109,7 +1109,7 @@ describe("publishBuild", () => {
     const unknown = () => publishBuild(draft, "no-such-build");
     const empty = () => publishBuild(draft, "empty");
 
-    expect(unknown).toThrow(/нет сборки no-such-build/);
+    expect(unknown).toThrow(/no build no-such-build/);
     expect(empty).toThrow(/build empty has no events/);
   });
 });

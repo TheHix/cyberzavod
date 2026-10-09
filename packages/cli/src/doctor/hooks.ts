@@ -1,4 +1,4 @@
-// Проверка хуков агента: в `.claude/settings.json` стоят обработчики той версии, что в конфиге.
+// Agent hooks check: `.claude/settings.json` has the handlers of the version in the config.
 
 import {
   inspectClaudeHooks,
@@ -46,7 +46,7 @@ function resultOf({ reading, version, doctor, claudeMessages }: HooksOutcome): C
   }
 }
 
-/** Хуки адаптера в настройках проекта соответствуют версии из конфига. */
+/** The adapter hooks in the project settings match the version from the config. */
 export const hooksCheck: ProjectCheck = {
   id: "hooks",
   run: async ({ project, messages, claudeMessages }) => {

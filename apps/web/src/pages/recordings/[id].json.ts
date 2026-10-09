@@ -3,9 +3,9 @@ import type { SessionRecord } from "@cyberzavod/core";
 import { publishedRecordings } from "@/entities/recording";
 
 /**
- * Файл на каждую запись сайта. Он один на все языки и лежит вне `[...lang]`: запись не
- * переводится. Адрес собирает `recordingFileUrl` (`entities/recording-file`).
- * @returns {object[]} Параметры маршрута и запись.
+ * A file per site recording. There is one for all languages and it lives outside `[...lang]`:
+ * recordings are not translated. `recordingFileUrl` (`entities/recording-file`) builds the address.
+ * @returns {object[]} Route parameters and the recording.
  */
 export const getStaticPaths = (() =>
   publishedRecordings.map((recording) => ({
@@ -14,12 +14,12 @@ export const getStaticPaths = (() =>
   }))) satisfies GetStaticPaths;
 
 /**
- * Полная запись сборки в JSON — её лениво грузит журнал серии на главной и на странице проекта,
- * чтобы полные тексты всех записей не попадали в разметку страницы. Это не страница: в карту
- * сайта она не идёт.
- * @param {object} context Контекст маршрута Astro.
- * @param {object} context.props Свойства из `getStaticPaths`: запись.
- * @returns {Response} Запись в JSON.
+ * A full build recording in JSON: the series journal on the home and project pages loads it lazily,
+ * so the full texts of all recordings do not end up in the page markup. This is not a page: it does
+ * not go into the sitemap.
+ * @param {object} context Astro route context.
+ * @param {object} context.props Props from `getStaticPaths`: the recording.
+ * @returns {Response} The recording in JSON.
  */
 export const GET: APIRoute<{ recording: SessionRecord }> = ({ props }) =>
   new Response(JSON.stringify(props.recording), {

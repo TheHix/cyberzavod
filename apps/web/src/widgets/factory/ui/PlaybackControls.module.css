@@ -5,7 +5,7 @@
   align-items: center;
 }
 
-/* Отступы по краям — место для ползунка в крайних положениях. */
+/* Edge padding leaves room for the slider in its extreme positions. */
 .timeline {
   display: grid;
   gap: var(--space-s);
@@ -32,7 +32,8 @@
   font-weight: 700;
 }
 
-/* На узком и низком экране скорость не нужна: HUD отдаёт место полке речи. */
+/* On a narrow and short screen the speed is not needed: the HUD gives the space to the speech
+   shelf. */
 @media (max-width: 48rem), (max-height: 40rem) {
   .speed {
     display: none;

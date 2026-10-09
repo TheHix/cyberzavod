@@ -1,10 +1,10 @@
-// Журнал серии меняет сборку в той же панели. Браузер помнит прокрутку и у закрытой панели, а
-// задать её закрытой нельзя: без этого новая сборка открылась бы посреди текста — там, где
-// читали прежнюю.
+// The series journal changes the build in the same panel. The browser remembers the scroll even
+// for a closed panel, and it cannot be set while closed: without this the new build would open in
+// the middle of the text, where the previous one was being read.
 
 import type { ReadableAtom } from "nanostores";
 
-// Ближайший предок, который прокручивает журнал, — тело выезжающей панели.
+// The nearest ancestor that scrolls the journal is the body of the sliding panel.
 function scrollContainerOf(journal: HTMLElement): HTMLElement | null {
   for (let node = journal.parentElement; node !== null; node = node.parentElement) {
     const { overflowY } = getComputedStyle(node);
@@ -17,11 +17,12 @@ function scrollContainerOf(journal: HTMLElement): HTMLElement | null {
 }
 
 /**
- * Показывает новую сборку в журнале с начала: сразу, если панель открыта, иначе — когда её
- * откроют. Сборку, которую уже видели, журнал оставляет там, где её читали.
- * @param {HTMLElement} journal Журнал внутри выезжающей панели.
- * @param {ReadableAtom<string | undefined>} $recordingId id сборки в журнале; нет, пока её нет.
- * @returns {() => void} Перестаёт следить.
+ * Shows a new build in the journal from the start: right away if the panel is open, otherwise when
+ * it opens. A build already seen stays where it was being read.
+ * @param {HTMLElement} journal Journal inside the sliding panel.
+ * @param {ReadableAtom<string | undefined>} $recordingId Id of the build in the journal; absent
+ *   while there is none.
+ * @returns {() => void} Stops following.
  */
 export function showNewRecordingsFromStart(
   journal: HTMLElement,
@@ -34,7 +35,7 @@ export function showNewRecordingsFromStart(
     const recordingId = $recordingId.get();
     const container = scrollContainerOf(journal);
     const isSeen = recordingId === seenRecordingId;
-    // У закрытой панели нет раскладки: прокрутку ей задать нельзя, и сборку там никто не видит.
+    // A closed panel has no layout: its scroll cannot be set, and nobody sees the build there.
     const isShown = journal.getClientRects().length > 0;
 
     if (container === null || isSeen || !isShown) return;

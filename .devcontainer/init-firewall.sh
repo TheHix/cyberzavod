@@ -1,30 +1,30 @@
 #!/usr/bin/env bash
-# Файрвол dev-контейнера: исходящие соединения только на белый список.
-# Основан на скрипте из dev-контейнера Claude Code. Отличия:
-#   - любая ошибка закрывает сеть целиком, а не оставляет её открытой;
-#   - DNS только через встроенный резолвер Docker (127.0.0.11), а не на любой адрес;
-#   - SSH только на адреса из белого списка (GitHub), а не на любой хост;
-#   - домены проекта: npm, Go-модули, вход в Claude.
+# Dev container firewall: outbound connections only to the allowlist.
+# Based on the script from the Claude Code dev container. Differences:
+#   - any error closes the network entirely instead of leaving it open;
+#   - DNS only through Docker's embedded resolver (127.0.0.11), not to any address;
+#   - SSH only to allowlisted addresses (GitHub), not to any host;
+#   - project domains: npm, Go modules, Claude sign-in.
 #
-# Это защита от случайного доступа, а не от целенаправленной утечки: на адреса GitHub и
-# общие адреса CDN выйти можно. Подробнее — .devcontainer/README.md.
+# This protects against accidental access, not against deliberate exfiltration: GitHub addresses and
+# shared CDN addresses are reachable. More in .devcontainer/README.md.
 #
-# IP доменов резолвятся при запуске. CDN иногда меняют адреса — тогда помогает
-# повторный запуск: `sudo /usr/local/bin/init-firewall.sh`.
+# Domain IPs are resolved at startup. CDNs sometimes change addresses; then a rerun
+# helps: `sudo /usr/local/bin/init-firewall.sh`.
 set -euo pipefail
 IFS=$'\n\t'
 
 readonly ALLOWED_DOMAINS=(
-  # пакеты
+  # packages
   registry.npmjs.org
   proxy.golang.org
   sum.golang.org
-  # Claude: API и вход в подписку
+  # Claude: API and subscription sign-in
   api.anthropic.com
   claude.ai
   console.anthropic.com
   platform.claude.com
-  # VS Code: расширения и обновления, если контейнер открыт из него
+  # VS Code: extensions and updates, if the container is opened from it
   marketplace.visualstudio.com
   vscode.blob.core.windows.net
   update.code.visualstudio.com
@@ -35,7 +35,7 @@ readonly PROBE_TIMEOUT_SECONDS=5
 
 log() { echo "==> $*"; }
 
-# При любой ошибке сеть закрывается полностью: лучше контейнер без сети, чем без файрвола.
+# On any error the network is closed entirely: better no network than no firewall.
 lock_down() {
   iptables -P INPUT DROP
   iptables -P FORWARD DROP
@@ -47,10 +47,10 @@ lock_down() {
 }
 trap lock_down ERR
 
-# --- Сбор адресов. Правила пока не тронуты.
+# --- Collecting addresses. Rules are not touched yet.
 
-# Временный выход к api.github.com: без него повторный запуск после аварийного закрытия
-# не смог бы скачать диапазоны. Эти правила сбрасываются ниже вместе со всеми остальными.
+# Temporary access to api.github.com: without it a rerun after an emergency close
+# could not download the ranges. These rules are reset below along with all the others.
 mapfile -t github_api_ips < <(dig +short A api.github.com | grep -E '^[0-9.]+$')
 iptables -I INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 for ip in "${github_api_ips[@]}"; do
@@ -75,13 +75,13 @@ for domain in "${ALLOWED_DOMAINS[@]}"; do
   domain_ips+=("${ips[@]}")
 done
 
-# Сеть Docker: соседние сервисы (база db) и опубликованные порты с хоста.
+# Docker network: neighbouring services (the db database) and ports published from the host.
 host_ip=$(ip route | awk '/^default/ {print $3}')
 [[ -n "$host_ip" ]]
 host_network="${host_ip%.*}.0/24"
 
-# --- Применение. DNS внутри Docker идёт через 127.0.0.11 по loopback — его NAT-правила
-# переживают сброс таблиц, а наружу UDP/53 не открывается.
+# --- Applying. DNS inside Docker goes through 127.0.0.11 over loopback: its NAT rules
+# survive the table reset, and UDP/53 is not opened to the outside.
 
 docker_dns_rules=$(iptables-save -t nat | grep "127\.0\.0\.11" || true)
 
@@ -117,11 +117,11 @@ iptables -A INPUT -s "$host_network" -j ACCEPT
 iptables -A OUTPUT -d "$host_network" -j ACCEPT
 iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-# В том числе SSH: только к адресам из белого списка, то есть к GitHub.
+# Including SSH: only to allowlisted addresses, that is, to GitHub.
 iptables -A OUTPUT -m set --match-set allowed-domains dst -j ACCEPT
 iptables -A OUTPUT -j REJECT --reject-with icmp-admin-prohibited
 
-# --- Проверка.
+# --- Checking.
 
 if curl -s --connect-timeout "$PROBE_TIMEOUT_SECONDS" "$BLOCKED_PROBE_URL" > /dev/null; then
   echo "проверка не прошла: $BLOCKED_PROBE_URL доступен" >&2

@@ -1,4 +1,4 @@
-// Package github говорит с GitHub: проверяет токены авторов и меняет код входа на сайте на токен.
+// Package github talks to GitHub: it verifies authors' tokens and exchanges site sign-in codes.
 package github
 
 import (
@@ -17,29 +17,29 @@ import (
 
 const (
 	requestTimeout = 5 * time.Second
-	// tokenCacheTTL — сколько помнить ответ GitHub на токен: CLI ходит в API серией запросов,
-	// и каждый из них не должен стоить запроса к GitHub.
+	// tokenCacheTTL is how long to remember GitHub's answer for a token: the CLI calls the API in
+	// a series of requests, and each of them should not cost a request to GitHub.
 	tokenCacheTTL = 10 * time.Minute
-	// maxUserResponseBytes — с запасом больше ответа GET /user; защищает от бесконечного тела.
+	// maxUserResponseBytes is well above a GET /user response; it guards against an endless body.
 	maxUserResponseBytes = 1 << 20
 	gitHubAPIVersion     = "2022-11-28"
 	userAgent            = "cyberzavod-api"
 )
 
-// Verifier узнаёт у GitHub автора по токену и помнит ответ tokenCacheTTL.
+// Verifier asks GitHub for the author by token and remembers the answer for tokenCacheTTL.
 type Verifier struct {
 	apiURL string
 	client *http.Client
 	cache  *tokenCache
 }
 
-// githubUser — нужные поля ответа GET /user.
+// githubUser holds the needed fields of the GET /user response.
 type githubUser struct {
 	ID    int64  `json:"id"`
 	Login string `json:"login"`
 }
 
-// NewVerifier создаёт проверку токенов у API GitHub по адресу apiURL.
+// NewVerifier creates a token verifier against the GitHub API at apiURL.
 func NewVerifier(apiURL string) *Verifier {
 	return &Verifier{
 		apiURL: strings.TrimSuffix(apiURL, "/"),
@@ -48,8 +48,8 @@ func NewVerifier(apiURL string) *Verifier {
 	}
 }
 
-// Verify возвращает автора, которому принадлежит токен. Если GitHub токен не принял —
-// gallery.ErrTokenRejected; другие ошибки значат, что GitHub не ответил толком.
+// Verify returns the author who owns the token. If GitHub rejected the token, it returns
+// gallery.ErrTokenRejected; other errors mean GitHub did not give a proper answer.
 func (v *Verifier) Verify(ctx context.Context, token string) (gallery.User, error) {
 	key := sha256.Sum256([]byte(token))
 	if user, isCached := v.cache.get(key); isCached {
@@ -66,7 +66,7 @@ func (v *Verifier) Verify(ctx context.Context, token string) (gallery.User, erro
 	return user, nil
 }
 
-// fetchUser спрашивает GitHub, чей это токен.
+// fetchUser asks GitHub whose token this is.
 func (v *Verifier) fetchUser(ctx context.Context, token string) (gallery.User, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
@@ -85,7 +85,7 @@ func (v *Verifier) fetchUser(ctx context.Context, token string) (gallery.User, e
 	if err != nil {
 		return gallery.User{}, fmt.Errorf("запрос к GitHub: %w", err)
 	}
-	// Тело уже прочитано или не нужно: ошибка закрытия ничего не меняет в ответе.
+	// The body is already read or not needed: a close error changes nothing in the response.
 	defer func() { _ = response.Body.Close() }()
 
 	return userFromResponse(response)

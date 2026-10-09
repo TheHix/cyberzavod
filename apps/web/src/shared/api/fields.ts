@@ -1,17 +1,18 @@
-// Чтение полей ответа API. Ответ приходит из сети: каждое поле проверяется, прежде чем попасть
-// в типы сайта, и ответ не того вида — ошибка с местом, а не `undefined` в разметке.
+// Reading API response fields. The response comes from the network: each field is checked before
+// it enters the site's types, and a malformed response is an error with its location, not
+// `undefined` in the markup.
 
 import { ApiResponseError } from "./errors.ts";
 
-/** Объект JSON с полями, ещё не проверенными. */
+/** A JSON object whose fields are not checked yet. */
 export type JsonObject = Readonly<Record<string, unknown>>;
 
 /**
- * Проверяет, что значение — объект JSON.
- * @param {unknown} value Значение из ответа.
- * @param {string} place Что это, для сообщения об ошибке: `ответ /api/stats`.
- * @returns {JsonObject} То же значение как объект.
- * @throws {ApiResponseError} Если это не объект.
+ * Checks that the value is a JSON object.
+ * @param {unknown} value Value from the response.
+ * @param {string} place What this is, for the error message: `ответ /api/stats`.
+ * @returns {JsonObject} The same value as an object.
+ * @throws {ApiResponseError} If it is not an object.
  */
 export function objectAt(value: unknown, place: string): JsonObject {
   const isObject = typeof value === "object" && value !== null && !Array.isArray(value);
@@ -22,12 +23,12 @@ export function objectAt(value: unknown, place: string): JsonObject {
 }
 
 /**
- * Читает строковое поле.
- * @param {JsonObject} object Объект из ответа.
- * @param {string} key Имя поля.
- * @param {string} place Что это за объект, для сообщения об ошибке.
- * @returns {string} Значение поля.
- * @throws {ApiResponseError} Если поля нет или оно не строка.
+ * Reads a string field.
+ * @param {JsonObject} object Object from the response.
+ * @param {string} key Field name.
+ * @param {string} place What this object is, for the error message.
+ * @returns {string} Field value.
+ * @throws {ApiResponseError} If the field is missing or not a string.
  */
 export function stringAt(object: JsonObject, key: string, place: string): string {
   const value = object[key];
@@ -38,12 +39,12 @@ export function stringAt(object: JsonObject, key: string, place: string): string
 }
 
 /**
- * Читает числовое поле: неотрицательное целое — счётчик.
- * @param {JsonObject} object Объект из ответа.
- * @param {string} key Имя поля.
- * @param {string} place Что это за объект, для сообщения об ошибке.
- * @returns {number} Значение поля.
- * @throws {ApiResponseError} Если поля нет или оно не неотрицательное целое.
+ * Reads a numeric field: a non-negative integer, a counter.
+ * @param {JsonObject} object Object from the response.
+ * @param {string} key Field name.
+ * @param {string} place What this object is, for the error message.
+ * @returns {number} Field value.
+ * @throws {ApiResponseError} If the field is missing or not a non-negative integer.
  */
 export function countAt(object: JsonObject, key: string, place: string): number {
   const value = object[key];
@@ -55,12 +56,12 @@ export function countAt(object: JsonObject, key: string, place: string): number 
 }
 
 /**
- * Читает логическое поле.
- * @param {JsonObject} object Объект из ответа.
- * @param {string} key Имя поля.
- * @param {string} place Что это за объект, для сообщения об ошибке.
- * @returns {boolean} Значение поля.
- * @throws {ApiResponseError} Если поля нет или оно не `true`/`false`.
+ * Reads a boolean field.
+ * @param {JsonObject} object Object from the response.
+ * @param {string} key Field name.
+ * @param {string} place What this object is, for the error message.
+ * @returns {boolean} Field value.
+ * @throws {ApiResponseError} If the field is missing or not `true`/`false`.
  */
 export function booleanAt(object: JsonObject, key: string, place: string): boolean {
   const value = object[key];
@@ -71,12 +72,12 @@ export function booleanAt(object: JsonObject, key: string, place: string): boole
 }
 
 /**
- * Читает поле-массив.
- * @param {JsonObject} object Объект из ответа.
- * @param {string} key Имя поля.
- * @param {string} place Что это за объект, для сообщения об ошибке.
- * @returns {readonly unknown[]} Элементы массива, ещё не проверенные.
- * @throws {ApiResponseError} Если поля нет или оно не массив.
+ * Reads an array field.
+ * @param {JsonObject} object Object from the response.
+ * @param {string} key Field name.
+ * @param {string} place What this object is, for the error message.
+ * @returns {readonly unknown[]} Array elements, not checked yet.
+ * @throws {ApiResponseError} If the field is missing or not an array.
  */
 export function arrayAt(object: JsonObject, key: string, place: string): readonly unknown[] {
   const value = object[key];

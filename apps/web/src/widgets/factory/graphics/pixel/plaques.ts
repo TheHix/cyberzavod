@@ -1,5 +1,6 @@
-// Таблички с названиями станков и кабинета: где они стоят и как рисуются. Место считают
-// и рисование, и границы цеха (`planBounds`), поэтому табличка не может оказаться вне кадра.
+// Plaques with machine and office names: where they stand and how they are drawn. Both drawing
+// and factory bounds (`planBounds`) compute the position, so a plaque cannot end up outside the
+// frame.
 
 import { STAGES, type Stage } from "@cyberzavod/core";
 import {
@@ -19,14 +20,14 @@ import type { Palette } from "./palette.ts";
 import { textureOf } from "./textures.ts";
 import { PIXELS_PER_UNIT } from "./units.ts";
 
-/** Где стоит табличка и сколько она занимает, в единицах плана. */
+/** Where a plaque stands and how much space it takes, in plan units. */
 export interface PlaquePlacement {
   readonly text: string;
   readonly center: Point;
   readonly size: { width: number; height: number };
 }
 
-// Просвет между табличкой и станком, пиксели рисунка.
+// Gap between a plaque and a machine, sprite pixels.
 const PLAQUE_GAP = 1;
 
 function placementOf(text: string, center: Point): PlaquePlacement {
@@ -39,15 +40,16 @@ function placementOf(text: string, center: Point): PlaquePlacement {
   };
 }
 
-// Расстояние от центра станка (или места мастера) до центра таблички: половина станка, зазор
-// и половина таблички.
+// Distance from the center of a machine (or the foreman spot) to the center of the plaque: half
+// the machine, the gap and half the plaque.
 function offsetOf(text: string): number {
   const plaqueHeight = plaqueSize(text).height;
 
   return (MACHINE_SIZE.height + plaqueHeight) / 2 / PIXELS_PER_UNIT + PLAQUE_GAP / PIXELS_PER_UNIT;
 }
 
-// Табличка станка — со стороны, противоположной рабочему; если они на одной высоте — над станком.
+// A machine plaque is on the side opposite the worker; if they are at the same height, above the
+// machine.
 function stationPlacement(stage: Stage, plan: StationPlan, locale: Locale): PlaquePlacement {
   const text = STAGE_LABELS[stage][locale];
   const awayFromWorker = Math.sign(plan.machine.y - plan.post.y) || -1;
@@ -58,8 +60,8 @@ function stationPlacement(stage: Stage, plan: StationPlan, locale: Locale): Plaq
   });
 }
 
-// Табличка кабинета — за местом мастера, по ту же сторону от стола, что и он, в одном ряду
-// с табличками станков.
+// The office plaque is behind the foreman spot, on the same side of the desk as the foreman, in
+// one row with the machine plaques.
 function foremanPlacement(plan: ForemanPlan, locale: Locale): PlaquePlacement {
   const awayFromDesk = Math.sign(plan.post.y - plan.desk.y) || 1;
   const text = FOREMAN_LABEL[locale];
@@ -70,7 +72,8 @@ function foremanPlacement(plan: ForemanPlan, locale: Locale): PlaquePlacement {
   });
 }
 
-// Люди стоят у рабочих мест, у мест мастера возле станков, за столом и у двери кабинета.
+// People stand at workstations, at foreman spots near the machines, at the desk and at the office
+// door.
 function figurePoints(layout: FactoryLayout): Point[] {
   const stations = STAGES.map((stage) => layout.stations[stage]);
 
@@ -82,7 +85,7 @@ function figurePoints(layout: FactoryLayout): Point[] {
   ];
 }
 
-// Прямоугольник стоящего человека в единицах плана.
+// Rectangle of a standing human in plan units.
 function figureRect(point: Point): PlanBounds {
   const { left, top, right, bottom } = ACTOR_FIGURE;
 
@@ -102,9 +105,9 @@ function overlaps(a: PlanBounds, b: PlanBounds): boolean {
   return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }
 
-// Если фигура стоит на табличке, табличка сдвигается вдоль ряда на меньшее из двух расстояний —
-// влево или вправо, — пока между ними не окажется зазор. Вертикаль не трогаем: она задана
-// стороной рабочего и размерами станка.
+// If a figure stands on a plaque, the plaque moves along the row by the smaller of two distances,
+// left or right, until there is a gap between them. The vertical is left alone: it is set by the
+// worker's side and the machine size.
 function clearOf(placement: PlaquePlacement, figures: readonly PlanBounds[]): PlaquePlacement {
   const gap = PLAQUE_GAP / PIXELS_PER_UNIT;
   let center = placement.center;
@@ -128,12 +131,12 @@ function clearOf(placement: PlaquePlacement, figures: readonly PlanBounds[]): Pl
 }
 
 /**
- * Места всех табличек плана: по одной на станок и на кабинет мастера. Табличка не заходит
- * на человека ни в одной его точке плана.
- * @param {FactoryLayout} layout План цеха.
- * @param {Locale} locale Язык надписей.
- * @returns {PlaquePlacement[]} Таблички в порядке этапов, кабинет — последний.
- * @throws {Error} Если табличку нельзя поставить, не задев фигур.
+ * Positions of all plan plaques: one per machine and one for the foreman's office. A plaque does
+ * not overlap a human at any of their plan points.
+ * @param {FactoryLayout} layout Floor plan.
+ * @param {Locale} locale Label language.
+ * @returns {PlaquePlacement[]} Plaques in stage order, the office last.
+ * @throws {Error} If a plaque cannot be placed without touching figures.
  */
 export function plaquePlacements(layout: FactoryLayout, locale: Locale): PlaquePlacement[] {
   const figures = figurePoints(layout).map(figureRect);
@@ -145,9 +148,9 @@ export function plaquePlacements(layout: FactoryLayout, locale: Locale): PlaqueP
 }
 
 /**
- * Прямоугольник таблички в пикселях рисунка: левый верхний угол — целый пиксель, как её рисуют.
- * @param {PlaquePlacement} placement Место таблички.
- * @returns {PlanBounds} Прямоугольник в пикселях рисунка.
+ * Plaque rectangle in sprite pixels: the top left corner is a whole pixel, as it is drawn.
+ * @param {PlaquePlacement} placement Plaque position.
+ * @returns {PlanBounds} Rectangle in sprite pixels.
  */
 export function plaqueRect({ center, size }: PlaquePlacement): PlanBounds {
   return {
@@ -159,11 +162,11 @@ export function plaqueRect({ center, size }: PlaquePlacement): PlanBounds {
 }
 
 /**
- * Рисует таблички плана; координаты — в пикселях рисунка.
- * @param {FactoryLayout} layout План цеха.
- * @param {Palette} palette Краски цеха.
- * @param {Locale} locale Язык надписей.
- * @returns {Container} Все таблички: они лежат поверх станков и кабинета.
+ * Draws the plan plaques; coordinates are in sprite pixels.
+ * @param {FactoryLayout} layout Floor plan.
+ * @param {Palette} palette Factory inks.
+ * @param {Locale} locale Label language.
+ * @returns {Container} All plaques: they lie over the machines and the office.
  */
 export function drawPlaques(layout: FactoryLayout, palette: Palette, locale: Locale): Container {
   const plaques = new Container();

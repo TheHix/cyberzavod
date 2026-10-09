@@ -6,33 +6,34 @@ import { bubbleLeftOf, placeBubble } from "../lib/bubble-placement.ts";
 import styles from "./SpeechBubble.module.css";
 
 interface Props {
-  /** Графика цеха — переводит точку плана в координаты пола; нет, пока не загрузилась. */
+  /** Factory graphics: converts a plan point to floor coordinates; absent until loaded. */
   graphics: FactoryGraphics | undefined;
-  /** Поле цеха, свободное от меню и HUD: пузырь не выходит за его края. */
+  /** Floor field free of the menu and HUD: the bubble does not go past its edges. */
   field: Frame;
-  /** Точка плана над говорящим; нет, если говорящего не нашли. */
+  /** Plan point above the speaker; absent if the speaker was not found. */
   position: Point | null;
-  /** Метка, текст и раскрытые подробности: когда пузырю тесно, они прокручиваются. */
+  /** Label, text and expanded details: when the bubble is cramped, they scroll. */
   children: JSX.Element;
-  /** Кнопки под текстом: они видны всегда. */
+  /** Buttons below the text: they are always visible. */
   actions: JSX.Element;
 }
 
 /**
- * Пузырь над точкой цеха: рамка и расположение, общие у промпта, вмешательства и реплики.
- * Раскрывается по высоте туда, где до края поля больше места, по ширине стоит серединой над
- * говорящим и сдвигается внутрь поля у края; не шире поля и не выше места до его края, а текст,
- * которому тесно, прокручивается внутри.
- * @param {Props} props Свойства компонента.
- * @param {FactoryGraphics | undefined} props.graphics Графика цеха, если уже загружена.
- * @param {Frame} props.field Поле цеха, свободное от меню и HUD.
- * @param {Point | null} props.position Точка плана над говорящим.
- * @param {JSX.Element} props.children Метка, текст и раскрытые подробности.
- * @param {JSX.Element} props.actions Кнопки под текстом.
- * @returns {JSX.Element} Пузырь или ничего, пока неизвестно, где его поставить.
+ * A bubble over a factory point: the frame and placement shared by a prompt, intervention and
+ * message. Opens vertically toward where there is more room to the field edge, horizontally stays
+ * centered over the speaker and shifts into the field at the edge; no wider than the field and no
+ * taller than the room to its edge, and cramped text scrolls inside.
+ * @param {Props} props Component props.
+ * @param {FactoryGraphics | undefined} props.graphics Factory graphics, if already loaded.
+ * @param {Frame} props.field Floor field free of the menu and HUD.
+ * @param {Point | null} props.position Plan point above the speaker.
+ * @param {JSX.Element} props.children Label, text and expanded details.
+ * @param {JSX.Element} props.actions Buttons below the text.
+ * @returns {JSX.Element} The bubble, or nothing while it is unknown where to place it.
  */
 export function SpeechBubble(props: Props): JSX.Element {
-  // Ширину пузыря задаёт текст, поэтому сдвиг внутрь поля считается по замеру, а не заранее.
+  // The text sets the bubble width, so the shift into the field is computed from a measurement, not
+  // in advance.
   const [bubbleWidth, setBubbleWidth] = createSignal(0);
   const placement = createMemo(() => {
     const point = props.position;

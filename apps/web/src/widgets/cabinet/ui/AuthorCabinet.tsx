@@ -12,13 +12,13 @@ type Visibility = "private" | "public";
 
 interface Props {
   gallery: OwnGallery;
-  /** Действия кабинета. */
+  /** Cabinet actions. */
   model: CabinetModel;
-  /** Идёт действие: кнопки выключены. */
+  /** An action is running: buttons are disabled. */
   isBusy: boolean;
-  /** Последнее действие не удалось. */
+  /** The last action failed. */
   hasFailed: boolean;
-  /** Адрес сайта — для строки бейджа. */
+  /** Site address, for the badge line. */
   siteUrl: string;
   locale: Locale;
 }
@@ -28,16 +28,16 @@ function visibilityOf(gallery: OwnGallery): Visibility {
 }
 
 /**
- * Кабинет вошедшего автора: кто вошёл и выход, видимость галереи с бейджем для открытой
- * галереи и записи с удалением.
- * @param {Props} props Свойства компонента.
- * @param {OwnGallery} props.gallery Своя галерея автора.
- * @param {CabinetModel} props.model Действия кабинета.
- * @param {boolean} props.isBusy Идёт ли действие.
- * @param {boolean} props.hasFailed Не удалось ли последнее действие.
- * @param {string} props.siteUrl Адрес сайта.
- * @param {Locale} props.locale Язык страницы.
- * @returns {JSX.Element} Кабинет автора.
+ * Cabinet of a signed-in author: who is signed in and sign-out, gallery visibility with a badge
+ * for a public gallery, and recordings with deletion.
+ * @param {Props} props Component props.
+ * @param {OwnGallery} props.gallery The author's own gallery.
+ * @param {CabinetModel} props.model Cabinet actions.
+ * @param {boolean} props.isBusy Whether an action is running.
+ * @param {boolean} props.hasFailed Whether the last action failed.
+ * @param {string} props.siteUrl Site address.
+ * @param {Locale} props.locale Page language.
+ * @returns {JSX.Element} Author cabinet.
  */
 export function AuthorCabinet(props: Props): JSX.Element {
   const visibilityOptions = () => [

@@ -1,13 +1,14 @@
-// Проигрывание сцены: где мы, идём ли и с какой скоростью. Чистые функции — их применяет
-// модель цеха (factory.ts), а часы с requestAnimationFrame живут в ui/frame-clock.ts.
+// Scene playback: where we are, whether it is running and at what speed. Pure functions: the
+// factory model (factory.ts) applies them, and the requestAnimationFrame clock lives in
+// ui/frame-clock.ts.
 
-/** Скорости проигрывания на выбор. */
+/** Playback speeds to choose from. */
 export const SPEEDS = [1, 2, 4] as const;
 
-/** Скорость проигрывания. */
+/** Playback speed. */
 export type Speed = (typeof SPEEDS)[number];
 
-/** Состояние проигрывания: момент сцены в мс, её длина, идёт ли и с какой скоростью. */
+/** Playback state: the scene moment in ms, its length, whether it is running and at what speed. */
 export interface Playback {
   readonly position: number;
   readonly duration: number;
@@ -16,20 +17,20 @@ export interface Playback {
 }
 
 /**
- * Начинает проигрывание сцены с начала.
- * @param {number} duration Длительность сцены, мс.
- * @param {boolean} playing Идёт ли сразу.
- * @returns {Playback} Состояние в начале сцены.
+ * Starts scene playback from the beginning.
+ * @param {number} duration Scene duration, ms.
+ * @param {boolean} playing Whether it runs at once.
+ * @returns {Playback} State at the start of the scene.
  */
 export function startPlayback(duration: number, playing: boolean): Playback {
   return { position: 0, duration, playing, speed: SPEEDS[0] };
 }
 
 /**
- * Сдвигает проигрывание на прошедшее время; в конце сцены останавливается.
- * @param {Playback} playback Текущее состояние.
- * @param {number} elapsedMs Сколько мс прошло с прошлого кадра.
- * @returns {Playback} Состояние после сдвига.
+ * Advances playback by the elapsed time; stops at the end of the scene.
+ * @param {Playback} playback Current state.
+ * @param {number} elapsedMs How many ms passed since the previous frame.
+ * @returns {Playback} State after the advance.
  */
 export function advance(playback: Playback, elapsedMs: number): Playback {
   if (!playback.playing) return playback;
@@ -40,39 +41,40 @@ export function advance(playback: Playback, elapsedMs: number): Playback {
 }
 
 /**
- * Перематывает в момент сцены.
- * @param {Playback} playback Текущее состояние.
- * @param {number} position Момент сцены, мс; вне сцены прижимается к её границам.
- * @returns {Playback} Состояние в новом моменте.
+ * Rewinds to a scene moment.
+ * @param {Playback} playback Current state.
+ * @param {number} position Scene moment, ms; outside the scene it is clamped to its bounds.
+ * @returns {Playback} State at the new moment.
  */
 export function seek(playback: Playback, position: number): Playback {
   return { ...playback, position: Math.min(playback.duration, Math.max(0, position)) };
 }
 
 /**
- * Переносит проигрывание в сцену другой длины: идёт ли и скорость остаются прежними.
- * @param {Playback} playback Текущее состояние.
- * @param {number} duration Длительность новой сцены, мс.
- * @param {number} position Момент в новой сцене, мс; вне сцены прижимается к её границам.
- * @returns {Playback} То же проигрывание в новой сцене.
+ * Moves playback into a scene of another length: whether it runs and the speed stay the same.
+ * @param {Playback} playback Current state.
+ * @param {number} duration Duration of the new scene, ms.
+ * @param {number} position Moment in the new scene, ms; outside the scene it is clamped to its
+ *   bounds.
+ * @returns {Playback} The same playback in the new scene.
  */
 export function withDuration(playback: Playback, duration: number, position: number): Playback {
   return seek({ ...playback, duration }, position);
 }
 
 /**
- * Дошла ли сцена до конца.
- * @param {Playback} playback Текущее состояние.
- * @returns {boolean} `true`, если момент — конец сцены.
+ * Whether the scene has reached the end.
+ * @param {Playback} playback Current state.
+ * @returns {boolean} `true` if the moment is the end of the scene.
  */
 export function isAtEnd(playback: Playback): boolean {
   return playback.position >= playback.duration;
 }
 
 /**
- * Ставит на паузу или продолжает; досмотренную сцену запускает с начала.
- * @param {Playback} playback Текущее состояние.
- * @returns {Playback} Состояние после переключения.
+ * Pauses or resumes; a finished scene restarts from the beginning.
+ * @param {Playback} playback Current state.
+ * @returns {Playback} State after the toggle.
  */
 export function togglePlaying(playback: Playback): Playback {
   if (playback.playing) return { ...playback, playing: false };
@@ -83,9 +85,9 @@ export function togglePlaying(playback: Playback): Playback {
 }
 
 /**
- * Узнаёт скорость по её записи — как её отдают переключатели интерфейса.
- * @param {string} value Запись скорости: `"2"`.
- * @returns {Speed | undefined} Скорость или undefined, если такой нет среди SPEEDS.
+ * Recognizes a speed by its string form, as the interface toggles give it.
+ * @param {string} value Speed as a string: `"2"`.
+ * @returns {Speed | undefined} The speed, or undefined if SPEEDS has no such one.
  */
 export function speedFrom(value: string): Speed | undefined {
   return SPEEDS.find((speed) => `${speed}` === value);

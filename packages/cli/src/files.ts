@@ -1,13 +1,13 @@
-// Файлы и каталоги проекта, которых может не быть.
+// Project files and directories that may be missing.
 
 import { readFile, rmdir } from "node:fs/promises";
 import { isNotFound } from "@cyberzavod/storage";
 
 /**
- * Читает текстовый файл, которого может не быть.
- * @param {string} file Абсолютный путь файла.
- * @returns {Promise<string | undefined>} Текст файла или undefined, если файла нет.
- * @throws {Error} Если файл не читается по другой причине, чем «нет файла».
+ * Reads a text file that may be missing.
+ * @param {string} file Absolute file path.
+ * @returns {Promise<string | undefined>} File text, or undefined if there is no file.
+ * @throws {Error} If the file cannot be read for a reason other than "no file".
  */
 export async function readOptionalText(file: string): Promise<string | undefined> {
   try {
@@ -19,7 +19,7 @@ export async function readOptionalText(file: string): Promise<string | undefined
   }
 }
 
-// `rmdir` отвечает по-разному на непустой каталог: ENOTEMPTY (Linux, macOS), EEXIST (часть ОС).
+// `rmdir` answers a non-empty directory differently: ENOTEMPTY (Linux, macOS), EEXIST (some OSes).
 const DIRECTORY_NOT_EMPTY_CODES = new Set(["ENOTEMPTY", "EEXIST"]);
 
 function isDirectoryNotEmpty(err: unknown): boolean {
@@ -27,10 +27,10 @@ function isDirectoryNotEmpty(err: unknown): boolean {
 }
 
 /**
- * Удаляет каталог, если он пуст; непустой или отсутствующий каталог остаётся как есть.
- * @param {string} directory Абсолютный путь каталога.
- * @returns {Promise<void>} Готово, когда каталог удалён или удалять нечего.
- * @throws {Error} Если удалить не получилось по другой причине.
+ * Removes a directory if it is empty; a non-empty or missing directory stays as it is.
+ * @param {string} directory Absolute directory path.
+ * @returns {Promise<void>} Done when the directory is removed or there is nothing to remove.
+ * @throws {Error} If removal fails for another reason.
  */
 export async function removeDirectoryIfEmpty(directory: string): Promise<void> {
   try {

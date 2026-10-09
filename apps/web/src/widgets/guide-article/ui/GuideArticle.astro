@@ -1,5 +1,5 @@
 ---
-// Статья гайда: заголовок, описание и текст в одной панели, которая прокручивается внутри поля.
+// A guide article: the title, description and text in one panel that scrolls inside the field.
 import type { PublishedGuide } from "@/entities/guide";
 import { CopyCode } from "@/features/copy-code";
 import type { Locale } from "@/shared/i18n/locale.ts";
@@ -8,7 +8,7 @@ import GuideBody from "./GuideBody.astro";
 
 interface Props {
   guide: PublishedGuide;
-  /** Язык страницы: на нём статья и подписи кнопок. */
+  /** Page language: the article and button captions are in it. */
   locale: Locale;
 }
 
@@ -33,7 +33,8 @@ const proseId = `guide-${guide.id}`;
 <CopyCode client:idle scope={proseId} locale={locale} />
 
 <style>
-  /* minmax(0, …): иначе колонка не уже самого длинного кода, и панель прокручивается вбок. */
+  /* minmax(0, …): otherwise the column is no narrower than the longest code, and the panel scrolls
+     sideways. */
   .article {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

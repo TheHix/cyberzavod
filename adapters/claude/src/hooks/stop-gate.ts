@@ -1,11 +1,11 @@
-// Хук Stop: если агент в этом ходе менял код, он не может закончить, пока проверки проекта
-// красные. Нет конфига или команд проверок — агент отпускается без проверок; битый конфиг —
-// отпускается с сообщением. Возвращает агента к работе JSON-решение `block` с кодом выхода 0:
-// ненулевой код хуки адаптера читают как «npx не запустился» и отпускают агента (см.
-// generate/settings.ts), поэтому код 2 здесь не годится. Защита от вечного цикла: после
-// MAX_BLOCKS отказов за ход агент отпускается, зовёт человека и оставляет отметку `human-call`
-// для записи сессии; если счётчик не удаётся записать, агент тоже отпускается. Счётчик обнуляет
-// начало хода, поэтому здесь он только растёт.
+// Stop hook: if the agent changed code in this turn, it cannot finish while the project checks are
+// red. No config or no check commands: the agent is let go without checks; a broken config: it is
+// let go with a message. The JSON `block` decision with exit code 0 sends the agent back to work:
+// the adapter's hooks read a non-zero code as "npx did not start" and let the agent go (see
+// generate/settings.ts), so code 2 does not fit here. Infinite loop guard: after MAX_BLOCKS
+// refusals per turn the agent is let go, calls the human and leaves the `human-call` marker for the
+// session recording; if the counter cannot be written, the agent is let go too. The start of a
+// turn resets the counter, so here it only grows.
 
 import { readFile, rm, writeFile } from "node:fs/promises";
 import {
@@ -25,7 +25,7 @@ const MAX_BLOCKS = 3;
 const OUTPUT_TAIL_LINES = 40;
 const SUCCESS_EXIT_CODE = 0;
 
-/** Решение хука остановки. */
+/** Stop hook decision. */
 type StopVerdict =
   | { kind: "release" }
   | { kind: "release-with-message"; message: string }
@@ -33,7 +33,7 @@ type StopVerdict =
 
 const RELEASE: StopVerdict = { kind: "release" };
 
-/** Остановка одной сессии: где лежит её состояние. */
+/** Stop of one session: where its state lives. */
 interface StopSession {
   root: string;
   statePath(name: HookStateName): string;
@@ -62,8 +62,8 @@ async function readState(file: string): Promise<string | undefined> {
   }
 }
 
-// Если отпечатка начала хода нет (хуки подключились посреди хода), код считается изменённым
-// при любых незакоммиченных правках в каталогах с кодом.
+// If there is no turn-start fingerprint (hooks were connected mid-turn), the code counts as
+// changed whenever the code directories have any uncommitted changes.
 async function codeChangedThisTurn(session: StopSession, checks: ProjectChecks): Promise<boolean> {
   const turnStart = await readState(session.statePath("turn-start"));
 
@@ -72,8 +72,8 @@ async function codeChangedThisTurn(session: StopSession, checks: ProjectChecks):
   return turnStart !== codeFingerprint(session.root, checks.paths);
 }
 
-// Счётчик, который не прочитать или не записать, не даёт защиты от вечного цикла: такой отказ
-// вызывающий превращает в отпуск агента.
+// A counter that cannot be read or written gives no protection against an infinite loop: the
+// caller turns such a refusal into letting the agent go.
 async function countedBlock(counter: string): Promise<number | undefined> {
   try {
     const stored = await readState(counter);
@@ -104,7 +104,7 @@ function tailOf(output: string): string {
   return lines.slice(-OUTPUT_TAIL_LINES).join("\n");
 }
 
-// Отметка нужна хуку записи: следующий промпт человека — вызов хуком остановки.
+// The capture hook needs the marker: the human's next prompt answers the stop hook's call.
 async function callHuman(session: StopSession, blocks: number): Promise<StopVerdict> {
   const { stop } = session.messages;
   const message = stop.humanCalled(MAX_BLOCKS);
@@ -141,7 +141,8 @@ async function verdictOnRedChecks(
   };
 }
 
-// Без git не понять, менял ли агент код: держать его вслепую хуже, чем отпустить с сообщением.
+// Without git there is no telling whether the agent changed code: holding it blindly is worse
+// than letting it go with a message.
 async function codeChangedOrGitMissing(
   session: StopSession,
   checks: ProjectChecks,
@@ -187,12 +188,12 @@ async function verdictOf(session: StopSession): Promise<StopVerdict> {
   return verdictOnRedChecks(session, checks, run.output);
 }
 
-// На месте файла состояния может оказаться каталог: агент отпускается и тогда.
+// A directory may sit where the state file should be: the agent is let go then too.
 async function removeState(file: string): Promise<void> {
   await rm(file, { force: true, recursive: true });
 }
 
-// Отпущенный агент закончил ход: следующий промпт начнёт новый.
+// The released agent has finished the turn: the next prompt starts a new one.
 async function endTurn(session: StopSession): Promise<void> {
   await removeState(session.statePath("turn-start"));
   await removeState(session.statePath("stop-blocks"));
@@ -222,9 +223,9 @@ async function outcomeOf(session: StopSession, verdict: StopVerdict): Promise<Ho
 }
 
 /**
- * Решает, может ли агент закончить ход: запускает проверки, если он менял код.
- * @param {HookContext} context Вызов хука.
- * @returns {Promise<HookOutcome>} Отпустить, отпустить с сообщением или вернуть к работе.
+ * Decides whether the agent may finish the turn: runs the checks if it changed code.
+ * @param {HookContext} context Hook call.
+ * @returns {Promise<HookOutcome>} Let go, let go with a message, or send back to work.
  */
 export async function gateStop(context: HookContext): Promise<HookOutcome> {
   const sessionId = sessionIdOf(context.payload);

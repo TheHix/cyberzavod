@@ -1,50 +1,53 @@
 import type { FactoryLayout, Point, Scene } from "@cyberzavod/player";
 import type { Locale } from "@/shared/i18n/locale.ts";
 
-/** Точка в координатах контейнера цеха, CSS-пиксели от его левого верхнего угла. */
+/** A point in floor container coordinates, CSS pixels from its top left corner. */
 export interface ScreenPoint {
   readonly x: number;
   readonly y: number;
 }
 
-/** Прямоугольник в координатах контейнера: поле, свободное от меню и HUD, куда встаёт план. */
+/**
+ * A rectangle in container coordinates: the field free of the menu and HUD, where the plan fits.
+ */
 export interface Frame extends ScreenPoint {
   readonly width: number;
   readonly height: number;
 }
 
 /**
- * Графика цеха — как выглядят пол, станки, рабочие и деталь. Модель и интерфейс над цехом
- * знают только этот интерфейс, поэтому графику можно заменить целиком (пиксели, фигуры, 3D),
- * не трогая ядро, модель и компоненты.
+ * Factory graphics: how the floor, machines, workers and the part look. The model and the UI over
+ * the floor know only this interface, so the graphics can be replaced entirely (pixels, shapes,
+ * 3D) without touching the core, the model and the components.
  */
 export interface FactoryGraphics {
-  /** Встраивает холст в контейнер и рисует неподвижный план цеха. */
+  /** Embeds the canvas into the container and draws the static floor plan. */
   mount(container: HTMLElement, layout: FactoryLayout): Promise<void>;
   /**
-   * Заменяет неподвижный план — пол, станки, кабинет. Рабочие, мастер и деталь остаются.
-   * Вписывает новый план в поле следующий `resize`: до него масштаб остаётся от прежнего плана.
+   * Replaces the static plan: the floor, machines, office. Workers, the foreman and the part stay.
+   * The next `resize` fits the new plan into the field: until then the scale stays from the old
+   * plan.
    */
   setLayout(layout: FactoryLayout): void;
-  /** Рисует кадр сцены. */
+  /** Draws a scene frame. */
   render(scene: Scene): void;
   /**
-   * Подстраивается под размер контейнера (CSS-пиксели): пол — на весь контейнер,
-   * план — вписан в поле `frame`.
+   * Adapts to the container size (CSS pixels): the floor covers the whole container, the plan
+   * fits into the `frame` field.
    */
   resize(width: number, height: number, frame: Frame): void;
-  /** Переводит точку плана в координаты контейнера — для HTML поверх холста. */
+  /** Converts a plan point to container coordinates, for HTML over the canvas. */
   toScreen(point: Point): ScreenPoint;
-  /** Освобождает холст и память видеокарты. */
+  /** Frees the canvas and GPU memory. */
   destroy(): void;
 }
 
 /**
- * Загружает графику цеха, которую показывает сайт. Её код приходит отдельным файлом и только
- * в браузере; чтобы сменить графику, достаточно вернуть здесь другую реализацию FactoryGraphics.
- * Надписи графики — на языке страницы.
- * @param {Locale} locale Язык страницы.
- * @returns {Promise<FactoryGraphics>} Графика, ещё не встроенная в страницу.
+ * Loads the factory graphics the site shows. Its code comes as a separate file and only in the
+ * browser; to change the graphics, it is enough to return another FactoryGraphics implementation
+ * here. Graphics labels are in the page language.
+ * @param {Locale} locale Page language.
+ * @returns {Promise<FactoryGraphics>} Graphics not yet embedded in the page.
  */
 export async function loadFactoryGraphics(locale: Locale): Promise<FactoryGraphics> {
   const { PixelGraphics } = await import("./pixel/pixel-graphics.ts");

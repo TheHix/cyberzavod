@@ -1,47 +1,47 @@
-# Единые команды проекта. `make help` — список.
+# Shared project commands. `make help` lists them.
 
 .DEFAULT_GOAL := help
 .PHONY: help up down dev api-dev format check check-web check-api check-docker check-scripts
 
-help: ## Показать команды
+help: ## Show commands
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-17s %s\n", $$1, $$2}'
 
-up: ## Поднять Postgres и API в Docker и дождаться готовности
+up: ## Start Postgres and API in Docker and wait until ready
 	docker compose up -d --build --wait
 
-down: ## Остановить Docker-окружение (данные базы сохраняются)
+down: ## Stop the Docker environment (database data is kept)
 	docker compose down
 
-dev: up ## API в Docker + фронт с горячей перезагрузкой
+dev: up ## API in Docker + frontend with hot reload
 	pnpm dev
 
-api-dev: ## API из исходников: миграции и запуск (нужен DATABASE_URL; в dev-контейнере задан)
+api-dev: ## API from sources: migrations and start (needs DATABASE_URL; set in the dev container)
 	cd apps/api && go run ./cmd/api migrate && go run ./cmd/api serve
 
-format: ## Привести код к стилю: Prettier и ESLint --fix для TS, gofumpt и goimports для Go
+format: ## Bring code to style: Prettier and ESLint --fix for TS, gofumpt and goimports for Go
 	pnpm format
 	cd apps/api && golangci-lint fmt ./...
 
-check: check-web check-api check-docker check-scripts ## Все проверки: то же, что запускает CI
+check: check-web check-api check-docker check-scripts ## All checks: the same as CI runs
 
-# Сверка файлов агента со сборкой — здесь, а не в check-scripts: сборке нужны
-# Node и зависимости workspace, а job scripts их не ставит. `pnpm -r run check` собирает CLI.
-check-web: ## Стиль, типы, тесты и сборка фронта и пакетов, файлы агента совпадают с harness
+# Checking agent files against the build is here, not in check-scripts: the build needs Node
+# and workspace dependencies, which the scripts job lacks. `pnpm -r run check` builds the CLI.
+check-web: ## Style, types, tests and build of frontend and packages; agent files match the harness
 	pnpm lint
 	pnpm -r run check
 	node packages/cli/dist/cyberzavod.mjs sync --check
 
-# Тест хука форматирования Go — здесь, а не в check-scripts: хуку нужны Go и golangci-lint,
-# а они есть везде, где запускается check-api (CI-job api, dev-контейнер).
-check-api: ## golangci-lint, тесты и сборка API, тест хука форматирования Go
+# The Go formatting hook test is here, not in check-scripts: the hook needs Go and golangci-lint,
+# and they are present wherever check-api runs (the api CI job, the dev container).
+check-api: ## golangci-lint, tests and build of the API, Go formatting hook test
 	cd apps/api && golangci-lint run ./... && go test ./... && go build -o /dev/null ./cmd/api
 	.claude/hooks/format-go.test.sh
 
-check-docker: ## Сборка Docker-образов API и сайта
+check-docker: ## Build the API and site Docker images
 	docker build -q -t cyberzavod-api:check apps/api >/dev/null
 	docker build -q -f apps/web/Dockerfile -t cyberzavod-web:check . >/dev/null
 
-check-scripts: ## Shell-скрипты dev-контейнера и хуков проекта: shellcheck и тесты хуков
+check-scripts: ## Dev container and project hook shell scripts: shellcheck and hook tests
 	docker run --rm -v "$(CURDIR):/mnt:ro" koalaman/shellcheck:stable -x \
 		/mnt/.devcontainer/init-firewall.sh /mnt/.claude/hooks/format-go.sh \
 		/mnt/.claude/hooks/format-go.test.sh /mnt/.claude/hooks/session-start.sh \

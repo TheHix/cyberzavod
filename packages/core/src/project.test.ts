@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseProject, ProjectError } from "./project.ts";
 
-// Карточка как сырой JSON: тесты портят её как угодно, проверяет parseProject.
+// The card as raw JSON: tests break it however they like, parseProject validates it.
 function validProject(): Record<string, unknown> {
   return {
     id: "cyberzavod",
@@ -94,9 +94,9 @@ describe("parseProject", () => {
 
   it.each([
     ["name строкой, а не переводами", { name: "Киберзавод" }, /name/],
-    ["name без английского", { name: { ru: "Киберзавод" } }, /name на en/],
-    ["description без русского", { description: { en: "Factory." } }, /description на ru/],
-    ["пустое name", { name: { en: "  ", ru: "Киберзавод" } }, /name на en/],
+    ["name без английского", { name: { ru: "Киберзавод" } }, /name in en/],
+    ["description без русского", { description: { en: "Factory." } }, /description in ru/],
+    ["пустое name", { name: { en: "  ", ru: "Киберзавод" } }, /name in en/],
     ["description с переводом строки", { description: { en: "a\nb", ru: "б" } }, /description/],
   ])("отклоняет карточку: %s", (_case, override, message) => {
     const raw = { ...validProject(), ...override };

@@ -1,19 +1,20 @@
-// Краски цеха. Единственный источник — токены оформления (shared/ui/tokens.css): цех читает
-// их при встраивании, поэтому пол совпадает с фоном страницы, а контур — с контуром панелей.
+// Factory inks. The only source is the design tokens (shared/ui/tokens.css): the factory reads them
+// on embedding, so the floor matches the page background, and the outline matches the panel
+// outline.
 
 import type { Stage } from "@cyberzavod/core";
 import type { PartStatus } from "@cyberzavod/player";
 import { parseColor } from "@/shared/lib/color.ts";
 import type { TokenSource } from "@/shared/lib/css-tokens.ts";
 
-/** Краски цеха числами 0xRRGGBB — в таком виде их берёт PixiJS. */
+/** Factory inks as 0xRRGGBB numbers, the form PixiJS takes them in. */
 export interface Palette {
   readonly ink: number;
   readonly inkSoft: number;
   readonly paper: number;
-  /** Чистый белый: стекло, блики и основа свечения, которую красит `tint`. */
+  /** Pure white: glass, highlights and the glow base that `tint` colors. */
   readonly white: number;
-  /** Цвет станка и формы его рабочего: у каждого этапа свой. */
+  /** Color of the machine and its worker's uniform: each stage has its own. */
   readonly stations: Readonly<Record<Stage, number>>;
   readonly floor: {
     readonly tile: number;
@@ -23,9 +24,9 @@ export interface Palette {
     readonly mark: number;
     readonly pad: number;
   };
-  /** Цвет формы мастера: свой, не совпадающий с цветом ни одного этапа. */
+  /** Foreman uniform color: their own, matching no stage color. */
   readonly foreman: number;
-  /** Каска мастера: почти белая, его видно среди рабочих в жёлтых касках. */
+  /** Foreman helmet: almost white, so they stand out among workers in yellow helmets. */
   readonly foremanHelmet: number;
   readonly skin: number;
   readonly helmet: number;
@@ -33,17 +34,18 @@ export interface Palette {
   readonly screen: number;
   readonly screenGlass: number;
   readonly belt: number;
-  /** Лампа станка: выключена — тусклая, работает — светится. */
+  /** Machine lamp: dim when off, lit when working. */
   readonly lamp: { readonly off: number; readonly on: number };
-  /** Свечение под деталью по состоянию; у детали в работе свечения нет. */
+  /** Glow under the part by state; a part in work has no glow. */
   readonly status: Readonly<Record<PartStatus, number | null>>;
 }
 
 /**
- * Собирает краски цеха из токенов оформления.
- * @param {TokenSource} tokens Стили элемента, где видны токены (`getComputedStyle`).
- * @returns {Palette} Краски цеха.
- * @throws {Error} Если какого-то токена нет или он не цвет вида `#rrggbb` или `#rgb`.
+ * Collects factory inks from the design tokens.
+ * @param {TokenSource} tokens Styles of an element where the tokens are visible
+ *   (`getComputedStyle`).
+ * @returns {Palette} Factory inks.
+ * @throws {Error} If some token is missing or is not a color of the form `#rrggbb` or `#rgb`.
  */
 export function readPalette(tokens: TokenSource): Palette {
   const color = (name: string) => parseColor(tokens.getPropertyValue(name));

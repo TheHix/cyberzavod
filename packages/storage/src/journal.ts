@@ -1,6 +1,6 @@
-// Журнал проекта на диске: каталог, в котором каждая запись — файл
-// `<коллекция>/<id>.json`. Один и тот же код хранит журнал и в репозитории проекта,
-// и в каталоге рядом с ним: отличается только путь.
+// The project journal on disk: a directory where each record is a file
+// `<collection>/<id>.json`. The same code keeps the journal both in the project repository
+// and in a directory next to it: only the path differs.
 
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -13,7 +13,7 @@ import {
 } from "@cyberzavod/core";
 import { isNotFound } from "./project.ts";
 
-/** Каталог записей каждого типа внутри журнала. */
+/** Directory for records of each type inside the journal. */
 export const RECORD_COLLECTIONS: Readonly<Record<RecordType, string>> = {
   session: "sessions",
   decision: "decisions",
@@ -21,27 +21,27 @@ export const RECORD_COLLECTIONS: Readonly<Record<RecordType, string>> = {
 };
 
 /**
- * Рабочие файлы адаптеров внутри журнала: сырые журналы сессий и черновики. Это не записи,
- * в git они не идут.
+ * Adapters' working files inside the journal: raw session logs and drafts. These are not records
+ * and do not go into git.
  */
 export const CAPTURE_DIRECTORY = "capture";
 
 const RECORD_EXTENSION = ".json";
 
-/** Ошибка журнала: файл записи не читается или не прошёл проверку. */
+/** Journal error: a record file cannot be read or failed validation. */
 export class JournalError extends Error {}
 
 /**
- * Каталог журнала проекта.
- * @param {string} root Корень проекта.
- * @param {ProjectConfig} config Конфиг проекта.
- * @returns {string} Абсолютный путь журнала: `journal` конфига от корня проекта.
+ * The project's journal directory.
+ * @param {string} root Project root.
+ * @param {ProjectConfig} config Project config.
+ * @returns {string} Absolute journal path: the config's `journal` from the project root.
  */
 export function journalDirectory(root: string, config: ProjectConfig): string {
   return path.resolve(root, ...config.journal.split("/"));
 }
 
-// Каталога ещё нет — значит, и записей в нём нет; другие ошибки не глотаются.
+// No directory yet means no records in it either; other errors are not swallowed.
 async function recordFilesIn(directory: string): Promise<string[]> {
   try {
     const names = await readdir(directory);
@@ -60,28 +60,28 @@ async function readRecord(file: string): Promise<JournalRecord> {
 
     return parseRecord(JSON.parse(text));
   } catch (err) {
-    throw new JournalError(`запись ${file} не прошла проверку: ${(err as Error).message}`, {
+    throw new JournalError(`record ${file} failed validation: ${(err as Error).message}`, {
       cause: err,
     });
   }
 }
 
-/** Журнал в каталоге файловой системы. */
+/** Journal in a file system directory. */
 export class DirectoryRecordStore implements RecordStore {
   readonly #directory: string;
 
   /**
-   * Открывает журнал в каталоге; каталог создаётся при первой записи.
-   * @param {string} directory Абсолютный путь журнала.
+   * Opens a journal in a directory; the directory is created on the first write.
+   * @param {string} directory Absolute journal path.
    */
   constructor(directory: string) {
     this.#directory = directory;
   }
 
   /**
-   * Перечисляет все записи журнала.
-   * @returns {Promise<JournalRecord[]>} Записи по коллекциям, внутри коллекции — по имени файла.
-   * @throws {JournalError} Если файл записи битый.
+   * Lists all journal records.
+   * @returns {Promise<JournalRecord[]>} Records by collection, within a collection by file name.
+   * @throws {JournalError} If a record file is corrupt.
    */
   async list(): Promise<JournalRecord[]> {
     const records: JournalRecord[] = [];
@@ -98,9 +98,9 @@ export class DirectoryRecordStore implements RecordStore {
   }
 
   /**
-   * Сохраняет запись в файл `<коллекция>/<id>.json`.
-   * @param {JournalRecord} record Проверенная запись.
-   * @returns {Promise<void>} Готово, когда файл записан.
+   * Saves a record to the file `<collection>/<id>.json`.
+   * @param {JournalRecord} record The validated record.
+   * @returns {Promise<void>} Resolves when the file is written.
    */
   async write(record: JournalRecord): Promise<void> {
     const file = this.pathOf(record);
@@ -110,9 +110,9 @@ export class DirectoryRecordStore implements RecordStore {
   }
 
   /**
-   * Где лежит или ляжет запись.
-   * @param {JournalRecord} record Запись.
-   * @returns {string} Абсолютный путь файла записи.
+   * Where the record lies or will lie.
+   * @param {JournalRecord} record The record.
+   * @returns {string} Absolute path of the record file.
    */
   pathOf(record: JournalRecord): string {
     return path.join(this.#directory, RECORD_COLLECTIONS[record.type], `${record.id}.json`);

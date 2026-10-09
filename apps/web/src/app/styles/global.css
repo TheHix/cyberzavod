@@ -11,7 +11,7 @@ body {
   height: 100%;
 }
 
-/* Весь сайт — игровое поле: страница не прокручивается, длинное содержимое — в панелях. */
+/* The whole site is a game field: the page does not scroll, long content goes in panels. */
 body {
   margin: 0;
   overflow: hidden;

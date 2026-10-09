@@ -3,31 +3,33 @@ import type { Locale } from "@/shared/i18n/locale.ts";
 import { languageNoteOf } from "@/shared/lib/language-note.ts";
 import type { BuildProject } from "./build-project.ts";
 
-/** Место сборки в серии её проекта: «сборка 2 из 7». */
+/** Place of a build in its project's series: "build 2 of 7". */
 export interface SeriesPosition {
-  /** Номер сборки среди сборок проекта по порядку задач, с нуля. */
+  /** Build number among the project's builds in task order, from zero. */
   readonly index: number;
-  /** Сколько сборок у проекта. */
+  /** How many builds the project has. */
   readonly count: number;
 }
 
-/** Сборка серии: запись для цеха и то, что HUD пишет рядом с ней. */
+/** A series build: the recording for the floor and what the HUD writes next to it. */
 export interface SeriesBuild {
-  /** Запись без полных текстов реплик и вмешательств: цеху нужна только строка. */
+  /** Recording without full message and intervention texts: the floor needs only the line. */
   readonly recording: BriefSessionRecord;
   readonly project: BuildProject;
-  /** Пометка о языке оригинала записи; нет, если запись на языке страницы. */
+  /**
+   * Note about the recording's original language; absent if the recording is in the page language.
+   */
   readonly languageNote?: string | undefined;
   readonly position: SeriesPosition;
 }
 
 /**
- * Собирает сборки одного проекта в серию для цеха: запись без полных текстов, проект и место
- * сборки среди сборок проекта.
- * @param {readonly SessionRecord[]} recordings Записи проекта по порядку задач.
- * @param {BuildProject} project Проект этих записей.
- * @param {Locale} locale Язык страницы: на нём пометка о языке записи.
- * @returns {SeriesBuild[]} Сборки серии в том же порядке.
+ * Assembles one project's builds into a series for the floor: the recording without full texts,
+ * the project and the build's place among the project's builds.
+ * @param {readonly SessionRecord[]} recordings Project recordings in task order.
+ * @param {BuildProject} project Project of these recordings.
+ * @param {Locale} locale Page language: the recording language note is in it.
+ * @returns {SeriesBuild[]} Series builds in the same order.
  */
 export function seriesBuildsOf(
   recordings: readonly SessionRecord[],

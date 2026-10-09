@@ -1,5 +1,5 @@
-// `cyberzavod doctor`: проверяет по пунктам машину, подключение проекта и файлы агента и под
-// каждой ошибкой говорит, как её чинить. Ничего не исправляет и не ходит в сеть.
+// `cyberzavod doctor`: checks the machine, the project connection and the agent files item by item
+// and says under each error how to fix it. Fixes nothing and does not go to the network.
 
 import type { ClaudeMessages } from "@cyberzavod/adapter-claude";
 import type {
@@ -27,7 +27,7 @@ const FAILED_SIGN = "✗";
 const NOTICE_SIGN = "–";
 const HINT_INDENT = "    ";
 
-/** Проверки машины в порядке показа: идут до проверок проекта и не зависят от него. */
+/** Machine checks in display order: they run before project checks and do not depend on them. */
 const MACHINE_CHECKS: readonly MachineCheck[] = [
   nodeCheck,
   gitCheck,
@@ -36,34 +36,34 @@ const MACHINE_CHECKS: readonly MachineCheck[] = [
 ];
 const CONFIG_CHECK_ID = "config";
 
-/** Что нужно проверкам проекта от внешнего мира: поиск программ и запуск команд. */
+/** What project checks need from the outside world: program lookup and running commands. */
 export type ProjectTools = Pick<ProjectContext, "isProgramAvailable" | "runCommand">;
 
-/** Что нужно `doctor`: машина, проверки проекта, версия CLI, тексты и работа с программами. */
+/** What `doctor` needs: machine, project checks, CLI version, texts and program access. */
 export interface DoctorOptions {
   machine: Machine;
-  /** Проверки проекта в порядке показа; идут, только если проект найден. */
+  /** Project checks in display order; they run only if a project is found. */
   projectChecks: readonly ProjectCheck[];
-  /** Поиск программ и запуск команд для проверок проекта. */
+  /** Program lookup and running commands for project checks. */
   projectTools: ProjectTools;
   installation: Installation;
   messages: CliMessages;
   claudeMessages: ClaudeMessages;
-  /** Напечатать итог одним JSON-документом, а не строками для человека. */
+  /** Print the result as one JSON document rather than lines for the human. */
   isJson: boolean;
 }
 
-/** Результат проверки с её кодом. */
+/** A check result with its code. */
 interface IdentifiedResult {
   id: string;
   result: CheckResult;
 }
 
 /**
- * Проверки проекта в порядке показа; проверка команд — та, что выбрал вызывающий: найти программы
- * или запустить команды.
- * @param {ProjectCheck} commandsCheck Проверка команд проверок проекта.
- * @returns {ProjectCheck[]} Хуки, файлы агента, правила, команды и `.gitignore`.
+ * Project checks in display order; the commands check is the one the caller chose: find the
+ * programs or run the commands.
+ * @param {ProjectCheck} commandsCheck Check of the project's check commands.
+ * @returns {ProjectCheck[]} Hooks, agent files, rules, commands and `.gitignore`.
  */
 export function projectChecksWith(commandsCheck: ProjectCheck): ProjectCheck[] {
   return [hooksCheck, freshnessCheck, rulesCheck, commandsCheck, gitignoreCheck];
@@ -96,7 +96,7 @@ function isProblem(result: CheckResult): boolean {
   }
 }
 
-// Результаты по одному, в порядке показа: долгие проверки не держат уже готовые пункты.
+// Results one at a time, in display order: slow checks do not hold back items that are ready.
 async function* resultsOf(
   directory: string,
   options: DoctorOptions,
@@ -138,13 +138,13 @@ function jsonOf({ id, result }: IdentifiedResult) {
 }
 
 /**
- * Проверяет машину, подключение проекта и файлы агента и печатает строку на пункт: ✓, ✗ или –,
- * а под ✗ — как починить; с `isJson` — один JSON-документ. Вне проекта печатает проверки машины
- * и ошибку конфига.
- * @param {string} directory Каталог, из которого запущена команда.
- * @param {DoctorOptions} options Машина, проверки проекта, поиск программ и запуск команд
- *   (`projectTools`), версия CLI, тексты, вид вывода.
- * @returns {Promise<boolean>} true, если ни одна проверка не провалилась.
+ * Checks the machine, the project connection and the agent files and prints a line per item: ✓,
+ * ✗ or –, and under ✗ how to fix it; with `isJson`, one JSON document. Outside a project prints
+ * the machine checks and the config error.
+ * @param {string} directory Directory the command was run from.
+ * @param {DoctorOptions} options Machine, project checks, program lookup and command running
+ *   (`projectTools`), CLI version, texts, output format.
+ * @returns {Promise<boolean>} true if no check failed.
  */
 export async function runDoctor(directory: string, options: DoctorOptions): Promise<boolean> {
   const { messages, isJson } = options;

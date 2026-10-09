@@ -7,7 +7,7 @@ import (
 	"github.com/bysavelii/cyberzavod/apps/api/internal/gallery"
 )
 
-// tokenCache помнит автора по sha256 токена: сам токен в памяти сервера не хранится.
+// tokenCache remembers the author by the token's sha256: the token itself is not kept in memory.
 type tokenCache struct {
 	ttl time.Duration
 	now func() time.Time
@@ -48,7 +48,7 @@ func (c *tokenCache) put(key [32]byte, user gallery.User) {
 	c.entries[key] = cachedUser{user: user, expiresAt: now.Add(c.ttl)}
 }
 
-// forgetExpired убирает просроченные токены, чтобы кэш не рос без конца. Вызывается под mu.
+// forgetExpired drops expired tokens so the cache does not grow forever. Called under mu.
 func (c *tokenCache) forgetExpired(now time.Time) {
 	for key, entry := range c.entries {
 		isExpired := !now.Before(entry.expiresAt)

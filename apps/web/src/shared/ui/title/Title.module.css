@@ -5,7 +5,7 @@
   line-height: 1.2;
 }
 
-/* Блок занимает ровно `--lines` строк: короткий текст не сжимает его, длинный обрезается. */
+/* The block takes exactly `--lines` lines: short text does not shrink it, long text is clipped. */
 .clamped {
   display: -webkit-box;
   min-height: calc(var(--lines) * 1lh);

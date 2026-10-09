@@ -1,15 +1,15 @@
 node_modules/
 dist/
-# Копия корневого LICENSE для npm-пакета, её делает prepack
+# Copy of the root LICENSE for the npm package, made by prepack
 /packages/cli/LICENSE
 .DS_Store
 .env
 *.log
 
-# Рабочие файлы адаптеров агентов: сырые журналы сессий и черновики записей до проверки
-# человеком в репозиторий не попадают
+# Agent adapters' working files: raw session logs and recording drafts do not get into the
+# repository before the human reviews them
 /.cyberzavod/journal/capture/
-# Прежний каталог журнала: в локальных копиях в нём остались сырые журналы с промптами
+# Former journal directory: in local copies it still holds raw logs with prompts
 /journal/
 .claude/settings.local.json
 .astro/

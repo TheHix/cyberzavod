@@ -1,5 +1,5 @@
-// Захват сессий: хук Claude Code пишет сырой журнал, из него собирается черновик,
-// после редактуры промптов черновик публикуется записью для цеха.
+// Session capture: a Claude Code hook writes the raw log, a draft is built from it,
+// and after the prompts are edited the draft is published as a recording for the factory floor.
 
 export {
   fromHookPayload,

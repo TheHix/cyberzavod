@@ -1,4 +1,4 @@
-// Package badge рисует SVG-бейдж галереи для README: «cyberzavod | N builds».
+// Package badge draws the gallery SVG badge for a README: "cyberzavod | N builds".
 package badge
 
 import (
@@ -10,7 +10,7 @@ import (
 
 const (
 	label = "cyberzavod"
-	// privateMessage — что видно на бейдже закрытой или несуществующей галереи.
+	// privateMessage is what a private or nonexistent gallery's badge shows.
 	privateMessage = "private"
 
 	labelColor   = "#555"
@@ -18,23 +18,23 @@ const (
 	privateColor = "#9f9f9f"
 
 	height = 20
-	// charWidth — средняя ширина символа шрифта 11px без кернинга. Шрифт у зрителя свой,
-	// поэтому ширина оценивается по числу символов, а не измеряется.
+	// charWidth is the average character width of an 11px font without kerning. The viewer has
+	// their own font, so the width is estimated from the character count rather than measured.
 	charWidth = 7
 	padding   = 6
 	textY     = 14
 	fontStack = "Verdana,Geneva,DejaVu Sans,sans-serif"
 )
 
-// Builds рисует бейдж открытой галереи login с count записями.
+// Builds draws the badge of the public gallery of login with count recordings.
 func Builds(login string, count int) string {
 	message := buildsMessage(count)
 
 	return render(login, message, buildsColor)
 }
 
-// Private рисует серый бейдж закрытой или несуществующей галереи: картинка в чужом README
-// не ломается, но и не выдаёт, есть ли такой автор.
+// Private draws the grey badge of a private or nonexistent gallery: the image in someone's README
+// does not break, but it does not reveal whether such an author exists either.
 func Private(login string) string {
 	return render(login, privateMessage, privateColor)
 }
@@ -47,7 +47,7 @@ func buildsMessage(count int) string {
 	return strconv.Itoa(count) + " builds"
 }
 
-// render собирает SVG из двух половин: серая подпись и цветное сообщение.
+// render builds the SVG from two halves: a grey label and a coloured message.
 func render(login, message, messageColor string) string {
 	labelWidth := textWidth(label)
 	messageWidth := textWidth(message)
@@ -74,7 +74,7 @@ func render(login, message, messageColor string) string {
 	)
 }
 
-// textWidth оценивает ширину надписи с полями по краям.
+// textWidth estimates the width of a label with padding at the edges.
 func textWidth(text string) int {
 	return utf8.RuneCountInString(text)*charWidth + 2*padding
 }

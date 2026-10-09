@@ -10,9 +10,9 @@ import { publishedRecordings } from "@/entities/recording";
 import { createFactoryModel, type FactoryModel } from "./factory.ts";
 import type { Speech } from "@/features/journal-sync";
 
-// Темп по умолчанию сжимает минуту записи в секунду сцены: постановка работает 0–2 000 мс.
-// Первый промпт мастер говорит, дойдя до станка постановки; второй приходит, когда деталь
-// уже у станка кода.
+// The default tempo compresses a minute of recording into a second of scene: plan works 0–2,000 ms.
+// The foreman says the first prompt on reaching the plan machine; the second arrives when the part
+// is already at the code machine.
 function recordingWithPrompt(): SessionRecord {
   return {
     version: 1,
@@ -37,7 +37,7 @@ function recordingWithPrompt(): SessionRecord {
   };
 }
 
-// Момент сцены, когда висит промпт с номером `index`: чуть позже его начала.
+// The scene moment when the prompt with number `index` is shown: slightly after its start.
 function duringPrompt(model: FactoryModel, index: number): number {
   return (model.$script.get().prompts[index]?.start ?? 0) + 100;
 }
@@ -159,9 +159,9 @@ describe("createFactoryModel", () => {
   });
 });
 
-// Реплики на тех же минутах: мастер даёт задание постановке, постановка говорит на месте
-// (адресат не следующий по передаче), а рабочий кода обменивается репликой с проверками
-// у места передачи.
+// Messages at the same minutes: the foreman gives the plan stage a task, the plan stage speaks in
+// place (the addressee is not next in the handoff), and the code worker exchanges a message with
+// checks at the handoff spot.
 function recordingWithMessages(): SessionRecord {
   const base = recordingWithPrompt();
 
@@ -203,7 +203,7 @@ function recordingWithMessages(): SessionRecord {
   };
 }
 
-// Момент сцены, когда висит реплика с номером `index`: чуть позже её начала.
+// The scene moment when the message with number `index` is shown: slightly after its start.
 function duringMessage(model: FactoryModel, index: number): number {
   return (model.$script.get().messages[index]?.start ?? 0) + 100;
 }
@@ -265,7 +265,7 @@ describe("createFactoryModel: реплики", () => {
   });
 });
 
-// Вмешательства на тех же минутах: решение у станка постановки, потом у станка кода.
+// Interventions at the same minutes: a decision at the plan machine, then at the code machine.
 function recordingWithInterventions(): SessionRecord {
   const base = recordingWithPrompt();
 
@@ -296,7 +296,7 @@ function recordingWithInterventions(): SessionRecord {
   };
 }
 
-// Момент сцены, когда висит вмешательство с номером `index`: чуть позже его начала.
+// The scene moment when the intervention with number `index` is shown: slightly after its start.
 function duringIntervention(model: FactoryModel, index: number): number {
   return (model.$script.get().interventions[index]?.start ?? 0) + 100;
 }
@@ -450,8 +450,8 @@ describe("createFactoryModel: журнал", () => {
   });
 });
 
-// Время события в журнале и то, куда перематывает «показать в цехе»: по промптам, репликам
-// и вмешательствам.
+// The event time in the journal and where "show on floor" rewinds to: for prompts, messages
+// and interventions.
 function speechTimes(recording: SessionRecord): { speech: Speech; t: number }[] {
   const prompts = recording.data.events.filter((event) => event.type === "prompt");
   const messages = recording.data.events.filter((event) => event.type === "message");
@@ -470,7 +470,7 @@ function speechTimes(recording: SessionRecord): { speech: Speech; t: number }[] 
   ];
 }
 
-// Речи, у которых после перемотки время записи не равно времени события.
+// Speeches whose recording time after rewinding does not equal the event time.
 function mismatchedSpeech(recording: SessionRecord, layout: FactoryLayout): unknown[] {
   const model = createFactoryModel(briefOf(recording), layout);
 
@@ -610,7 +610,7 @@ describe("createFactoryModel: план", () => {
   });
 });
 
-// Вторая запись серии: другой id и итоги, промпт под тем же номером 0.
+// The second recording of the series: a different id and totals, a prompt under the same number 0.
 function nextRecording(): SessionRecord {
   const base = recordingWithPrompt();
 

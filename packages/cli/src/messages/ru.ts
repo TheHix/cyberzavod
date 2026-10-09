@@ -1,10 +1,10 @@
-// Русские тексты CLI.
+// Russian CLI texts.
 
 import { CLI_COMMAND, HOOK_NAMES } from "@cyberzavod/adapter-claude";
 import { API_URL_VARIABLE, DEFAULT_API_URL } from "../sharing/services.ts";
 import type { CliMessages } from "./cli-messages.ts";
 
-/** Тексты CLI на русском. */
+/** CLI texts in Russian. */
 export const ru: CliMessages = {
   help: {
     title: "Cyberzavod — локальный harness разработки с ИИ-агентами.",

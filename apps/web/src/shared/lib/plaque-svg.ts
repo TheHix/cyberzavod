@@ -1,20 +1,20 @@
 import { plaqueArt, plaqueRuns, type PlaqueInk, type PlaqueRun } from "./pixel-plaque.ts";
 
-// Табличка строкой SVG — для картинок, которые собираются при сборке без Solid и DOM:
-// иконки вкладки и превью ссылок. В меню ту же табличку рисует компонент PixelPlaque.
+// A plaque as an SVG string, for images made at build time without Solid or the DOM:
+// tab icons and link previews. In the menu the same plaque is drawn by the PixelPlaque component.
 
-/** Краски таблички цветами CSS. */
+/** Plaque colors as CSS colors. */
 export type PlaquePaints = Readonly<Record<PlaqueInk, string>>;
 
-/** Холст картинки, посередине которого стоит табличка. */
+/** Image canvas with the plaque in its middle. */
 export interface PlaqueCanvas {
-  /** Ширина картинки в пикселях. */
+  /** Image width in pixels. */
   readonly width: number;
-  /** Высота картинки в пикселях. */
+  /** Image height in pixels. */
   readonly height: number;
-  /** Какую долю ширины и высоты холста табличка занимает самое большее: от 0 до 1. */
+  /** The largest share of the canvas width and height the plaque takes: from 0 to 1. */
   readonly fill: number;
-  /** Фон под табличкой; без него холст прозрачный. */
+  /** Background under the plaque; without it the canvas is transparent. */
   readonly background?: string;
 }
 
@@ -29,13 +29,13 @@ function runRect(run: PlaqueRun, paint: string): string {
 }
 
 /**
- * Рисует табличку с надписью посередине холста. Пиксель таблички — целое число пикселей
- * картинки, чтобы края оставались чёткими и после перевода в PNG.
- * @param {readonly string[]} lines Строки надписи; строчные буквы становятся заглавными.
- * @param {PlaquePaints} paints Краски таблички.
- * @param {PlaqueCanvas} canvas Холст картинки.
- * @returns {string} Документ SVG.
- * @throws {Error} Если в надписи есть буква без глифа.
+ * Draws a plaque with a label in the middle of the canvas. A plaque pixel is a whole number of
+ * image pixels, so edges stay crisp even after conversion to PNG.
+ * @param {readonly string[]} lines Label lines; lowercase letters become uppercase.
+ * @param {PlaquePaints} paints Plaque colors.
+ * @param {PlaqueCanvas} canvas Image canvas.
+ * @returns {string} SVG document.
+ * @throws {Error} If the label has a letter without a glyph.
  */
 export function plaqueSvg(
   lines: readonly string[],

@@ -1,5 +1,5 @@
-/* Сворачиваемый блок: шапка со стрелкой, содержимое под ней. Свой маркер браузера скрыт —
-   вместо него стрелка, которая поворачивается вниз, когда блок раскрыт. */
+/* Collapsible block: a header with an arrow, the content below it. The browser's own marker is
+   hidden; instead an arrow turns down when the block is expanded. */
 .disclosure {
   --marker-size: 1.25rem;
 }

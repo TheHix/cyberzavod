@@ -3,15 +3,16 @@ import { messageAnchor } from "@/entities/message";
 import { PANELS } from "@/shared/config/panels.ts";
 import type { FactoryModel } from "../model/factory.ts";
 
-// Журнал серии — остров, и полная запись приходит в него файлом: сразу после нажатия записи в
-// журнале может ещё не быть. Столько журнал ждёт её, чтобы прокрутить к ней.
+// The series journal is an island, and the full recording comes into it as a file: right after a
+// click the entry may not be in the journal yet. The journal waits this long for it to scroll to
+// it.
 const ENTRY_WAIT_MS = 10_000;
 
-// Запись встаёт к верху журнала, а не в середину: длинная реплика выше панели, и посередине её
-// шапка и начало текста ушли бы за верхний край.
+// The entry goes to the top of the journal, not the middle: a long message is taller than the
+// panel, and in the middle its header and the start of the text would go past the top edge.
 const ENTRY_ALIGNMENT: ScrollIntoViewOptions = { block: "start" };
 
-// Прокручивает журнал к записи; если её ещё нет, ждёт, пока журнал её покажет.
+// Scrolls the journal to the entry; if it is not there yet, waits until the journal shows it.
 function scrollToEntry(panel: HTMLElement, anchor: string): void {
   const entry = document.getElementById(anchor);
 
@@ -35,8 +36,8 @@ function scrollToEntry(panel: HTMLElement, anchor: string): void {
 }
 
 /**
- * Открывает панель журнала сборки и прокручивает её к записи, как только запись в журнале есть.
- * @param {string} anchor id записи в журнале, например `message-3`.
+ * Opens the build journal panel and scrolls it to the entry as soon as the entry is in the journal.
+ * @param {string} anchor Entry id in the journal, e.g. `message-3`.
  */
 export function openJournalAt(anchor: string): void {
   const panel = document.getElementById(PANELS.journal);
@@ -49,17 +50,17 @@ export function openJournalAt(anchor: string): void {
     return;
   }
 
-  // Запись прокручивается, когда панель открылась: у закрытой панели нет раскладки, а журнал
-  // серии при открытии ставит новую сборку в начало — прокрутка к записи должна идти после него.
+  // The entry scrolls once the panel has opened: a closed panel has no layout, and on opening the
+  // series journal puts the new build at the start, so scrolling to the entry must come after it.
   panel.addEventListener("toggle", () => scrollToEntry(panel, anchor), { once: true });
   panel.showPopover();
 }
 
 /**
- * Показывает полный текст реплики: ставит цех на паузу, чтобы его прочитать, и открывает
- * журнал на этой реплике.
- * @param {FactoryModel} model Модель цеха, которую нужно остановить.
- * @param {number} index Номер реплики в записи (`MessageCue.index`).
+ * Shows the full text of a message: pauses the floor so it can be read, and opens the journal at
+ * this message.
+ * @param {FactoryModel} model The factory model to stop.
+ * @param {number} index Message number in the recording (`MessageCue.index`).
  */
 export function showMessageDetails(model: FactoryModel, index: number): void {
   model.pause();
@@ -67,10 +68,10 @@ export function showMessageDetails(model: FactoryModel, index: number): void {
 }
 
 /**
- * Показывает полный текст вмешательства: ставит цех на паузу, чтобы его прочитать, и открывает
- * журнал на этом вмешательстве.
- * @param {FactoryModel} model Модель цеха, которую нужно остановить.
- * @param {number} index Номер вмешательства в записи (`InterventionCue.index`).
+ * Shows the full text of an intervention: pauses the floor so it can be read, and opens the
+ * journal at this intervention.
+ * @param {FactoryModel} model The factory model to stop.
+ * @param {number} index Intervention number in the recording (`InterventionCue.index`).
  */
 export function showInterventionDetails(model: FactoryModel, index: number): void {
   model.pause();

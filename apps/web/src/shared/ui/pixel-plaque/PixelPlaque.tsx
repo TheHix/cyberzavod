@@ -9,13 +9,13 @@ interface Props {
 }
 
 /**
- * Пиксельная табличка ui-kit: надпись тем же шрифтом и в той же рамке, что таблички станков
- * в цехе. Картинка без смысла для программ чтения — подпись даёт обёртка.
- * Размер пикселя задаёт `--plaque-pixel` снаружи, целым числом CSS-пикселей, чтобы края были чёткими.
- * @param {Props} props Свойства компонента.
- * @param {readonly string[]} props.lines Строки надписи; строчные буквы становятся заглавными.
- * @param {string} [props.class] Дополнительный класс для раскладки снаружи.
- * @returns {JSX.Element} Табличка в SVG.
+ * ui-kit pixel plaque: a label in the same font and frame as the machine plaques on the factory
+ * floor. The image means nothing to screen readers; the wrapper provides the label.
+ * The pixel size is set by `--plaque-pixel` from outside, in whole CSS pixels, so edges stay crisp.
+ * @param {Props} props Component props.
+ * @param {readonly string[]} props.lines Label lines; lowercase letters become uppercase.
+ * @param {string} [props.class] Extra class for layout from outside.
+ * @returns {JSX.Element} SVG plaque.
  */
 export function PixelPlaque(props: Props): JSX.Element {
   const art = () => plaqueArt(props.lines);

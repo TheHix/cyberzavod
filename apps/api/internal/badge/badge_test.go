@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// svgSize — то, что бейдж сообщает о своём размере.
+// svgSize is what the badge reports about its size.
 type svgSize struct {
 	Width int `xml:"width,attr"`
 }

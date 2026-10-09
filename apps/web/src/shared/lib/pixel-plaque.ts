@@ -1,12 +1,13 @@
-// Пиксельный шрифт табличек: заглавные кириллица и латиница из названий этапов, мастера и логотипа.
-// Векторный шрифт при целом увеличении размывается, а готовый пиксельный с кириллицей — это ассет
-// и лицензия, поэтому глифы лежат здесь строками. Табличку рисуют и цех (в текстуру), и меню
-// (в SVG логотипа), поэтому рисунок — строки букв-красок без привязки к графике.
+// Pixel font for plaques: uppercase Cyrillic and Latin letters from the stage, foreman and logo
+// names. A vector font blurs at integer scaling, and a ready-made pixel font with Cyrillic is an
+// asset and a license, so the glyphs live here as strings. Both the factory floor (into a texture)
+// and the menu (into the logo SVG) draw plaques, so the art is rows of color letters with no tie to
+// the graphics.
 
-/** Рисунок таблички: строки одной длины, буква — краска из `PLAQUE_INKS`. */
+/** Plaque art: rows of equal length, each letter a color from `PLAQUE_INKS`. */
 export type PlaqueArt = readonly string[];
 
-/** Буквы красок в рисунке таблички: контур, бумага, затенённая бумага и пустота. */
+/** Color letters in plaque art: outline, paper, shaded paper and blank. */
 export const PLAQUE_INKS = {
   ink: "k",
   paper: "p",
@@ -14,7 +15,7 @@ export const PLAQUE_INKS = {
   blank: ".",
 } as const;
 
-/** Глифы заглавных букв высотой 5 пикселей: `k` — штрих буквы, `.` — пусто. */
+/** Glyphs of uppercase letters 5 pixels high: `k` is a letter stroke, `.` is blank. */
 export const PLAQUE_GLYPHS: Readonly<Record<string, PlaqueArt>> = {
   А: [".k.", "k.k", "kkk", "k.k", "k.k"],
   Б: ["kkk", "k..", "kk.", "k.k", "kk."],
@@ -38,8 +39,8 @@ export const PLAQUE_GLYPHS: Readonly<Record<string, PlaqueArt>> = {
   Ь: ["k..", "k..", "kk.", "k.k", "kk."],
   Ю: ["k.kk.", "k.k.k", "kkk.k", "k.k.k", "k.kk."],
   Я: [".kk", "k.k", ".kk", "k.k", "k.k"],
-  // Латинские буквы того же вида, что кириллические, рисуются так же: на одной табличке и на
-  // одной странице не должно быть двух разных «А» шрифта.
+  // Latin letters that look like Cyrillic ones are drawn the same: one plaque or one page must
+  // not have two different "A" glyphs.
   A: [".k.", "k.k", "kkk", "k.k", "k.k"],
   B: ["kk.", "k.k", "kk.", "k.k", "kk."],
   C: ["kkk", "k..", "k..", "k..", "kkk"],
@@ -62,7 +63,10 @@ export const PLAQUE_GLYPHS: Readonly<Record<string, PlaqueArt>> = {
   Z: ["kkk", "..k", ".k.", "k..", "kkk"],
 };
 
-/** Насколько тень бумаги темнее самой бумаги — для `shade`: у табличек цеха, в меню и в иконках одна. */
+/**
+ * How much darker the paper shade is than the paper, for `shade`: the same on the factory floor
+ * plaques, in the menu and in the icons.
+ */
 export const PLAQUE_PAPER_SHADE = -0.12;
 
 const GLYPH_HEIGHT = 5;
@@ -82,7 +86,7 @@ function glyphOf(letter: string): PlaqueArt {
   return glyph;
 }
 
-// Строка надписи пиксельными рядами: буквы через промежуток, пустое — бумага.
+// A label line as pixel rows: letters with a gap between them, empty space is paper.
 function lineArt(text: string): string[] {
   const letters = [...text.toLocaleUpperCase("ru-RU")].map(glyphOf);
   const gap = BLANK.repeat(LETTER_GAP);
@@ -95,7 +99,7 @@ function lineArt(text: string): string[] {
   );
 }
 
-// Короткая строка встаёт по центру самой длинной.
+// A short line is centered on the longest one.
 function centered(row: string, width: number): string {
   const before = Math.floor((width - row.length) / 2);
 
@@ -106,17 +110,17 @@ function paperRows(count: number, width: number): string[] {
   return Array.from({ length: count }, () => PAPER.repeat(width));
 }
 
-// Верхний и нижний контур со срезанными углами; тень повторяет нижний.
+// Top and bottom outline with cut corners; the shadow repeats the bottom one.
 function edgeRow(width: number): string {
   return BLANK + INK.repeat(width - 2 * OUTLINE) + BLANK;
 }
 
 /**
- * Рисует табличку с надписью заглавными: бумага, контур в 1 пиксель, тень вниз в 1 пиксель,
- * буквы через 1 пиксель, строки через 1 пиксель и по центру.
- * @param {readonly string[]} lines Строки надписи; строчные буквы становятся заглавными.
- * @returns {PlaqueArt} Рисунок таблички.
- * @throws {Error} Если в надписи есть буква без глифа.
+ * Draws a plaque with an uppercase label: paper, a 1-pixel outline, a 1-pixel drop shadow,
+ * letters 1 pixel apart, lines 1 pixel apart and centered.
+ * @param {readonly string[]} lines Label lines; lowercase letters become uppercase.
+ * @returns {PlaqueArt} Plaque art.
+ * @throws {Error} If the label has a letter without a glyph.
  */
 export function plaqueArt(lines: readonly string[]): PlaqueArt {
   const lineRows = lines.map(lineArt);
@@ -139,10 +143,10 @@ export function plaqueArt(lines: readonly string[]): PlaqueArt {
   ];
 }
 
-/** Краска таблички, которую видно: всё, кроме пустоты. */
+/** A visible plaque color: everything except blank. */
 export type PlaqueInk = Exclude<keyof typeof PLAQUE_INKS, "blank">;
 
-/** Подряд идущие пиксели одной краски в строке рисунка: в SVG это один прямоугольник. */
+/** Consecutive pixels of one color in an art row: one rectangle in SVG. */
 export interface PlaqueRun {
   readonly ink: PlaqueInk;
   readonly x: number;
@@ -184,10 +188,10 @@ function rowRuns(row: string, y: number): PlaqueRun[] {
 }
 
 /**
- * Делит рисунок таблички на отрезки одной краски по строкам; пустые пиксели пропускает.
- * @param {PlaqueArt} art Рисунок таблички.
- * @returns {PlaqueRun[]} Отрезки сверху вниз и слева направо.
- * @throws {Error} Если в рисунке есть буква не из `PLAQUE_INKS`.
+ * Splits plaque art into same-color runs row by row; skips blank pixels.
+ * @param {PlaqueArt} art Plaque art.
+ * @returns {PlaqueRun[]} Runs from top to bottom and left to right.
+ * @throws {Error} If the art has a letter not in `PLAQUE_INKS`.
  */
 export function plaqueRuns(art: PlaqueArt): PlaqueRun[] {
   return art.flatMap(rowRuns);

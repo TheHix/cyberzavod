@@ -1,10 +1,13 @@
-// Проверка входа в галерею: токен читается с диска, сеть не нужна. Вход нужен только для
-// публикации записей, поэтому его отсутствие — не ошибка.
+// Gallery login check: the token is read from disk, no network needed. Login is only needed to
+// publish recordings, so its absence is not an error.
 
 import { CommandError } from "../errors.ts";
 import { failed, notice, passed, type MachineCheck } from "./check.ts";
 
-/** Токен галереи сохранён; нет файла — заметка, битый файл — ошибка. Токен не печатается. */
+/**
+ * The gallery token is saved; no file is a notice, a broken file is an error. The token is not
+ * printed.
+ */
 export const galleryCheck: MachineCheck = {
   id: "gallery",
   run: async (machine, messages) => {

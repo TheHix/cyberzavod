@@ -1,6 +1,6 @@
-/* Метка-таблетка: «человек → Claude Opus 5.5», дата, время. В тесной строке или колонке она
-   сжимается с многоточием, а не вытесняет соседей и не выходит за край; полный текст остаётся в
-   разметке. */
+/* Pill chip: "human → Claude Opus 5.5", a date, a time. In a tight row or column it shrinks
+   with an ellipsis instead of pushing neighbors out or overflowing the edge; the full text stays
+   in the markup. */
 .chip {
   display: inline-block;
   max-width: 100%;

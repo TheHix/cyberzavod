@@ -1,10 +1,10 @@
-// Package migrations хранит SQL-миграции и вшивает их в бинарник API.
-// Новая миграция — новый файл NNNNN_описание.sql с секциями goose Up и Down.
+// Package migrations stores SQL migrations and embeds them in the API binary.
+// A new migration is a new file NNNNN_description.sql with goose Up and Down sections.
 package migrations
 
 import "embed"
 
-// FS — SQL-миграции, вшитые в бинарник.
+// FS holds the SQL migrations embedded in the binary.
 //
 //go:embed *.sql
 var FS embed.FS

@@ -3,10 +3,10 @@ import type { GuideMeta } from "./guide.ts";
 type Ordered = Pick<GuideMeta, "id" | "order">;
 
 /**
- * Порядок гайдов в списке: по `order`, при равном — по id.
- * @param {Ordered} a Первый гайд.
- * @param {Ordered} b Второй гайд.
- * @returns {number} Отрицательное число, если `a` идёт раньше `b`.
+ * Guide order in the list: by `order`, on a tie by id.
+ * @param {Ordered} a First guide.
+ * @param {Ordered} b Second guide.
+ * @returns {number} A negative number if `a` comes before `b`.
  */
 export function byGuideOrder(a: Ordered, b: Ordered): number {
   return a.order - b.order || a.id.localeCompare(b.id);

@@ -1,5 +1,5 @@
-// Package httpapi собирает HTTP-маршруты API. Все пути начинаются с /api:
-// nginx отдаёт под этим префиксом запросы в Go, остальное — статика фронта.
+// Package httpapi assembles the API HTTP routes. All paths start with /api:
+// nginx forwards requests under this prefix to Go; the rest is frontend static files.
 package httpapi
 
 import (
@@ -14,26 +14,26 @@ import (
 )
 
 const (
-	// HealthPath — путь проверки жизни процесса; по нему же ходит подкоманда healthcheck.
+	// HealthPath is the process liveness path; the healthcheck subcommand also calls it.
 	HealthPath = "/api/health"
 	readyPath  = "/api/ready"
 
 	databasePingTimeout = 2 * time.Second
 )
 
-// Pinger — всё, что нужно от базы для проверки готовности.
+// Pinger is everything needed from the database for the readiness check.
 type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
-// TokenVerifier узнаёт автора по токену GitHub. Токен, который GitHub не принял, —
+// TokenVerifier finds the author by a GitHub token. A token GitHub did not accept gives
 // gallery.ErrTokenRejected.
 type TokenVerifier interface {
 	Verify(ctx context.Context, token string) (gallery.User, error)
 }
 
-// Galleries — хранилище галерей: авторы, их записи и сводка по открытым галереям.
-// Чего нет или что закрыто для посторонних — gallery.ErrNotFound.
+// Galleries is the gallery store: authors, their recordings and the summary of public galleries.
+// What does not exist or is private to outsiders gives gallery.ErrNotFound.
 type Galleries interface {
 	SaveUser(ctx context.Context, user gallery.User) error
 	Account(ctx context.Context, ownerID int64) (gallery.Account, error)
@@ -46,46 +46,47 @@ type Galleries interface {
 	Stats(ctx context.Context) (gallery.Stats, error)
 }
 
-// Sessions — хранилище сессий входа на сайте. Сессия ищется по sha256 её идентификатора;
-// нет сессии или она просрочена — session.ErrNotFound.
+// Sessions is the store of site sign-in sessions. A session is looked up by the sha256 of its id;
+// a missing or expired session gives session.ErrNotFound.
 type Sessions interface {
 	CreateSession(ctx context.Context, created session.Session) error
 	SessionUser(ctx context.Context, tokenHash []byte) (gallery.User, error)
 	DeleteSession(ctx context.Context, tokenHash []byte) error
 }
 
-// OAuthApp — OAuth-приложение GitHub для входа на сайте.
+// OAuthApp is the GitHub OAuth app for sign-in on the site.
 type OAuthApp interface {
 	AuthorizeURL(state, redirectURI string) string
 	ExchangeCode(ctx context.Context, code, redirectURI string) (token string, err error)
 }
 
-// Deps — зависимости обработчиков API.
+// Deps are the dependencies of the API handlers.
 type Deps struct {
 	DB        Pinger
 	Galleries Galleries
 	Sessions  Sessions
 	Tokens    TokenVerifier
-	// GitHubClientID — client_id OAuth-приложения для входа из CLI; пусто — вход недоступен.
+	// GitHubClientID is the OAuth app client_id for sign-in from the CLI; empty: sign-in is off.
 	GitHubClientID string
-	// OAuth — приложение для входа на сайте; nil — вход на сайте недоступен.
+	// OAuth is the app for sign-in on the site; nil means sign-in on the site is unavailable.
 	OAuth OAuthApp
-	// PublicURL — адрес сайта без завершающего "/": origin для проверки запросов по куке
-	// и основа адреса возврата с GitHub.
+	// PublicURL is the site address without a trailing "/": the origin for checking cookie requests
+	// and the base of the GitHub return address.
 	PublicURL string
-	// Now — часы для сроков сессий и окон частоты изменений; nil — time.Now. Тесты подменяют.
+	// Now is the clock for session expiry and change-rate windows; nil means time.Now.
+	// Tests replace it.
 	Now    func() time.Time
 	Logger *slog.Logger
 }
 
-// api — обработчики маршрутов поверх общих зависимостей.
+// api holds the route handlers on top of the shared dependencies.
 type api struct {
 	deps    Deps
 	now     func() time.Time
 	changes *changeLimiter
 }
 
-// NewHandler собирает маршруты API.
+// NewHandler assembles the API routes.
 func NewHandler(deps Deps) http.Handler {
 	now := deps.Now
 	if now == nil {
@@ -120,12 +121,13 @@ func NewHandler(deps Deps) http.Handler {
 	return mux
 }
 
-// health отвечает, жив ли процесс. Базу не трогает, чтобы её сбой не перезапускал API.
+// health reports whether the process is alive. It does not touch the database, so that
+// a database failure does not restart the API.
 func health(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// ready отвечает, может ли API обслуживать запросы, то есть доступна ли база.
+// ready reports whether the API can serve requests, that is, whether the database is reachable.
 func (a *api) ready(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), databasePingTimeout)
 	defer cancel()
@@ -138,7 +140,7 @@ func (a *api) ready(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
 }
 
-// writeJSON отвечает телом body в JSON с кодом status.
+// writeJSON responds with body as JSON and code status.
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

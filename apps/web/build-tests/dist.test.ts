@@ -20,7 +20,8 @@ import { LOCALES } from "../src/shared/i18n/locale.ts";
 const DIST = fileURLToPath(new URL("../dist", import.meta.url));
 const NGINX_CONFIG = fileURLToPath(new URL("../nginx.conf", import.meta.url));
 
-// Тесты идут после `astro build`: без сборки проверять нечего, и это ошибка, а не пропуск.
+// The tests run after `astro build`: without a build there is nothing to check, and that is an
+// error, not a skip.
 function builtSite(): BuiltSite {
   if (!existsSync(DIST)) throw new Error("нет dist/: сначала нужна сборка `astro build`");
   if (config.site === undefined) throw new Error("в astro.config.ts не задан site");

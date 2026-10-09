@@ -12,8 +12,8 @@ import (
 
 const (
 	badgeSuffix = ".svg"
-	// publicCacheControl — бейдж и сводку можно держать в кэше браузера и CDN пять минут:
-	// они меняются редко, а показываются в чужих README и на каждой странице аналитики.
+	// publicCacheControl lets browsers and CDNs cache the badge and the summary for five minutes:
+	// they change rarely, but are shown in other people's READMEs and on every analytics page.
 	publicCacheControl = "public, max-age=300"
 )
 
@@ -21,7 +21,7 @@ type galleriesResponse struct {
 	Galleries []gallery.Overview `json:"galleries"`
 }
 
-// galleries отдаёт список открытых галерей.
+// galleries returns the list of public galleries.
 func (a *api) galleries(w http.ResponseWriter, r *http.Request) {
 	overviews, err := a.deps.Galleries.PublicGalleries(r.Context())
 	if err != nil {
@@ -32,7 +32,7 @@ func (a *api) galleries(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, galleriesResponse{Galleries: overviews})
 }
 
-// publicGallery отдаёт открытую галерею автора; закрытую не отличить от несуществующей.
+// publicGallery returns the author's public gallery; a private one looks like a missing one.
 func (a *api) publicGallery(w http.ResponseWriter, r *http.Request) {
 	found, err := a.deps.Galleries.PublicGallery(r.Context(), r.PathValue("login"))
 	if errors.Is(err, gallery.ErrNotFound) {
@@ -48,7 +48,7 @@ func (a *api) publicGallery(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, found)
 }
 
-// sharedRecording отдаёт запись по секретной ссылке, даже из закрытой галереи.
+// sharedRecording returns a recording by its secret link, even from a private gallery.
 func (a *api) sharedRecording(w http.ResponseWriter, r *http.Request) {
 	shared, err := a.deps.Galleries.SharedRecording(r.Context(), r.PathValue("slug"))
 	if errors.Is(err, gallery.ErrNotFound) {
@@ -64,8 +64,8 @@ func (a *api) sharedRecording(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, shared)
 }
 
-// badge отдаёт SVG-бейдж галереи по адресу /api/badges/<login>.svg. Закрытая и
-// несуществующая галерея получают серый бейдж с кодом 200: картинка в README не ломается.
+// badge returns the gallery SVG badge at /api/badges/<login>.svg. A private and a
+// nonexistent gallery get a grey badge with code 200: the image in a README does not break.
 func (a *api) badge(w http.ResponseWriter, r *http.Request) {
 	login, isSVG := strings.CutSuffix(r.PathValue("file"), badgeSuffix)
 	if !isSVG || login == "" {
@@ -85,7 +85,7 @@ func (a *api) badge(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(svg))
 }
 
-// badgeImage рисует бейдж открытой галереи или, если её не нашли, серый «private».
+// badgeImage draws the badge of a public gallery or, if it was not found, a grey "private" one.
 func (a *api) badgeImage(ctx context.Context, login string) (string, error) {
 	found, err := a.deps.Galleries.PublicGallery(ctx, login)
 	if errors.Is(err, gallery.ErrNotFound) {
@@ -99,7 +99,7 @@ func (a *api) badgeImage(ctx context.Context, login string) (string, error) {
 	return badge.Builds(found.Login, len(found.Recordings)), nil
 }
 
-// stats отдаёт сводку по записям открытых галерей.
+// stats returns the summary of recordings in public galleries.
 func (a *api) stats(w http.ResponseWriter, r *http.Request) {
 	stats, err := a.deps.Galleries.Stats(r.Context())
 	if err != nil {

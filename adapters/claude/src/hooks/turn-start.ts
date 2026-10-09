@@ -1,13 +1,13 @@
-// Хук UserPromptSubmit: начинает ход — запоминает отпечаток кода и обнуляет счётчик отказов
-// хука остановки. По отпечатку хук остановки понимает, менял ли агент код именно в этом ходе.
-// Нет конфига проекта, команд проверок или конфиг битый — хук ничего не запоминает: хук остановки
-// в этих случаях отпускает агента без проверок.
+// UserPromptSubmit hook: starts a turn by saving the code fingerprint and resetting the stop hook's
+// refusal counter. The fingerprint tells the stop hook whether the agent changed code in this turn.
+// With no project config, no check commands, or a broken config, the hook saves nothing: in those
+// cases the stop hook lets the agent go without checks.
 //
-// Ход начинается, только если отпечатка ещё нет: отчёты сабагентов посреди работы приходят
-// тем же событием и не должны сдвигать начало хода. Хук остановки удаляет отпечаток, когда
-// отпускает агента. Если ход прервали (Stop не вызван), следующий ход наследует и начало
-// прерванного хода, и его счётчик: проверка выйдет строже, а попыток может остаться меньше трёх.
-// Зацикливания при этом нет.
+// A turn starts only if there is no fingerprint yet: subagent reports mid-work arrive as the same
+// event and must not move the start of the turn. The stop hook deletes the fingerprint when it
+// lets the agent go. If a turn was interrupted (Stop not called), the next turn inherits both the
+// start of the interrupted turn and its counter: the check gets stricter and fewer than three
+// attempts may remain. There is no infinite loop.
 
 import { existsSync } from "node:fs";
 import { rm, writeFile } from "node:fs/promises";
@@ -18,7 +18,7 @@ import { codeFingerprint, type GitError } from "./fingerprint.ts";
 import { sessionIdOf, SILENT_EXIT, type HookContext, type HookOutcome } from "./hook.ts";
 import { hookStatePath } from "./state.ts";
 
-// Битый конфиг здесь не повод шуметь: о нём скажет хук остановки.
+// A broken config is no reason to make noise here: the stop hook reports it.
 async function configOrNothing(root: string): Promise<ProjectConfig | undefined> {
   try {
     return await readProjectConfig(root);
@@ -30,10 +30,10 @@ async function configOrNothing(root: string): Promise<ProjectConfig | undefined>
 }
 
 /**
- * Начинает ход: запоминает отпечаток кода, если ход ещё не начат.
- * @param {HookContext} context Вызов хука.
- * @returns {Promise<HookOutcome>} Всегда молчаливый выход.
- * @throws {GitError} Если git не запускается.
+ * Starts a turn: saves the code fingerprint if the turn has not started yet.
+ * @param {HookContext} context Hook call.
+ * @returns {Promise<HookOutcome>} Always a silent exit.
+ * @throws {GitError} If git does not start.
  */
 export async function startTurn(context: HookContext): Promise<HookOutcome> {
   const config = await configOrNothing(context.projectDirectory);

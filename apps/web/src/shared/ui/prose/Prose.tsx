@@ -3,30 +3,30 @@ import { cx } from "@/shared/lib/cx.ts";
 import styles from "./Prose.module.css";
 
 interface Props {
-  /** id контейнера: по нему островки находят текст, например чтобы добавить кнопки блокам кода. */
+  /** Container id: islands find the text by it, for example to add buttons to code blocks. */
   id?: string | undefined;
   class?: string | undefined;
   children: JSX.Element;
 }
 
 /**
- * Вид блока кода с местом под кнопку: обёртка, в которую встаёт `<pre>` и кнопка действия
- * рядом с ним. Без обёртки `<pre>` выглядит так же, просто без кнопки.
- * @returns {string} Класс обёртки блока кода.
+ * Look of a code block with room for a button: a wrapper that holds `<pre>` and an action button
+ * next to it. Without the wrapper `<pre>` looks the same, just without a button.
+ * @returns {string} Code block wrapper class.
  */
 export function codeBlockClass(): string {
   return cx(styles.codeBlock);
 }
 
 /**
- * Контейнер текста статьи ui-kit: оформляет заголовки второго и третьего уровня, абзацы, списки,
- * ссылки, код, цитаты и разделители, которые приходят готовой разметкой, например из Markdown.
- * Статичный: ничего не делает сам.
- * @param {Props} props Свойства компонента.
- * @param {string} [props.id] id контейнера.
- * @param {string} [props.class] Дополнительный класс для раскладки снаружи.
- * @param {JSX.Element} props.children Текст статьи.
- * @returns {JSX.Element} Контейнер текста.
+ * ui-kit article text container: styles second- and third-level headings, paragraphs, lists,
+ * links, code, quotes and rules that arrive as ready-made markup, for example from Markdown.
+ * Static: does nothing on its own.
+ * @param {Props} props Component props.
+ * @param {string} [props.id] Container id.
+ * @param {string} [props.class] Extra class for layout from outside.
+ * @param {JSX.Element} props.children Article text.
+ * @returns {JSX.Element} Text container.
  */
 export function Prose(props: Props): JSX.Element {
   return (

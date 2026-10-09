@@ -44,7 +44,7 @@ function typicalSession(): RawEvent[] {
   ];
 }
 
-// Исходы проверок по порядку: у вердикта станции — с запуском, у запуска проверок — без.
+// Checks outcomes in order: a station verdict with its run, a checks run without one.
 function checksOf(events: DraftEvent[]) {
   return events.flatMap((event) =>
     event.type === "draft_check"
@@ -649,7 +649,7 @@ function message(ts: number, agentId: string): AgentAssignment {
   return { ts: START + ts, text: `Сообщение ${agentId}`, via: "message", agentId };
 }
 
-// Реплики черновика: время, от кого, кому и откуда в сессии.
+// Draft messages: time, from whom, to whom and where in the session they came from.
 function routesOf(draft: { events: DraftEvent[] }) {
   return draft.events.flatMap((event) =>
     event.type === "draft_message" ? [[event.t, event.from, event.to, event.source]] : [],
@@ -914,8 +914,8 @@ describe("toDraft: маршруты реплик по правилу ремар�
     expect(routesOf(draft)).toEqual([[3_000, "planning", "foreman", "answer"]]);
   });
 
-  // Прогон с возвратом на доработку: задача, постановка, код, проверки, ревью с возвратом,
-  // правки, снова проверки и ревью, выпуск и ответ.
+  // A run with rework: task, plan, code, checks, review sending it back,
+  // fixes, checks and review again, release and reply.
   it("сводит сквозной прогон с возвратом к маршрутам из таблицы", () => {
     const raw: RawEvent[] = [
       { ts: START, kind: "session_start" },
@@ -1296,7 +1296,7 @@ function edit(ts: number, file: string, cwd?: string): RawEvent {
   return { ts, kind: "tool", tool: "Edit", ok: true, file, ...(cwd === undefined ? {} : { cwd }) };
 }
 
-// Этап или проверка и проект события по порядку: так видно, куда команда отнесена.
+// Stage or check and the event's project, in order: this shows where a command was assigned.
 function projectMarksOf(draft: Draft): string[] {
   return draft.events.flatMap((event) => {
     const project = "project" in event && event.project !== undefined ? event.project : "—";

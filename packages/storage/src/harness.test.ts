@@ -49,6 +49,6 @@ describe("workflowOf", () => {
 
     const act = () => workflowOf(harness, "long");
 
-    expect(act).toThrow("процесса long нет в harness; есть: default, short");
+    expect(act).toThrow("process long is not in the harness; available: default, short");
   });
 });

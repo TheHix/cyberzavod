@@ -1,26 +1,26 @@
-// Запись из галереи на странице `/r/`: её показывают два острова — цех и журнал сборки. Запись
-// грузится один раз, оба острова читают один стор.
+// A gallery recording on the `/r/` page: two islands show it, the factory floor and the build
+// journal. The recording loads once, both islands read one store.
 
 import { atom, type ReadableAtom } from "nanostores";
 import { fetchSharedRecording, queryParamOf, type SharedRecording } from "@/entities/gallery";
 import { LOADING, MISSING, settle, type Remote } from "@/shared/api/remote.ts";
 
-/** Запись из галереи: стор и действие, которое её открывает. */
+/** A gallery recording: the store and the action that opens it. */
 export interface SharedRecordingModel {
-  /** Запись по ссылке страницы: грузится, готова или почему её нет. */
+  /** The recording from the page link: loading, ready, or why it is missing. */
   readonly $recording: ReadableAtom<Remote<SharedRecording>>;
   /**
-   * Открывает запись по параметрам адреса. Повторный вызов не шлёт второй запрос.
-   * @param {string} search Параметры адреса — `location.search`.
-   * @returns {Promise<void>} Когда запись получена или стало ясно, почему её нет.
+   * Opens the recording from the address parameters. A repeated call sends no second request.
+   * @param {string} search Address parameters, `location.search`.
+   * @returns {Promise<void>} When the recording is received or it is clear why it is missing.
    */
   open(search: string): Promise<void>;
 }
 
 /**
- * Создаёт модель записи из галереи.
- * @param {(slug: string) => Promise<SharedRecording>} fetchRecording Запрос записи по slug.
- * @returns {SharedRecordingModel} Модель с начальным состоянием «грузится».
+ * Creates the gallery recording model.
+ * @param {(slug: string) => Promise<SharedRecording>} fetchRecording Recording request by slug.
+ * @returns {SharedRecordingModel} A model with the initial "loading" state.
  */
 export function createSharedRecordingModel(
   fetchRecording: (slug: string) => Promise<SharedRecording>,
@@ -52,13 +52,14 @@ export function createSharedRecordingModel(
 
 const sharedRecording = createSharedRecordingModel((slug) => fetchSharedRecording(slug));
 
-/** Запись из галереи на этой странице: общая для островов цеха и журнала. */
+/** The gallery recording on this page: shared by the factory floor and journal islands. */
 export const $sharedRecording = sharedRecording.$recording;
 
 /**
- * Открывает запись из галереи по параметрам адреса страницы; второй остров не шлёт второй запрос.
- * @param {string} search Параметры адреса — `location.search`.
- * @returns {Promise<void>} Когда запись получена или стало ясно, почему её нет.
+ * Opens the gallery recording from the page address parameters; a second island sends no second
+ * request.
+ * @param {string} search Address parameters, `location.search`.
+ * @returns {Promise<void>} When the recording is received or it is clear why it is missing.
  */
 export function openSharedRecording(search: string): Promise<void> {
   return sharedRecording.open(search);

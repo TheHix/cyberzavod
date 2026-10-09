@@ -1,13 +1,13 @@
-// Сборки сессии: какие события черновика к какой записи относятся и как считается время сборки.
-// Сборка — набор событий, а не отрезок времени: задачи в одной сессии идут вперемешку, а команды
-// основной сессии относятся к сборке своего проекта по пометке `project`.
+// Session builds: which draft events belong to which recording and how build time is counted.
+// A build is a set of events, not a time span: tasks in one session interleave, and commands
+// of the main session belong to their project's build by the `project` tag.
 
 import type { Draft, DraftBuild, DraftEvent, DraftRun } from "./draft.ts";
 
 /**
- * Самая долгая пауза в записи сборки: промежуток, в котором у сборки не работает ни одна
- * станция и нет её событий, сжимается до неё. Так в длительность не входит ни ожидание
- * человека, ни время, когда дирижёр занят другой задачей.
+ * The longest pause in a build recording: a gap in which no station of the build is working
+ * and it has no events is shrunk to it. So the duration includes neither waiting for the
+ * human nor time when the conductor is busy with another task.
  */
 export const IDLE_GAP_MS = 2 * 60 * 1000;
 
@@ -17,7 +17,7 @@ function runOf(event: DraftEvent): string | undefined {
     : event.run;
 }
 
-// Проект события основной сессии: его ставит `cyberzavod draft` по каталогу команды.
+// Project of a main session event: `cyberzavod draft` sets it from the command's directory.
 function projectOfEvent(event: DraftEvent): string | undefined {
   switch (event.type) {
     case "draft_prompt":
@@ -30,8 +30,9 @@ function projectOfEvent(event: DraftEvent): string | undefined {
   }
 }
 
-// Сборка, которую событие называет само: промпт, реплика и вмешательство — полем `build` (у реплики оно
-// перекрывает запуск), события станций — запуском. Остальные события сборки не называют.
+// The build an event names itself: a prompt, a message and an intervention by the `build` field
+// (for a message it overrides the run), station events by their run. Other events do not name a
+// build.
 function namedBuild(
   event: DraftEvent,
   buildOfRun: ReadonlyMap<string, string>,
@@ -60,24 +61,26 @@ function firstBuildsOfProjects(builds: readonly DraftBuild[]): Map<string, strin
 }
 
 /**
- * Определяет сборку каждого события черновика по порядку правил:
- * 1. промпт, реплика и вмешательство — сборка из их поля `build`;
- * 2. событие станции — сборка, в чьём списке `runs` указан запуск, а не указанный нигде — первая;
- * 3. событие основной сессии с пометкой `project` — сборка этого проекта, к которой относилось
- *    ближайшее предыдущее событие, а если таких не было — первая по порядку сборка проекта;
- *    у проекта без сборок правило не действует;
- * 4. остальные события — сборка текущего события: последнего, у которого она определена правилами
- *    1 и 2, а до первого такого — первая сборка.
- * Событие, отнесённое по проекту, текущую сборку не меняет: ответ человеку остаётся в задаче
- * своего промпта. Угадывать задачу по `#N` не нужно: номера issue повторяются между проектами.
- * @param {Draft} draft Черновик, в котором есть хотя бы одна сборка.
- * @returns {string[]} `id` сборки для каждого события черновика, в том же порядке.
- * @throws {Error} Если в черновике нет сборок: `parseDraft` такой черновик не пропускает.
+ * Determines the build of each draft event, applying the rules in order:
+ * 1. a prompt, a message and an intervention: the build from their `build` field;
+ * 2. a station event: the build whose `runs` list names the run, and one named nowhere goes to the
+ *    first;
+ * 3. a main session event with a `project` tag: the build of that project the closest preceding
+ *    event belonged to, or, if there was none, the project's first build in order;
+ *    the rule does not apply to a project without builds;
+ * 4. other events: the build of the current event, the last one whose build was set by rules
+ *    1 and 2, and before the first such event, the first build.
+ * An event assigned by project does not change the current build: a reply to the human stays in the
+ * task of its prompt. Guessing the task by `#N` is not needed: issue numbers repeat across
+ * projects.
+ * @param {Draft} draft Draft with at least one build.
+ * @returns {string[]} Build `id` for each draft event, in the same order.
+ * @throws {Error} If the draft has no builds: `parseDraft` rejects such a draft.
  */
 export function eventBuilds(draft: Draft): string[] {
   const firstBuild = draft.builds[0]?.id;
 
-  if (firstBuild === undefined) throw new Error("в черновике нет сборок");
+  if (firstBuild === undefined) throw new Error("draft has no builds");
 
   const runBuilds = draft.builds.flatMap(({ id, runs }) =>
     runs.map((run): [string, string] => [run, id]),
@@ -110,10 +113,10 @@ export function eventBuilds(draft: Draft): string[] {
 }
 
 /**
- * Находит запуски станций, которые не указаны ни в одной сборке: они достанутся первой.
- * @param {Draft} draft Черновик записей.
- * @returns {DraftRun[]} Окно каждого такого запуска, первое, по порядку журнала: после
- *   `SendMessage` у одного запуска несколько окон.
+ * Finds station runs not named in any build: they go to the first build.
+ * @param {Draft} draft Recording draft.
+ * @returns {DraftRun[]} The first window of each such run, in journal order: after
+ *   `SendMessage` one run has several windows.
  */
 export function unassignedRuns(draft: Draft): DraftRun[] {
   const assigned = new Set(draft.builds.flatMap(({ runs }) => runs));
@@ -129,10 +132,11 @@ export function unassignedRuns(draft: Draft): DraftRun[] {
 }
 
 /**
- * Находит проекты, чьи события есть в черновике, а сборки нет: эти события достанутся сборке
- * по времени, и редактору стоит завести для проекта сборку.
- * @param {Draft} draft Черновик записей.
- * @returns {string[]} Проекты из пометок `project` без сборки, без повторов, по порядку появления.
+ * Finds projects that have events in the draft but no build: those events go to the build
+ * by time, and the editor should create a build for the project.
+ * @param {Draft} draft Recording draft.
+ * @returns {string[]} Projects from `project` tags without a build, without repeats, in order of
+ *   appearance.
  */
 export function projectsWithoutBuild(draft: Draft): string[] {
   const withBuild = new Set(draft.builds.map(({ project }) => project));
@@ -147,13 +151,13 @@ export function projectsWithoutBuild(draft: Draft): string[] {
   return [...missing];
 }
 
-/** Время сборки без долгих пауз: от первого события и до конца её работы. */
+/** Build time without long pauses: from the first event to the end of its work. */
 export interface BuildTimeline {
-  /** Время первого события сборки в черновике, миллисекунды от начала журнала. */
+  /** Time of the build's first event in the draft, milliseconds from the start of the log. */
   start: number;
-  /** Длительность сборки в записи, миллисекунды. */
+  /** Build duration in the recording, milliseconds. */
   end: number;
-  /** Переводит время события черновика во время записи. */
+  /** Converts a draft event time to recording time. */
   at: (t: number) => number;
 }
 
@@ -162,13 +166,13 @@ interface Span {
   to: number;
 }
 
-// Токены, начало и конец сборки времени не задают: их ставит публикация, а токены сессии
-// в черновике стоят у ближайшего события, а не там, где что-то происходило.
+// Tokens, build start and build end do not define time: publishing sets them, and session tokens
+// sit in the draft at the nearest event, not where something happened.
 function isTimed(event: DraftEvent): boolean {
   return event.type !== "usage" && event.type !== "build_start" && event.type !== "build_end";
 }
 
-// Занятое время сборки: окно запуска станции и момент каждого события.
+// Busy time of a build: a station run window and the moment of each event.
 function spanOf(event: DraftEvent): Span {
   return event.type === "draft_run"
     ? { from: event.t, to: Math.max(event.t, event.until) }
@@ -190,12 +194,12 @@ function mergedSpans(events: readonly DraftEvent[]): Span[] {
 }
 
 /**
- * Считает время сборки: паузы длиннее `IDLE_GAP_MS`, когда у сборки не работает ни одна
- * станция и нет её событий, сжимаются до неё. Работа станции без событий внутри не пауза.
- * Конец сборки — её последнее событие или конец её последнего окна запуска.
- * @param {readonly DraftEvent[]} events События одной сборки по порядку.
- * @returns {BuildTimeline | undefined} Время сборки или undefined, если в ней нет событий
- *   со временем (токены, начало и конец не в счёт).
+ * Counts build time: pauses longer than `IDLE_GAP_MS`, when no station of the build is working
+ * and it has no events, are shrunk to it. Station work without events inside is not a pause.
+ * The build ends at its last event or at the end of its last run window.
+ * @param {readonly DraftEvent[]} events Events of one build, in order.
+ * @returns {BuildTimeline | undefined} Build time, or undefined if it has no events
+ *   with a time (tokens, start and end do not count).
  */
 export function buildTimeline(events: readonly DraftEvent[]): BuildTimeline | undefined {
   const spans = mergedSpans(events);

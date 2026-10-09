@@ -1,9 +1,9 @@
-/* Полка речи: строка метки и текст постоянной высоты, чтобы поле цеха не прыгало, когда
-   реплики меняются. Колонка не шире полки: иначе длинная метка распирает её под соседнее
-   управление. */
+/* The speech shelf: a label line and text of constant height, so the floor field does not jump
+   when messages change. The column is no wider than the shelf: otherwise a long label stretches it
+   under the neighboring controls. */
 .dock {
-  /* Раскрытый промпт — указание с уточнениями — не выше этого: дальше он прокручивается, а поле
-     цеха остаётся. */
+  /* An expanded prompt, the instruction with details, is no taller than this: beyond that it
+       scrolls, and the floor field stays. */
   --details-max-height: 35dvh;
 
   display: grid;
@@ -13,7 +13,8 @@
   align-content: start;
 }
 
-/* Строка метки занимает место и без метки: полка не меняет высоту между репликами. */
+/* The label line takes space even without a label: the shelf does not change height between
+   messages. */
 .route {
   display: flex;
   gap: var(--space-m);

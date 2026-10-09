@@ -1,18 +1,19 @@
-// Вход через GitHub по device flow: человек подтверждает код в браузере, CLI опрашивает GitHub.
-// Само обращение к GitHub — за интерфейсом `GithubDeviceAuth`, чтобы тесты шли без сети.
+// Login through GitHub with the device flow: the human confirms the code in the browser, the CLI
+// polls GitHub. The GitHub calls themselves sit behind the `GithubDeviceAuth` interface so that
+// tests run without the network.
 
 import { CommandError } from "../errors.ts";
 import { isObject, readJsonBody, sendRequest, type FetchFunction } from "./http.ts";
 
-/** Адрес, с которого GitHub выдаёт код устройства. */
+/** The address from which GitHub issues a device code. */
 export const GITHUB_DEVICE_CODE_URL = "https://github.com/login/device/code";
 
-/** Адрес, на котором GitHub выдаёт токен подтверждённому устройству. */
+/** The address at which GitHub issues a token to a confirmed device. */
 export const GITHUB_ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token";
 
 const DEVICE_CODE_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code";
 
-/** Код, который человек вводит на странице GitHub, и параметры опроса. */
+/** The code the human enters on the GitHub page, and the polling parameters. */
 export interface DeviceCode {
   deviceCode: string;
   userCode: string;
@@ -21,7 +22,7 @@ export interface DeviceCode {
   intervalSeconds: number;
 }
 
-/** Ответ GitHub на один опрос: токен выдан, ждать дальше, замедлиться или отказ. */
+/** GitHub's answer to one poll: token issued, keep waiting, slow down, or refusal. */
 export type TokenPoll =
   | { status: "granted"; token: string }
   | { status: "pending" }
@@ -29,7 +30,7 @@ export type TokenPoll =
   | { status: "expired" }
   | { status: "denied" };
 
-/** Обращения к GitHub во время входа. */
+/** Calls to GitHub during login. */
 export interface GithubDeviceAuth {
   requestDeviceCode(clientId: string): Promise<DeviceCode>;
   pollAccessToken(clientId: string, deviceCode: string): Promise<TokenPoll>;
@@ -93,23 +94,23 @@ function parseTokenPoll(body: unknown): TokenPoll {
   }
 }
 
-/** GitHub по HTTP: запросы формой, ответы JSON. */
+/** GitHub over HTTP: form requests, JSON responses. */
 export class HttpGithubAuth implements GithubDeviceAuth {
   readonly #fetch: FetchFunction;
 
   /**
-   * Клиент device flow GitHub.
-   * @param {FetchFunction} fetchImplementation Функция запроса; по умолчанию встроенный `fetch`.
+   * GitHub device flow client.
+   * @param {FetchFunction} fetchImplementation Request function; the built-in `fetch` by default.
    */
   constructor(fetchImplementation: FetchFunction = fetch) {
     this.#fetch = fetchImplementation;
   }
 
   /**
-   * Просит у GitHub код устройства. Права (scope) не запрашиваются: хватает логина и id.
-   * @param {string} clientId Идентификатор приложения GitHub.
-   * @returns {Promise<DeviceCode>} Код для человека и параметры опроса.
-   * @throws {CommandError} Если GitHub недоступен или ответил неожиданно.
+   * Asks GitHub for a device code. No permissions (scope) are requested: login and id are enough.
+   * @param {string} clientId GitHub app id.
+   * @returns {Promise<DeviceCode>} The code for the human and the polling parameters.
+   * @throws {CommandError} If GitHub is unavailable or answered unexpectedly.
    */
   async requestDeviceCode(clientId: string): Promise<DeviceCode> {
     const body = await this.#post(GITHUB_DEVICE_CODE_URL, { client_id: clientId });
@@ -118,11 +119,11 @@ export class HttpGithubAuth implements GithubDeviceAuth {
   }
 
   /**
-   * Спрашивает у GitHub, подтвердил ли человек код.
-   * @param {string} clientId Идентификатор приложения GitHub.
-   * @param {string} deviceCode Код устройства из `requestDeviceCode`.
-   * @returns {Promise<TokenPoll>} Токен или причина подождать либо отказаться.
-   * @throws {CommandError} Если GitHub недоступен или отклонил вход по другой причине.
+   * Asks GitHub whether the human has confirmed the code.
+   * @param {string} clientId GitHub app id.
+   * @param {string} deviceCode Device code from `requestDeviceCode`.
+   * @returns {Promise<TokenPoll>} The token, or a reason to wait or give up.
+   * @throws {CommandError} If GitHub is unavailable or rejected the login for another reason.
    */
   async pollAccessToken(clientId: string, deviceCode: string): Promise<TokenPoll> {
     const body = await this.#post(GITHUB_ACCESS_TOKEN_URL, {

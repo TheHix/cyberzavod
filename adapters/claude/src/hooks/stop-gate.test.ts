@@ -13,7 +13,7 @@ import { startTurn } from "./turn-start.ts";
 
 const SESSION = "test-session";
 const RELEASED = 0;
-// Проверка падает, пока существует apps/broken.
+// The check fails while apps/broken exists.
 const RED_WHEN_BROKEN = "test ! -f apps/broken || (echo 'ошибка типов в apps/broken'; exit 1)";
 
 const NO_CONFIG = "";
@@ -69,7 +69,7 @@ async function stopTimes(times: number): Promise<HookOutcome | undefined> {
   return outcome;
 }
 
-// Причина отказа из JSON-решения `block` на stdout; undefined, если хук агента не держит.
+// Refusal reason from the JSON `block` decision on stdout; undefined if the hook lets the agent go.
 function blockReason(outcome: HookOutcome): string | undefined {
   if (outcome.stdout === "") return undefined;
 

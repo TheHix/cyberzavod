@@ -1,17 +1,17 @@
 import { CanvasRenderer, WebGLRenderer } from "pixi.js";
 
-/** Рендерер цеха: WebGL, а без него Canvas. */
+/** Factory renderer: WebGL, or Canvas without it. */
 export type FactoryRenderer = WebGLRenderer | CanvasRenderer;
 
-// WebGPU не подключаем: при WebGL он не выбирался, а весит около 50 КБ. `Application` не
-// используем: его `init` вызывает `autoDetectRenderer`, а вместе с ним в чанк попадает код
-// всех рендереров.
+// WebGPU is not included: with WebGL it was never chosen, and it weighs about 50 KB. `Application`
+// is not used: its `init` calls `autoDetectRenderer`, and with it the code of all renderers gets
+// into the chunk.
 
 /**
- * Создаёт рендерер цеха под возможности браузера. Рендерер не инициализирован: `init` вызывает
- * тот, кто его встраивает.
- * @param {boolean} webGLSupported Поддерживает ли браузер WebGL.
- * @returns {FactoryRenderer} WebGL-рендерер, а если WebGL нет — Canvas.
+ * Creates a factory renderer for the browser's capabilities. The renderer is not initialized:
+ * `init` is called by whoever embeds it.
+ * @param {boolean} webGLSupported Whether the browser supports WebGL.
+ * @returns {FactoryRenderer} A WebGL renderer, or Canvas if there is no WebGL.
  */
 export function createRenderer(webGLSupported: boolean): FactoryRenderer {
   return webGLSupported ? new WebGLRenderer() : new CanvasRenderer();

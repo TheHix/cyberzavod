@@ -1,6 +1,7 @@
-// `cyberzavod sync`: заново смотрит на стек, ставит в конфиг текущую версию harness и приводит
-// файлы агента к harness. `--check` и `--diff` только показывают, что изменится: первый выходит с
-// кодом 1, если что-то устарело (так проверки проекта ловят устаревшие файлы), второй — с кодом 0.
+// `cyberzavod sync`: looks at the stack again, sets the current harness version in the config and
+// brings the agent files in line with the harness. `--check` and `--diff` only show what will
+// change: the first exits with code 1 if anything is outdated (so project checks catch outdated
+// files), the second with code 0.
 
 import {
   previewClaude,
@@ -18,17 +19,17 @@ import type { CliMessages } from "../messages/cli-messages.ts";
 import { hasLegacyTool, removeLegacyTool } from "./legacy-tool.ts";
 import { requireProjectAt, type ProjectAt } from "./project.ts";
 
-/** Что нужно синхронизации: перезаписывать ли файлы человека, версия Cyberzavod и тексты. */
+/** What sync needs: whether to overwrite the human's files, Cyberzavod version and texts. */
 export interface SyncCommandOptions {
-  /** Перезаписать файлы, которые написал человек или исправил руками. */
+  /** Overwrite files the human wrote or edited by hand. */
   force: boolean;
-  /** Запущенная версия Cyberzavod. */
+  /** The running Cyberzavod version. */
   installation: Installation;
-  /** Сообщения на выбранном языке. */
+  /** Messages in the chosen language. */
   messages: CliMessages;
 }
 
-/** Как показать, что изменит sync: текстом для человека или JSON для скриптов. */
+/** How to show what sync will change: as text for the human or as JSON for scripts. */
 export interface PreviewOptions {
   installation: Installation;
   messages: CliMessages;
@@ -36,8 +37,8 @@ export interface PreviewOptions {
 }
 
 /**
- * Состояние файлов агента: всё совпадает (`current`), sync их обновит (`outdated`), sync
- * остановится на файлах человека или исправленных руками (`blocked`).
+ * State of the agent files: everything matches (`current`), sync will update them (`outdated`),
+ * sync will stop at files written or edited by the human (`blocked`).
  */
 export type FilesStatus = "current" | "outdated" | "blocked";
 
@@ -93,9 +94,9 @@ function isClean(report: SyncReport): boolean {
 }
 
 /**
- * Состояние файлов агента по отчёту сравнения.
- * @param {SyncReport} report Отчёт `sync` в режиме проверки.
- * @returns {FilesStatus} Совпадают, устарели или sync остановится на чужих файлах.
+ * State of the agent files from the comparison report.
+ * @param {SyncReport} report `sync` report in check mode.
+ * @returns {FilesStatus} Match, outdated, or sync will stop at someone else's files.
  */
 export function filesStatusOf(report: SyncReport): FilesStatus {
   if (report.conflicts.length + report.edited.length > 0) return "blocked";
@@ -103,22 +104,22 @@ export function filesStatusOf(report: SyncReport): FilesStatus {
   return isClean(report) ? "current" : "outdated";
 }
 
-/** Что расходится с запущенной версией: файлы агента и версия harness в конфиге. */
+/** What differs from the running version: the agent files and the harness version in the config. */
 export interface ProjectFilesInspection {
-  /** Файлы агента, которые устарели, лишние, написаны человеком или исправлены руками. */
+  /** Agent files that are outdated, extra, written by the human or edited by hand. */
   report: SyncReport;
-  /** Версия harness в конфиге проекта. */
+  /** Harness version in the project config. */
   configVersion: string;
-  /** Версия в конфиге не совпадает с версией запущенного CLI. */
+  /** The config version does not match the running CLI version. */
   isHarnessOutdated: boolean;
 }
 
 /**
- * Сравнивает файлы агента проекта с тем, что собрала бы запущенная версия, ничего не записывая.
- * @param {ProjectAt} project Подключённый проект.
- * @param {Installation} installation Запущенная версия Cyberzavod.
- * @returns {Promise<ProjectFilesInspection>} Расхождения файлов и версии.
- * @throws {Error} Если файлы агента не собрать.
+ * Compares the project's agent files with what the running version would build, writing nothing.
+ * @param {ProjectAt} project Connected project.
+ * @param {Installation} installation The running Cyberzavod version.
+ * @returns {Promise<ProjectFilesInspection>} File and version differences.
+ * @throws {Error} If the agent files cannot be built.
  */
 export async function inspectProjectFiles(
   project: ProjectAt,
@@ -182,11 +183,11 @@ function printPreviewJson(inspection: ProjectFilesInspection): void {
 }
 
 /**
- * Показывает, что изменит sync, ничего не записывая.
- * @param {string} directory Каталог внутри проекта.
- * @param {PreviewOptions} options Версия, сообщения и вид вывода.
- * @returns {Promise<boolean>} true, если синхронизировать нечего.
- * @throws {Error} Если проекта нет или файлы агента не собрать.
+ * Shows what sync will change, writing nothing.
+ * @param {string} directory Directory inside the project.
+ * @param {PreviewOptions} options Version, messages and output format.
+ * @returns {Promise<boolean>} true if there is nothing to sync.
+ * @throws {Error} If there is no project or the agent files cannot be built.
  */
 export async function previewProject(directory: string, options: PreviewOptions): Promise<boolean> {
   const { installation, messages, isJson } = options;
@@ -200,12 +201,13 @@ export async function previewProject(directory: string, options: PreviewOptions)
 }
 
 /**
- * Синхронизирует проект с harness: обновляет конфиг и файлы агента, убирает CLI прежних версий.
- * Если генератор упрётся в файлы человека, не меняется ничего, в том числе конфиг.
- * @param {string} directory Каталог внутри проекта.
- * @param {SyncCommandOptions} options Перезаписать ли файлы человека, версия, сообщения.
- * @returns {Promise<void>} Готово, когда всё записано.
- * @throws {Error} Если проекта нет или файлы агента не собрать.
+ * Syncs the project with the harness: updates the config and agent files, removes the CLI of
+ * earlier versions. If the generator runs into the human's files, nothing changes, the config
+ * included.
+ * @param {string} directory Directory inside the project.
+ * @param {SyncCommandOptions} options Whether to overwrite the human's files, version, messages.
+ * @returns {Promise<void>} Done when everything is written.
+ * @throws {Error} If there is no project or the agent files cannot be built.
  */
 export async function syncProject(directory: string, options: SyncCommandOptions): Promise<void> {
   const { force, installation, messages } = options;
@@ -213,7 +215,8 @@ export async function syncProject(directory: string, options: SyncCommandOptions
   const config = await refreshedConfig(project.root, project.config);
   const claudeInstallation = claudeInstallationOf(installation);
 
-  // Файлы человека ищутся до первой записи: при конфликте конфиг остаётся прежним.
+  // The human's files are looked for before the first write: on a conflict the config stays as it
+  // was.
   if (!force) {
     requireWritable(await previewClaude({ root: project.root, config }, claudeInstallation));
   }

@@ -1,5 +1,5 @@
-/* Точка над говорящим: пузырь раскрывается от неё вверх или вниз и стоит над ней серединой, пока
-   не упрётся в край поля. */
+/* The point above the speaker: the bubble opens from it up or down and stays centered over it
+   until it hits the field edge. */
 .anchor {
   --bubble-max-width: 24rem;
   --bubble-distance: 2rem;
@@ -14,9 +14,10 @@
   height: 0;
 }
 
-/* Пузырь не шире поля (--field-width) и не выше места от якоря до его края (--room-height): за
-   краем его закрыли бы меню и HUD, а ниже окна его не прочитать — страница не прокручивается.
-   Сдвиг внутрь поля (--bubble-left) считается по ширине пузыря после замера. */
+/* The bubble is no wider than the field (--field-width) and no taller than the room from the
+   anchor to its edge (--room-height): beyond the edge the menu and HUD would cover it, and below
+   the window it cannot be read, since the page does not scroll. The shift into the field
+   (--bubble-left) is computed from the bubble width after measuring. */
 .bubble {
   position: absolute;
   left: var(--bubble-left);
@@ -28,8 +29,8 @@
   max-width: min(var(--bubble-max-width), var(--field-width));
   max-height: calc(var(--room-height) - var(--bubble-distance));
   padding: var(--space-m) var(--space-l);
-  /* В узком поле длинное слово или метка не шире пузыря: перенос посреди слова лучше текста за
-     контуром. */
+  /* In a narrow field a long word or label is no wider than the bubble: a break mid-word is better
+     than text past the outline. */
   overflow-wrap: anywhere;
   background: var(--paper);
   border: var(--outline);
@@ -37,10 +38,10 @@
   box-shadow: var(--lift);
 }
 
-/* Метка, текст и подробности прокручиваются вместе, а кнопки под ними остаются на месте: на узком
-   поле закреплённое указание заняло бы всю высоту и не оставило места уточнениям. Прокручивается
-   этот блок, а не пузырь, иначе прокрутка обрезала бы хвостик. Строки по содержимому: в тесном
-   блоке метка с overflow: hidden иначе сжалась бы до контура. */
+/* The label, text and details scroll together, while the buttons below them stay in place: in a
+   narrow field a pinned instruction would take the whole height and leave no room for details.
+   This block scrolls, not the bubble, otherwise scrolling would clip the tail. Rows by content:
+   otherwise in a cramped block a label with overflow: hidden would shrink to the outline. */
 .text {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -50,9 +51,10 @@
   justify-items: start;
 }
 
-/* Хвостик — повёрнутый квадрат на краю пузыря, обращённом к говорящему: он закрывает контур
-   пузыря в месте стыка и рисует свой только с двух внешних сторон. Он смотрит на якорь, но не
-   заходит на скругление угла, даже если пузырь прижат к краю поля дальше говорящего. */
+/* The tail is a rotated square on the bubble edge facing the speaker: it covers the bubble outline
+   at the joint and draws its own only on the two outer sides. It points at the anchor but does
+   not go onto the corner rounding, even if the bubble is pushed to the field edge beyond the
+   speaker. */
 .bubble::after {
   --tail-center: clamp(
     var(--tail-inset),

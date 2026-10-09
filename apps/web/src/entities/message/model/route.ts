@@ -2,8 +2,8 @@ import type { BriefMessageEvent, Speaker } from "@cyberzavod/core";
 import { FOREMAN_LABEL, STAGE_LABELS } from "@/shared/config/stages.ts";
 import type { Locale } from "@/shared/i18n/locale.ts";
 
-// Подписи участников: этапы — как на табличках, мастер — со строчной буквы, чтобы в середине
-// маршрута он читался как слово, а в начале получал заглавную.
+// Participant captions: stages as on the signs, the foreman in lowercase so that mid-route
+// it reads as a word and at the start gets a capital letter.
 function speakerLabel(speaker: Speaker, locale: Locale): string {
   return speaker === "foreman"
     ? FOREMAN_LABEL[locale].toLowerCase()
@@ -15,10 +15,10 @@ function capitalized(text: string): string {
 }
 
 /**
- * Маршрут реплики для подписи: кто кому говорит.
- * @param {BriefMessageEvent} message Реплика из записи.
- * @param {Locale} locale Язык подписей.
- * @returns {string} Например «Код → Проверки» или «Постановка → мастер»; по-английски «Plan → foreman».
+ * Message route for the caption: who is talking to whom.
+ * @param {BriefMessageEvent} message Message from the recording.
+ * @param {Locale} locale Caption language.
+ * @returns {string} E.g. «Код → Проверки» or «Постановка → мастер»; in English «Plan → foreman».
  */
 export function routeOf(message: BriefMessageEvent, locale: Locale): string {
   return `${capitalized(speakerLabel(message.from, locale))} → ${speakerLabel(message.to, locale)}`;

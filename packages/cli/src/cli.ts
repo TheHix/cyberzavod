@@ -1,5 +1,5 @@
-// Разбор командной строки: имя команды выбирает обработчик из таблицы, обработчик получает
-// аргументы и каталог, из которого запущен CLI, и возвращает код выхода.
+// Command line parsing: the command name picks a handler from the table, the handler gets the
+// arguments and the directory the CLI was run from, and returns the exit code.
 
 import { homedir, tmpdir } from "node:os";
 import { parseArgs } from "node:util";
@@ -54,8 +54,8 @@ const OPTIONS_END = "--";
 const DEBUG_VARIABLE = "CYBERZAVOD_DEBUG";
 
 /**
- * Как запущена команда: её аргументы, каталог, из которого её вызвали, окружение и тексты на
- * выбранном языке.
+ * How a command was run: its arguments, the directory it was called from, the environment and
+ * texts in the chosen language.
  */
 interface Invocation {
   args: string[];
@@ -65,8 +65,8 @@ interface Invocation {
   claudeMessages: ClaudeMessages;
 }
 
-// Справка команды лежит в каталоге сообщений: команда без справки не компилируется. Раздел —
-// место команды в общей справке; служебные команды (`service`) в списке не показываются.
+// A command's help lives in the message catalog: a command without help does not compile. The
+// section is the command's place in the general help; service commands (`service`) are not listed.
 interface Command {
   section: CommandPlacement;
   run(invocation: Invocation): Promise<number>;
@@ -90,7 +90,7 @@ function defaultSharing(env: Environment): Sharing {
   return createSharing({ env, platform: process.platform, homeDirectory: homedir() });
 }
 
-// Машина и поиск программ с окружением вызова: PATH берётся из него, а не из process.env.
+// The machine and program lookup use the calling environment: PATH comes from it, not process.env.
 function doctorOptionsOf(
   invocation: Pick<Invocation, "directory" | "env" | "messages" | "claudeMessages">,
   installation: Installation,
@@ -119,7 +119,8 @@ function doctorOptionsOf(
   };
 }
 
-// Без терминала disconnect не удаляет без явного `--yes`: необратимое — только с согласия.
+// Without a terminal disconnect does not delete without an explicit `--yes`: irreversible only with
+// consent.
 function refuseWithoutTerminal(isConfirmed: boolean, messages: CliMessages): Confirmation {
   if (isConfirmed) return confirmWithoutAsking;
 
@@ -395,8 +396,8 @@ const EXPECTED_ERRORS = [
 ];
 const ARGUMENT_ERROR_PREFIX = "ERR_PARSE_ARGS";
 
-// Ошибки, которые человек исправляет сам: им хватает сообщения. Неверные аргументы parseArgs
-// сообщает ошибкой с кодом ERR_PARSE_ARGS_*.
+// Errors the human fixes themselves: the message is enough. parseArgs reports invalid arguments
+// with an ERR_PARSE_ARGS_* error code.
 function isExpected(err: unknown): err is Error {
   if (EXPECTED_ERRORS.some((kind) => err instanceof kind)) return true;
 
@@ -405,8 +406,8 @@ function isExpected(err: unknown): err is Error {
   return typeof code === "string" && code.startsWith(ARGUMENT_ERROR_PREFIX);
 }
 
-// Ошибки с текстом по каталогу печатаются на выбранном языке; остальные — как есть: тексты
-// сервера и диагностика формата файлов не переводятся.
+// Errors with catalog text are printed in the chosen language; the rest as is: server texts and
+// file format diagnostics are not translated.
 function expectedErrorText(
   err: Error,
   messages: CliMessages,
@@ -425,8 +426,8 @@ interface UnexpectedError {
   messages: CliMessages;
 }
 
-// Ошибка, которой человек не ждёт, — тоже без трассы стека: что случилось и где взять
-// подробности. Трасса — только с CYBERZAVOD_DEBUG.
+// An error the human does not expect is also printed without a stack trace: what happened and
+// where to get details. The trace only with CYBERZAVOD_DEBUG.
 function printUnexpectedError({ name, err, env, messages }: UnexpectedError): number {
   const reason = err instanceof Error ? err.message : String(err);
   const isDebug = Boolean(env[DEBUG_VARIABLE]);
@@ -450,7 +451,7 @@ function hasHelpFlag(args: readonly string[]): boolean {
   return options.some((argument) => COMMAND_HELP_FLAGS.includes(argument));
 }
 
-// Служебные команды не подсказываются: человек их не набирает.
+// Service commands are not suggested: the human does not type them.
 function printUnknownCommand(name: string, messages: CliMessages): number {
   const suggestion = closestName(name, listedCommandNames(COMMANDS));
   const text =
@@ -463,13 +464,14 @@ function printUnknownCommand(name: string, messages: CliMessages): number {
   return FAILURE;
 }
 
-/** Выбранный язык и аргументы без флага `--lang`. */
+/** The chosen language and the arguments without the `--lang` flag. */
 interface LanguageChoice {
   language: InterfaceLanguage;
   rest: string[];
 }
 
-// Ошибка флага языка возвращается, а не бросается: печатать её приходится на языке без флага.
+// A language flag error is returned, not thrown: it has to be printed in a language without the
+// flag.
 function chooseLanguage(argv: string[], env: Environment): LanguageChoice | CommandError {
   try {
     const { flag, rest } = extractLanguageFlag(argv);
@@ -491,11 +493,12 @@ function printLanguageError(err: CommandError, env: Environment): number {
 }
 
 /**
- * Выполняет команду CLI.
- * @param {string[]} argv Аргументы после имени программы.
- * @param {string} directory Каталог, из которого запущен CLI.
- * @param {Environment} env Окружение процесса: язык сообщений, адрес сервера, каталог проекта хука.
- * @returns {Promise<number>} Код выхода.
+ * Runs a CLI command.
+ * @param {string[]} argv Arguments after the program name.
+ * @param {string} directory Directory the CLI was run from.
+ * @param {Environment} env Process environment: message language, server address, hook project
+ *   directory.
+ * @returns {Promise<number>} Exit code.
  */
 export async function runCli(argv: string[], directory: string, env: Environment): Promise<number> {
   const choice = chooseLanguage(argv, env);
@@ -512,7 +515,7 @@ export async function runCli(argv: string[], directory: string, env: Environment
     return SUCCESS;
   }
 
-  // Версия печатается голым числом, как у npm: её читают скрипты и сверка выпуска.
+  // The version is printed as a bare number, like npm does: scripts and the release check read it.
   if (VERSION_REQUESTS.includes(name)) {
     console.log(HARNESS_VERSION);
 

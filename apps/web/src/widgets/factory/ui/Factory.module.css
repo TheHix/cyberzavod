@@ -1,4 +1,5 @@
-/* Цех на всё окно: холст позади всего, поле для плана и HUD справа — сеткой поверх. */
+/* The factory fills the window: the canvas behind everything, the field for the plan and the HUD on
+   the right as a grid on top. */
 .factory {
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--hud-width);
@@ -16,7 +17,7 @@
   display: block;
 }
 
-/* Поле: прозрачное место между меню и HUD, в него вписывается план цеха. */
+/* The field: a transparent space between the menu and the HUD, the floor plan fits into it. */
 .field {
   position: relative;
   min-height: 0;
@@ -53,7 +54,8 @@
     grid-template-rows: minmax(0, 1fr) auto;
   }
 
-  /* На узком и низком экране пузыри закрыли бы станки: речь показывает полка в HUD. */
+  /* On a narrow and short screen bubbles would cover the machines: the speech shelf in the HUD
+     shows speech. */
   .overlay {
     display: none;
   }

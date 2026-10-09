@@ -1,37 +1,37 @@
-// Кто выполняет этап: провайдер, агент и модель. Ядро не знает ни одного провайдера —
-// какие сочетания работают, решает адаптер агента.
+// Who runs a stage: provider, agent and model. The core knows no provider:
+// which combinations work is decided by the agent's adapter.
 
 import { isLine, isObject } from "./guards.ts";
 
 /**
- * Агент этапа. Любое поле может отсутствовать: тогда адаптер берёт своё значение по умолчанию.
- * Модель `default` значит то же, что её отсутствие.
+ * Stage agent. Any field may be missing: then the adapter uses its own default.
+ * Model `default` means the same as no model.
  */
 export interface AgentConfig {
-  /** Провайдер модели, например `anthropic`. */
+  /** Model provider, for example `anthropic`. */
   provider?: string;
-  /** Агент, который ведёт работу, например `claude`; по нему выбирается адаптер. */
+  /** Agent that does the work, for example `claude`; it selects the adapter. */
   agent?: string;
-  /** Модель или `default`. */
+  /** Model or `default`. */
   model?: string;
 }
 
-/** Модель по выбору адаптера: для каждого этапа своя. */
+/** Model chosen by the adapter: its own for each stage. */
 export const DEFAULT_MODEL = "default";
 
-/** Ошибка описания агента: оно пришло извне и не прошло проверку. */
+/** Agent description error: it came from outside and failed validation. */
 export class AgentConfigError extends Error {}
 
 const AGENT_FIELDS = ["provider", "agent", "model"] as const;
 
 /**
- * Проверяет описание агента этапа.
- * @param {unknown} raw Разобранный JSON агента.
- * @returns {AgentConfig} Проверенное описание; отсутствующих полей нет и в результате.
- * @throws {AgentConfigError} Если описание не объект или поле не строка в одну строку.
+ * Validates a stage agent description.
+ * @param {unknown} raw Parsed JSON of the agent.
+ * @returns {AgentConfig} The validated description; missing fields are missing in the result too.
+ * @throws {AgentConfigError} If the description is not an object or a field is not one-line text.
  */
 export function parseAgentConfig(raw: unknown): AgentConfig {
-  if (!isObject(raw)) throw new AgentConfigError("агент должен быть объектом");
+  if (!isObject(raw)) throw new AgentConfigError("agent must be an object");
 
   const config: AgentConfig = {};
 
@@ -39,7 +39,7 @@ export function parseAgentConfig(raw: unknown): AgentConfig {
     const value = raw[field];
 
     if (value === undefined) continue;
-    if (!isLine(value)) throw new AgentConfigError(`${field} должен быть непустой строкой`);
+    if (!isLine(value)) throw new AgentConfigError(`${field} must be a non-empty string`);
 
     config[field] = value;
   }

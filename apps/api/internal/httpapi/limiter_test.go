@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// testClock — часы, которые идут, только когда их переводят.
+// testClock is a clock that moves only when it is set forward.
 type testClock struct{ now time.Time }
 
 func (c *testClock) Now() time.Time { return c.now }
@@ -19,7 +19,7 @@ func newTestClock() *testClock {
 	return &testClock{now: time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)}
 }
 
-// spendAttempts тратит count попыток автора ownerID; каждая должна пройти.
+// spendAttempts spends count attempts of author ownerID; each must pass.
 func spendAttempts(t *testing.T, limiter *changeLimiter, ownerID int64, count int) {
 	t.Helper()
 
@@ -78,7 +78,7 @@ func TestChangeLimiterForgetsEndedWindows(t *testing.T) {
 	}
 }
 
-// changeRequest собирает загрузку или удаление записи автора по токену.
+// changeRequest builds a recording upload or deletion by an author with a token.
 func changeRequest(t *testing.T, method string) *http.Request {
 	t.Helper()
 

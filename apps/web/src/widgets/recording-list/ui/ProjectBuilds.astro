@@ -1,6 +1,7 @@
 ---
-// Сборки одного проекта по порядку задач с номерами: заголовок-ссылка на запись, день и главные
-// счётчики. Тот же список — в панели записей под шапкой проекта и в панели «Проект».
+// Builds of one project in task order with numbers: a title link to the recording, the day and
+// the main counters. The same list is in the recordings panel under the project header and in the
+// "Project" panel.
 import { summarize, type SessionRecord } from "@cyberzavod/core";
 import { recordingUrl } from "@/entities/recording";
 import type { Locale } from "@/shared/i18n/locale.ts";
@@ -10,9 +11,11 @@ import { languageNoteOf } from "@/shared/lib/language-note.ts";
 import { Title } from "@/shared/ui";
 
 interface Props {
-  /** Записи сборок проекта по порядку задач (`projectSeriesOf`): номер сборки — её место здесь. */
+  /**
+   * Project build recordings in task order (`projectSeriesOf`): a build's number is its place here.
+   */
   recordings: readonly SessionRecord[];
-  /** Язык страницы: на нём подписи и форматы чисел и дат. */
+  /** Page language: captions and number and date formats are in it. */
   locale: Locale;
 }
 
@@ -54,7 +57,7 @@ const { recordings, locale } = Astro.props;
     padding-left: var(--space-xl);
   }
 
-  /* Номер сборки — её место по порядку задач: плотным шрифтом, как заголовок рядом. */
+  /* The build number is its place in task order: in a dense font, like the title next to it. */
   .build::marker {
     font-family: var(--font-display);
     font-weight: 800;

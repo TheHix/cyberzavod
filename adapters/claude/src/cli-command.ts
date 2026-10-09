@@ -1,16 +1,16 @@
-// Как адаптер зовёт CLI: пакет из npm через npx.
+// How the adapter calls the CLI: the npm package via npx.
 
-/** Имя npm-пакета Cyberzavod. */
+/** Name of the Cyberzavod npm package. */
 export const PACKAGE_NAME = "cyberzavod";
 
-/** Команда запуска CLI для подсказок человеку: версию подбирает npx. */
+/** Command that runs the CLI in hints for the human: npx picks the version. */
 export const CLI_COMMAND = `npx ${PACKAGE_NAME}`;
 
 /**
- * Команда запуска CLI той версии, что записана в конфиге проекта: так черновик и публикация идут
- * той же версией, что писала журнал.
- * @param {string} version Версия Cyberzavod из конфига проекта.
- * @returns {string} Команда запуска без аргументов.
+ * Command that runs the CLI version recorded in the project config, so drafting and publishing use
+ * the same version that wrote the journal.
+ * @param {string} version Cyberzavod version from the project config.
+ * @returns {string} Run command without arguments.
  */
 export function pinnedCliCommand(version: string): string {
   return `${CLI_COMMAND}@${version}`;

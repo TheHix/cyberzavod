@@ -7,18 +7,18 @@ import { Button, Card } from "@/shared/ui";
 import styles from "./SignInFailedNotice.module.css";
 
 interface Props {
-  /** Язык страницы: на нём сообщение. */
+  /** Page language: the message is in it. */
   locale: Locale;
 }
 
 const ICON_STROKE = 3;
 
 /**
- * Сообщение о неудачном входе: API возвращает на сайт с `?login=failed`. Отметка сразу уходит из
- * адреса, чтобы не вернуться после обновления страницы и не попасть в путь возврата.
- * @param {Props} props Свойства компонента.
- * @param {Locale} props.locale Язык страницы.
- * @returns {JSX.Element} Сообщение с кнопкой «закрыть» или ничего.
+ * Failed sign-in message: the API returns to the site with `?login=failed`. The mark leaves the
+ * address at once so it does not come back after a page reload or get into the return path.
+ * @param {Props} props Component props.
+ * @param {Locale} props.locale Page language.
+ * @returns {JSX.Element} The message with a "close" button, or nothing.
  */
 export function SignInFailedNotice(props: Props): JSX.Element {
   const [isShown, setShown] = createSignal(false);

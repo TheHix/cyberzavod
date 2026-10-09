@@ -1,4 +1,4 @@
-// `cyberzavod login` и `cyberzavod logout`: вход через GitHub и выход.
+// `cyberzavod login` and `cyberzavod logout`: logging in through GitHub and logging out.
 
 import type { CommandError } from "../errors.ts";
 import type { CliMessages } from "../messages/cli-messages.ts";
@@ -6,12 +6,12 @@ import { waitForAccessToken } from "../sharing/device-flow.ts";
 import type { Sharing } from "../sharing/services.ts";
 
 /**
- * Входит через GitHub: показывает код, ждёт подтверждения, проверяет токен на сервере и
- * сохраняет его. Токен нигде не печатается.
- * @param {Sharing} sharing Зависимости команд публикации.
- * @param {CliMessages} messages Сообщения на выбранном языке.
- * @returns {Promise<void>} Готово, когда токен сохранён.
- * @throws {CommandError} Если код истёк, вход отклонён или GitHub недоступен.
+ * Logs in through GitHub: shows the code, waits for confirmation, checks the token on the server
+ * and saves it. The token is never printed.
+ * @param {Sharing} sharing Dependencies of the sharing commands.
+ * @param {CliMessages} messages Messages in the chosen language.
+ * @returns {Promise<void>} Done when the token is saved.
+ * @throws {CommandError} If the code expired, the login was rejected or GitHub is unavailable.
  */
 export async function login(sharing: Sharing, messages: CliMessages): Promise<void> {
   const clientId = await sharing.api.githubClientId();
@@ -33,10 +33,10 @@ export async function login(sharing: Sharing, messages: CliMessages): Promise<vo
 }
 
 /**
- * Выходит: удаляет сохранённый токен.
- * @param {Sharing} sharing Зависимости команд публикации.
- * @param {CliMessages} messages Сообщения на выбранном языке.
- * @returns {Promise<void>} Готово, когда токена не осталось.
+ * Logs out: removes the saved token.
+ * @param {Sharing} sharing Dependencies of the sharing commands.
+ * @param {CliMessages} messages Messages in the chosen language.
+ * @returns {Promise<void>} Done when no token is left.
  */
 export async function logout(sharing: Sharing, messages: CliMessages): Promise<void> {
   const hadToken = await sharing.credentials.remove();

@@ -1,7 +1,7 @@
-// Публикация записей из черновика. Без черновика берётся самый свежий. Без сборки публикуются
-// все сборки черновика, и если хоть одна не готова, не пишется ничего; со сборкой — только она,
-// остальные могут быть не готовы. Запись без исходных текстов промптов ложится в журнал
-// проекта — оттуда её берёт сайт при сборке.
+// Publishing recordings from a draft. Without a draft the most recent one is taken. Without a build
+// all builds of the draft are published, and if even one is not ready nothing is written; with a
+// build only that one is, and the rest may be unready. The recording, without the original prompt
+// texts, goes into the project journal, where the site picks it up at build time.
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -12,15 +12,15 @@ import { ClaudeError } from "../errors.ts";
 import type { ClaudeMessages } from "../messages/claude-messages.ts";
 import { captureDirectories, newestFile, requireProject } from "../paths.ts";
 
-/** Что опубликовать: проект и, если нужно, конкретные черновик и сборку. */
+/** What to publish: the project and, if needed, a specific draft and build. */
 export interface PublishSessionsOptions {
-  /** Каталог внутри проекта. */
+  /** Directory inside the project. */
   projectDirectory: string;
-  /** Черновик; без него берётся самый свежий. */
+  /** Draft; without it the most recent one is taken. */
   draftPath?: string;
-  /** Сборка черновика; без неё публикуются все. */
+  /** Build of the draft; without it all are published. */
   buildId?: string;
-  /** Сообщения на выбранном языке. */
+  /** Messages in the chosen language. */
   messages: ClaudeMessages;
 }
 
@@ -30,7 +30,7 @@ function isPublishProblem(err: unknown): err is PublishProblem {
   return err instanceof DraftError || err instanceof RecordError || err instanceof ClaudeError;
 }
 
-// Ошибки формата (`DraftError`, `RecordError`) не переводятся: их текст — диагностика файла.
+// Format errors (`DraftError`, `RecordError`) are not translated: their text is a file diagnostic.
 function problemText(err: PublishProblem, messages: ClaudeMessages): string {
   return err instanceof ClaudeError ? err.describe(messages) : err.message;
 }
@@ -49,7 +49,7 @@ function publishBuildOrProblem(
   }
 }
 
-// Сначала проверяются все выбранные сборки, чтобы не опубликовать часть записей.
+// All selected builds are checked first so as not to publish only some of the recordings.
 function publishSelected(
   draft: Draft,
   buildId: string | undefined,
@@ -77,11 +77,11 @@ function publishSelected(
 }
 
 /**
- * Публикует сборки черновика записями в журнал проекта. Неготовый черновик — сообщение об
- * ошибке, а не исключение: его исправляет человек.
- * @param {PublishSessionsOptions} options Проект, черновик, сборка и сообщения.
- * @returns {Promise<boolean>} true, если записи опубликованы.
- * @throws {ClaudeError} Если проекта или черновиков нет.
+ * Publishes the draft's builds as recordings into the project journal. An unready draft yields an
+ * error message, not an exception: the human fixes it.
+ * @param {PublishSessionsOptions} options Project, draft, build and messages.
+ * @returns {Promise<boolean>} true if the recordings were published.
+ * @throws {ClaudeError} If there is no project or no drafts.
  */
 export async function publishSessions(options: PublishSessionsOptions): Promise<boolean> {
   const { messages } = options;

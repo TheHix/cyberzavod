@@ -7,22 +7,22 @@ import { readCssTokens } from "./css-tokens.ts";
 import { PLAQUE_PAPER_SHADE } from "./pixel-plaque.ts";
 import { plaqueSvg, type PlaqueCanvas, type PlaquePaints } from "./plaque-svg.ts";
 
-// Иконки сайта и превью ссылок — табличка логотипа из меню, собранная при сборке.
-// Краски — из токенов оформления, надписи — из LOGO_LINES и LOGO_SHORT_LINES.
+// Site icons and link previews: the menu logo plaque, made at build time.
+// Colors come from the design tokens, labels from LOGO_LINES and LOGO_SHORT_LINES.
 
-/** Сторона иконки для экрана «Домой» на iOS, в пикселях. */
+/** Side of the iOS home screen icon, in pixels. */
 export const TOUCH_ICON_SIZE = 180;
 
-/** Размер превью ссылки (`og:image`) — тот, что ждут соцсети и мессенджеры, в пикселях. */
+/** Link preview size (`og:image`) expected by social networks and messengers, in pixels. */
 export const PREVIEW_IMAGE_SIZE = { width: 1200, height: 630 } as const;
 
-// Иконка вкладки — векторная, её сторона задаёт только целый шаг пикселя таблички.
+// The tab icon is vector; its side only sets the whole-number step of the plaque pixel.
 const FAVICON_SIZE = 32;
 const TOUCH_ICON_FILL = 0.8;
 const PREVIEW_IMAGE_FILL = 0.6;
-// Лицо логотипа — как у таблички в меню (`--plaque-face` в Sidebar.module.css).
+// The logo face matches the menu plaque (`--plaque-face` in Sidebar.module.css).
 const LOGO_FACE_TOKEN = "--sun";
-// Фон — пол цеха: так выглядит страница вокруг логотипа.
+// The background is the factory floor: that is how the page around the logo looks.
 const BACKGROUND_TOKEN = "--floor";
 const INK_TOKEN = "--ink";
 
@@ -43,17 +43,17 @@ function logoPaints(): PlaquePaints {
 }
 
 /**
- * Цвет интерфейса браузера вокруг сайта (`theme-color`) — пол цеха.
- * @returns {string} Цвет вида `#rrggbb`.
+ * Color of the browser interface around the site (`theme-color`): the factory floor.
+ * @returns {string} Color of the form `#rrggbb`.
  */
 export function siteThemeColor(): string {
   return formatColor(tokenColor(BACKGROUND_TOKEN));
 }
 
 /**
- * Иконка вкладки: короткая табличка логотипа («CZ», «КЗ») на прозрачном фоне.
- * @param {Locale} locale Язык страниц, для которых иконка.
- * @returns {string} Документ SVG.
+ * Tab icon: the short logo plaque ("CZ", «КЗ») on a transparent background.
+ * @param {Locale} locale Language of the pages the icon is for.
+ * @returns {string} SVG document.
  */
 export function faviconSvg(locale: Locale): string {
   return plaqueSvg(LOGO_SHORT_LINES[locale], logoPaints(), {
@@ -64,10 +64,10 @@ export function faviconSvg(locale: Locale): string {
 }
 
 /**
- * Иконка для экрана «Домой»: короткая табличка логотипа на полу цеха. iOS не берёт прозрачность
- * и SVG, поэтому фон сплошной, а картинка — PNG.
- * @param {Locale} locale Язык страниц, для которых иконка.
- * @returns {Promise<Uint8Array<ArrayBuffer>>} Картинка PNG.
+ * Home screen icon: the short logo plaque on the factory floor. iOS does not accept transparency
+ * or SVG, so the background is solid and the image is a PNG.
+ * @param {Locale} locale Language of the pages the icon is for.
+ * @returns {Promise<Uint8Array<ArrayBuffer>>} PNG image.
  */
 export async function touchIconPng(locale: Locale): Promise<Uint8Array<ArrayBuffer>> {
   return pngOf(LOGO_SHORT_LINES[locale], {
@@ -79,9 +79,10 @@ export async function touchIconPng(locale: Locale): Promise<Uint8Array<ArrayBuff
 }
 
 /**
- * Превью ссылки на сайт в соцсетях и мессенджерах: полная табличка логотипа на полу цеха.
- * @param {Locale} locale Язык страниц, для которых превью.
- * @returns {Promise<Uint8Array<ArrayBuffer>>} Картинка PNG.
+ * Preview of a link to the site in social networks and messengers: the full logo plaque on the
+ * factory floor.
+ * @param {Locale} locale Language of the pages the preview is for.
+ * @returns {Promise<Uint8Array<ArrayBuffer>>} PNG image.
  */
 export async function previewImagePng(locale: Locale): Promise<Uint8Array<ArrayBuffer>> {
   return pngOf(LOGO_LINES[locale], {

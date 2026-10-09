@@ -1,5 +1,5 @@
-/* Текст статьи: разметка приходит готовой (из Markdown), поэтому элементы оформляются
-   селекторами по тегам внутри контейнера. */
+/* Article text: the markup arrives ready-made (from Markdown), so elements are styled with
+   tag selectors inside the container. */
 .prose {
   --prose-width: 46rem;
   --prose-gap: var(--space-l);
@@ -72,7 +72,7 @@
   border-radius: var(--radius-s);
 }
 
-/* Блок кода прокручивается по горизонтали сам, а не растягивает страницу. */
+/* A code block scrolls horizontally on its own rather than stretching the page. */
 .prose pre {
   padding: var(--space-m);
   overflow-x: auto;
@@ -108,7 +108,7 @@
   border-top: var(--outline);
 }
 
-/* Блок кода с кнопкой: код и кнопка в одной строке, кнопка не уезжает при прокрутке кода. */
+/* Code block with a button: code and button in one row; the button stays as the code scrolls. */
 .codeBlock {
   display: flex;
   gap: var(--space-s);

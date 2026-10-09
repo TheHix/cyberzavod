@@ -1,14 +1,14 @@
 import type { PublishedProject } from "./published.ts";
 
-/** Ошибка поиска карточки: запись или страница ссылается на проект, которого нет в `projects/`. */
+/** Card lookup error: a recording or page refers to a project that is not in `projects/`. */
 export class UnknownProjectError extends Error {}
 
 /**
- * Находит карточку проекта по id.
- * @param {readonly PublishedProject[]} projects Карточки проектов.
- * @param {string} id Идентификатор проекта, например из `SessionRecord.projectId`.
- * @returns {PublishedProject} Карточка проекта.
- * @throws {UnknownProjectError} Если карточки с таким id нет.
+ * Finds a project card by id.
+ * @param {readonly PublishedProject[]} projects Project cards.
+ * @param {string} id Project id, e.g. from `SessionRecord.projectId`.
+ * @returns {PublishedProject} The project card.
+ * @throws {UnknownProjectError} If there is no card with this id.
  */
 export function projectOf(projects: readonly PublishedProject[], id: string): PublishedProject {
   const project = projects.find((candidate) => candidate.id === id);

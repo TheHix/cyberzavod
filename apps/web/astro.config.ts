@@ -8,13 +8,13 @@ import { pathWithoutLocale } from "./src/shared/i18n/path.ts";
 
 export default defineConfig({
   site: "https://cyberzavod.com",
-  // Все страницы собираются в статический HTML; JS получают только островки с client:*.
+  // All pages build to static HTML; only client:* islands get JS.
   output: "static",
   integrations: [
     solid(),
-    // Карта сайта со ссылками между языками (xhtml:link) строится по тем же LOCALES, что и маршруты.
+    // The sitemap with links between languages (xhtml:link) uses the same LOCALES as the routes.
     sitemap({
-      // Страницы с noindex поисковику не предлагаются.
+      // Pages with noindex are not offered to search engines.
       filter: (page) => !isUnindexedPath(pathWithoutLocale(new URL(page).pathname)),
       i18n: {
         defaultLocale: DEFAULT_LOCALE,
@@ -23,12 +23,12 @@ export default defineConfig({
     }),
   ],
   markdown: {
-    // Shiki красит код цветами своей темы инлайн-стилями, а цвета сайта берутся только из токенов.
+    // Shiki colors code with its theme as inline styles, but site colors come only from tokens.
     syntaxHighlight: false,
   },
   vite: {
     resolve: {
-      // Журнал проекта, карточки проектов и гайды лежат в корне репозитория.
+      // The project journal, project cards and guides live at the repository root.
       alias: {
         "@journal": fileURLToPath(new URL("../../.cyberzavod/journal", import.meta.url)),
         "@projects": fileURLToPath(new URL("../../projects", import.meta.url)),
@@ -36,7 +36,7 @@ export default defineConfig({
       },
     },
     server: {
-      // В разработке запросы к API уходят в Go-сервер из docker compose.
+      // In development, API requests go to the Go server from docker compose.
       proxy: { "/api": "http://localhost:8080" },
     },
   },

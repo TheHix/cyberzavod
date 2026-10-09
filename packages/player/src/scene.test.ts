@@ -14,9 +14,9 @@ import {
 } from "./script.fixtures.ts";
 import { buildScript, type FactoryScript } from "./script.ts";
 
-// Моменты сцены для reworkRecording — см. тесты buildScript: постановка работает 0–2 000,
-// поднимает деталь до 2 200, несёт её коду (по проходу — 4 200–14 200), отдаёт 15 200–15 300;
-// код поворачивается к ней с 15 050, кладёт деталь до 15 500 и работает 15 500–18 500.
+// Scene moments for reworkRecording, see the buildScript tests: plan works 0–2,000, lifts the part
+// until 2,200, carries it to code (along the aisle 4,200–14,200), hands it over 15,200–15,300; code
+// turns toward it from 15,050, puts the part down until 15,500 and works 15,500–18,500.
 function reworkScript(): FactoryScript {
   return buildScript(reworkRecording(), LINE_LAYOUT, PLAIN_PACING);
 }
@@ -53,15 +53,15 @@ describe("sceneAt", () => {
 
     const scene = sceneAt(script, 15_125);
 
-    // На полпути от «к станку» (−π/2) к «к проходу» (π/2).
+    // Halfway from "toward the machine" (−π/2) to "toward the aisle" (π/2).
     expect(scene.workers[1]?.heading).toBeCloseTo(0);
   });
 
   it("поворачивает по кратчайшей дуге, даже через ±π", () => {
     const script = reworkScript();
 
-    // Рабочий проверок бежит по проходу влево (π) и с 57 000 поворачивает вверх (−π/2):
-    // на полпути поворота это 5π/4, а не π/4, как вышло бы в обход через ноль.
+    // The checks worker runs left along the aisle (π) and from 57,000 turns up (−π/2):
+    // halfway through the turn that is 5π/4, not π/4 as it would be going around through zero.
     const scene = sceneAt(script, 57_075);
 
     expect(scene.workers[3]?.heading).toBeCloseTo(1.25 * Math.PI);
@@ -72,7 +72,7 @@ describe("sceneAt", () => {
 
     const scene = sceneAt(script, 15_250);
 
-    // Посередине между руками отдающего (y = 0,55) и получателя (y = 0,45).
+    // Midway between the giver's hands (y = 0.55) and the receiver's (y = 0.45).
     expect([scene.part.position.x, scene.part.position.y, scene.part.holder]).toEqual([
       10,
       expect.closeTo(0.5),
@@ -147,8 +147,8 @@ describe("sceneAt: мастер и реплики", () => {
   const specPost = LINE_LAYOUT.stations.planning.foremanPost;
   const towardSpec = headingTo(specPost, LINE_LAYOUT.stations.planning.post);
 
-  // Мастер идёт к постановке 500–27 500, говорит промпт до 28 500, слушает «принял» до 29 500,
-  // с 30 000 возвращается: к 57 000 он у стола и поворачивается за 150 мс.
+  // The foreman walks to plan 500–27,500, says the prompt until 28,500, listens to "got it" until
+  // 29,500, returns from 30,000: by 57,000 they are at the desk and turn within 150 ms.
   function chatScript(): FactoryScript {
     return buildScript(chatRecording(), LINE_LAYOUT, PLAIN_PACING);
   }
@@ -171,7 +171,7 @@ describe("sceneAt: мастер и реплики", () => {
 
     const scene = sceneAt(script, 4_500);
 
-    // От двери (22, 6) вверх в проход: с 2 500 до 6 500 по единице в секунду.
+    // From the door (22, 6) up into the aisle: from 2,500 to 6,500 at one unit per second.
     expect(scene.foreman).toEqual({
       position: { x: 22, y: 4 },
       heading: -Math.PI / 2,
@@ -197,7 +197,8 @@ describe("sceneAt: мастер и реплики", () => {
 
     const scene = sceneAt(script, 57_075);
 
-    // К столу мастер идёт по проходу влево (π) и поворачивается вверх (−π/2) по короткой дуге.
+    // The foreman walks left along the aisle to the desk (π) and turns up (−π/2) along the short
+    // arc.
     expect(scene.foreman).toMatchObject({ position: post, activity: "idle" });
     expect(scene.foreman.heading).toBeCloseTo(1.25 * Math.PI);
   });
@@ -210,7 +211,7 @@ describe("sceneAt: мастер и реплики", () => {
     ]);
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
-    // Мастер говорит 27 100–28 100, с 28 600 идёт назад 27 с и поворачивается за 150 мс.
+    // The foreman speaks 27,100–28,100, walks back from 28,600 for 27 s and turns within 150 ms.
     const scene = sceneAt(script, 55_750);
 
     expect(scene.foreman).toMatchObject({ position: post, heading: facing, activity: "idle" });
@@ -271,7 +272,7 @@ describe("sceneAt: мастер и реплики", () => {
   });
 });
 
-// Шаг выборки кадров при проверке, что время записи не идёт назад, мс.
+// Frame sampling step when checking that recording time never goes backwards, ms.
 const FRAME_STEP_MS = 20;
 
 describe.each(SPEECH_RECORDINGS)("sceneAt: время записи, запись $name", ({ recording }) => {

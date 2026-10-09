@@ -1,7 +1,7 @@
-// Картинки сайта (иконки, превью ссылок) собираются при сборке, где нет `getComputedStyle`,
-// поэтому их краски читаются прямо из текста tokens.css.
+// Site images (icons, link previews) are made at build time, where there is no
+// `getComputedStyle`, so their colors are read straight from the text of tokens.css.
 
-/** Откуда читаются токены — как у `CSSStyleDeclaration`: пустая строка, если токена нет. */
+/** Where tokens are read from, as in `CSSStyleDeclaration`: an empty string for a missing token. */
 export interface TokenSource {
   getPropertyValue(name: string): string;
 }
@@ -9,10 +9,10 @@ export interface TokenSource {
 const DECLARATION = /(--[\w-]+)\s*:\s*([^;]+);/g;
 
 /**
- * Читает объявления пользовательских свойств из текста CSS. Берётся первое объявление каждого
- * токена — из `:root`: переопределения ниже (медиазапросы движения) краски не трогают.
- * @param {string} css Текст таблицы стилей с токенами.
- * @returns {TokenSource} Значения токенов по имени.
+ * Reads custom property declarations from CSS text. The first declaration of each token is taken,
+ * the one from `:root`: overrides below (motion media queries) do not touch the colors.
+ * @param {string} css Text of the stylesheet with the tokens.
+ * @returns {TokenSource} Token values by name.
  */
 export function readCssTokens(css: string): TokenSource {
   const values = new Map<string, string>();

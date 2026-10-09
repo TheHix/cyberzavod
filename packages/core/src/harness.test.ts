@@ -50,7 +50,7 @@ describe("parseStageGuide", () => {
   it("отклоняет шапку без описания", () => {
     const act = () => parseStageGuide("record", stageFile("title: Фиксация"));
 
-    expect(act).toThrow(/title и description/);
+    expect(act).toThrow(/title and description/);
   });
 
   it("отклоняет роль без доступа", () => {
@@ -74,7 +74,7 @@ describe("parseStageGuide", () => {
 
     const act = () => parseStageGuide("implementation", text);
 
-    expect(act).toThrow(/не поле/);
+    expect(act).toThrow(/not a field/);
   });
 });
 

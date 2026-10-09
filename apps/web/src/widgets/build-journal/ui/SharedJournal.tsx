@@ -6,16 +6,16 @@ import { JournalTimeline } from "./JournalTimeline.tsx";
 import styles from "./Timeline.module.css";
 
 interface Props {
-  /** Язык страницы: на нём метки, подписи и сообщения журнала. */
+  /** Page language: journal labels, captions and messages are in it. */
   locale: Locale;
 }
 
 /**
- * Журнал сборки записи из галереи: запись приходит из API в браузере, пока её нет — сообщение,
- * почему.
- * @param {Props} props Свойства компонента.
- * @param {Locale} props.locale Язык страницы.
- * @returns {JSX.Element} Журнал или сообщение.
+ * Build journal of a gallery recording: the recording comes from the API in the browser; while it
+ * is missing, a message says why.
+ * @param {Props} props Component props.
+ * @param {Locale} props.locale Page language.
+ * @returns {JSX.Element} Journal or message.
  */
 export function SharedJournal(props: Props): JSX.Element {
   const state = useStoreValue($sharedRecording);

@@ -1,24 +1,24 @@
-// Единственный вопрос `init`: «Продолжить?». Отвечает человек в терминале или заготовка без
-// вопроса — для `--yes`, CI и облака, где терминала нет.
+// The only question of `init`: "Continue?". Answered by the human in a terminal or by a preset
+// without asking, for `--yes`, CI and the cloud, where there is no terminal.
 
 import { createInterface } from "node:readline";
 
-/** Потоки, через которые CLI говорит с человеком. */
+/** Streams through which the CLI talks to the human. */
 export interface TerminalStreams {
-  /** Откуда читать ответ. */
+  /** Where to read the answer from. */
   input: NodeJS.ReadableStream;
-  /** Куда писать вопрос. */
+  /** Where to write the question. */
   output: NodeJS.WritableStream;
 }
 
 /**
- * Задаёт вопрос «да или нет» и возвращает согласие.
- * @param {string} question Вопрос.
- * @returns {Promise<boolean>} Согласился ли человек.
+ * Asks a yes-or-no question and returns consent.
+ * @param {string} question The question.
+ * @returns {Promise<boolean>} Whether the human agreed.
  */
 export type Confirmation = (question: string) => Promise<boolean>;
 
-/** Ответы, которые считаются согласием: пустая строка — это Enter на значении по умолчанию. */
+/** Answers that count as consent: an empty string is Enter on the default value. */
 const ACCEPTED_ANSWERS: readonly string[] = ["", "y", "yes", "д", "да"];
 
 function isAccepted(answer: string): boolean {
@@ -26,10 +26,10 @@ function isAccepted(answer: string): boolean {
 }
 
 /**
- * Спрашивает человека в терминале и читает одну строку. Согласие — Enter, `y`, `yes`, `д`, `да`;
- * любой другой ответ и конец ввода — отказ.
- * @param {TerminalStreams} streams Ввод и вывод.
- * @returns {Confirmation} Вопрос на заданных потоках.
+ * Asks the human in the terminal and reads one line. Consent is Enter, `y`, `yes`, `д`, `да`;
+ * any other answer and end of input are a refusal.
+ * @param {TerminalStreams} streams Input and output.
+ * @returns {Confirmation} The question on the given streams.
  */
 export function terminalConfirmation(streams: TerminalStreams): Confirmation {
   return async (question) => {
@@ -41,7 +41,8 @@ export function terminalConfirmation(streams: TerminalStreams): Confirmation {
 
       const line = await lines.next();
 
-      // Без ввода терминал не перевёл строку за человека: следующий вывод ушёл бы в эту же.
+      // Without input the terminal did not break the line for the human: the next output would land
+      // on the same one.
       if (line.done === true) {
         streams.output.write("\n");
 
@@ -56,7 +57,7 @@ export function terminalConfirmation(streams: TerminalStreams): Confirmation {
 }
 
 /**
- * Соглашается, ничего не спрашивая: `init --yes` и запуск без терминала.
- * @returns {Promise<boolean>} Всегда согласие.
+ * Agrees without asking anything: `init --yes` and running without a terminal.
+ * @returns {Promise<boolean>} Always consent.
  */
 export const confirmWithoutAsking: Confirmation = () => Promise.resolve(true);

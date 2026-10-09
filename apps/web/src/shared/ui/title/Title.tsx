@@ -4,27 +4,27 @@ import { cx } from "@/shared/lib/cx.ts";
 import styles from "./Title.module.css";
 
 interface Props {
-  /** Элемент: заголовок нужного уровня или строчный текст внутри ссылки и `<summary>`. */
+  /** Element: a heading of the needed level or inline text inside a link and `<summary>`. */
   as?: "h1" | "h2" | "h3" | "p" | "span" | undefined;
   size?: "m" | "l" | "xl" | undefined;
-  /** Сколько строк занимает текст: блок постоянной высоты, лишнее обрезается. */
+  /** How many lines the text takes: a fixed-height block, the rest is clipped. */
   lines?: number | undefined;
   class?: string | undefined;
-  /** Язык текста, если он не совпадает с языком страницы: например, запись в оригинале. */
+  /** Text language when it differs from the page language: for example, an original recording. */
   lang?: string | undefined;
   children: JSX.Element;
 }
 
 /**
- * Заголовок ui-kit плотным шрифтом: название сборки, главное указание промпта.
- * @param {Props} props Свойства компонента.
- * @param {"h1" | "h2" | "h3" | "p" | "span"} [props.as] Элемент; по умолчанию `p`.
- * @param {"m" | "l" | "xl"} [props.size] Размер; по умолчанию `l`.
- * @param {number} [props.lines] Число строк постоянной высоты; без него текст растёт как есть.
- * @param {string} [props.class] Дополнительный класс для раскладки снаружи.
- * @param {string} [props.lang] Язык текста, если он не совпадает с языком страницы.
- * @param {JSX.Element} props.children Текст.
- * @returns {JSX.Element} Заголовок.
+ * ui-kit title in a dense font: a build name, the main instruction of a prompt.
+ * @param {Props} props Component props.
+ * @param {"h1" | "h2" | "h3" | "p" | "span"} [props.as] Element; `p` by default.
+ * @param {"m" | "l" | "xl"} [props.size] Size; `l` by default.
+ * @param {number} [props.lines] Number of lines of fixed height; without it the text grows as is.
+ * @param {string} [props.class] Extra class for layout from outside.
+ * @param {string} [props.lang] Text language when it differs from the page language.
+ * @param {JSX.Element} props.children Text.
+ * @returns {JSX.Element} Title.
  */
 export function Title(props: Props): JSX.Element {
   return (

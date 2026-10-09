@@ -1,19 +1,19 @@
-# Локальное окружение: Postgres и API в Docker, фронт запускается отдельно через `pnpm dev`.
-# Порядок запуска как в продакшене: база готова → миграции прошли → стартует API.
+# Local environment: Postgres and API in Docker, the frontend runs separately via `pnpm dev`.
+# Startup order as in production: database ready → migrations applied → API starts.
 name: cyberzavod
 
 x-api: &api
   build: ./apps/api
   image: cyberzavod-api:dev
   environment:
-    # Пароль только для локальной разработки; на сервере секреты лежат в .env.
+    # Password for local development only; on the server secrets live in .env.
     DATABASE_URL: postgres://cyberzavod:cyberzavod@db:5432/cyberzavod?sslmode=disable
     API_ADDR: ":8080"
-    # client_id OAuth-приложения GitHub для входа из CLI и на сайте; пусто — вход недоступен.
+    # GitHub OAuth app client_id for sign-in from the CLI and on the site; empty: sign-in is off.
     GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
-    # Секрет того же приложения для входа на сайте; пусто — вход на сайте недоступен.
+    # Secret of the same app for sign-in on the site; empty: sign-in on the site is off.
     GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
-    # Адрес сайта в разработке: на него GitHub вернёт после входа, с ним сверяется Origin.
+    # Site address in development: GitHub returns to it after sign-in, Origin is checked against it.
     PUBLIC_URL: http://localhost:4321
 
 services:
@@ -43,7 +43,7 @@ services:
   api:
     <<: *api
     command: ["serve"]
-    # Больше таймаута Shutdown в API (10 с), чтобы Docker не убил процесс раньше.
+    # Longer than the API Shutdown timeout (10 s), so that Docker does not kill the process earlier.
     stop_grace_period: 15s
     ports:
       - "127.0.0.1:8080:8080"

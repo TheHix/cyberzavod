@@ -1,11 +1,11 @@
 import { For, type JSX } from "solid-js";
 import styles from "./BarList.module.css";
 
-/** Строка диаграммы: подпись, число для длины полосы и оно же текстом на языке страницы. */
+/** Chart row: a label, the number for the bar length, and the same number as page-language text. */
 export interface BarItem {
   readonly label: string;
   readonly value: number;
-  /** Число, отформатированное по языку страницы. */
+  /** The number formatted for the page language. */
   readonly valueText: string;
 }
 
@@ -14,11 +14,11 @@ interface Props {
 }
 
 /**
- * Горизонтальная диаграмма ui-kit на CSS: полоса каждой строки — доля от наибольшей. Числа
- * написаны текстом рядом, полосы скрыты от программ чтения.
- * @param {Props} props Свойства компонента.
- * @param {readonly BarItem[]} props.items Строки диаграммы.
- * @returns {JSX.Element} Список строк с полосами.
+ * ui-kit horizontal CSS bar chart: each row's bar is its share of the largest one. The numbers
+ * are written as text beside them, and the bars are hidden from screen readers.
+ * @param {Props} props Component props.
+ * @param {readonly BarItem[]} props.items Chart rows.
+ * @returns {JSX.Element} List of rows with bars.
  */
 export function BarList(props: Props): JSX.Element {
   const largest = () => Math.max(0, ...props.items.map((item) => item.value));

@@ -1,10 +1,10 @@
-// Абзацы полного текста реплики разделены пустой строкой.
+// Paragraphs of a message's full text are separated by a blank line.
 const PARAGRAPH_BREAK = /\n\s*\n/;
 
 /**
- * Делит полный текст реплики на абзацы по пустым строкам.
- * @param {string} text Полный текст реплики.
- * @returns {string[]} Непустые абзацы без пробелов по краям; переводы строк внутри абзаца остаются.
+ * Splits a message's full text into paragraphs at blank lines.
+ * @param {string} text Full message text.
+ * @returns {string[]} Non-empty trimmed paragraphs; line breaks inside a paragraph stay.
  */
 export function paragraphsOf(text: string): string[] {
   return text

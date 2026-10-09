@@ -1,39 +1,39 @@
-// Карточка проекта: то, что сайт показывает о проекте, который собирает завод.
+// Project card: what the site shows about a project the factory builds.
 
 import { isLine, isObject } from "./guards.ts";
 import { isRecordId } from "./record.ts";
 
-/** Текст карточки на каждом языке витрины: язык — ключ, перевод — значение. */
+/** Card text in each showcase language: the language is the key, the translation is the value. */
 export type ProjectText<Language extends string> = Readonly<Record<Language, string>>;
 
 /**
- * Карточка проекта для сайта: название, описание и ссылки. Тексты — на каждом языке витрины,
- * ссылки общие. Как проект собирать — в `.cyberzavod/project.json` его репозитория, сюда это
- * не попадает.
+ * Project card for the site: name, description and links. Texts are in each showcase language,
+ * links are shared. How to build the project lives in `.cyberzavod/project.json` of its
+ * repository and does not get here.
  */
 export interface Project<Language extends string> {
-  /** Идентификатор проекта: тот же, что `SessionRecord.project`, и часть адреса страницы проекта. */
+  /** Project id: the same as `SessionRecord.project`, and part of the project page address. */
   id: string;
   name: ProjectText<Language>;
-  /** Описание одной строкой на каждом языке. */
+  /** One-line description in each language. */
   description: ProjectText<Language>;
-  /** Адрес репозитория, https. */
+  /** Repository address, https. */
   repo?: string;
-  /** Адрес сайта проекта, https. */
+  /** Project website address, https. */
   website?: string;
   /**
-   * Языки и инструменты проекта, как их пишут сами: «TypeScript», «Vite». Не переводятся и
-   * показываются как есть, по порядку.
+   * Project languages and tools as they spell themselves: "TypeScript", "Vite". Not translated,
+   * shown as is, in order.
    */
   stack?: readonly string[];
 }
 
-/** Ошибка карточки проекта: она пришла извне и не прошла проверку. */
+/** Project card error: the card came from outside and failed validation. */
 export class ProjectError extends Error {}
 
 const SECURE_PROTOCOL = "https:";
 
-// Стек — короткая подпись к проекту, а не список зависимостей.
+// The stack is a short caption for the project, not a list of dependencies.
 const MAX_STACK_ITEMS = 6;
 
 function isSecureUrl(value: unknown): value is string {
@@ -42,7 +42,7 @@ function isSecureUrl(value: unknown): value is string {
   return new URL(value).protocol === SECURE_PROTOCOL;
 }
 
-// Необязательная ссылка: нет в карточке — нет и в результате, а не `undefined`.
+// Optional link: absent from the card means absent from the result, not `undefined`.
 function parseLink(
   raw: Record<string, unknown>,
   field: "repo" | "website",
@@ -51,13 +51,13 @@ function parseLink(
 
   if (value === undefined) return {};
   if (!isSecureUrl(value)) {
-    throw new ProjectError(`${field} должен быть адресом с https`);
+    throw new ProjectError(`${field} must be an https URL`);
   }
 
   return { [field]: value };
 }
 
-// Необязательный стек: нет в карточке — нет и в результате, как у ссылок.
+// Optional stack: absent from the card means absent from the result, as with links.
 function parseStack(raw: Record<string, unknown>): Pick<Project<string>, "stack"> {
   const { stack } = raw;
 
@@ -67,7 +67,7 @@ function parseStack(raw: Record<string, unknown>): Pick<Project<string>, "stack"
 
   if (!isList || !stack.every(isLine)) {
     throw new ProjectError(
-      `stack должен быть списком из 1–${MAX_STACK_ITEMS} непустых строк без переводов строки`,
+      `stack must be a list of 1–${MAX_STACK_ITEMS} non-empty single-line strings`,
     );
   }
 
@@ -80,14 +80,14 @@ function parseText<Language extends string>(
   languages: readonly Language[],
 ): ProjectText<Language> {
   if (!isObject(raw)) {
-    throw new ProjectError(`${field} должно быть объектом с переводами: ${languages.join(", ")}`);
+    throw new ProjectError(`${field} must be an object with translations: ${languages.join(", ")}`);
   }
 
   const missing = languages.filter((language) => !isLine(raw[language]));
 
   if (missing.length > 0) {
     throw new ProjectError(
-      `${field} на ${missing.join(", ")} должно быть непустой строкой без переводов строки`,
+      `${field} in ${missing.join(", ")} must be a non-empty single-line string`,
     );
   }
 
@@ -97,21 +97,23 @@ function parseText<Language extends string>(
 }
 
 /**
- * Проверяет карточку проекта, пришедшую извне, и возвращает её типизированной.
- * @param {unknown} raw Разобранный JSON карточки.
- * @param {readonly Language[]} languages Языки витрины: название и описание нужны на каждом.
- * @returns {Project<Language>} Проверенная карточка; неизвестные поля и языки отброшены.
- * @throws {ProjectError} Если карточка не соответствует формату или в ней нет перевода.
+ * Validates a project card that came from outside and returns it typed.
+ * @param {unknown} raw Parsed JSON of the card.
+ * @param {readonly Language[]} languages Showcase languages: name and description needed in each.
+ * @returns {Project<Language>} The validated card; unknown fields and languages are dropped.
+ * @throws {ProjectError} If the card does not match the format or lacks a translation.
  */
 export function parseProject<Language extends string>(
   raw: unknown,
   languages: readonly Language[],
 ): Project<Language> {
-  if (!isObject(raw)) throw new ProjectError("карточка проекта должна быть объектом");
+  if (!isObject(raw)) throw new ProjectError("project card must be an object");
 
   const { id } = raw;
 
-  if (!isRecordId(id)) throw new ProjectError("id должен состоять из букв, цифр, «_» и «-»");
+  if (!isRecordId(id)) {
+    throw new ProjectError("id must contain only letters, digits, underscores and hyphens");
+  }
 
   return {
     id,

@@ -30,7 +30,7 @@ async function exists(file: string): Promise<boolean> {
   );
 }
 
-// Запоминает, что было напечатано к моменту вопроса, и отвечает заготовленным ответом.
+// Remembers what was printed by the time of the question and replies with a prepared answer.
 function answering(isConfirmed: boolean): {
   confirm: Confirmation;
   asked: string[];

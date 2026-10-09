@@ -1,4 +1,4 @@
-// Package config читает настройки API из переменных окружения.
+// Package config reads the API settings from environment variables.
 package config
 
 import (
@@ -17,29 +17,29 @@ const (
 	defaultPublicURL      = "https://cyberzavod.com"
 )
 
-// Config — настройки API, прочитанные из окружения.
+// Config holds the API settings read from the environment.
 type Config struct {
-	// Addr — адрес, на котором слушает HTTP-сервер, например ":8080".
+	// Addr is the address the HTTP server listens on, for example ":8080".
 	Addr string
-	// DatabaseURL — строка подключения к Postgres.
+	// DatabaseURL is the Postgres connection string.
 	DatabaseURL string
-	// GitHubClientID — client_id OAuth-приложения GitHub, через которое входят из CLI по
-	// device flow и на сайте. Пусто — вход недоступен, остальное API работает.
+	// GitHubClientID is the client_id of the GitHub OAuth app used to sign in from the CLI via
+	// device flow and on the site. Empty means sign-in is unavailable; the rest of the API works.
 	GitHubClientID string
-	// GitHubClientSecret — секрет OAuth-приложения для входа на сайте. Пусто — вход на сайте
-	// недоступен, CLI работает. Не логируется.
+	// GitHubClientSecret is the OAuth app secret for sign-in on the site. Empty means sign-in on
+	// the site is unavailable; the CLI works. Never logged.
 	GitHubClientSecret string
-	// GitHubAPIURL — адрес API GitHub, у которого проверяются токены авторов.
+	// GitHubAPIURL is the GitHub API address used to verify authors' tokens.
 	GitHubAPIURL string
-	// GitHubOAuthURL — адрес GitHub, на котором живут страница согласия и обмен кода.
+	// GitHubOAuthURL is the GitHub address that hosts the consent page and the code exchange.
 	GitHubOAuthURL string
-	// PublicURL — адрес сайта без завершающего "/": из него строится адрес возврата с GitHub,
-	// и с ним сверяется Origin запросов по куке сессии.
+	// PublicURL is the site address without a trailing "/": the GitHub return address is built
+	// from it, and the Origin of cookie-session requests is checked against it.
 	PublicURL string
 }
 
-// Load читает настройки из переменных окружения. DATABASE_URL обязателен, остальные — нет;
-// PUBLIC_URL, если задан, — только схема и хост.
+// Load reads the settings from environment variables. DATABASE_URL is required, the rest are not;
+// PUBLIC_URL, if set, must be only a scheme and host.
 func Load() (Config, error) {
 	cfg := Config{
 		Addr:               Addr(),
@@ -62,13 +62,13 @@ func Load() (Config, error) {
 	return cfg, nil
 }
 
-// HasSiteLogin отвечает, настроен ли вход на сайте: для него нужны и client_id, и секрет.
+// HasSiteLogin reports whether site sign-in is configured: it needs both client_id and secret.
 func (c Config) HasSiteLogin() bool {
 	return c.GitHubClientID != "" && c.GitHubClientSecret != ""
 }
 
-// validateOrigin проверяет, что адрес — только схема http(s) и хост: с ним напрямую
-// сравнивается заголовок Origin, а в нём пути не бывает.
+// validateOrigin checks that the address is only an http(s) scheme and a host: the Origin header
+// is compared with it directly, and Origin never has a path.
 func validateOrigin(address string) error {
 	parsed, err := url.Parse(address)
 	if err != nil {
@@ -84,7 +84,7 @@ func validateOrigin(address string) error {
 	return nil
 }
 
-// Addr возвращает адрес HTTP-сервера. Отдельно от Load, потому что healthcheck база не нужна.
+// Addr returns the HTTP server address. Separate from Load: healthcheck needs no database.
 func Addr() string {
 	return envOrDefault("API_ADDR", defaultAddr)
 }
@@ -98,8 +98,8 @@ func envOrDefault(name, fallback string) string {
 	return fallback
 }
 
-// LocalURL строит адрес, по которому процесс достучится до своего же сервера:
-// хост из addr отбрасывается, остаётся localhost и порт.
+// LocalURL builds the address at which the process reaches its own server:
+// the host from addr is dropped, leaving localhost and the port.
 func LocalURL(addr, path string) (string, error) {
 	_, port, err := net.SplitHostPort(addr)
 	if err != nil {

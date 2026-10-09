@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { bubbleLeftOf, placeBubble, verticalRoomOf } from "./bubble-placement.ts";
 
-// Поле начинается не от края экрана: слева меню, справа HUD.
+// The field does not start at the screen edge: the menu is on the left, the HUD on the right.
 const FIELD = { x: 100, y: 0, width: 900, height: 500 };
 
-// Узкое поле широкой раскладки: окно около 800 px, меню слева и HUD справа съели почти всё.
+// A narrow field of the wide layout: a window of about 800 px, the menu on the left and the HUD on
+// the right ate almost all of it.
 const NARROW_FIELD = { x: 152, y: 20, width: 228, height: 620 };
 
 describe("verticalRoomOf", () => {

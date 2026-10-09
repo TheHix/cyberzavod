@@ -6,23 +6,23 @@ import styles from "./Drawer.module.css";
 const ICON_STROKE = 3;
 
 interface Props {
-  /** id панели: его указывают кнопки, которые её открывают (`popovertarget`). */
+  /** Panel id: the buttons that open it reference it (`popovertarget`). */
   id: string;
   title: string;
-  /** Подпись кнопки закрытия на языке страницы: kit словаря не знает. */
+  /** Close button label in the page language: the kit does not know the dictionary. */
   closeLabel: string;
   children: JSX.Element;
 }
 
 /**
- * Выезжающая панель ui-kit на нативном popover: без JS открывается кнопкой с
- * `popovertarget`, закрывается по Esc и кликом мимо, а содержимое всегда есть в HTML.
- * @param {Props} props Свойства компонента.
- * @param {string} props.id Идентификатор панели.
- * @param {string} props.title Заголовок панели.
- * @param {string} props.closeLabel Подпись кнопки закрытия.
- * @param {JSX.Element} props.children Содержимое.
- * @returns {JSX.Element} Панель, скрытая до открытия.
+ * ui-kit slide-out panel on a native popover: without JS it opens from a button with
+ * `popovertarget`, closes by Esc or a click outside, and its content is always in the HTML.
+ * @param {Props} props Component props.
+ * @param {string} props.id Panel id.
+ * @param {string} props.title Panel title.
+ * @param {string} props.closeLabel Close button label.
+ * @param {JSX.Element} props.children Content.
+ * @returns {JSX.Element} Panel, hidden until opened.
  */
 export function Drawer(props: Props): JSX.Element {
   const titleId = () => `${props.id}-title`;

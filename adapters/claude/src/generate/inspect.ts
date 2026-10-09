@@ -1,5 +1,5 @@
-// Хуки в `.claude/settings.json` проекта: читает файл и сверяет с тем, что ставит адаптер.
-// Ничего не пишет и не требует harness, поэтому годится для диагностики подключения.
+// Hooks in the project's `.claude/settings.json`: reads the file and compares it with what the
+// adapter installs. Writes nothing and needs no harness, so it suits connection diagnostics.
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -14,7 +14,7 @@ import {
   type HooksInspection,
 } from "./settings.ts";
 
-/** Хуки прочитаны (`HooksInspection`) или `settings.json` разобрать нельзя (`unreadable`, `error`). */
+/** Hooks were read (`HooksInspection`) or `settings.json` is unparsable (`unreadable`, `error`). */
 export type HooksReading = HooksInspection | { kind: "unreadable"; error: ClaudeError };
 
 async function readSettingsText(projectRoot: string): Promise<string | undefined> {
@@ -28,12 +28,12 @@ async function readSettingsText(projectRoot: string): Promise<string | undefined
 }
 
 /**
- * Проверяет, стоят ли в `.claude/settings.json` проекта хуки адаптера нужной версии.
- * @param {string} projectRoot Корень проекта.
- * @param {string} version Версия Cyberzavod из конфига проекта.
- * @returns {Promise<HooksReading>} Состояние хуков; нет файла — `missing`; файл не JSON, не объект
- *   или с `hooks` не того вида — `unreadable` с ошибкой адаптера.
- * @throws {Error} Если файл не читается по другой причине, чем «нет файла».
+ * Checks whether the project's `.claude/settings.json` has the adapter hooks of the right version.
+ * @param {string} projectRoot Project root.
+ * @param {string} version Cyberzavod version from the project config.
+ * @returns {Promise<HooksReading>} Hook state; no file: `missing`; the file is not JSON, not an
+ *   object, or has `hooks` of the wrong shape: `unreadable` with an adapter error.
+ * @throws {Error} If the file cannot be read for a reason other than "no file".
  */
 export async function inspectClaudeHooks(
   projectRoot: string,

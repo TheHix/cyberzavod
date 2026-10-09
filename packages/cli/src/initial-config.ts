@@ -1,5 +1,5 @@
-// Конфиг проекта, с которым `init` подключает проект: найденное в проекте, процесс и агенты
-// по умолчанию, поверх них — флаги человека.
+// The project config `init` connects the project with: what was found in the project, the default
+// workflow and agents, with the human's flags on top.
 
 import path from "node:path";
 import {
@@ -14,13 +14,13 @@ import { projectIdOf, stackOf, type DetectedProject } from "./detect.ts";
 import { HARNESS_VERSION } from "./installation/installation.ts";
 import { CommandError } from "./errors.ts";
 
-/** Агент, которого сейчас умеет вести Cyberzavod. */
+/** The agent Cyberzavod can currently drive. */
 export const DEFAULT_AGENT: Required<Omit<AgentConfig, "model">> = {
   provider: "anthropic",
   agent: "claude",
 };
 
-/** Процесс, который `init` ставит проекту. */
+/** The workflow `init` sets for the project. */
 export const DEFAULT_WORKFLOW = "default";
 
 const PROJECT_ID_OPTION = "--id";
@@ -31,23 +31,23 @@ const CURRENT_DIRECTORY = ".";
 const WINDOWS_SEPARATOR = "\\";
 const TRAILING_SEPARATORS = /\/+$/;
 
-/** Значения флагов `init`: что человек задал сам вместо найденного. */
+/** `init` flag values: what the human set instead of what was found. */
 export interface InitOverrides {
-  /** `--id`: идентификатор проекта. */
+  /** `--id`: project id. */
   projectId?: string;
-  /** `--check`: команды проверки; целиком заменяют найденные. */
+  /** `--check`: check commands; they fully replace the found ones. */
   checks?: string[];
-  /** `--journal`: каталог журнала от корня проекта. */
+  /** `--journal`: journal directory from the project root. */
   journal?: string;
 }
 
-/** Что нужно для начального конфига: найденное, harness и флаги. */
+/** What the initial config needs: findings, harness and flags. */
 export interface InitialConfigSource {
-  /** Найденное в проекте. */
+  /** What was found in the project. */
   detected: DetectedProject;
-  /** Harness: процессы и этапы. */
+  /** Harness: workflows and stages. */
   harness: Harness;
-  /** Флаги человека. */
+  /** The human's flags. */
   overrides: InitOverrides;
 }
 
@@ -71,8 +71,8 @@ function isAbsolutePath(value: string): boolean {
   return path.isAbsolute(value) || path.win32.isAbsolute(value);
 }
 
-// Журнал в конфиге — путь от корня проекта через `/`: обратная косая черта Windows и
-// косая черта в конце (`./lab/`) в него не попадают.
+// The journal in the config is a path from the project root with `/`: Windows backslashes and a
+// trailing slash (`./lab/`) do not get into it.
 function journalOption(value: string): string {
   const journal = requiredValue(JOURNAL_OPTION, value);
 
@@ -82,7 +82,7 @@ function journalOption(value: string): string {
   const normalized = path.posix.normalize(slashed);
   const relative = normalized.replace(TRAILING_SEPARATORS, "");
 
-  // Журнал в корне проекта засорил бы его: каталог журнала должен быть своим.
+  // A journal in the project root would clutter it: the journal needs its own directory.
   if (relative === CURRENT_DIRECTORY) {
     throw new CommandError((m) => m.errors.journalIsProjectRoot(journal));
   }
@@ -90,7 +90,7 @@ function journalOption(value: string): string {
   return relative;
 }
 
-// Агента получает каждый этап процесса, у которого в harness есть роль.
+// Every workflow stage that has a role in the harness gets an agent.
 function agentsOf(harness: Harness, stages: readonly Stage[]): Partial<Record<Stage, AgentConfig>> {
   const agents: Partial<Record<Stage, AgentConfig>> = {};
 
@@ -104,11 +104,11 @@ function agentsOf(harness: Harness, stages: readonly Stage[]): Partial<Record<St
 }
 
 /**
- * Собирает конфиг проекта из найденного: идентификатор, проверки и стек из проекта, процесс
- * `default` и агент на каждый этап с ролью. Флаги человека перекрывают найденное.
- * @param {InitialConfigSource} source Найденное в проекте, harness и флаги.
- * @returns {ProjectConfig} Конфиг проекта с версией harness этого CLI.
- * @throws {CommandError} Если флаг пуст или `--journal` задан абсолютным путём.
+ * Builds the project config from the findings: id, checks and stack from the project, the
+ * `default` workflow and an agent for each stage with a role. The human's flags override findings.
+ * @param {InitialConfigSource} source Project findings, harness and flags.
+ * @returns {ProjectConfig} Project config with this CLI's harness version.
+ * @throws {CommandError} If a flag is empty or `--journal` is an absolute path.
  */
 export function initialConfigOf(source: InitialConfigSource): ProjectConfig {
   const { detected, harness, overrides } = source;

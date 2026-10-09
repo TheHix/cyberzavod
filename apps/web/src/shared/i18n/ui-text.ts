@@ -1,13 +1,13 @@
 import type { Translated } from "./locale.ts";
 
 /**
- * Словарь интерфейса: группы по месту на странице, в каждой — подпись на всех языках. Язык, которого
- * не хватает у любой записи, не компилируется. Текст с параметрами — функция в каждом языке;
- * формы множественного числа — `PluralWords`. Содержимое страниц (гайды, карточки проектов,
- * записи) сюда не входит.
+ * Interface dictionary: groups by place on the page, each with a label in every language. A
+ * language missing from any entry does not compile. Text with parameters is a function in each
+ * language; plural forms are `PluralWords`. Page content (guides, project cards, recordings) is
+ * not part of it.
  */
 export const UI_TEXT = {
-  /** Боковое меню. */
+  /** Sidebar menu. */
   menu: {
     label: { en: "Menu", ru: "Меню" },
     home: {
@@ -21,13 +21,14 @@ export const UI_TEXT = {
     guides: { en: "Guides", ru: "Гайды" },
     about: { en: "About", ru: "О заводе" },
     code: { en: "Code", ru: "Код" },
-    // Видимая подпись плитки — код языка («RU»); он входит в доступное имя (WCAG 2.5.3).
+    // The tile's visible label is the language code ("RU"); it is part of the accessible name
+    // (WCAG 2.5.3).
     language: {
       en: (code: string, name: string) => `${code} — ${name}`,
       ru: (code: string, name: string) => `${code} — ${name}`,
     },
   },
-  /** Заголовки и кнопки выезжающих панелей. */
+  /** Titles and buttons of the slide-out panels. */
   panels: {
     records: { en: "Build recordings", ru: "Записи сборок" },
     journal: { en: "Build log", ru: "Журнал сборки" },
@@ -35,7 +36,7 @@ export const UI_TEXT = {
     about: { en: "About", ru: "О заводе" },
     close: { en: "Close", ru: "Закрыть" },
   },
-  /** HUD цеха: счётчики сборки. */
+  /** Factory floor HUD: build counters. */
   hud: {
     label: { en: "Build", ru: "Сборка" },
     time: { en: "Time", ru: "Время" },
@@ -44,7 +45,7 @@ export const UI_TEXT = {
     reworks: { en: "Reworks", ru: "Возвраты" },
     interventions: { en: "Interventions", ru: "Вмешательства" },
   },
-  /** Управление проигрыванием. */
+  /** Playback controls. */
   playback: {
     play: { en: "Play", ru: "Смотреть" },
     pause: { en: "Pause", ru: "Пауза" },
@@ -54,7 +55,7 @@ export const UI_TEXT = {
     speed: { en: "Speed", ru: "Скорость" },
     speedLabel: { en: "Playback speed", ru: "Скорость проигрывания" },
   },
-  /** Пузыри речи и полка речи: метки и раскрытие. */
+  /** Speech bubbles and the speech shelf: labels and expanding. */
   speech: {
     more: { en: "more", ru: "подробнее" },
     less: { en: "less", ru: "свернуть" },
@@ -65,7 +66,7 @@ export const UI_TEXT = {
       ru: (recipient: string) => `человек → ${recipient}`,
     },
   },
-  /** Журнал сборки. */
+  /** Build journal. */
   journal: {
     empty: {
       en: "This build has no prompts, interventions or messages.",
@@ -77,7 +78,7 @@ export const UI_TEXT = {
       ru: (clock: string, route: string) => `Показать в цехе: ${clock}, ${route}`,
     },
   },
-  /** Списки записей и гайдов. */
+  /** Lists of recordings and guides. */
   lists: {
     noRecordings: { en: "No builds yet.", ru: "Записей пока нет." },
     noGuides: { en: "No guides yet.", ru: "Гайдов пока нет." },
@@ -98,12 +99,12 @@ export const UI_TEXT = {
       ru: { one: "сборка", few: "сборки", many: "сборок" },
     },
   },
-  /** Карточка проекта. */
+  /** Project card. */
   project: {
     repo: { en: "Repository", ru: "Репозиторий" },
     website: { en: "Website", ru: "Сайт" },
   },
-  /** Заголовки и тексты страниц. */
+  /** Page titles and texts. */
   pages: {
     floor: { en: "Floor", ru: "Цех" },
     homeHeading: {
@@ -142,13 +143,13 @@ export const UI_TEXT = {
         `Как ИИ-агенты собирали «${title}»: промпты человека, реплики мастера и станций, время и токены.`,
     },
   },
-  /** Единицы длительности: «1 ч 05 мин», «1 h 05 min». */
+  /** Duration units: "1 h 05 min", «1 ч 05 мин». */
   duration: {
     hour: { en: "h", ru: "ч" },
     minute: { en: "min", ru: "мин" },
     second: { en: "s", ru: "с" },
   },
-  /** Страница «не найдено». */
+  /** The "not found" page. */
   notFound: {
     title: { en: "Page not found", ru: "Страница не найдена" },
     label: { en: "404", ru: "404" },
@@ -159,14 +160,14 @@ export const UI_TEXT = {
     },
     toFloor: { en: "Back to the floor", ru: "Вернуться в цех" },
   },
-  /** Запись сборки: она не переводится, язык оригинала подписан. */
+  /** Build recording: it is not translated, and its original language is labeled. */
   recording: {
     language: {
       en: (language: string) => `recorded in ${language}`,
       ru: (language: string) => `язык записи: ${language}`,
     },
   },
-  /** Запись из галереи по секретной ссылке: пока её нельзя показать — почему. */
+  /** Gallery recording by secret link: why it cannot be shown yet. */
   sharedRecording: {
     loading: { en: "Loading the recording…", ru: "Загружаем запись…" },
     missing: {
@@ -181,13 +182,13 @@ export const UI_TEXT = {
       en: "Could not load the recording — try reloading the page.",
       ru: "Не удалось загрузить запись — попробуйте обновить страницу.",
     },
-    // Карточки проекта у записи из галереи нет: автор и id проекта, как репозиторий на GitHub.
+    // A gallery recording has no project card: the author and project id, like a GitHub repository.
     project: {
       en: (owner: string, project: string) => `${owner} / ${project}`,
       ru: (owner: string, project: string) => `${owner} / ${project}`,
     },
   },
-  /** Данные из API на страницах галерей и аналитики: пока их нельзя показать — почему. */
+  /** API data on the gallery and analytics pages: why it cannot be shown yet. */
   remote: {
     loading: { en: "Loading…", ru: "Загружаем…" },
     broken: {
@@ -199,7 +200,7 @@ export const UI_TEXT = {
       ru: "Не удалось загрузить данные — попробуйте обновить страницу.",
     },
   },
-  /** Галереи: общий список и галерея автора с бейджем. */
+  /** Galleries: the shared list and an author's gallery with a badge. */
   gallery: {
     listHeading: { en: "Open galleries", ru: "Открытые галереи" },
     listIntro: {
@@ -235,12 +236,13 @@ export const UI_TEXT = {
       ru: { idle: "Копировать Markdown", copied: "Скопировано", failed: "Не удалось скопировать" },
     },
   },
-  /** Вход через GitHub: кнопка в меню и в панели записей, сообщение о неудачном входе. */
+  /** Sign-in with GitHub: the button in the menu and recordings panel, the failed sign-in message. */
   account: {
     signIn: { en: "Sign in with GitHub", ru: "Войти через GitHub" },
-    // Подпись плитки меню: полная в узкую плитку не помещается, она — в доступном имени и `title`.
+    // Menu tile label: the full one does not fit a narrow tile, so it goes in the accessible name
+    // and `title`.
     signInShort: { en: "Sign in", ru: "Войти" },
-    // Видимая подпись — логин; он входит в доступное имя (WCAG 2.5.3).
+    // The visible label is the login; it is part of the accessible name (WCAG 2.5.3).
     cabinetLabel: {
       en: (login: string) => `${login} — your account`,
       ru: (login: string) => `${login} — личный кабинет`,
@@ -254,7 +256,7 @@ export const UI_TEXT = {
       ru: "Не удалось войти через GitHub, попробуйте ещё раз.",
     },
   },
-  /** Личный кабинет: своя галерея, записи и подсказка про CLI. */
+  /** Account page: your own gallery, recordings and a CLI hint. */
   cabinet: {
     heading: { en: "Your account", ru: "Личный кабинет" },
     guestIntro: {
@@ -305,7 +307,7 @@ export const UI_TEXT = {
       ru: "Перед этим войдите в CLI:",
     },
   },
-  /** Аналитика по записям открытых галерей. */
+  /** Analytics on the recordings of public galleries. */
   stats: {
     heading: { en: "Build analytics", ru: "Аналитика сборок" },
     intro: {
@@ -325,7 +327,7 @@ export const UI_TEXT = {
     failed: { en: "failed", ru: "с ошибкой" },
     none: { en: "None so far.", ru: "Пока не было." },
   },
-  /** Панель «Проект»: итоги сборок проекта и сами сборки по порядку задач. */
+  /** The "Project" panel: project build totals and the builds themselves in task order. */
   projectPanel: {
     totalsHeading: { en: "Totals", ru: "Итоги" },
     buildsHeading: { en: "Builds in task order", ru: "Сборки по порядку задач" },
@@ -344,7 +346,7 @@ export const UI_TEXT = {
       ru: { one: "вмешательство", few: "вмешательства", many: "вмешательств" },
     },
   },
-  /** Галереи: примеры — проекты, которые цех собрал с нуля, — над галереями пользователей. */
+  /** Galleries: examples (projects the factory built from scratch) above the user galleries. */
   examples: {
     heading: { en: "Examples", ru: "Примеры" },
     intro: {
@@ -353,7 +355,7 @@ export const UI_TEXT = {
     },
     userGalleriesHeading: { en: "User galleries", ru: "Галереи пользователей" },
   },
-  /** Остров цеха. */
+  /** Factory floor island. */
   factory: {
     canvasLabel: {
       en: (title: string) => `The floor is playing the build “${title}”`,
@@ -365,7 +367,7 @@ export const UI_TEXT = {
       ru: "Цех не запустился — попробуйте обновить страницу.",
     },
   },
-  /** Серия сборок на главной и странице проекта: место сборки в HUD и журнал текущей сборки. */
+  /** Build series on the home and project pages: the build's place in the HUD and its journal. */
   series: {
     buildOf: {
       en: (number: number, count: number) => `build ${number} of ${count}`,
@@ -385,14 +387,14 @@ export const UI_TEXT = {
       ru: "Не удалось загрузить журнал сборки — попробуйте обновить страницу.",
     },
   },
-  /** Кнопка «копировать» у блоков кода: подписи по состояниям. */
+  /** The copy button on code blocks: labels per state. */
   copy: {
     labels: {
       en: { idle: "Copy code", copied: "Copied", failed: "Could not copy" },
       ru: { idle: "Копировать код", copied: "Скопировано", failed: "Не удалось скопировать" },
     },
   },
-  /** Панель «О заводе». */
+  /** The "About" panel. */
   about: {
     how: {
       en: "The agent adapter (Claude Code is the first one) writes the session log, and the log becomes a record: stages, prompts, messages, time and tokens. The floor plays it back — each machine is a stage, workers hand the part over from hand to hand, and the foreman in the office hands out tasks and accepts reports.",

@@ -1,15 +1,15 @@
-// Вход, который требуют команды автора: токен из хранилища и понятная ошибка, если он не годится.
+// The login author commands require: the token from the store and a clear error if it is not valid.
 
 import { CommandError } from "../errors.ts";
 import { isApiError, UNAUTHORIZED_CODE } from "./api.ts";
 import type { Sharing } from "./services.ts";
 
 /**
- * Выполняет действие автора с сохранённым токеном.
- * @param {Sharing} sharing Зависимости команд публикации.
- * @param {(token: string) => Promise<Result>} action Действие, которому нужен токен.
- * @returns {Promise<Result>} Результат действия.
- * @throws {CommandError} Если входа не было или сервер не принял токен.
+ * Runs an author action with the saved token.
+ * @param {Sharing} sharing Dependencies of the sharing commands.
+ * @param {(token: string) => Promise<Result>} action The action that needs the token.
+ * @returns {Promise<Result>} The action result.
+ * @throws {CommandError} If there was no login or the server did not accept the token.
  */
 export async function withToken<Result>(
   sharing: Sharing,

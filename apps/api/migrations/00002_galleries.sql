@@ -1,4 +1,4 @@
--- Галереи: авторы, вошедшие через GitHub, и записи сессий, которые они загрузили.
+-- Galleries: authors signed in through GitHub, and the session recordings they uploaded.
 
 -- +goose Up
 CREATE TABLE users (
@@ -6,11 +6,11 @@ CREATE TABLE users (
     login text NOT NULL,
     gallery_public boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
-    -- Последняя перемена галереи: логин, видимость, загрузка или удаление записи.
+    -- Last change of the gallery: login, visibility, upload or deletion of a recording.
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Логин GitHub не различает регистр, поэтому и адрес галереи и бейджа его не различает.
+-- GitHub logins are case-insensitive, so gallery and badge addresses are case-insensitive too.
 CREATE UNIQUE INDEX users_login_key ON users (lower(login));
 
 CREATE TABLE recordings (

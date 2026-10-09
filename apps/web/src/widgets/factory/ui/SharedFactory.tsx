@@ -11,12 +11,12 @@ import type { BuildProject } from "../lib/build-project.ts";
 import { Factory } from "./Factory.tsx";
 
 interface Props {
-  /** Язык страницы: на нём подписи цеха и сообщения. */
+  /** Page language: floor captions and messages are in it. */
   locale: Locale;
 }
 
-// Карточки проекта у записи из галереи нет: в HUD — автор и проект, ссылка — на галерею автора,
-// если она открыта.
+// A gallery recording has no project card: the HUD shows the author and the project, the link
+// leads to the author's gallery if it is public.
 function projectOf(shared: SharedRecording, locale: Locale): BuildProject {
   return {
     name: UI_TEXT.sharedRecording.project[locale](shared.owner, shared.record.projectId),
@@ -25,11 +25,12 @@ function projectOf(shared: SharedRecording, locale: Locale): BuildProject {
 }
 
 /**
- * Цех записи из галереи: запись приходит из API в браузере и проигрывается тем же цехом, что
- * записи журнала проекта. Пока её нет — сообщение в поле, почему.
- * @param {Props} props Свойства компонента.
- * @param {Locale} props.locale Язык страницы.
- * @returns {JSX.Element} Цех с HUD или сообщение.
+ * Factory of a gallery recording: the recording comes from the API in the browser and plays on the
+ * same floor as the project journal recordings. While it is missing, a message in the field says
+ * why.
+ * @param {Props} props Component props.
+ * @param {Locale} props.locale Page language.
+ * @returns {JSX.Element} The factory with the HUD, or a message.
  */
 export function SharedFactory(props: Props): JSX.Element {
   const state = useStoreValue($sharedRecording);

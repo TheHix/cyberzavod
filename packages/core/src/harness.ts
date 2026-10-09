@@ -1,52 +1,52 @@
-// Harness — процесс разработки в текстах: принципы, этапы и ведущий. Здесь — модель этих текстов
-// и их разбор; откуда взять тексты (каталог на диске или встроенные в сборку CLI), решают другие
-// пакеты.
+// Harness is the development process in text: principles, stages and the lead. Here is the model
+// of these texts and their parsing; where to get the texts (a directory on disk or built into the
+// CLI bundle) is decided by other packages.
 
 import { isLine } from "./guards.ts";
 import { parseWorkflow, STAGES, type Stage, type Workflow } from "./stage.ts";
 
-/** Что может делать роль этапа: только читать или ещё и менять файлы. */
+/** What a stage role may do: only read, or also change files. */
 export const STAGE_ACCESS = ["read", "write"] as const;
 
-/** Доступ роли этапа к файлам проекта. */
+/** A stage role's access to the project files. */
 export type StageAccess = (typeof STAGE_ACCESS)[number];
 
-/** Роль этапа: агент, которому ведущий передаёт работу. */
+/** Stage role: the agent the lead hands work to. */
 export interface StageRole {
-  /** Имя роли, например `analyst`; по нему адаптер называет файл агента. */
+  /** Role name, for example `analyst`; the adapter names the agent file after it. */
   name: string;
   access: StageAccess;
 }
 
-/** Описание этапа из `harness/stages/<этап>.md`. */
+/** Stage description from `harness/stages/<stage>.md`. */
 export interface StageGuide {
   stage: Stage;
-  /** Название этапа для людей. */
+  /** Stage title for people. */
   title: string;
-  /** Одна строка о том, что делает этап. */
+  /** One line about what the stage does. */
   description: string;
-  /** Роль этапа; у этапа, который ведущий делает сам, её нет. */
+  /** Stage role; a stage the lead runs itself has none. */
   role?: StageRole;
-  /** Текст этапа без шапки: инструкция роли или ведущему. */
+  /** Stage text without the header: instructions for the role or the lead. */
   body: string;
 }
 
-/** Принцип из `harness/principles/`: имя файла без расширения и текст. */
+/** Principle from `harness/principles/`: the file name without extension, and the text. */
 export interface Principle {
   name: string;
   text: string;
 }
 
-/** Весь harness: принципы, этапы, процессы и правила ведущего. */
+/** The whole harness: principles, stages, workflows and the lead's rules. */
 export interface Harness {
   principles: Principle[];
   stages: Record<Stage, StageGuide>;
   workflows: Workflow[];
-  /** Как ведущий проводит задачу через этапы. */
+  /** How the lead takes a task through the stages. */
   conductor: string;
 }
 
-/** Ошибка harness: файл этапа или процесса не прошёл проверку. */
+/** Harness error: a stage or workflow file failed validation. */
 export class HarnessError extends Error {}
 
 const FRONTMATTER = /^---\n([\s\S]*?)\n---\n/;
@@ -55,14 +55,16 @@ const FRONTMATTER_LINE = /^([a-z]+):\s*(.*)$/;
 function frontmatterOf(text: string, stage: Stage): { fields: Map<string, string>; body: string } {
   const match = FRONTMATTER.exec(text);
 
-  if (match === null) throw new HarnessError(`этап ${stage}: нет шапки между строками ---`);
+  if (match === null) throw new HarnessError(`stage ${stage}: no front matter between --- lines`);
 
   const fields = new Map<string, string>();
 
   for (const line of (match[1] ?? "").split("\n")) {
     const field = FRONTMATTER_LINE.exec(line);
 
-    if (field === null) throw new HarnessError(`этап ${stage}: строка шапки «${line}» не поле`);
+    if (field === null) {
+      throw new HarnessError(`stage ${stage}: front matter line «${line}» is not a field`);
+    }
 
     fields.set(field[1] ?? "", (field[2] ?? "").trim());
   }
@@ -79,24 +81,26 @@ function roleOf(fields: ReadonlyMap<string, string>, stage: Stage): StageRole | 
 
   if (name === undefined) return undefined;
   if (!/^[a-z][a-z-]*$/.test(name)) {
-    throw new HarnessError(`этап ${stage}: role — строчные латинские буквы и «-»`);
+    throw new HarnessError(
+      `stage ${stage}: role must contain only lowercase Latin letters and «-»`,
+    );
   }
 
   const access = fields.get("access");
 
   if (!isStageAccess(access)) {
-    throw new HarnessError(`этап ${stage}: access должен быть ${STAGE_ACCESS.join(" или ")}`);
+    throw new HarnessError(`stage ${stage}: access must be ${STAGE_ACCESS.join(" or ")}`);
   }
 
   return { name, access };
 }
 
 /**
- * Разбирает файл этапа: шапку `ключ: значение` между строками `---` и текст после неё.
- * @param {Stage} stage Этап, которому принадлежит файл.
- * @param {string} text Содержимое файла.
- * @returns {StageGuide} Описание этапа.
- * @throws {HarnessError} Если шапки нет, в ней нет названия или описания, или роль задана неверно.
+ * Parses a stage file: a `key: value` header between `---` lines and the text after it.
+ * @param {Stage} stage The stage the file belongs to.
+ * @param {string} text File contents.
+ * @returns {StageGuide} Stage description.
+ * @throws {HarnessError} If the header is missing, lacks a title or description, or has a bad role.
  */
 export function parseStageGuide(stage: Stage, text: string): StageGuide {
   const { fields, body } = frontmatterOf(text.replace(/\r\n/g, "\n"), stage);
@@ -104,7 +108,7 @@ export function parseStageGuide(stage: Stage, text: string): StageGuide {
   const description = fields.get("description");
 
   if (!isLine(title) || !isLine(description)) {
-    throw new HarnessError(`этап ${stage}: в шапке нужны title и description`);
+    throw new HarnessError(`stage ${stage}: front matter needs title and description`);
   }
 
   const role = roleOf(fields, stage);
@@ -115,8 +119,8 @@ export function parseStageGuide(stage: Stage, text: string): StageGuide {
 }
 
 /**
- * Файлы harness: путь от корня harness через `/` → текст. Так harness одинаково приходит
- * из каталога на диске и из сборки CLI, где он встроен.
+ * Harness files: path from the harness root with `/` → text. This way the harness arrives the same
+ * from a directory on disk and from the CLI bundle where it is built in.
  */
 export type HarnessFiles = Readonly<Record<string, string>>;
 
@@ -130,7 +134,7 @@ const CONDUCTOR = "conductor.md";
 function requiredFile(files: HarnessFiles, name: string): string {
   const text = files[name];
 
-  if (text === undefined) throw new HarnessError(`в harness нет файла ${name}`);
+  if (text === undefined) throw new HarnessError(`harness has no file ${name}`);
 
   return text;
 }
@@ -142,8 +146,8 @@ function compareNames(left: string, right: string): number {
   return 0;
 }
 
-// Файлы прямо в каталоге, без вложенных: порядок по имени, чтобы тексты не зависели от того,
-// в каком порядке их отдал диск.
+// Files directly in the directory, not nested: sorted by name so the texts do not depend on the
+// order the disk returned them in.
 function filesIn(files: HarnessFiles, directory: string, extension: string): [string, string][] {
   const matching = Object.entries(files).filter(
     ([path]) => path.startsWith(directory) && path.endsWith(extension),
@@ -163,24 +167,24 @@ function workflowFrom(name: string, text: string): Workflow {
   try {
     raw = JSON.parse(text);
   } catch (err) {
-    throw new HarnessError(`процесс ${name}: не JSON`, { cause: err });
+    throw new HarnessError(`workflow ${name}: not JSON`, { cause: err });
   }
 
   const workflow = parseWorkflow(raw);
 
   if (workflow.name !== name) {
-    throw new HarnessError(`процесс ${name}: name должен совпадать с именем файла`);
+    throw new HarnessError(`workflow ${name}: name must match the file name`);
   }
 
   return workflow;
 }
 
 /**
- * Собирает harness из его файлов: принципы, этап на каждый из `STAGES`, процессы и правила ведущего.
- * @param {HarnessFiles} files Файлы harness.
+ * Builds the harness from its files: principles, a stage per `STAGES`, workflows, lead's rules.
+ * @param {HarnessFiles} files Harness files.
  * @returns {Harness} Harness.
- * @throws {HarnessError} Если файла этапа или правил ведущего нет либо этап или процесс не прошёл
- *   проверку.
+ * @throws {HarnessError} If a stage file or the lead's rules are missing, or a stage or workflow
+ *   fails validation.
  */
 export function parseHarness(files: HarnessFiles): Harness {
   const stages = Object.fromEntries(

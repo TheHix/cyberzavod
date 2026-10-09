@@ -1,5 +1,5 @@
-# Dev-контейнер и база рядом с ним. Docker внутри контейнера нет намеренно:
-# Docker-in-Docker требует привилегированного режима, а это свело бы изоляцию на нет.
+# Dev container and the database next to it. There is no Docker inside the container on purpose:
+# Docker-in-Docker requires privileged mode, and that would defeat the isolation.
 name: cyberzavod-dev
 
 services:
@@ -9,39 +9,39 @@ services:
       args:
         TZ: ${TZ:-Europe/Moscow}
     command: sleep infinity
-    # Нужны только для iptables внутри контейнера.
+    # Needed only for iptables inside the container.
     cap_add:
       - NET_ADMIN
       - NET_RAW
     environment:
       DATABASE_URL: postgres://cyberzavod:cyberzavod@db:5432/cyberzavod?sslmode=disable
       API_ADDR: ":8080"
-      # client_id OAuth-приложения GitHub для входа из CLI и на сайте; пусто — вход недоступен.
+      # GitHub OAuth app client_id for sign-in from the CLI and on the site; empty: sign-in is off.
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
-      # Секрет того же приложения для входа на сайте; пусто — вход на сайте недоступен.
+      # Secret of the same app for sign-in on the site; empty: sign-in on the site is off.
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
-      # Адрес сайта в разработке: на него GitHub вернёт после входа, с ним сверяется Origin.
+      # Site address in development: GitHub returns here after sign-in; Origin is checked by it.
       PUBLIC_URL: http://localhost:4321
       CLAUDE_CONFIG_DIR: /home/node/.claude
-      # Без телеметрии: меньше доменов в белом списке файрвола.
+      # No telemetry: fewer domains in the firewall allowlist.
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
       ASTRO_TELEMETRY_DISABLED: "1"
       HISTFILE: /commandhistory/.zsh_history
-      # Хранилище pnpm — в своём томе. Иначе pnpm, видя node_modules на другом томе,
-      # создаёт .pnpm-store прямо в папке проекта на хосте.
+      # The pnpm store has its own volume. Otherwise pnpm, seeing node_modules on another volume,
+      # creates .pnpm-store right in the project folder on the host.
       npm_config_store_dir: /home/node/.local/share/pnpm/store
-      # pnpm из packageManager скачивается без интерактивного вопроса.
+      # pnpm from packageManager is downloaded without an interactive prompt.
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
     ports:
       - "127.0.0.1:4321:4321"
       - "127.0.0.1:8080:8080"
     volumes:
       - ..:/workspace:cached
-      # Конфиг и хуки git — только на чтение: иначе агент мог бы записать туда команду
-      # (core.fsmonitor, хук), и её выполнил бы git status на хосте.
+      # Git config and hooks are read-only: otherwise the agent could write a command there
+      # (core.fsmonitor, a hook), and git status on the host would run it.
       - ../.git/config:/workspace/.git/config:ro
       - ../.git/hooks:/workspace/.git/hooks:ro
-      # Свои node_modules у контейнера: на Mac и в Linux разные бинарники (esbuild).
+      # The container has its own node_modules: Mac and Linux have different binaries (esbuild).
       - node-modules:/workspace/node_modules
       - web-node-modules:/workspace/apps/web/node_modules
       - core-node-modules:/workspace/packages/core/node_modules
@@ -50,7 +50,7 @@ services:
       - adapter-claude-node-modules:/workspace/adapters/claude/node_modules
       - pnpm-store:/home/node/.local/share/pnpm
       - go-cache:/home/node/go
-      # Вход в Claude и GitHub сохраняется между пересборками контейнера.
+      # Claude and GitHub sign-in persists across container rebuilds.
       - claude-config:/home/node/.claude
       - gh-config:/home/node/.config/gh
       - history:/commandhistory

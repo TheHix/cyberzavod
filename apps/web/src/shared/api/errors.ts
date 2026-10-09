@@ -1,15 +1,18 @@
-/** API ответил ошибкой: код из тела `{"error": "<код>", "message": "<текст>"}` и статус HTTP. */
+/**
+ * The API responded with an error: the code from the `{"error": "<code>", "message": "<text>"}`
+ * body and the HTTP status.
+ */
 export class ApiRequestError extends Error {
-  /** Статус ответа HTTP. */
+  /** HTTP response status. */
   readonly status: number;
-  /** Код ошибки из тела ответа, например `not_found`. */
+  /** Error code from the response body, for example `not_found`. */
   readonly code: string;
 
   /**
-   * Создаёт ошибку по ответу API.
-   * @param {number} status Статус ответа HTTP.
-   * @param {string} code Код ошибки из тела ответа.
-   * @param {string} message Текст ошибки для разработчика.
+   * Creates an error from an API response.
+   * @param {number} status HTTP response status.
+   * @param {string} code Error code from the response body.
+   * @param {string} message Error text for the developer.
    */
   constructor(status: number, code: string, message: string) {
     super(message);
@@ -18,5 +21,5 @@ export class ApiRequestError extends Error {
   }
 }
 
-/** Ответ API не того вида, что описан в контракте: поле пропало, не того типа или запись битая. */
+/** An API response off the contract: a field is missing or of the wrong type, or the record is broken. */
 export class ApiResponseError extends Error {}

@@ -8,8 +8,8 @@ import (
 	"github.com/bysavelii/cyberzavod/apps/api/internal/session"
 )
 
-// openSession заводит автора octocat и сохраняет ему сессию, которая истекает через
-// expiresIn (отрицательное — уже истекла). Возвращает идентификатор сессии.
+// openSession creates the author octocat and saves a session for them that expires in
+// expiresIn (negative means already expired). Returns the session identifier.
 func openSession(t *testing.T, store *Store, expiresIn time.Duration) string {
 	t.Helper()
 
@@ -27,7 +27,7 @@ func openSession(t *testing.T, store *Store, expiresIn time.Duration) string {
 	return token
 }
 
-// countSessions возвращает, сколько сессий лежит в базе, включая просроченные.
+// countSessions returns how many sessions are in the database, including expired ones.
 func countSessions(t *testing.T, store *Store) int {
 	t.Helper()
 

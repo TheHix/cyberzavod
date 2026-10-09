@@ -1,27 +1,27 @@
-// Проход цеха — ломаная. С места к проходу идут по кратчайшей, дальше вдоль него: так идущий
-// не проходит сквозь чужие станки, каким бы ни был план.
+// The factory aisle is a polyline. From a spot people walk to the aisle by the shortest path, then
+// along it: that way a walker never passes through other machines, whatever the layout.
 
 import { distance, type Point } from "./layout.ts";
 
-/** Проход: ломаная из двух и больше точек плана. */
+/** Aisle: a polyline of two or more layout points. */
 export type Aisle = readonly [Point, Point, ...Point[]];
 
-/** Остановка на проходе: ближайшая к месту точка прохода и путь до неё по проходу. */
+/** Stop on the aisle: the aisle point nearest to a spot and the path to it along the aisle. */
 export interface AisleStop {
   readonly point: Point;
-  /** Длина пути по проходу от его первой вершины до `point`, единиц плана. */
+  /** Length of the path along the aisle from its first vertex to `point`, in layout units. */
   readonly along: number;
 }
 
-// Допуск сравнения длин: проекции на соседние отрезки у угла считаются независимо, и
-// «поровну» без допуска выпадало бы по случайности округления.
+// Length comparison tolerance: projections onto adjacent segments at a corner are computed
+// independently, and without a tolerance "equal" would depend on random rounding.
 const EPSILON = 1e-9;
 
 interface Segment {
   readonly from: Point;
   readonly to: Point;
   readonly length: number;
-  /** Путь по проходу от его первой вершины до начала отрезка. */
+  /** Path along the aisle from its first vertex to the start of the segment. */
   readonly offset: number;
 }
 
@@ -43,7 +43,8 @@ function segmentsOf(aisle: Aisle): Segment[] {
   return segments;
 }
 
-// Доля отрезка, ближайшая к точке; за концами прижимается к концу, у вырожденного отрезка — 0.
+// Share of the segment nearest to the point; beyond the ends it clamps to the end, 0 for
+// a degenerate segment.
 function shareNearest(segment: Segment, point: Point): number {
   if (segment.length === 0) return 0;
 
@@ -64,11 +65,12 @@ function stopOn(segment: Segment, point: Point): AisleStop {
 }
 
 /**
- * Ближайшая к точке остановка на проходе.
- * @param {Aisle} aisle Проход.
- * @param {Point} point Откуда идут к проходу.
- * @returns {AisleStop} Проекция точки на ближайший отрезок; за концами прохода — его конец.
- * Если отрезки на равном расстоянии, берётся первый.
+ * The stop on the aisle nearest to a point.
+ * @param {Aisle} aisle Aisle.
+ * @param {Point} point Where the walk to the aisle starts.
+ * @returns {AisleStop} Projection of the point onto the nearest segment; beyond the aisle ends,
+ * its end.
+ * If segments are equally far, the first one is taken.
  */
 export function aisleStop(aisle: Aisle, point: Point): AisleStop {
   let nearest: AisleStop | undefined;
@@ -84,16 +86,16 @@ export function aisleStop(aisle: Aisle, point: Point): AisleStop {
     }
   }
 
-  // Проход из двух точек всегда даёт хотя бы один отрезок.
+  // An aisle of two points always yields at least one segment.
   return nearest ?? { point: aisle[0], along: 0 };
 }
 
 /**
- * Вершины прохода строго между двумя остановками — повороты, которые нужно пройти.
- * @param {Aisle} aisle Проход.
- * @param {AisleStop} from Откуда идут.
- * @param {AisleStop} to Куда идут.
- * @returns {Point[]} Вершины в порядке хода; на одном отрезке — пусто.
+ * Aisle vertices strictly between two stops: the corners to pass.
+ * @param {Aisle} aisle Aisle.
+ * @param {AisleStop} from Where the walk starts.
+ * @param {AisleStop} to Where the walk goes.
+ * @returns {Point[]} Vertices in walking order; empty on a single segment.
  */
 export function aisleWalk(aisle: Aisle, from: AisleStop, to: AisleStop): Point[] {
   const low = Math.min(from.along, to.along);

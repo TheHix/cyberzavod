@@ -1,20 +1,21 @@
-// Общее для обращений в сеть: встроенный `fetch` Node, который в тестах заменяется заглушкой.
+// Shared network access: Node's built-in `fetch`, replaced by a stub in tests.
 
 import { CommandError } from "../errors.ts";
 
-/** Функция запроса: встроенный `fetch` или заглушка в тесте. */
+/** Request function: the built-in `fetch` or a stub in a test. */
 export type FetchFunction = typeof fetch;
 
-/** Параметры запроса: метод, заголовки, тело. */
+/** Request parameters: method, headers, body. */
 export type RequestOptions = NonNullable<Parameters<FetchFunction>[1]>;
 
 /**
- * Отправляет запрос; сбой сети превращает в ошибку команды с адресом, а не в трассу стека.
- * @param {FetchFunction} fetchImplementation Функция запроса.
- * @param {string} url Адрес запроса.
- * @param {RequestOptions} init Параметры запроса.
- * @returns {Promise<Response>} Ответ сервера, любого статуса.
- * @throws {CommandError} Если до сервера не удалось достучаться.
+ * Sends a request; turns a network failure into a command error with the address, not a stack
+ * trace.
+ * @param {FetchFunction} fetchImplementation Request function.
+ * @param {string} url Request address.
+ * @param {RequestOptions} init Request parameters.
+ * @returns {Promise<Response>} Server response of any status.
+ * @throws {CommandError} If the server could not be reached.
  */
 export async function sendRequest(
   fetchImplementation: FetchFunction,
@@ -35,9 +36,9 @@ export async function sendRequest(
 }
 
 /**
- * Читает тело ответа как JSON.
- * @param {Response} response Ответ сервера.
- * @returns {Promise<unknown>} Разобранный JSON или undefined, если тело пустое или не JSON.
+ * Reads the response body as JSON.
+ * @param {Response} response Server response.
+ * @returns {Promise<unknown>} Parsed JSON, or undefined if the body is empty or not JSON.
  */
 export async function readJsonBody(response: Response): Promise<unknown> {
   const text = await response.text();
@@ -52,9 +53,9 @@ export async function readJsonBody(response: Response): Promise<unknown> {
 }
 
 /**
- * Проверяет, что значение — объект с полями.
- * @param {unknown} value Проверяемое значение.
- * @returns {value is Record<string, unknown>} true, если это объект, а не массив и не null.
+ * Checks that the value is an object with fields.
+ * @param {unknown} value The value to check.
+ * @returns {value is Record<string, unknown>} true if it is an object, not an array and not null.
  */
 export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

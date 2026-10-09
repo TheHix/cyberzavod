@@ -1,6 +1,6 @@
-// Границы нарисованного цеха в единицах плана: площадки станков и кабинета, места рабочих
-// и мастера, дверь и таблички. По ним план вписывается в поле — без пустых краёв, которые есть
-// у плана целиком. Размеры берутся из рисунков, а не подгоняются.
+// Bounds of the drawn factory in plan units: machine and office pads, worker and foreman spots,
+// the door and plaques. The plan fits into the field by them, without the empty margins the whole
+// plan has. Sizes are taken from the sprites, not tuned.
 
 import { STAGES } from "@cyberzavod/core";
 import { type FactoryLayout, type Point } from "@cyberzavod/player";
@@ -12,7 +12,7 @@ import { padRects } from "./floor.ts";
 import { plaquePlacements, plaqueRect } from "./plaques.ts";
 import { PIXELS_PER_UNIT } from "./units.ts";
 
-/** Прямоугольник. */
+/** A rectangle. */
 export interface PlanBounds {
   readonly x: number;
   readonly y: number;
@@ -20,7 +20,10 @@ export interface PlanBounds {
   readonly height: number;
 }
 
-/** Как план встаёт в поле: CSS-пикселей на единицу плана и где на холсте начало плана. */
+/**
+ * How the plan sits in the field: CSS pixels per plan unit and where the plan origin is on the
+ * canvas.
+ */
 export interface PlanFit {
   readonly scale: number;
   readonly offset: ScreenPoint;
@@ -37,7 +40,7 @@ function unitsOf(rect: PlanBounds): PlanBounds {
   };
 }
 
-// Фигура с центром в точке плана: стоит вне площадки, поэтому считается отдельно.
+// A figure centered on a plan point: it stands outside the pad, so it is counted separately.
 function actorRect(point: Point): PlanBounds {
   return {
     x: Math.round(point.x * PIXELS_PER_UNIT) - ACTOR_SIZE.width / 2,
@@ -47,10 +50,10 @@ function actorRect(point: Point): PlanBounds {
 }
 
 /**
- * Считает, какую часть плана занимает нарисованный цех.
- * @param {FactoryLayout} layout План цеха.
- * @param {Locale} locale Язык надписей: от него зависит ширина табличек.
- * @returns {PlanBounds} Прямоугольник в единицах плана, который надо вписать в поле.
+ * Computes which part of the plan the drawn factory occupies.
+ * @param {FactoryLayout} layout Floor plan.
+ * @param {Locale} locale Label language: plaque width depends on it.
+ * @returns {PlanBounds} Rectangle in plan units to fit into the field.
  */
 export function planBounds(layout: FactoryLayout, locale: Locale): PlanBounds {
   const rects = [
@@ -68,12 +71,12 @@ export function planBounds(layout: FactoryLayout, locale: Locale): PlanBounds {
 }
 
 /**
- * Вписывает нарисованный цех в поле целиком и по центру так, чтобы пиксель рисунка занимал
- * целое число пикселей устройства: край спрайта не попадает между ними и остаётся резким.
- * @param {PlanBounds} bounds Границы нарисованного цеха в единицах плана.
- * @param {Frame} field Поле на холсте, свободное от меню и HUD, CSS-пиксели.
- * @param {number} resolution Пикселей устройства в CSS-пикселе.
- * @returns {PlanFit} Масштаб (CSS-пикселей на единицу) и сдвиг плана на холсте.
+ * Fits the drawn factory into the field entirely and centered, so that a sprite pixel takes a whole
+ * number of device pixels: a sprite edge does not fall between them and stays sharp.
+ * @param {PlanBounds} bounds Bounds of the drawn factory in plan units.
+ * @param {Frame} field Canvas field free of the menu and HUD, CSS pixels.
+ * @param {number} resolution Device pixels per CSS pixel.
+ * @returns {PlanFit} Scale (CSS pixels per unit) and plan offset on the canvas.
  */
 export function fitPixelPlan(bounds: PlanBounds, field: Frame, resolution: number): PlanFit {
   const fitting = Math.min(field.width / bounds.width, field.height / bounds.height);

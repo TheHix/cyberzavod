@@ -1,62 +1,62 @@
-// Этапы и процесс. Процесс (workflow) — порядок этапов, по которому идёт любая задача; что
-// делает агент на этапе, описано в harness/stages/, а здесь — только словарь этапов и проверка
-// описания процесса.
+// Stages and the workflow. A workflow is the order of stages every task goes through; what the
+// agent does at a stage is described in harness/stages/, and here is only the stage vocabulary
+// and validation of the workflow description.
 
 import { isLine, isObject } from "./guards.ts";
 
 /**
- * Этапы процесса, которые знает завод, в порядке процесса по умолчанию: постановка, код, ревью,
- * проверки, фиксация. Новый этап — новая строка здесь, его станок в планах цеха и файл
- * `harness/stages/<этап>.md`.
+ * Workflow stages the factory knows, in the order of the default workflow: plan, code, review,
+ * checks, record. A new stage is a new line here, its machine in the factory floor layout and a
+ * `harness/stages/<stage>.md` file.
  */
 export const STAGES = ["planning", "implementation", "review", "verification", "record"] as const;
 
-/** Этап процесса — одна из станций цеха. */
+/** Workflow stage: one of the factory floor stations. */
 export type Stage = (typeof STAGES)[number];
 
 /**
- * Проверяет, что значение — известный этап.
- * @param {unknown} value Проверяемое значение.
- * @returns {value is Stage} true, если это один из `STAGES`.
+ * Checks that a value is a known stage.
+ * @param {unknown} value The value to check.
+ * @returns {value is Stage} true if it is one of `STAGES`.
  */
 export function isStage(value: unknown): value is Stage {
   return (STAGES as readonly unknown[]).includes(value);
 }
 
-/** Процесс: имя и этапы по порядку. Описание лежит в `harness/workflows/<имя>.json`. */
+/** Workflow: a name and stages in order. Described in `harness/workflows/<name>.json`. */
 export interface Workflow {
   name: string;
   stages: Stage[];
 }
 
-/** Ошибка описания процесса: оно пришло извне и не прошло проверку. */
+/** Workflow description error: it came from outside and failed validation. */
 export class WorkflowError extends Error {}
 
 /**
- * Проверяет описание процесса, прочитанное из файла.
- * @param {unknown} raw Разобранный JSON процесса.
- * @returns {Workflow} Проверенный процесс; неизвестные поля отброшены.
- * @throws {WorkflowError} Если нет имени, этапов, этап неизвестен или повторяется.
+ * Validates a workflow description read from a file.
+ * @param {unknown} raw Parsed JSON of the workflow.
+ * @returns {Workflow} The validated workflow; unknown fields are dropped.
+ * @throws {WorkflowError} If the name or stages are missing, or a stage is unknown or repeated.
  */
 export function parseWorkflow(raw: unknown): Workflow {
-  if (!isObject(raw)) throw new WorkflowError("процесс должен быть объектом");
+  if (!isObject(raw)) throw new WorkflowError("workflow must be an object");
 
   const { name, stages } = raw;
 
-  if (!isLine(name)) throw new WorkflowError("name должно быть непустой строкой");
+  if (!isLine(name)) throw new WorkflowError("name must be a non-empty string");
   if (!Array.isArray(stages) || stages.length === 0) {
-    throw new WorkflowError("stages должны быть непустым списком");
+    throw new WorkflowError("stages must be a non-empty list");
   }
 
   const unknownStage = stages.find((stage) => !isStage(stage));
 
   if (unknownStage !== undefined) {
-    throw new WorkflowError(`неизвестный этап ${String(unknownStage)}`);
+    throw new WorkflowError(`unknown stage ${String(unknownStage)}`);
   }
 
   const hasDuplicates = new Set(stages).size !== stages.length;
 
-  if (hasDuplicates) throw new WorkflowError("этапы повторяются");
+  if (hasDuplicates) throw new WorkflowError("stages are repeated");
 
   return { name, stages: stages as Stage[] };
 }

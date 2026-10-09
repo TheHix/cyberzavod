@@ -3,21 +3,21 @@ import { cx } from "@/shared/lib/cx.ts";
 import styles from "./Avatar.module.css";
 
 interface Props {
-  /** Адрес картинки. */
+  /** Image URL. */
   src: string;
-  /** Подпись картинки; пустая, если рядом и так стоит имя. */
+  /** Image alt text; empty when the name is already shown next to it. */
   alt: string;
-  /** Размер: под иконку плитки меню или рядом с заголовком. */
+  /** Size: for a menu tile icon or next to a heading. */
   size?: "small" | "large" | undefined;
 }
 
 /**
- * Аватар ui-kit: круглая картинка в контуре — портрет автора рядом с его логином.
- * @param {Props} props Свойства компонента.
- * @param {string} props.src Адрес картинки.
- * @param {string} props.alt Подпись картинки.
- * @param {"small" | "large"} [props.size] Размер; по умолчанию `small`.
- * @returns {JSX.Element} Картинка.
+ * ui-kit avatar: a round outlined image, the author's portrait next to their login.
+ * @param {Props} props Component props.
+ * @param {string} props.src Image URL.
+ * @param {string} props.alt Image alt text.
+ * @param {"small" | "large"} [props.size] Size; `small` by default.
+ * @returns {JSX.Element} Image.
  */
 export function Avatar(props: Props): JSX.Element {
   return (

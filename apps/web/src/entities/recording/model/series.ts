@@ -1,11 +1,11 @@
 import type { SessionRecord } from "@cyberzavod/core";
 import { oldestFirst } from "./order.ts";
 
-/** Сборки одного проекта по порядку задач: от каркаса до последней доработки. */
+/** Builds of one project in task order: from the scaffold to the last rework. */
 export interface ProjectSeries {
-  /** Идентификатор проекта, как в записях и в карточке. */
+  /** Project id, as in the recordings and the project card. */
   readonly projectId: string;
-  /** Записи проекта, начатые раньше — первыми. */
+  /** The project's recordings, earliest started first. */
   readonly recordings: readonly SessionRecord[];
 }
 
@@ -16,10 +16,10 @@ function projectIdsInOrderOfAppearance(ordered: readonly SessionRecord[]): reado
 }
 
 /**
- * Раскладывает записи по проектам: проекты — в порядке, в каком завод за них брался, сборки
- * внутри — по порядку задач. Так их показывают списки и так цех проигрывает серию.
- * @param {readonly SessionRecord[]} recordings Записи сборок в любом порядке.
- * @returns {readonly ProjectSeries[]} Серии проектов; проект без записей сюда не попадает.
+ * Groups recordings by project: projects in the order the factory took them on, builds within a
+ * project in task order. This is how lists show them and how the factory floor plays a series.
+ * @param {readonly SessionRecord[]} recordings Build recordings in any order.
+ * @returns {readonly ProjectSeries[]} Project series; a project without recordings is left out.
  */
 export function projectSeriesOf(recordings: readonly SessionRecord[]): readonly ProjectSeries[] {
   const ordered = [...recordings].sort(oldestFirst);

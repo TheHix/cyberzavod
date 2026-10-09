@@ -1,56 +1,56 @@
-// План цеха в условных единицах. Представление на сайте само решает, сколько пикселей
-// в единице, поэтому план один для любой графики.
+// Factory floor layout in abstract units. The site's view decides how many pixels make a unit,
+// so one layout serves any graphics.
 
 import type { Aisle } from "./aisle.ts";
 import { type Stage } from "@cyberzavod/core";
 
-/** Точка на плане цеха; ось y направлена вниз, как на экране. */
+/** A point on the factory layout; the y axis points down, as on screen. */
 export interface Point {
   readonly x: number;
   readonly y: number;
 }
 
-/** Станок на плане: где стоит он, где у него работает рабочий и куда тот смотрит. */
+/** A machine on the layout: where it stands, where its worker works and which way they face. */
 export interface StationPlan {
   readonly machine: Point;
   readonly post: Point;
-  /** Направление взгляда рабочего за станком, радианы: 0 — вправо, π/2 — вниз. */
+  /** Heading of the worker at the machine, radians: 0 is right, π/2 is down. */
   readonly facing: number;
-  /** Где стоит мастер, когда говорит с рабочим: сбоку от рабочего места, вне пути детали. */
+  /** Where the foreman stands when talking to the worker: beside the post, off the part's path. */
   readonly foremanPost: Point;
 }
 
-/** Кабинет мастера: стол, место за ним, выход и куда мастер смотрит, пока ни с кем не говорит. */
+/** The foreman's office: desk, spot behind it, exit and where the foreman faces when idle. */
 export interface ForemanPlan {
   readonly desk: Point;
   readonly post: Point;
-  /** Направление взгляда мастера у стола, радианы: 0 — вправо, π/2 — вниз. */
+  /** Heading of the foreman at the desk, radians: 0 is right, π/2 is down. */
   readonly facing: number;
-  /** Выход из кабинета в обход стола: отсюда мастер выходит в проход. */
+  /** Exit from the office around the desk: from here the foreman steps into the aisle. */
   readonly door: Point;
 }
 
-/** Размер прямоугольника на экране: поля под план или всего окна, пикселей. */
+/** Size of a rectangle on screen: the field for the layout or the whole window, in pixels. */
 export interface Size {
   readonly width: number;
   readonly height: number;
 }
 
-/** План цеха: размер пола, проход, станок каждого этапа и кабинет мастера. */
+/** Factory layout: floor size, aisle, the machine of each stage and the foreman's office. */
 export interface FactoryLayout {
   readonly width: number;
   readonly height: number;
   /**
-   * Наименьшее соотношение ширины поля к высоте, при котором берётся этот план (см.
-   * `layoutFor`); у последнего плана в `FACTORY_LAYOUTS` — 0.
+   * The smallest field width-to-height ratio at which this layout is chosen (see
+   * `layoutFor`); 0 for the last layout in `FACTORY_LAYOUTS`.
    */
   readonly minFieldAspect: number;
   /**
-   * Наименьшее соотношение ширины экрана к высоте, при котором берётся этот план (см.
-   * `layoutFor`); у последнего плана в `FACTORY_LAYOUTS` — 0.
+   * The smallest screen width-to-height ratio at which this layout is chosen (see
+   * `layoutFor`); 0 for the last layout in `FACTORY_LAYOUTS`.
    */
   readonly minScreenAspect: number;
-  /** Проход — ломаная из точек плана: с места к проходу идут по кратчайшей, дальше вдоль него. */
+  /** Aisle: a polyline of layout points; people walk to it by the shortest path, then along it. */
   readonly aisle: Aisle;
   readonly stations: Readonly<Record<Stage, StationPlan>>;
   readonly foreman: ForemanPlan;
@@ -58,25 +58,26 @@ export interface FactoryLayout {
 
 const FACING_UP = -Math.PI / 2;
 const FACING_DOWN = Math.PI / 2;
-// Мастер встаёт рядом с рабочим, на этом расстоянии по горизонтали от его места.
+// The foreman stands next to the worker, this far horizontally from the worker's spot.
 const FOREMAN_SIDE_OFFSET = 1.5;
 
 function stationOf(machine: Point, post: Point, facing: number): StationPlan {
   return { machine, post, facing, foremanPost: { x: post.x + FOREMAN_SIDE_OFFSET, y: post.y } };
 }
 
-// Поле 351×487 на телефоне — соотношение 0,72, и ему нужен портретный план; поле десктопа
-// 852×860 — 0,99, там остаётся широкий вид цеха. Граница лежит между ними.
+// A 351×487 field on a phone has a ratio of 0.72 and needs the portrait layout; a desktop field of
+// 852×860 is 0.99 and keeps the wide factory view. The threshold lies between them.
 const WIDE_MIN_FIELD_ASPECT = 0.8;
-// Одной формы поля мало: в Safari на iPhone панели браузера съедают высоту, и поле под меню и
-// HUD выходит почти квадратным, как на десктопе. Экран в портретной ориентации — всегда
-// портретный план.
+// The field shape alone is not enough: in Safari on iPhone the browser bars eat the height, and the
+// field under the menu and HUD comes out almost square, as on desktop. A screen in portrait
+// orientation always gets the portrait layout.
 const WIDE_MIN_SCREEN_ASPECT = 1;
 
 /**
- * Широкий план: петля на полу 16×9. Сверху слева направо — постановка, код, ревью;
- * снизу справа налево — проверки и фиксация, так деталь идёт по кругу. Кабинет мастера — внизу слева,
- * в стороне от маршрутов рабочих; мастер ходит к станкам и встаёт справа от рабочего.
+ * Wide layout: a loop on a 16×9 floor. Along the top, left to right: plan, code, review;
+ * along the bottom, right to left: checks and record, so the part goes around. The foreman's
+ * office is bottom left, away from the workers' routes; the foreman walks to machines and stands
+ * to the right of the worker.
  */
 export const WIDE_LAYOUT: FactoryLayout = {
   width: 16,
@@ -103,11 +104,11 @@ export const WIDE_LAYOUT: FactoryLayout = {
 };
 
 /**
- * Портретный план для узкого поля: пол 7×10, станки в два столбца по обе стороны вертикального
- * прохода. Деталь идёт по кругу: левый столбец сверху вниз, затем правый снизу вверх. Кабинет
- * мастера — внизу справа. Все рабочие и мастер у стола смотрят вверх. Путь детали от места
- * рабочего к проходу горизонтальный, поэтому место мастера на клетку ниже места рабочего,
- * со стороны прохода: мастер стоит вне этого пути.
+ * Portrait layout for a narrow field: a 7×10 floor, machines in two columns on both sides of a
+ * vertical aisle. The part goes around: the left column top to bottom, then the right one bottom to
+ * top. The foreman's office is bottom right. All workers and the foreman at the desk face up. The
+ * part's path from a worker's spot to the aisle is horizontal, so the foreman's spot is one cell
+ * below the worker's, on the aisle side: the foreman stands off that path.
  */
 export const PORTRAIT_LAYOUT: FactoryLayout = {
   width: 7,
@@ -159,8 +160,8 @@ export const PORTRAIT_LAYOUT: FactoryLayout = {
 };
 
 /**
- * Планы цеха от широкого к узкому: `layoutFor` берёт первый подходящий по форме поля.
- * Новый план — новая строка здесь.
+ * Factory layouts from wide to narrow: `layoutFor` takes the first that fits the field shape.
+ * A new layout is a new line here.
  */
 export const FACTORY_LAYOUTS: readonly [FactoryLayout, ...FactoryLayout[]] = [
   WIDE_LAYOUT,
@@ -176,13 +177,14 @@ function hasArea(size: Size): boolean {
 }
 
 /**
- * Выбирает план по форме поля и экрана: первый, у которого `minFieldAspect` не больше
- * отношения ширины поля к высоте, а `minScreenAspect` — того же у экрана. Если не подходит
- * ни один, остаётся самый узкий — последний.
- * @param {Size} field Поле, в которое вписывается план.
- * @param {Size} screen Всё окно.
- * @param {readonly [FactoryLayout, ...FactoryLayout[]]} layouts Планы от широкого к узкому; у последнего оба порога 0.
- * @returns {FactoryLayout} Подходящий план; у поля или экрана без площади — последний.
+ * Picks a layout by the shape of the field and the screen: the first whose `minFieldAspect` is at
+ * most the field's width-to-height ratio, and whose `minScreenAspect` is at most the screen's. If
+ * none fits, the narrowest one, the last, remains.
+ * @param {Size} field Field the layout is fitted into.
+ * @param {Size} screen The whole window.
+ * @param {readonly [FactoryLayout, ...FactoryLayout[]]} layouts Layouts from wide to narrow; the
+ * last has both thresholds at 0.
+ * @returns {FactoryLayout} The fitting layout; the last one if the field or screen has no area.
  */
 export function layoutFor(
   field: Size,
@@ -203,42 +205,42 @@ export function layoutFor(
 }
 
 /**
- * Расстояние между точками плана.
- * @param {Point} a Первая точка.
- * @param {Point} b Вторая точка.
- * @returns {number} Расстояние в единицах плана.
+ * Distance between layout points.
+ * @param {Point} a First point.
+ * @param {Point} b Second point.
+ * @returns {number} Distance in layout units.
  */
 export function distance(a: Point, b: Point): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
 /**
- * Точка на отрезке между двумя точками.
- * @param {Point} from Начало отрезка.
- * @param {Point} to Конец отрезка.
- * @param {number} progress Доля пути от 0 до 1.
- * @returns {Point} Точка, пройденная на эту долю.
+ * A point on the segment between two points.
+ * @param {Point} from Start of the segment.
+ * @param {Point} to End of the segment.
+ * @param {number} progress Share of the way from 0 to 1.
+ * @returns {Point} The point reached at that share.
  */
 export function pointBetween(from: Point, to: Point, progress: number): Point {
   return { x: from.x + (to.x - from.x) * progress, y: from.y + (to.y - from.y) * progress };
 }
 
 /**
- * Направление взгляда из одной точки на другую.
- * @param {Point} from Откуда смотрят.
- * @param {Point} to Куда смотрят.
- * @returns {number} Угол в радианах: 0 — вправо, π/2 — вниз.
+ * Heading from one point toward another.
+ * @param {Point} from Where one looks from.
+ * @param {Point} to Where one looks.
+ * @returns {number} Angle in radians: 0 is right, π/2 is down.
  */
 export function headingTo(from: Point, to: Point): number {
   return Math.atan2(to.y - from.y, to.x - from.x);
 }
 
 /**
- * Точка, где останавливается идущий к цели: не доходя до неё заданное расстояние.
- * @param {Point} from Откуда идут.
- * @param {Point} target К кому идут.
- * @param {number} gap Сколько не доходить, в единицах плана.
- * @returns {Point} Точка остановки; если цель ближе `gap`, — место, откуда шли.
+ * Point where someone walking toward a target stops: the given distance short of it.
+ * @param {Point} from Where the walk starts.
+ * @param {Point} target Who the walk is toward.
+ * @param {number} gap How far short to stop, in layout units.
+ * @returns {Point} The stopping point; if the target is closer than `gap`, the starting spot.
  */
 export function stopShortOf(from: Point, target: Point, gap: number): Point {
   const length = distance(from, target);

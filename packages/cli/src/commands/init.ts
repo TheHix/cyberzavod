@@ -1,6 +1,6 @@
-// `cyberzavod init`: подключает проект в текущем каталоге — показывает, что найдено и что
-// появится, спрашивает одно «Продолжить?», пишет конфиг, AGENTS.md и файлы агента. Проект
-// остаётся на своём месте: Cyberzavod его не клонирует и не переносит.
+// `cyberzavod init`: connects the project in the current directory: shows what was found and what
+// will appear, asks a single "Continue?", writes the config, AGENTS.md and agent files. The project
+// stays where it is: Cyberzavod neither clones nor moves it.
 
 import { rename, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -18,7 +18,7 @@ import { appendIgnoreEntry, captureIgnoreEntry, GITIGNORE_FILE } from "./gitigno
 import { requireProjectAt } from "./project.ts";
 import { filesStatusOf, inspectProjectFiles } from "./sync.ts";
 
-/** Файл правил проекта для агентов в его корне. */
+/** The project's rules file for agents, in its root. */
 export const RULES_FILE = "AGENTS.md";
 const LEGACY_ENTRYPOINT = "CLAUDE.md";
 const AGENT_DIRECTORY = ".claude/";
@@ -39,9 +39,9 @@ function starterRules(template: string, name: string, commands: string[]): strin
     .replaceAll(TODO_PLACEHOLDER, RULES_TODO_MARK);
 }
 
-// Что будет с правилами проекта: AGENTS.md уже есть и не меняется; написанный человеком
-// CLAUDE.md и есть правила, он переезжает в AGENTS.md, а на его месте появится тонкий CLAUDE.md
-// от генератора; иначе AGENTS.md пишется из заготовки.
+// What happens to the project rules: AGENTS.md already exists and is not changed; a CLAUDE.md
+// written by the human is the rules, so it moves to AGENTS.md, and a thin generated CLAUDE.md
+// takes its place; otherwise AGENTS.md is written from the starter.
 type RulesPlan = "kept" | "moved" | "starter";
 
 async function planRules(root: string): Promise<RulesPlan> {
@@ -105,8 +105,8 @@ function slashed(file: string): string {
   return file.split(PATH_SEPARATORS).join("/");
 }
 
-// Файлы, которые появятся, называются так, как их увидит человек: проект и агент — без
-// перечисления их содержимого.
+// Files that will appear are named the way the human will see them: the project and the agent,
+// without listing their contents.
 function createdFiles(ignoreEntry: string | undefined): string[] {
   const files = [slashed(PROJECT_CONFIG_FILE), LEGACY_ENTRYPOINT, AGENT_DIRECTORY];
 
@@ -141,7 +141,7 @@ function printSummary({ config, rulesPlan, ignoreEntry, messages }: Summary): vo
   console.log(init.overrideHint);
 }
 
-// Каждый путь сворачивается до верхнего элемента: `.claude/agents/planner.md` → `.claude/`.
+// Each path collapses to its top element: `.claude/agents/planner.md` → `.claude/`.
 function topLevelEntry(file: string): string {
   const [first = file, ...rest] = file.split(PATH_SEPARATORS);
 
@@ -175,19 +175,20 @@ function printDone({ changed, isRulesFileWritten, isIgnoreEntryAdded, messages }
   );
 }
 
-/** Что нужно подключению проекта: подтверждение, флаги, версия Cyberzavod и тексты. */
+/** What connecting a project needs: confirmation, flags, Cyberzavod version and texts. */
 export interface InitOptions {
-  /** Спрашивает «Продолжить?» или соглашается без вопроса. */
+  /** Asks "Continue?" or agrees without asking. */
   confirm: Confirmation;
-  /** Значения флагов `init`: они перекрывают найденное. */
+  /** `init` flag values: they override what was found. */
   overrides: InitOverrides;
-  /** Запущенная версия Cyberzavod. */
+  /** The running Cyberzavod version. */
   installation: Installation;
-  /** Сообщения на выбранном языке. */
+  /** Messages in the chosen language. */
   messages: CliMessages;
 }
 
-// Уже подключённый проект `init` не меняет, а говорит, в порядке ли он и что делать дальше.
+// `init` does not change an already connected project; it says whether it is fine and what to do
+// next.
 async function reportConnected(root: string, options: InitOptions): Promise<boolean> {
   const { installation, messages } = options;
   const project = await requireProjectAt(root);
@@ -203,8 +204,8 @@ async function reportConnected(root: string, options: InitOptions): Promise<bool
   return isCurrent;
 }
 
-// Файлы, на месте которых генератор написал бы свои, ищутся до первой записи: так отказ
-// оставляет проект нетронутым. Рукописный CLAUDE.md, который станет AGENTS.md, не мешает.
+// Files the generator would write over are looked for before the first write: so a refusal leaves
+// the project untouched. A handwritten CLAUDE.md that will become AGENTS.md is not in the way.
 async function blockingFiles(
   root: string,
   config: ProjectConfig,
@@ -222,14 +223,14 @@ async function blockingFiles(
 }
 
 /**
- * Подключает проект: показывает найденное, спрашивает «Продолжить?», пишет конфиг и файлы
- * агента. После отказа ничего не пишет. Уже подключённый проект не меняет, а проверяет.
- * @param {string} root Корень проекта — каталог, из которого запущена команда.
- * @param {InitOptions} options Подтверждение, флаги, версия Cyberzavod, сообщения.
- * @returns {Promise<boolean>} true, если проект подключён и его файлы актуальны или человек
- *   отказался; false, если подключённому проекту нужен sync.
- * @throws {CommandError} Если флаг задан неверно или файлы человека мешают подключению: тогда
- *   ничего не записано.
+ * Connects the project: shows what was found, asks "Continue?", writes the config and agent
+ * files. After a refusal writes nothing. An already connected project is checked, not changed.
+ * @param {string} root Project root: the directory the command was run from.
+ * @param {InitOptions} options Confirmation, flags, Cyberzavod version, messages.
+ * @returns {Promise<boolean>} true if the project is connected and its files are current, or the
+ *   human refused; false if the connected project needs sync.
+ * @throws {CommandError} If a flag is invalid or the human's files block connecting: then
+ *   nothing is written.
  */
 export async function initProject(root: string, options: InitOptions): Promise<boolean> {
   const { confirm, overrides, installation, messages } = options;

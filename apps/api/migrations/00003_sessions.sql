@@ -1,4 +1,4 @@
--- Сессии входа на сайте: браузер держит случайный идентификатор в куке, в базе — только его sha256.
+-- Site sign-in sessions: the browser keeps a random id in a cookie, the database only its sha256.
 
 -- +goose Up
 CREATE TABLE sessions (
@@ -8,7 +8,7 @@ CREATE TABLE sessions (
     expires_at timestamptz NOT NULL
 );
 
--- Просроченные сессии удаляются при создании новой: индекс находит их без полного прохода.
+-- Expired sessions are deleted when a new one is created: the index finds them without a full scan.
 CREATE INDEX sessions_expires_at_idx ON sessions (expires_at);
 
 -- +goose Down

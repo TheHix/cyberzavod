@@ -1,7 +1,8 @@
-// Станки: у каждого этапа свой рисунок 40×20 — корпус цвета этапа с тёмной передней гранью и
-// декором на крышке (чертёж, терминал, пробирки, лупа, конвейер). Подвижное — отдельные спрайты:
-// накладки работы (показана одна, пока рабочий бьёт у станка), лампа погасшая всегда
-// на месте, горящая появляется, пока станок держит деталь. Остальное в кадре не меняется.
+// Machines: each stage has its own 40×20 sprite, a casing in the stage color with a dark front
+// face and decor on the lid (blueprint, terminal, test tubes, magnifier, conveyor). Moving parts
+// are separate sprites: work overlays (one shown while the worker strikes at the machine), the
+// unlit lamp always in place, the lit one appears while the machine holds the part. Nothing else
+// changes in a frame.
 
 import type { Stage } from "@cyberzavod/core";
 import type { Point, StationPlan } from "@cyberzavod/player";
@@ -22,8 +23,8 @@ import { textureOf } from "./textures.ts";
 import { PIXELS_PER_UNIT } from "./units.ts";
 
 /**
- * Рисунки станков по этапам. Новый этап — новая строка. Буквы — по `ART_LEGEND`: `b`, `B` и `l` —
- * корпус, его тень и блик в цвете этапа.
+ * Machine sprites by stage. A new stage is a new row. Letters follow `ART_LEGEND`: `b`, `B` and `l`
+ * are the casing, its shade and highlight in the stage color.
  */
 export const MACHINE_ART: Readonly<Record<Stage, SpriteArt>> = {
   planning: [
@@ -138,30 +139,30 @@ export const MACHINE_ART: Readonly<Record<Stage, SpriteArt>> = {
   ],
 };
 
-/** Лампа станка, когда он не работает: тусклая. */
+/** Machine lamp when it is not working: dim. */
 export const LAMP_OFF_ART: SpriteArt = [".kkk.", "koook", "koook", "koook", ".kkk."];
 
-/** Лампа работающего станка: светится, она же мигает. */
+/** Lamp of a working machine: lit, and it blinks. */
 export const LAMP_ON_ART: SpriteArt = [".kkk.", "kO*Ok", "kOOOk", "kOOOk", ".kkk."];
 
-/** Где лампа на рисунке станка: левый верхний угол, пиксели от угла рисунка. */
+/** Where the lamp is on the machine sprite: top left corner, pixels from the sprite corner. */
 export const LAMP_AT = { x: 33, y: 2 } as const;
 
-/** Накладка работы станка: кадры поверх корпуса, которые сменяют друг друга в такт удару. */
+/** Machine work overlay: frames over the casing that alternate in time with the strike. */
 export interface MachineWorkArt {
-  /** Левый верхний угол накладки, пиксели от угла рисунка станка, как у `LAMP_AT`. */
+  /** Top left corner of the overlay, pixels from the machine sprite corner, as in `LAMP_AT`. */
   readonly at: { readonly x: number; readonly y: number };
   /**
-   * Кадры работы: в кадре только пиксели, которые в работе отличаются от корпуса, остальное —
-   * точка. Все кадры одного размера.
+   * Work frames: a frame has only the pixels that differ from the casing during work, the rest is a
+   * dot. All frames are the same size.
    */
   readonly frames: Readonly<Record<WorkBeat, SpriteArt>>;
 }
 
 /**
- * Накладки работы станков по этапам. Новый этап — новая строка. Постановка — перо ведёт линию
- * по чертежу, код — строки в терминале то растут, то сжимаются, мигает курсор, проверки — пузырьки в колбах,
- * ревью — блик ходит по линзе лупы, фиксация — полосы ленты сдвигаются.
+ * Machine work overlays by stage. A new stage is a new row. Plan: a pen draws a line on the
+ * blueprint; code: lines in the terminal grow and shrink, the cursor blinks; checks: bubbles in the
+ * flasks; review: a glint moves across the magnifier lens; record: the belt stripes shift.
  */
 export const MACHINE_WORK_ART: Readonly<Record<Stage, MachineWorkArt>> = {
   planning: {
@@ -273,13 +274,13 @@ export const MACHINE_WORK_ART: Readonly<Record<Stage, MachineWorkArt>> = {
 
 const MACHINE_SIZES = Object.values(MACHINE_ART).map(artSize);
 
-/** Размер самого большого станка: от него считается отступ табличек и границы цеха. */
+/** Size of the largest machine: plaque offset and factory bounds are computed from it. */
 export const MACHINE_SIZE: ArtSize = MACHINE_SIZES.reduce((largest, size) => ({
   width: Math.max(largest.width, size.width),
   height: Math.max(largest.height, size.height),
 }));
 
-/** Подвижные части станка в кадре: накладки работы и горящая лампа. */
+/** Moving parts of a machine in a frame: work overlays and the lit lamp. */
 export interface MachineSprites {
   readonly work: Readonly<Record<WorkBeat, Sprite>>;
   readonly lampOn: Sprite;
@@ -316,11 +317,11 @@ function workSpritesOf(stage: Stage, inks: Inks, machineCorner: Point): Record<W
 }
 
 /**
- * Рисует станок этапа; координаты — в пикселях рисунка.
- * @param {Stage} stage Этап станка.
- * @param {StationPlan} plan Где станок и его рабочий.
- * @param {Palette} palette Краски цеха.
- * @returns {{ root: Container; sprites: MachineSprites }} Станок и его подвижные части.
+ * Draws a stage machine; coordinates are in sprite pixels.
+ * @param {Stage} stage Machine stage.
+ * @param {StationPlan} plan Where the machine and its worker are.
+ * @param {Palette} palette Factory inks.
+ * @returns {{ root: Container; sprites: MachineSprites }} The machine and its moving parts.
  */
 export function drawMachine(
   stage: Stage,
@@ -338,7 +339,7 @@ export function drawMachine(
 
   lampOn.visible = false;
   const work = workSpritesOf(stage, inks, { x: left, y: top });
-  // Накладки лежат на корпусе и под лампами: лампа остаётся видна поверх любого кадра работы.
+  // Overlays lie on the casing and under the lamps: the lamp stays visible over any work frame.
   const root = new Container({
     children: [
       spriteOf(art, inks, left, top),
@@ -357,9 +358,9 @@ export function drawMachine(
 }
 
 /**
- * Показывает кадр работы станка: накладку текущего такта или ни одной, пока станок стоит.
- * @param {MachineSprites} sprites Подвижные части станка.
- * @param {MachineWork} work Кадр работы или покой.
+ * Shows a machine work frame: the overlay of the current beat, or none while the machine stands.
+ * @param {MachineSprites} sprites Moving parts of the machine.
+ * @param {MachineWork} work Work frame or rest.
  */
 export function showMachineWork(sprites: MachineSprites, work: MachineWork): void {
   for (const [beat, sprite] of Object.entries(sprites.work)) sprite.visible = beat === work;

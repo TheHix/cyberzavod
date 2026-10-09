@@ -1,5 +1,5 @@
-// Общие данные для тестов `doctor`: машина без диска, подключённый проект во временном каталоге
-// и контекст проверок проекта.
+// Shared data for `doctor` tests: a machine without a disk, a connected project in a temporary
+// directory and the project checks context.
 
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -15,19 +15,19 @@ import { CLI_MESSAGES } from "../messages/catalog.ts";
 import { memoryCredentials, SECRET_TOKEN } from "../sharing/fixtures.ts";
 import type { CommandRunner, Machine, ProjectContext } from "./check.ts";
 
-/** Тексты на английском: тесты проверяют подсказки дословно. */
+/** English texts: tests check hints word for word. */
 export const messages = CLI_MESSAGES.en;
 
-/** Заполненные правила проекта: без заглушек заготовки. */
+/** Filled-in project rules: no starter placeholders. */
 export const FILLED_RULES = "# Rules\n\nFilled in.\n";
 
-/** Команда проверки у подключённого проекта в тестах. */
+/** The check command of a connected project in tests. */
 export const PROJECT_CHECK_COMMAND = "make check";
 
 /**
- * Машина, на которой всё в порядке: свежий Node, git найден, токен сохранён.
- * @param {Partial<Machine>} patch Поля, которые нужно заменить.
- * @returns {Machine} Машина для проверок.
+ * A machine where everything is fine: recent Node, git found, token saved.
+ * @param {Partial<Machine>} patch Fields to replace.
+ * @returns {Machine} A machine for checks.
  */
 export function machine(patch: Partial<Machine> = {}): Machine {
   return {
@@ -39,10 +39,11 @@ export function machine(patch: Partial<Machine> = {}): Machine {
 }
 
 /**
- * Подключённый проект во временном каталоге: `init --yes` с одной проверкой и заполненный
- * AGENTS.md. Вывод `init` подавлен до конца теста; каталог удаляется после теста.
- * @param {string[]} checks Команды проверок проекта.
- * @returns {Promise<ProjectAt>} Проект.
+ * A connected project in a temporary directory: `init --yes` with one check and a filled-in
+ * AGENTS.md. `init` output is suppressed until the end of the test; the directory is removed after
+ * it.
+ * @param {string[]} checks Project check commands.
+ * @returns {Promise<ProjectAt>} The project.
  */
 export async function connectedProject(checks = [PROJECT_CHECK_COMMAND]): Promise<ProjectAt> {
   const root = await mkdtemp(path.join(tmpdir(), "cyberzavod-doctor-"));
@@ -63,23 +64,23 @@ export async function connectedProject(checks = [PROJECT_CHECK_COMMAND]): Promis
 }
 
 /**
- * Проект, как его видят проверки, по корню на диске.
- * @param {string} root Корень подключённого проекта.
- * @returns {Promise<ProjectAt>} Проект с актуальным конфигом.
+ * The project as checks see it, from its root on disk.
+ * @param {string} root Root of the connected project.
+ * @returns {Promise<ProjectAt>} The project with the current config.
  */
 export async function projectAt(root: string): Promise<ProjectAt> {
   const config = await readProjectConfig(root);
 
-  if (config === undefined) throw new Error(`в ${root} нет проекта`);
+  if (config === undefined) throw new Error(`no project in ${root}`);
 
   return { root, config, journal: journalDirectory(root, config) };
 }
 
 /**
- * Контекст проверок проекта: программы найдены, команды завершаются с кодом 0.
- * @param {ProjectAt} project Подключённый проект.
- * @param {Partial<ProjectContext>} patch Поля, которые нужно заменить.
- * @returns {Promise<ProjectContext>} Контекст.
+ * Project checks context: programs are found, commands exit with code 0.
+ * @param {ProjectAt} project Connected project.
+ * @param {Partial<ProjectContext>} patch Fields to replace.
+ * @returns {Promise<ProjectContext>} The context.
  */
 export async function projectContext(
   project: ProjectAt,

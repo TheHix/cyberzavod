@@ -1,12 +1,12 @@
-// Повороты: доля пути действия и кратчайшая дуга. Общие у сценария (откуда начинается поворот)
-// и кадра (как он идёт), чтобы они считали одинаково.
+// Turns: the share of an action's path and the shortest arc. Shared by the script (where a turn
+// starts) and the frame (how it goes), so that both compute it the same way.
 
 /**
- * Доля пройденного от `start` до `end`; у мгновенного действия — сразу 1.
- * @param {number} start Начало действия, мс.
- * @param {number} end Конец действия, мс.
- * @param {number} time Момент, мс.
- * @returns {number} Доля от 0 до 1.
+ * Share of the way from `start` to `end`; an instant action is at 1 right away.
+ * @param {number} start Start of the action, ms.
+ * @param {number} end End of the action, ms.
+ * @param {number} time Moment, ms.
+ * @returns {number} Share from 0 to 1.
  */
 export function progressOf(start: number, end: number, time: number): number {
   if (end <= start) return 1;
@@ -15,11 +15,12 @@ export function progressOf(start: number, end: number, time: number): number {
 }
 
 /**
- * Поворот по кратчайшей дуге: от 350° к 10° — через 0°, а не назад через весь круг.
- * @param {number} from Направление в начале, радианы.
- * @param {number} to Направление в конце, радианы.
- * @param {number} progress Доля поворота от 0 до 1.
- * @returns {number} Направление, радианы.
+ * Turn along the shortest arc: from 350° to 10° goes through 0°, not back around the whole
+ * circle.
+ * @param {number} from Heading at the start, radians.
+ * @param {number} to Heading at the end, radians.
+ * @param {number} progress Share of the turn from 0 to 1.
+ * @returns {number} Heading, radians.
  */
 export function turned(from: number, to: number, progress: number): number {
   const delta = Math.atan2(Math.sin(to - from), Math.cos(to - from));

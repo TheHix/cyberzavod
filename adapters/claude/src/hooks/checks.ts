@@ -1,29 +1,29 @@
-// Проверки проекта для хуков: что запускать и правки в каких каталогах этого требуют.
+// Project checks for hooks: what to run, and which directories' changes require it.
 
 import { closeSync, openSync, readFileSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import type { ProjectConfig } from "@cyberzavod/core";
 
-/** Проверки проекта: одна команда и каталоги с кодом, за которыми следят хуки. */
+/** Project checks: one command and the code directories the hooks watch. */
 export interface ProjectChecks {
   command: string;
   paths: string[];
 }
 
-/** Итог прогона проверок: прошли ли они и что напечатали. */
+/** Outcome of a checks run: whether they passed and what they printed. */
 export interface ChecksRun {
   passed: boolean;
   output: string;
 }
 
 const WHOLE_REPOSITORY = ".";
-// `&&` понимают и sh, и cmd.exe: первая красная команда останавливает остальные.
+// Both sh and cmd.exe understand `&&`: the first red command stops the rest.
 const COMMAND_SEPARATOR = " && ";
 
 /**
- * Проверки из конфига проекта.
- * @param {ProjectConfig} config Конфиг проекта.
- * @returns {ProjectChecks | undefined} Проверки или undefined, если команд нет.
+ * Checks from the project config.
+ * @param {ProjectConfig} config Project config.
+ * @returns {ProjectChecks | undefined} The checks, or undefined if there are no commands.
  */
 export function checksOf(config: ProjectConfig): ProjectChecks | undefined {
   const { commands, paths } = config.verification;
@@ -37,12 +37,12 @@ export function checksOf(config: ProjectConfig): ProjectChecks | undefined {
 }
 
 /**
- * Запускает проверки оболочкой системы в корне проекта. Вывод идёт в файл, а не в канал: так
- * stdout и stderr ложатся в одном порядке, как их печатала команда.
- * @param {ProjectChecks} checks Проверки проекта.
- * @param {string} root Корень проекта.
- * @param {string} outputFile Временный файл для вывода; после прогона удаляется.
- * @returns {ChecksRun} Прошли ли проверки и их вывод.
+ * Runs the checks with the system shell in the project root. Output goes to a file, not a pipe, so
+ * stdout and stderr keep the order in which the command printed them.
+ * @param {ProjectChecks} checks Project checks.
+ * @param {string} root Project root.
+ * @param {string} outputFile Temporary file for the output; deleted after the run.
+ * @returns {ChecksRun} Whether the checks passed, and their output.
  */
 export function runChecks(checks: ProjectChecks, root: string, outputFile: string): ChecksRun {
   const output = openSync(outputFile, "w");

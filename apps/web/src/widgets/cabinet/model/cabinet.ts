@@ -1,9 +1,9 @@
-// Действия автора в кабинете: каждое меняет данные в API, а что получилось, кабинет и меню узнают
-// новым запросом `GET /api/me` — второго описания галереи на странице нет.
+// Author actions in the cabinet: each changes data in the API, and the cabinet and menu learn the
+// result with a new `GET /api/me` request, so the page has no second description of the gallery.
 
 import { atom, type ReadableAtom } from "nanostores";
 
-/** Запросы кабинета к API и запрос, который заново узнаёт, кто вошёл. */
+/** Cabinet requests to the API and the request that finds out again who is signed in. */
 export interface CabinetRequests {
   setGalleryPublic(isPublic: boolean): Promise<void>;
   deleteRecording(id: string): Promise<void>;
@@ -11,36 +11,39 @@ export interface CabinetRequests {
   reloadAccount(): Promise<void>;
 }
 
-/** Модель кабинета: идёт ли действие, не сорвалось ли последнее, и сами действия. */
+/** Cabinet model: whether an action is running, whether the last one failed, and the actions. */
 export interface CabinetModel {
-  /** Идёт действие: кнопки выключены, чтобы не отправить второе поверх первого. */
+  /** An action is running: buttons are disabled so a second one is not sent over the first. */
   readonly $isBusy: ReadableAtom<boolean>;
-  /** Последнее действие не удалось: кабинет показывает сообщение. */
+  /** The last action failed: the cabinet shows a message. */
   readonly $hasFailed: ReadableAtom<boolean>;
   /**
-   * Открывает или закрывает галерею.
-   * @param {boolean} isPublic Открыть ли галерею.
-   * @returns {Promise<void>} Когда изменение сохранено и кабинет обновлён или стало ясно, что нет.
+   * Makes the gallery public or private.
+   * @param {boolean} isPublic Whether to make the gallery public.
+   * @returns {Promise<void>} When the change is saved and the cabinet updated, or it is clear it is
+   *   not.
    */
   setGalleryPublic(isPublic: boolean): Promise<void>;
   /**
-   * Удаляет запись из галереи.
-   * @param {string} id id записи.
-   * @returns {Promise<void>} Когда запись удалена и кабинет обновлён или стало ясно, что нет.
+   * Deletes a recording from the gallery.
+   * @param {string} id Recording id.
+   * @returns {Promise<void>} When the recording is deleted and the cabinet updated, or it is clear
+   *   it is not.
    */
   deleteRecording(id: string): Promise<void>;
   /**
-   * Выходит с сайта.
-   * @returns {Promise<void>} Когда выход сделан и кабинет обновлён или стало ясно, что нет.
+   * Signs out of the site.
+   * @returns {Promise<void>} When sign-out is done and the cabinet updated, or it is clear it is
+   *   not.
    */
   signOut(): Promise<void>;
 }
 
 /**
- * Создаёт модель кабинета. После любого действия, удачного или нет, кабинет заново узнаёт, кто
- * вошёл: например, сессия могла истечь, и тогда автор становится гостем.
- * @param {CabinetRequests} requests Запросы к API.
- * @returns {CabinetModel} Модель без идущих действий.
+ * Creates the cabinet model. After any action, successful or not, the cabinet finds out again who
+ * is signed in: for example, the session may have expired, and then the author becomes a guest.
+ * @param {CabinetRequests} requests API requests.
+ * @returns {CabinetModel} A model with no running actions.
  */
 export function createCabinetModel(requests: CabinetRequests): CabinetModel {
   const $isBusy = atom(false);

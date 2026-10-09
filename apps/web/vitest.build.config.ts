@@ -1,4 +1,4 @@
 import { defineConfig } from "vitest/config";
 
-// Тесты собранного сайта идут отдельно от тестов исходников: им нужен готовый `dist/`.
+// Built-site tests run separately from source tests: they need a finished `dist/`.
 export default defineConfig({ test: { include: ["build-tests/**/*.test.ts"] } });

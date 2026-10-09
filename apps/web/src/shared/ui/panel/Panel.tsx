@@ -3,22 +3,22 @@ import { cx } from "@/shared/lib/cx.ts";
 import styles from "./Panel.module.css";
 
 interface Props {
-  /** Ярлык над содержимым: «Сборка», «Журнал». */
+  /** Label above the content: "Build", "Journal". */
   label?: string | undefined;
-  /** Прокручивать ли содержимое внутри панели, когда оно не помещается в отведённую высоту. */
+  /** Whether to scroll the content inside the panel when it does not fit the given height. */
   scrollable?: boolean | undefined;
   class?: string | undefined;
   children: JSX.Element;
 }
 
 /**
- * Панель ui-kit — светлая плашка с контуром, в ней собирается интерфейс поверх цеха.
- * @param {Props} props Свойства компонента.
- * @param {string} [props.label] Ярлык над содержимым.
- * @param {boolean} [props.scrollable] Прокручивать содержимое внутри панели.
- * @param {string} [props.class] Дополнительный класс для раскладки снаружи.
- * @param {JSX.Element} props.children Содержимое.
- * @returns {JSX.Element} Панель.
+ * ui-kit panel: a light outlined tile that holds the interface over the factory floor.
+ * @param {Props} props Component props.
+ * @param {string} [props.label] Label above the content.
+ * @param {boolean} [props.scrollable] Scroll the content inside the panel.
+ * @param {string} [props.class] Extra class for layout from outside.
+ * @param {JSX.Element} props.children Content.
+ * @returns {JSX.Element} Panel.
  */
 export function Panel(props: Props): JSX.Element {
   return (

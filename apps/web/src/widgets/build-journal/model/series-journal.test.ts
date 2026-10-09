@@ -27,7 +27,8 @@ function sessionOf(id: string): SessionRecord {
   };
 }
 
-// Журнал серии с подменным цехом и кешем: запись в цехе задаёт тест, запросы он видит.
+// Series journal with a stub floor and cache: the test sets the recording on the floor and sees
+// requests.
 function seriesJournal(sceneRecordingId: string | null = null) {
   const fetchFile = vi.fn((id: string) => Promise.resolve(sessionOf(id)));
   const files = createRecordingFiles(fetchFile);
@@ -48,7 +49,7 @@ function follow(journal: SeriesJournalModel): void {
   stops.push(journal.follow());
 }
 
-// Запросы кеша завершаются в микрозадачах: ждём, пока они сядут в стор.
+// Cache requests settle in microtasks: wait until they land in the store.
 async function settled(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve));
 }

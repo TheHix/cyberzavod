@@ -1,5 +1,5 @@
-// Проигрыватель цеха: запись сессии → сценарий → кадр в любой момент. Нужен только витрине
-// (сайту); инструмент разработки о нём не знает. Чистый TypeScript, как ядро.
+// Factory floor player: session recording → script → frame at any moment. Only the showcase
+// (the site) needs it; the development tool knows nothing about it. Pure TypeScript, like the core.
 
 export type { Aisle } from "./aisle.ts";
 export { carryTime, ScriptMismatchError } from "./carry-time.ts";

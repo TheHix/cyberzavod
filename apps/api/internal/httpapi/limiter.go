@@ -11,14 +11,14 @@ import (
 )
 
 const (
-	// galleryChangeLimit — сколько загрузок и удалений записей автор может сделать за
-	// galleryChangeWindow: живому автору хватает с запасом, а забить базу перезаливками нельзя.
+	// galleryChangeLimit is how many recording uploads and deletions an author can make per
+	// galleryChangeWindow: plenty for a real author, too few to flood the database with re-uploads.
 	galleryChangeLimit  = 20
 	galleryChangeWindow = time.Hour
 )
 
-// changeLimiter считает попытки автора менять галерею в фиксированном окне. Счётчики живут
-// в памяти процесса: API работает одним экземпляром.
+// changeLimiter counts an author's attempts to change the gallery in a fixed window. Counters
+// live in process memory: the API runs as a single instance.
 type changeLimiter struct {
 	limit  int
 	window time.Duration
@@ -28,7 +28,7 @@ type changeLimiter struct {
 	windows map[int64]changeWindow
 }
 
-// changeWindow — окно автора: когда началось и сколько попыток в нём уже было.
+// changeWindow is an author's window: when it started and how many attempts it has had.
 type changeWindow struct {
 	startedAt time.Time
 	attempts  int
@@ -38,8 +38,8 @@ func newChangeLimiter(limit int, window time.Duration, now func() time.Time) *ch
 	return &changeLimiter{limit: limit, window: window, now: now, windows: map[int64]changeWindow{}}
 }
 
-// allow засчитывает попытку автора ownerID. Если попытки в окне кончились — false и через
-// сколько окно откроется заново.
+// allow counts an attempt by author ownerID. If the window's attempts are used up, it returns
+// false and how long until the window opens again.
 func (l *changeLimiter) allow(ownerID int64) (bool, time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -62,7 +62,7 @@ func (l *changeLimiter) allow(ownerID int64) (bool, time.Duration) {
 	return true, 0
 }
 
-// forgetEnded убирает закончившиеся окна, чтобы карта не росла без конца. Вызывается под mu.
+// forgetEnded drops ended windows so the map does not grow forever. Called under mu.
 func (l *changeLimiter) forgetEnded(now time.Time) {
 	for ownerID, window := range l.windows {
 		hasEnded := !now.Before(window.startedAt.Add(l.window))
@@ -72,8 +72,8 @@ func (l *changeLimiter) forgetEnded(now time.Time) {
 	}
 }
 
-// limitedChanges пускает к next, пока автор не исчерпал попытки изменить галерею; дальше —
-// 429 с Retry-After.
+// limitedChanges lets through to next until the author runs out of gallery change attempts;
+// after that it responds 429 with Retry-After.
 func (a *api) limitedChanges(next authorizedHandler) authorizedHandler {
 	return func(w http.ResponseWriter, r *http.Request, user gallery.User) {
 		isAllowed, retryAfter := a.changes.allow(user.GitHubID)
@@ -87,7 +87,7 @@ func (a *api) limitedChanges(next authorizedHandler) authorizedHandler {
 }
 
 func writeTooManyChanges(w http.ResponseWriter, retryAfter time.Duration) {
-	// Retry-After — целые секунды; округление вверх, чтобы повтор не пришёл раньше окна.
+	// Retry-After is in whole seconds; rounded up so the retry does not come before the window.
 	seconds := int(math.Ceil(retryAfter.Seconds()))
 	w.Header().Set("Retry-After", strconv.Itoa(seconds))
 	writeError(w, http.StatusTooManyRequests, codeTooManyRequests,

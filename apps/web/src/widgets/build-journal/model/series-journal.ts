@@ -1,5 +1,6 @@
-// Журнал серии сборок: показывает полную запись той сборки, что сейчас в цехе. Цех и журнал —
-// разные острова, какая запись в цехе — журнал узнаёт из `$sceneRecordingId` (journal-sync).
+// Build series journal: shows the full recording of the build that is on the floor now. The floor
+// and the journal are separate islands; the journal learns which recording is on the floor from
+// `$sceneRecordingId` (journal-sync).
 
 import { computed, type ReadableAtom } from "nanostores";
 import type { SessionRecord } from "@cyberzavod/core";
@@ -7,41 +8,48 @@ import { recordingFileOf, type RecordingFiles } from "@/entities/recording-file"
 import { MISSING, type Remote } from "@/shared/api/remote.ts";
 import { nextIndexInCircle } from "@/shared/lib/circle.ts";
 
-/** Откуда журнал серии берёт записи: порядок серии, запись в цехе и кеш полных записей. */
+/**
+ * Where the series journal gets recordings: the series order, the floor recording and the cache.
+ */
 export interface SeriesJournalSources {
-  /** id сборок серии в порядке, в каком их проигрывает цех. */
+  /** Build ids of the series in the order the floor plays them. */
   readonly recordingIds: readonly string[];
-  /** id записи, которую сейчас проигрывает цех; `null` — цех ещё не подключился. */
+  /**
+   * Id of the recording the floor is playing now; `null` means the floor is not connected yet.
+   */
   readonly $sceneRecordingId: ReadableAtom<string | null>;
-  /** Полные записи, которые уже спросили. */
+  /** Full recordings already requested. */
   readonly $files: ReadableAtom<RecordingFiles>;
-  /** Спрашивает полную запись, если её ещё не спрашивали. */
+  /** Requests a full recording unless it was already requested. */
   readonly request: (id: string) => Promise<void>;
 }
 
-/** Журнал серии: какую запись показать и как следить за цехом. */
+/** Series journal: which recording to show and how to follow the floor. */
 export interface SeriesJournalModel {
-  /** id сборки, которую показывает журнал, пока её запись грузится, — тоже; нет у пустой серии. */
+  /**
+   * Id of the build the journal shows, also while its recording loads; absent for an empty series.
+   */
   readonly $recordingId: ReadableAtom<string | undefined>;
-  /** Полная запись сборки, которая сейчас в цехе: грузится, готова или почему её нет. */
+  /** Full recording of the build on the floor now: loading, ready, or why it is missing. */
   readonly $recording: ReadableAtom<Remote<SessionRecord>>;
   /**
-   * Следит за цехом: спрашивает запись, которая в нём, и заранее — следующую в серии, чтобы
-   * журнал после смены сборки открылся без ожидания.
-   * @returns {() => void} Перестаёт следить.
+   * Follows the floor: requests the recording on it and, ahead of time, the next one in the
+   * series, so the journal opens without waiting after the build changes.
+   * @returns {() => void} Stops following.
    */
   follow(): () => void;
 }
 
 /**
- * Создаёт журнал серии сборок.
- * @param {SeriesJournalSources} sources Порядок серии, запись в цехе и кеш полных записей.
- * @returns {SeriesJournalModel} Журнал, который ещё не следит за цехом.
+ * Creates the build series journal.
+ * @param {SeriesJournalSources} sources Series order, floor recording and full recording cache.
+ * @returns {SeriesJournalModel} A journal that is not following the floor yet.
  */
 export function createSeriesJournal(sources: SeriesJournalSources): SeriesJournalModel {
   const { recordingIds, $sceneRecordingId, $files, request } = sources;
   const [firstId] = recordingIds;
-  // Пока цех не подключился, журнал показывает первую сборку серии: с неё цех и начнёт.
+  // Until the floor connects, the journal shows the first build of the series: the floor starts
+  // there.
   const $shownId = computed($sceneRecordingId, (id) => id ?? firstId);
   const $recording = computed([$shownId, $files], (id, files) =>
     id === undefined ? MISSING : recordingFileOf(files, id),

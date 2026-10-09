@@ -1,37 +1,37 @@
-// Страница галерей одна на общий список и на галерею автора: что показывать, решает параметр
-// адреса `user`, который страница узнаёт только в браузере.
+// One galleries page serves both the shared list and an author's gallery: the `user` address
+// parameter decides what to show, and the page learns it only in the browser.
 
 import { atom, type ReadableAtom } from "nanostores";
 import { queryParamOf, type Gallery, type GalleryListing } from "@/entities/gallery";
 import { LOADING, settle, type Remote } from "@/shared/api/remote.ts";
 
-/** Что на странице галерей: общий список открытых галерей или галерея автора. */
+/** What is on the galleries page: the shared list of public galleries or an author's gallery. */
 export type GalleryPage =
   | { readonly view: "list"; readonly galleries: Remote<readonly GalleryListing[]> }
   | { readonly view: "author"; readonly login: string; readonly gallery: Remote<Gallery> };
 
-/** Запросы страницы галерей к API. */
+/** Galleries page requests to the API. */
 export interface GalleryRequests {
   fetchGalleries(): Promise<readonly GalleryListing[]>;
   fetchGallery(login: string): Promise<Gallery>;
 }
 
-/** Страница галерей: что показывать и действие, которое открывает страницу по адресу. */
+/** Galleries page: what to show and the action that opens the page by its address. */
 export interface GalleryPageModel {
   readonly $page: ReadableAtom<GalleryPage>;
   /**
-   * Открывает галерею автора, если в адресе есть логин, иначе общий список.
-   * @param {string} search Параметры адреса — `location.search`.
-   * @returns {Promise<void>} Когда данные получены или стало ясно, почему их нет.
+   * Opens the author's gallery if the address has a login, otherwise the shared list.
+   * @param {string} search Address parameters, `location.search`.
+   * @returns {Promise<void>} When the data arrives or it is clear why there is none.
    */
   open(search: string): Promise<void>;
 }
 
 /**
- * Создаёт модель страницы галерей. Начальное состояние — общий список в загрузке: так страница
- * выглядит и при сборке, где адреса с параметрами ещё нет.
- * @param {GalleryRequests} requests Запросы к API.
- * @returns {GalleryPageModel} Модель страницы.
+ * Creates the galleries page model. The initial state is the shared list loading: this is also how
+ * the page looks at build time, when there is no address with parameters yet.
+ * @param {GalleryRequests} requests API requests.
+ * @returns {GalleryPageModel} Page model.
  */
 export function createGalleryPageModel(requests: GalleryRequests): GalleryPageModel {
   const $page = atom<GalleryPage>({ view: "list", galleries: LOADING });

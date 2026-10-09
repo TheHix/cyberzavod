@@ -1,39 +1,39 @@
-// Манифест сгенерированного: какие файлы и с каким содержимым записал генератор и какие запреты он
-// сам дописал в настройки. По нему sync и disconnect отличают свой нетронутый файл от своего, но
-// исправленного руками, а свой запрет — от такого же запрета человека.
+// Manifest of generated output: which files the generator wrote and with what contents, and which
+// deny rules it added to the settings itself. With it sync and disconnect tell their own untouched
+// file from their own hand-edited one, and their own deny rule from the same rule by the human.
 
 import { createHash } from "node:crypto";
 import { MARKER_DIRECTORY } from "@cyberzavod/storage";
 import { GenerateError } from "./claude.ts";
 
-/** Путь манифеста от корня проекта через `/`. */
+/** Manifest path from the project root with `/`. */
 export const MANIFEST_FILE = `${MARKER_DIRECTORY}/generated.json`;
 
-/** Версия формата манифеста; не путать с версией CLI и harness. */
+/** Manifest format version; not to be confused with the CLI and harness version. */
 export const MANIFEST_SCHEMA_VERSION = 1;
 
 const HASH_ALGORITHM = "sha256";
 
-/** Манифест сгенерированного. */
+/** Manifest of generated output. */
 export interface Manifest {
-  /** Отпечаток содержимого каждого записанного файла по пути от корня через `/`. */
+  /** Content fingerprint of each written file by path from the root with `/`. */
   files: Readonly<Record<string, string>>;
-  /** Запреты, которые дописал генератор, а не человек: их убирает disconnect. */
+  /** Deny rules added by the generator, not the human: disconnect removes them. */
   deny: readonly string[];
 }
 
-/** Пустой манифест: генератор в проекте ещё ничего не записал. */
+/** Empty manifest: the generator has not written anything in the project yet. */
 export const EMPTY_MANIFEST: Manifest = { files: {}, deny: [] };
 
-// Перевод строк при выписке из git на Windows не делает файл исправленным руками.
+// Line ending conversion on git checkout on Windows does not make a file hand-edited.
 function withUnixNewlines(text: string): string {
   return text.replace(/\r\n/g, "\n");
 }
 
 /**
- * Отпечаток содержимого файла; `\r\n` и `\n` дают один отпечаток.
- * @param {string} text Содержимое файла.
- * @returns {string} Отпечаток вида `sha256:<hex>`.
+ * Fingerprint of file contents; `\r\n` and `\n` give the same fingerprint.
+ * @param {string} text File contents.
+ * @returns {string} Fingerprint of the form `sha256:<hex>`.
  */
 export function contentHash(text: string): string {
   const digest = createHash(HASH_ALGORITHM).update(withUnixNewlines(text)).digest("hex");
@@ -68,10 +68,11 @@ function parseJson(text: string): unknown {
 }
 
 /**
- * Разбирает текст манифеста.
- * @param {string | undefined} text Содержимое файла; undefined, если файла нет.
- * @returns {Manifest} Манифест; пустой, если файла нет.
- * @throws {GenerateError} Если текст не JSON, версия формата неизвестна или поля не того вида.
+ * Parses the manifest text.
+ * @param {string | undefined} text File contents; undefined if there is no file.
+ * @returns {Manifest} The manifest; empty if there is no file.
+ * @throws {GenerateError} If the text is not JSON, the format version is unknown, or fields have
+ *   the wrong shape.
  */
 export function parseManifest(text: string | undefined): Manifest {
   if (text === undefined) return EMPTY_MANIFEST;
@@ -95,9 +96,10 @@ export function parseManifest(text: string | undefined): Manifest {
 }
 
 /**
- * Текст манифеста для записи на диск: пути и запреты по порядку, чтобы файл не менялся без нужды.
- * @param {Manifest} manifest Манифест.
- * @returns {string} JSON с переводом строки в конце.
+ * Manifest text to write to disk: paths and deny rules in order, so the file does not change
+ * needlessly.
+ * @param {Manifest} manifest Manifest.
+ * @returns {string} JSON with a trailing newline.
  */
 export function manifestText(manifest: Manifest): string {
   const paths = Object.keys(manifest.files).sort();

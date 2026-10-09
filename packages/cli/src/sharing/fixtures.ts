@@ -1,4 +1,4 @@
-// Общие данные для тестов публикации: заглушки сервера, GitHub и хранилища токена.
+// Shared data for sharing tests: stubs of the server, GitHub and the token store.
 
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -11,16 +11,16 @@ import type { GithubDeviceAuth } from "./github.ts";
 import type { CredentialsStore } from "./settings.ts";
 import type { Sharing } from "./services.ts";
 
-/** Токен, которого не должно быть ни в одной строке вывода. */
+/** A token that must not appear in any output line. */
 export const SECRET_TOKEN = "gho_secret_token_value";
 
-/** Адрес сервера в тестах. */
+/** Server address in tests. */
 export const TEST_SITE_URL = "https://cyberzavod.test";
 
 /**
- * Краткие сведения о записи на сервере.
- * @param {Partial<RecordingSummary>} patch Поля, которые нужно заменить.
- * @returns {RecordingSummary} Сведения о записи.
+ * Brief information about a recording on the server.
+ * @param {Partial<RecordingSummary>} patch Fields to replace.
+ * @returns {RecordingSummary} Recording information.
  */
 export function summary(patch: Partial<RecordingSummary> = {}): RecordingSummary {
   return {
@@ -36,18 +36,18 @@ export function summary(patch: Partial<RecordingSummary> = {}): RecordingSummary
 }
 
 /**
- * Автор с закрытой галереей и без записей.
- * @param {Partial<Me>} patch Поля, которые нужно заменить.
- * @returns {Me} Автор.
+ * An author with a private gallery and no recordings.
+ * @param {Partial<Me>} patch Fields to replace.
+ * @returns {Me} The author.
  */
 export function author(patch: Partial<Me> = {}): Me {
   return { login: "alice", galleryPublic: false, limit: 5, recordings: [], ...patch };
 }
 
 /**
- * Токен в памяти вместо файла.
- * @param {string | undefined} token Сохранённый токен; без него входа не было.
- * @returns {CredentialsStore} Хранилище токена.
+ * A token in memory instead of a file.
+ * @param {string | undefined} token The saved token; without it there was no login.
+ * @returns {CredentialsStore} The token store.
  */
 export function memoryCredentials(token?: string): CredentialsStore {
   let saved = token;
@@ -68,9 +68,9 @@ export function memoryCredentials(token?: string): CredentialsStore {
 }
 
 /**
- * Сервер, который отвечает как для вошедшего автора с закрытой галереей.
- * @param {Partial<CyberzavodApi>} patch Методы, которые нужно заменить.
- * @returns {CyberzavodApi} Заглушка сервера: каждый метод — шпион.
+ * A server that responds as for a logged-in author with a private gallery.
+ * @param {Partial<CyberzavodApi>} patch Methods to replace.
+ * @returns {CyberzavodApi} Server stub: every method is a spy.
  */
 export function fakeApi(patch: Partial<CyberzavodApi> = {}): CyberzavodApi {
   return {
@@ -84,9 +84,9 @@ export function fakeApi(patch: Partial<CyberzavodApi> = {}): CyberzavodApi {
 }
 
 /**
- * GitHub, который сразу выдаёт токен.
- * @param {Partial<GithubDeviceAuth>} patch Методы, которые нужно заменить.
- * @returns {GithubDeviceAuth} Заглушка GitHub.
+ * GitHub that issues a token right away.
+ * @param {Partial<GithubDeviceAuth>} patch Methods to replace.
+ * @returns {GithubDeviceAuth} GitHub stub.
  */
 export function fakeGithub(patch: Partial<GithubDeviceAuth> = {}): GithubDeviceAuth {
   return {
@@ -103,9 +103,9 @@ export function fakeGithub(patch: Partial<GithubDeviceAuth> = {}): GithubDeviceA
 }
 
 /**
- * Зависимости команд публикации без сети и диска.
- * @param {Partial<Sharing>} patch Поля, которые нужно заменить.
- * @returns {Sharing} Заглушки: вход выполнен, паузы мгновенные.
+ * Sharing command dependencies without network or disk.
+ * @param {Partial<Sharing>} patch Fields to replace.
+ * @returns {Sharing} Stubs: logged in, pauses are instant.
  */
 export function fakeSharing(patch: Partial<Sharing> = {}): Sharing {
   return {
@@ -119,9 +119,9 @@ export function fakeSharing(patch: Partial<Sharing> = {}): Sharing {
 }
 
 /**
- * Сессия для тестов.
- * @param {string} id Идентификатор записи.
- * @returns {SessionRecord} Сессия из начала и конца сборки.
+ * A session for tests.
+ * @param {string} id Recording id.
+ * @returns {SessionRecord} A session of the build's start and end.
  */
 export function validSession(id = "2026-10-07-demo"): SessionRecord {
   return {
@@ -145,8 +145,8 @@ export function validSession(id = "2026-10-07-demo"): SessionRecord {
 }
 
 /**
- * Временный проект с журналом в `journal/`; удаляется после теста.
- * @returns {Promise<string>} Корень проекта.
+ * A temporary project with the journal in `journal/`; removed after the test.
+ * @returns {Promise<string>} Project root.
  */
 export async function temporaryProject(): Promise<string> {
   const root = await mkdtemp(path.join(tmpdir(), "cyberzavod-share-"));
@@ -166,11 +166,11 @@ export async function temporaryProject(): Promise<string> {
 }
 
 /**
- * Кладёт файл записи сессии в журнал временного проекта.
- * @param {string} root Корень проекта.
- * @param {string} id Имя файла без расширения.
- * @param {string} text Содержимое файла.
- * @returns {Promise<void>} Готово, когда файл записан.
+ * Puts a session recording file into the temporary project's journal.
+ * @param {string} root Project root.
+ * @param {string} id File name without extension.
+ * @param {string} text File contents.
+ * @returns {Promise<void>} Done when the file is written.
  */
 export async function writeSessionFile(root: string, id: string, text: string): Promise<void> {
   const directory = path.join(root, "journal", "sessions");
@@ -180,8 +180,8 @@ export async function writeSessionFile(root: string, id: string, text: string): 
 }
 
 /**
- * Подавляет вывод `console.log` на время каждого теста группы; вызывать внутри `describe`.
- * @returns {() => string} Функция, которая возвращает всё напечатанное в тесте.
+ * Suppresses `console.log` output during each test of the group; call inside `describe`.
+ * @returns {() => string} A function that returns everything printed in the test.
  */
 export function captureOutput(): () => string {
   beforeEach(() => {

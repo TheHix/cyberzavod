@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Точка входа CLI. Через `pnpm cyberzavod` pnpm запускает скрипт из корня установки, поэтому
-// каталог вызова берётся из INIT_CWD, который pnpm и npm ставят в каталог, откуда их запустили.
+// CLI entry point. Through `pnpm cyberzavod` pnpm runs the script from the install root, so the
+// calling directory comes from INIT_CWD, which pnpm and npm set to the directory they were run
+// from.
 
 import { runCli } from "../cli.ts";
 

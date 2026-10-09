@@ -1,11 +1,11 @@
-// Формат пиксельного рисунка: массив строк, буква — краска. Чистый код без Pixi: строки
-// превращаются в цвета здесь, а в текстуру — в textures.ts.
+// Pixel sprite format: an array of strings, a letter is an ink. Pure code without Pixi: strings
+// turn into colors here, and into a texture in textures.ts.
 
 import { shade } from "@/shared/lib/color.ts";
 import { PLAQUE_PAPER_SHADE } from "@/shared/lib/pixel-plaque.ts";
 import type { Palette } from "./palette.ts";
 
-/** Смысловая краска рисунка: какой токен и какая ступень `shade()` лежат за буквой. */
+/** Semantic ink of a sprite: which token and which `shade()` step stand behind a letter. */
 export type Ink =
   | "outline"
   | "soft"
@@ -36,13 +36,13 @@ export type Ink =
   | "review"
   | "record";
 
-/** Краски рисунка числами 0xRRGGBB. */
+/** Sprite inks as 0xRRGGBB numbers. */
 export type Inks = Readonly<Record<Ink, number>>;
 
-/** Рисунок: строки одной длины, каждая буква — краска по `ART_LEGEND`. */
+/** A sprite: strings of equal length, each letter is an ink per `ART_LEGEND`. */
 export type SpriteArt = readonly string[];
 
-/** Буква рисунка и её краска; `null` — прозрачный пиксель. */
+/** A sprite letter and its ink; `null` is a transparent pixel. */
 export const ART_LEGEND: Readonly<Record<string, Ink | null>> = {
   ".": null,
   k: "outline",
@@ -75,14 +75,14 @@ export const ART_LEGEND: Readonly<Record<string, Ink | null>> = {
   "5": "record",
 };
 
-/** Готовая картинка: пиксели RGBA подряд, строка за строкой. */
+/** A ready image: RGBA pixels in a row, line after line. */
 export interface PixelImage {
   readonly width: number;
   readonly height: number;
   readonly pixels: Uint8ClampedArray<ArrayBuffer>;
 }
 
-/** Размер рисунка в пикселях. */
+/** Sprite size in pixels. */
 export interface ArtSize {
   readonly width: number;
   readonly height: number;
@@ -93,7 +93,7 @@ const OPAQUE = 255;
 const CHANNEL_MASK = 0xff;
 const RED_SHIFT = 16;
 const GREEN_SHIFT = 8;
-// Ступени объёма: тёмная грань и блик — от одной краски, чтобы вещь читалась одним цветом.
+// Volume steps: the dark face and the highlight come from one ink, so a thing reads as one color.
 const SHADE_DEEP = -0.3;
 const SHADE_LIGHT = 0.4;
 const SHADE_HELMET = -0.25;
@@ -101,27 +101,27 @@ const SHADE_HELMET_LIGHT = 0.45;
 const SHADE_WOOD_LIGHT = 0.35;
 
 /**
- * Тёмная ступень краски: грань в тени.
- * @param {number} color Краска 0xRRGGBB.
- * @returns {number} Краска темнее.
+ * Dark step of an ink: a face in shadow.
+ * @param {number} color Ink 0xRRGGBB.
+ * @returns {number} A darker ink.
  */
 export function darker(color: number): number {
   return shade(color, SHADE_DEEP);
 }
 
 /**
- * Светлая ступень краски: блик.
- * @param {number} color Краска 0xRRGGBB.
- * @returns {number} Краска светлее.
+ * Light step of an ink: a highlight.
+ * @param {number} color Ink 0xRRGGBB.
+ * @returns {number} A lighter ink.
  */
 export function lighter(color: number): number {
   return shade(color, SHADE_LIGHT);
 }
 
 /**
- * Краски каски одного цвета: сама каска, её тень и блик.
- * @param {number} color Цвет каски 0xRRGGBB.
- * @returns {Pick<Inks, "helmet" | "helmetShade" | "helmetLight">} Краски каски.
+ * Helmet inks of one color: the helmet itself, its shade and highlight.
+ * @param {number} color Helmet color 0xRRGGBB.
+ * @returns {Pick<Inks, "helmet" | "helmetShade" | "helmetLight">} Helmet inks.
  */
 export function helmetInks(color: number): Pick<Inks, "helmet" | "helmetShade" | "helmetLight"> {
   return {
@@ -132,10 +132,10 @@ export function helmetInks(color: number): Pick<Inks, "helmet" | "helmetShade" |
 }
 
 /**
- * Краски по умолчанию из палитры цеха. Станок и рабочий подменяют свои: `body*` — цвет корпуса,
- * `uniform*` — форма, `helmet*` — каска.
- * @param {Palette} palette Краски цеха.
- * @returns {Inks} Все краски рисунков.
+ * Default inks from the factory palette. A machine and a worker override their own: `body*` is the
+ * casing color, `uniform*` the uniform, `helmet*` the helmet.
+ * @param {Palette} palette Factory inks.
+ * @returns {Inks} All sprite inks.
  */
 export function paletteInks(palette: Palette): Inks {
   return {
@@ -165,20 +165,21 @@ export function paletteInks(palette: Palette): Inks {
 }
 
 /**
- * Размер рисунка.
- * @param {SpriteArt} art Рисунок строками.
- * @returns {ArtSize} Ширина — по первой строке, высота — число строк.
+ * Sprite size.
+ * @param {SpriteArt} art Sprite as strings.
+ * @returns {ArtSize} Width from the first string, height as the number of strings.
  */
 export function artSize(art: SpriteArt): ArtSize {
   return { width: art[0]?.length ?? 0, height: art.length };
 }
 
 /**
- * Красит рисунок: каждая буква становится пикселем своей краски, точка — прозрачным.
- * @param {SpriteArt} art Рисунок строками.
- * @param {Inks} inks Краски по смыслу.
- * @returns {PixelImage} Картинка RGBA.
- * @throws {Error} Если рисунок пуст, строки разной длины или встретилась неизвестная буква.
+ * Paints a sprite: each letter becomes a pixel of its ink, a dot becomes transparent.
+ * @param {SpriteArt} art Sprite as strings.
+ * @param {Inks} inks Inks by meaning.
+ * @returns {PixelImage} RGBA image.
+ * @throws {Error} If the sprite is empty, the strings differ in length, or an unknown letter
+ *   occurs.
  */
 export function paintArt(art: SpriteArt, inks: Inks): PixelImage {
   const { width, height } = artSize(art);
@@ -225,23 +226,23 @@ function setPixel(pixels: Uint8ClampedArray, at: number, color: number): void {
 }
 
 /**
- * Прозрачная картинка заданного размера: основа для плиток и площадок, которые рисуются кодом.
- * @param {number} width Ширина, пиксели.
- * @param {number} height Высота, пиксели.
- * @returns {PixelImage} Картинка без единого закрашенного пикселя.
+ * A transparent image of the given size: the base for tiles and pads drawn by code.
+ * @param {number} width Width, pixels.
+ * @param {number} height Height, pixels.
+ * @returns {PixelImage} An image without a single painted pixel.
  */
 export function blankImage(width: number, height: number): PixelImage {
   return { width, height, pixels: new Uint8ClampedArray(width * height * BYTES_PER_PIXEL) };
 }
 
 /**
- * Закрашивает прямоугольник одной краской; часть за краем картинки отбрасывается.
- * @param {PixelImage} image Картинка, которая меняется на месте.
- * @param {number} left Левый край прямоугольника, пиксели.
- * @param {number} top Верхний край прямоугольника, пиксели.
- * @param {number} width Ширина прямоугольника, пиксели.
- * @param {number} height Высота прямоугольника, пиксели.
- * @param {number} color Краска 0xRRGGBB.
+ * Fills a rectangle with one ink; the part beyond the image edge is discarded.
+ * @param {PixelImage} image Image changed in place.
+ * @param {number} left Left edge of the rectangle, pixels.
+ * @param {number} top Top edge of the rectangle, pixels.
+ * @param {number} width Rectangle width, pixels.
+ * @param {number} height Rectangle height, pixels.
+ * @param {number} color Ink 0xRRGGBB.
  */
 export function fillRect(
   image: PixelImage,
@@ -262,10 +263,10 @@ export function fillRect(
 }
 
 /**
- * Делает пиксель прозрачным: так срезаются углы плиток и площадок.
- * @param {PixelImage} image Картинка, которая меняется на месте.
- * @param {number} column Столбец пикселя.
- * @param {number} row Строка пикселя.
+ * Makes a pixel transparent: this is how the corners of tiles and pads are cut.
+ * @param {PixelImage} image Image changed in place.
+ * @param {number} column Pixel column.
+ * @param {number} row Pixel row.
  */
 export function clearPixel(image: PixelImage, column: number, row: number): void {
   const at = (row * image.width + column) * BYTES_PER_PIXEL;

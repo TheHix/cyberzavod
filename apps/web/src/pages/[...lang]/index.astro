@@ -23,7 +23,7 @@ interface Props {
 }
 
 const { locale } = Astro.props;
-// Серия по кругу: сборки проекта по порядку задач, затем сборки следующего проекта.
+// Series on a loop: a project's builds in task order, then the next project's builds.
 const seriesBuilds = projectSeriesOf(publishedRecordings).flatMap(({ projectId, recordings }) => {
   const project = projectOf(publishedProjects, projectId);
 

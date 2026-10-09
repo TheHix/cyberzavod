@@ -1,5 +1,5 @@
 // @ts-check
-// Правила стиля, которые можно проверить автоматически, — здесь, а не только в CLAUDE.md.
+// Style rules that can be checked automatically live here, not only in CLAUDE.md.
 
 import { defineConfig } from "eslint/config";
 import js from "@eslint/js";
@@ -12,14 +12,14 @@ import prettier from "eslint-config-prettier";
 import globals from "globals";
 import stylistic from "@stylistic/eslint-plugin";
 
-// Тестовые файлы: для них — правила Vitest, для остального кода — обязательный JSDoc.
+// Test files get the Vitest rules; the rest of the code gets mandatory JSDoc.
 const TEST_FILES = ["**/*.{test,spec}.{ts,tsx}"];
 
-// Вложенность блоков в функции — не глубже двух уровней: глубже — ранний выход или функция.
+// Block nesting in a function is at most two levels: deeper means an early exit or a function.
 const MAX_BLOCK_DEPTH = 2;
 
-// Пустая строка разделяет смысловые блоки: объявления — от действий, многострочный блок —
-// от соседей, ранний выход — от основного пути, итог — от того, что к нему привело.
+// A blank line separates blocks of meaning: declarations from actions, a multiline block
+// from its neighbours, an early exit from the main path, the result from what led to it.
 /** @type {{ blankLine: "always" | "any" | "never", prev: string | string[], next: string | string[] }[]} */
 const PADDING_LINES = [
   { blankLine: "always", prev: ["const", "let"], next: "*" },
@@ -44,24 +44,24 @@ export default defineConfig(
     ...solid,
     languageOptions: { ...solid.languageOptions, globals: globals.browser },
   },
-  // Код сайта работает в браузере: DOM-типы нужны и в .ts — например, для JSDoc.
+  // Site code runs in the browser: DOM types are needed in .ts too, for example for JSDoc.
   { files: ["apps/web/src/**/*.ts"], languageOptions: { globals: globals.browser } },
   astro.configs.recommended,
   {
     files: ["**/*.{ts,tsx}"],
     ignores: [...TEST_FILES, "**/*.config.ts"],
-    // Классический JSDoc с типами у @param и @returns — решение по стилю проекта.
+    // Classic JSDoc with types on @param and @returns is a project style decision.
     extends: [jsdoc.configs["flat/recommended-error"]],
     settings: { jsdoc: { mode: "typescript" } },
     rules: {
       "jsdoc/require-param-type": "error",
       "jsdoc/require-returns-type": "error",
-      // publicOnly: только то, что видно из других модулей, в любой форме экспорта.
+      // publicOnly: only what is visible from other modules, in any form of export.
       "jsdoc/require-jsdoc": [
         "error",
         {
           publicOnly: true,
-          // Пустые заготовки /** */ от --fix только прячут, что описания нет.
+          // Empty /** */ stubs from --fix only hide that there is no description.
           enableFixer: false,
           require: {
             FunctionDeclaration: true,
@@ -95,10 +95,10 @@ export default defineConfig(
   {
     plugins: { "@stylistic": stylistic },
     rules: {
-      // После eslint-config-prettier: он выключает curly, а тело условия на отдельной строке
-      // без скобок легко сломать при правке.
+      // After eslint-config-prettier: it turns off curly, and a condition body on a separate line
+      // without braces is easy to break when editing.
       curly: ["error", "multi-line"],
-      // Принцип «Читаемость кода»: то, что проверяется автоматически.
+      // The "Code readability" principle: what is checked automatically.
       "no-nested-ternary": "error",
       "max-depth": ["error", MAX_BLOCK_DEPTH],
       "prefer-const": "error",

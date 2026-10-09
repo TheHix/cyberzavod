@@ -1,4 +1,5 @@
-/* minmax(0, …): иначе колонка не уже строки Markdown, и панель прокручивается вбок. */
+/* minmax(0, …): otherwise the column is no narrower than the Markdown line, and the panel
+   scrolls sideways. */
 .badge {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

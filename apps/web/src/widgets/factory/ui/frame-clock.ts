@@ -1,16 +1,16 @@
-// Часы цеха: шаг модели на каждый кадр браузера, пока сцена идёт, цех на экране и вкладка
-// открыта. В остальное время requestAnimationFrame не крутится вовсе.
+// The factory clock: a model step on every browser frame while the scene runs, the floor is on
+// screen and the tab is open. The rest of the time requestAnimationFrame does not run at all.
 
 import type { FactoryModel } from "../model/factory.ts";
 
-// После фоновой вкладки или подвисания кадр приходит с большим разрывом — сцена не прыгает.
+// After a background tab or a freeze a frame arrives with a large gap, and the scene does not jump.
 const MAX_FRAME_MS = 100;
 
 /**
- * Запускает часы цеха.
- * @param {FactoryModel} model Модель, которую двигают часы.
- * @param {HTMLElement} container Элемент цеха: пока он не на экране, часы стоят.
- * @returns {() => void} Останавливает часы и отписывается от браузера.
+ * Starts the factory clock.
+ * @param {FactoryModel} model The model the clock moves.
+ * @param {HTMLElement} container The factory element: while it is off screen, the clock stands.
+ * @returns {() => void} Stops the clock and unsubscribes from the browser.
  */
 export function startFrameClock(model: FactoryModel, container: HTMLElement): () => void {
   let frameId = 0;
@@ -24,7 +24,8 @@ export function startFrameClock(model: FactoryModel, container: HTMLElement): ()
     const elapsed = Math.min(MAX_FRAME_MS, Math.max(0, now - lastTime));
 
     lastTime = now;
-    // Пока идёт шаг, frameId ещё не ноль — подписка на $playing не запустит второй цикл.
+    // While a step runs, frameId is not zero yet, so the $playing subscription will not start a
+    // second loop.
     model.advance(elapsed);
     frameId = isRunning() ? requestAnimationFrame(tick) : 0;
   };

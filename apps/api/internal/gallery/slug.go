@@ -11,8 +11,8 @@ const (
 	slugLength   = 12
 )
 
-// NewSlug выдаёт случайную секретную ссылку на запись: slugLength символов [a-z0-9]
-// из криптографического генератора, чтобы ссылку нельзя было подобрать.
+// NewSlug issues a random secret link to a recording: slugLength characters [a-z0-9]
+// from a cryptographic generator, so the link cannot be guessed.
 func NewSlug() (string, error) {
 	alphabetSize := big.NewInt(int64(len(slugAlphabet)))
 	slug := make([]byte, slugLength)

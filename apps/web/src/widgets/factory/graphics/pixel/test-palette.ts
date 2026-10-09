@@ -1,6 +1,6 @@
 import { readPalette, type Palette } from "./palette.ts";
 
-// Каждому токену — свой цвет, чтобы тест видел, откуда взята краска пикселя.
+// Each token gets its own color, so the test sees where a pixel's ink came from.
 const TOKEN_NAMES = [
   "--ink",
   "--ink-soft",
@@ -30,8 +30,8 @@ const TOKEN_NAMES = [
 ];
 
 /**
- * Палитра для тестов графики: у каждого токена свой цвет.
- * @returns {Palette} Краски цеха.
+ * Palette for graphics tests: each token has its own color.
+ * @returns {Palette} Factory inks.
  */
 export function testPalette(): Palette {
   const values = new Map(

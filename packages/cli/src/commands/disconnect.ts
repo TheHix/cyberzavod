@@ -1,6 +1,6 @@
-// `cyberzavod disconnect`: убирает Cyberzavod из проекта — только то, что он сам записал.
-// Сначала показывает план и спрашивает «Продолжить?»; код, AGENTS.md, журнал, свои настройки
-// и хуки человека остаются.
+// `cyberzavod disconnect`: removes Cyberzavod from the project, only what it wrote itself.
+// First shows the plan and asks "Continue?"; the code, AGENTS.md, the journal, the human's own
+// settings and hooks stay.
 
 import { rm } from "node:fs/promises";
 import path from "node:path";
@@ -16,14 +16,14 @@ import { requireProjectAt, type ProjectAt } from "./project.ts";
 
 const LIST_INDENT = "  ";
 
-/** Что нужно отключению: подтверждение и тексты. */
+/** What disconnecting needs: confirmation and texts. */
 export interface DisconnectCommandOptions {
-  /** Спрашивает «Продолжить?», соглашается без вопроса или отказывает. */
+  /** Asks "Continue?", agrees without asking, or refuses. */
   confirm: Confirmation;
   messages: CliMessages;
 }
 
-/** Итог отключения: всё убрано или человек отказался и ничего не изменилось. */
+/** Disconnect outcome: everything removed, or the human refused and nothing changed. */
 export type DisconnectOutcome = "removed" | "cancelled";
 
 function slashed(file: string): string {
@@ -77,14 +77,14 @@ function printList(title: string, lines: readonly string[]): void {
 }
 
 /**
- * Убирает Cyberzavod из проекта после согласия человека: файлы агента и их манифест, свои хуки и
- * запреты в настройках Claude Code, конфиг проекта. Код, AGENTS.md, журнал, строка `.gitignore`
- * для сырых журналов и всё чужое в настройках остаются.
- * @param {string} directory Каталог внутри проекта.
- * @param {DisconnectCommandOptions} options Подтверждение и тексты.
- * @returns {Promise<DisconnectOutcome>} Убрано или отменено.
- * @throws {Error} Если каталог не в проекте.
- * @throws {Error} Если настройки не разобраны: тогда ничего не изменено.
+ * Removes Cyberzavod from the project after the human agrees: agent files and their manifest, its
+ * hooks and denials in the Claude Code settings, the project config. The code, AGENTS.md, the
+ * journal, the `.gitignore` line for raw logs and everything else in the settings stay.
+ * @param {string} directory Directory inside the project.
+ * @param {DisconnectCommandOptions} options Confirmation and texts.
+ * @returns {Promise<DisconnectOutcome>} Removed or cancelled.
+ * @throws {Error} If the directory is not in a project.
+ * @throws {Error} If the settings do not parse: then nothing is changed.
  */
 export async function disconnectProject(
   directory: string,

@@ -12,26 +12,32 @@ import { SpeechDock } from "./SpeechDock.tsx";
 import styles from "./Hud.module.css";
 
 interface Props {
-  /** Проект, который собирали: он стоит рядом с датой. */
+  /** The project that was built: it stands next to the date. */
   project: BuildProject;
-  /** Пометка о языке оригинала записи рядом с датой; нет, если запись на языке страницы. */
+  /**
+   * Note about the recording's original language next to the date; absent if the recording is in
+   * the page language.
+   */
   languageNote: string | undefined;
-  /** Место сборки в серии её проекта рядом с проектом; нет у одиночной записи. */
+  /**
+   * Place of the build in its project's series next to the project; absent for a single recording.
+   */
   position: SeriesPosition | undefined;
-  /** Уровень заголовка: на странице записи это главный заголовок, на главной — нет. */
+  /** Heading level: on the recording page it is the main heading, on the home page it is not. */
   titleLevel: "h1" | "h2";
 }
 
 /**
- * HUD цеха: какая сборка идёт, к какому она проекту, её итоги и управление проигрыванием. Запись
- * и итоги берёт из модели цеха: в серии они меняются вместе со сборкой. На широком экране он
- * справа, на узком и низком — под полем, и в нём вместо пузырей над станками полка речи.
- * @param {Props} props Свойства компонента.
- * @param {BuildProject} props.project Проект, который собирали.
- * @param {string | undefined} props.languageNote Пометка о языке оригинала записи.
- * @param {SeriesPosition | undefined} props.position Место сборки в серии её проекта.
- * @param {"h1" | "h2"} props.titleLevel Уровень заголовка с названием сборки.
- * @returns {JSX.Element} Панель сборки.
+ * Factory HUD: which build is running, which project it belongs to, its totals and playback
+ * controls. Takes the recording and totals from the factory model: in a series they change with
+ * the build. On a wide screen it is on the right, on a narrow and short one under the field, and
+ * there it has the speech shelf instead of bubbles above the machines.
+ * @param {Props} props Component props.
+ * @param {BuildProject} props.project The project that was built.
+ * @param {string | undefined} props.languageNote Note about the recording's original language.
+ * @param {SeriesPosition | undefined} props.position Place of the build in its project's series.
+ * @param {"h1" | "h2"} props.titleLevel Level of the heading with the build name.
+ * @returns {JSX.Element} Build panel.
  */
 export function Hud(props: Props): JSX.Element {
   const model = useFactoryModel();
@@ -45,14 +51,15 @@ export function Hud(props: Props): JSX.Element {
     { label: UI_TEXT.hud.reworks[locale], value: String(summary().reworks) },
     { label: UI_TEXT.hud.interventions[locale], value: String(summary().interventions) },
   ];
-  // В серии номер сборки считают с единицы, как задачи проекта.
+  // In a series the build number counts from one, like the project's tasks.
   const positionLabel = (position: SeriesPosition) => {
     const buildNumber = position.index + 1;
 
     return UI_TEXT.series.buildOf[locale](buildNumber, position.count);
   };
-  // Подписи после проекта: место сборки в серии, день и язык записи. В серии они меняются вместе
-  // со сборкой, поэтому строятся заново из пропсов и записи модели.
+  // Captions after the project: the build's place in the series, the day and the recording
+  // language. In a series they change with the build, so they are rebuilt from the props and the
+  // model's recording.
   const captionParts = () => {
     const position = props.position === undefined ? undefined : positionLabel(props.position);
     const date = formatDate(recording().timestamp, locale);

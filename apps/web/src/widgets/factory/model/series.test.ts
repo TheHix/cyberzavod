@@ -3,7 +3,7 @@ import type { BriefSessionRecord } from "@cyberzavod/core";
 import type { SeriesBuild } from "../lib/series-builds.ts";
 import { createFactorySeries, type FactorySeries } from "./series.ts";
 
-// Сборка на две минуты: постановка, потом код.
+// A two-minute build: plan, then code.
 function recordingOf(id: string): BriefSessionRecord {
   return {
     version: 1,
@@ -36,7 +36,7 @@ function buildsOf(ids: readonly string[]): SeriesBuild[] {
 
 const stops: (() => void)[] = [];
 
-// Серия, которая следит за цехом; слежка снимается после теста.
+// A series that follows the floor; following is removed after the test.
 function followedSeries(ids: readonly string[]): FactorySeries {
   const series = createFactorySeries(buildsOf(ids));
 

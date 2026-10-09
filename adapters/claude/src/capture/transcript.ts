@@ -1,8 +1,8 @@
-// Токены, модели и тексты по транскрипту Claude Code (JSONL). Формат транскрипта внутренний
-// и может меняться, поэтому разбор терпимый: непонятные строки пропускаются.
+// Tokens, models and texts from a Claude Code transcript (JSONL). The transcript format is internal
+// and may change, so parsing is lenient: lines it does not understand are skipped.
 //
-// Считаются входные, выходные и записанные в кеш токены. Чтения из кеша не считаются:
-// это один и тот же контекст, перечитанный на каждом шаге, и они раздули бы счётчик в разы.
+// Input, output and cache-write tokens are counted. Cache reads are not counted:
+// it is the same context reread at every step, and they would inflate the counter many times over.
 
 interface Usage {
   input_tokens?: number;
@@ -10,13 +10,14 @@ interface Usage {
   cache_creation_input_tokens?: number;
 }
 
-/** Ответ модели в транскрипте: когда и какая модель ответила. */
+/** A model reply in the transcript: when it came and which model replied. */
 export interface ModelReply {
   ts: number;
   model: string;
 }
 
-// Служебные ответы Claude Code (например, о лимите сессии) помечены моделью `<synthetic>`.
+// Claude Code service replies (for example, about the session limit) are marked with the
+// `<synthetic>` model.
 const SERVICE_MODEL_PREFIX = "<";
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -76,14 +77,14 @@ function tokensOf(usage: Usage): number {
   );
 }
 
-/** Токены одного сообщения модели и время, когда оно закончилось. */
+/** Tokens of one model message and the time it finished. */
 export interface TokenUsage {
   ts: number;
   tokens: number;
 }
 
-// Одно сообщение модели встречается в транскрипте несколько раз (по частям ответа) —
-// учитывается последний вариант для каждого id, а время берётся у последней части с временем.
+// One model message appears in the transcript several times (in parts of the reply):
+// the last variant for each id counts, and the time is taken from the last part that has one.
 function messageUsages(transcript: string): { ts?: number; tokens: number }[] {
   const byMessage = new Map<string, { ts?: number; usage: Usage }>();
 
@@ -104,20 +105,20 @@ function messageUsages(transcript: string): { ts?: number; tokens: number }[] {
 }
 
 /**
- * Считает токены по транскрипту сессии Claude Code.
- * @param {string} transcript Содержимое транскрипта в формате JSONL.
- * @returns {number} Сумма входных, выходных и записанных в кеш токенов.
+ * Counts tokens from a Claude Code session transcript.
+ * @param {string} transcript Transcript contents in JSONL format.
+ * @returns {number} Sum of input, output and cache-write tokens.
  */
 export function countTokens(transcript: string): number {
   return messageUsages(transcript).reduce((total, { tokens }) => total + tokens, 0);
 }
 
 /**
- * Раскладывает токены транскрипта по сообщениям модели: по ним токены основной сессии
- * делятся между сборками.
- * @param {string} transcript Содержимое транскрипта в формате JSONL.
- * @returns {TokenUsage[]} Токены каждого сообщения по тем же правилам, что у `countTokens`,
- *   от ранних к поздним; сообщения без времени пропускаются.
+ * Splits transcript tokens by model message: main session tokens are divided between builds
+ * by them.
+ * @param {string} transcript Transcript contents in JSONL format.
+ * @returns {TokenUsage[]} Tokens of each message by the same rules as `countTokens`,
+ *   from earliest to latest; messages without a time are skipped.
  */
 export function tokenUsages(transcript: string): TokenUsage[] {
   return messageUsages(transcript)
@@ -126,9 +127,9 @@ export function tokenUsages(transcript: string): TokenUsage[] {
 }
 
 /**
- * Собирает ответы моделей из транскрипта по времени: по ним видно, какая модель получила промпт.
- * @param {string} transcript Содержимое транскрипта в формате JSONL.
- * @returns {ModelReply[]} Ответы моделей от ранних к поздним, без служебных.
+ * Collects model replies from the transcript by time: they show which model received a prompt.
+ * @param {string} transcript Transcript contents in JSONL format.
+ * @returns {ModelReply[]} Model replies from earliest to latest, without service ones.
  */
 export function modelReplies(transcript: string): ModelReply[] {
   return transcript
@@ -138,39 +139,39 @@ export function modelReplies(transcript: string): ModelReply[] {
     .sort((a, b) => a.ts - b.ts);
 }
 
-/** Текст модели в транскрипте: когда он сказан и что в нём. */
+/** Model text in the transcript: when it was said and what it says. */
 export interface TranscriptText {
   ts: number;
   text: string;
 }
 
-/** Задание сабагенту, выданное сессией: новому запуском (`spawn`) или сообщением (`message`). */
+/** A task the session gave a subagent: to a new run (`spawn`) or by a message (`message`). */
 export type AgentAssignment = { ts: number; text: string } & (
   { via: "spawn"; agentType: string; agentId?: string } | { via: "message"; agentId: string }
 );
 
-/** Отчёт запуска сабагента: что он сдал сессии, когда и кто это был. */
+/** A subagent run's report: what it handed back to the session, when, and who it was. */
 export interface AgentReport {
   ts: number;
   agentId: string;
   text: string;
 }
 
-/** Запись транскрипта, у которой есть сообщение и время. */
+/** A transcript entry that has a message and a time. */
 interface Entry {
   uuid?: string;
   role: "user" | "assistant";
   ts: number;
   message: Record<string, unknown>;
   agentId?: string;
-  /** Результат инструмента: у `Agent` в нём лежит `agentId` запущенного сабагента. */
+  /** Tool result: for `Agent` it holds the `agentId` of the launched subagent. */
   toolUseResult?: Record<string, unknown>;
 }
 
 const PARAGRAPH_SEPARATOR = "\n\n";
 const ASSISTANT_ROLE = "assistant";
 const USER_ROLE = "user";
-// Начала сообщений среды в роли user: это не новое задание, а служебная вставка.
+// Openings of environment messages in the user role: not a new task but a service insertion.
 const SERVICE_ENTRY_PREFIXES: readonly string[] = ["<system-reminder>", "[SYSTEM NOTIFICATION"];
 const AGENT_TOOL = "Agent";
 const SEND_MESSAGE_TOOL = "SendMessage";
@@ -199,7 +200,7 @@ function entryOfLine(line: string): Entry | null {
   };
 }
 
-// Записи по порядку строк; одна и та же запись (по uuid) может попасть в файл дважды.
+// Entries in line order; the same entry (by uuid) may land in the file twice.
 function entriesOf(transcript: string): Entry[] {
   const seen = new Set<string>();
   const entries: Entry[] = [];
@@ -248,8 +249,8 @@ function textPartsOf(entry: Entry): TranscriptText[] {
   return parts;
 }
 
-// Текстовые блоки одного ответа модели приходят отдельными записями с общим message.id:
-// ответ — это все его тексты подряд, а время — время последнего из них.
+// Text blocks of one model reply come as separate entries with a shared message.id:
+// the reply is all its texts in a row, and its time is the time of the last of them.
 function textsOfEntries(entries: readonly Entry[]): TranscriptText[] {
   const byMessage = new Map<string, TranscriptText[]>();
 
@@ -272,9 +273,9 @@ function textsOfEntries(entries: readonly Entry[]): TranscriptText[] {
 }
 
 /**
- * Собирает тексты ответов модели из транскрипта: итоговые ответы человеку берутся отсюда.
- * @param {string} transcript Содержимое транскрипта в формате JSONL.
- * @returns {TranscriptText[]} Ответы модели от ранних к поздним, без служебных.
+ * Collects model reply texts from the transcript: final replies to the human come from here.
+ * @param {string} transcript Transcript contents in JSONL format.
+ * @returns {TranscriptText[]} Model replies from earliest to latest, without service ones.
  */
 export function assistantTexts(transcript: string): TranscriptText[] {
   return textsOfEntries(entriesOf(transcript)).sort((a, b) => a.ts - b.ts);
@@ -288,8 +289,8 @@ function resultCallIdsOf(entry: Entry): string[] {
   });
 }
 
-// Запущенный сабагент узнаётся по результату вызова `Agent`: запись user с блоком
-// `tool_result` того же `tool_use_id` и `agentId` в `toolUseResult`.
+// A launched subagent is recognized by the result of the `Agent` call: a user entry with a
+// `tool_result` block of the same `tool_use_id` and `agentId` in `toolUseResult`.
 function agentIdsByCall(entries: readonly Entry[]): Map<string, string> {
   const agentIds = new Map<string, string>();
 
@@ -348,10 +349,10 @@ function assignmentOf(
 }
 
 /**
- * Находит задания, которые сессия выдала сабагентам: вызовы `Agent` и `SendMessage`.
- * @param {string} transcript Содержимое транскрипта сессии в формате JSONL.
- * @returns {AgentAssignment[]} Задания от ранних к поздним; у задания новому запуску есть
- *   `agentId`, если в транскрипте нашёлся результат вызова.
+ * Finds tasks the session gave to subagents: `Agent` and `SendMessage` calls.
+ * @param {string} transcript Session transcript contents in JSONL format.
+ * @returns {AgentAssignment[]} Tasks from earliest to latest; a task for a new run has
+ *   `agentId` if the call result was found in the transcript.
  */
 export function agentAssignments(transcript: string): AgentAssignment[] {
   const entries = entriesOf(transcript);
@@ -364,7 +365,7 @@ export function agentAssignments(transcript: string): AgentAssignment[] {
     .sort((a, b) => a.ts - b.ts);
 }
 
-// Запуск сабагента начинается с записи user со строкой — задание или сообщение координатора.
+// A subagent run starts with a user entry holding a string: the task or a coordinator message.
 function startsRun(entry: Entry): boolean {
   if (entry.role !== USER_ROLE) return false;
 
@@ -398,7 +399,7 @@ function handbackOf(entry: Entry): TranscriptText | null {
   return handbacks.at(-1) ?? null;
 }
 
-// Отчёт запуска — последняя сдача работы, а если её не было, последний текст модели.
+// A run's report is the last hand-back of work, or, if there was none, the last model text.
 function reportOfRun(run: readonly Entry[]): TranscriptText | null {
   const handbacks = run.map(handbackOf).filter((handback) => handback !== null);
 
@@ -410,10 +411,10 @@ function reportOfRun(run: readonly Entry[]): TranscriptText | null {
 }
 
 /**
- * Находит отчёты запусков сабагента в его транскрипте: по одному на запуск.
- * @param {string} transcript Содержимое транскрипта сабагента в формате JSONL.
- * @returns {AgentReport[]} Отчёты от ранних к поздним; запуск без отчёта и записи без
- *   `agentId` пропускаются.
+ * Finds the reports of a subagent's runs in its transcript: one per run.
+ * @param {string} transcript Subagent transcript contents in JSONL format.
+ * @returns {AgentReport[]} Reports from earliest to latest; a run without a report and entries
+ *   without `agentId` are skipped.
  */
 export function agentReports(transcript: string): AgentReport[] {
   return runsOf(entriesOf(transcript))

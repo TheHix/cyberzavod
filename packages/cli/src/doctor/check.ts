@@ -1,4 +1,4 @@
-// Общие типы проверок `doctor`: результат, проверка машины и проверка проекта.
+// Shared `doctor` check types: the result, a machine check and a project check.
 
 import type { ClaudeMessages } from "@cyberzavod/adapter-claude";
 import type { ProjectAt } from "../commands/project.ts";
@@ -6,12 +6,13 @@ import type { Installation } from "../installation/installation.ts";
 import type { CliMessages } from "../messages/cli-messages.ts";
 import type { CredentialsStore } from "../sharing/settings.ts";
 
-/** Разделитель элементов списка в строках проверок. */
+/** Separator of list elements in check lines. */
 export const LIST_SEPARATOR = ", ";
 
 /**
- * Итог одной проверки: прошла (`passed`), не прошла и есть как починить (`failed`) или не ошибка,
- * но человеку стоит знать (`notice`). Код выхода `doctor` зависит только от `failed`.
+ * Outcome of one check: passed (`passed`), failed with a way to fix it (`failed`), or not an
+ * error but worth the human's attention (`notice`). The `doctor` exit code depends only on
+ * `failed`.
  */
 export type CheckResult =
   | { status: "passed"; summary: string }
@@ -19,73 +20,76 @@ export type CheckResult =
   | { status: "notice"; summary: string; hint: string };
 
 /**
- * Проверка прошла.
- * @param {string} summary Что найдено.
- * @returns {CheckResult} Результат `passed`.
+ * The check passed.
+ * @param {string} summary What was found.
+ * @returns {CheckResult} A `passed` result.
  */
 export function passed(summary: string): CheckResult {
   return { status: "passed", summary };
 }
 
 /**
- * Проверка не прошла.
- * @param {{ problem: string; fix: string }} failure Что не так и что сделать.
- * @param {string} failure.problem Что не так.
- * @param {string} failure.fix Одно действие, которое чинит.
- * @returns {CheckResult} Результат `failed`.
+ * The check failed.
+ * @param {{ problem: string; fix: string }} failure What is wrong and what to do.
+ * @param {string} failure.problem What is wrong.
+ * @param {string} failure.fix One action that fixes it.
+ * @returns {CheckResult} A `failed` result.
  */
 export function failed(failure: { problem: string; fix: string }): CheckResult {
   return { status: "failed", ...failure };
 }
 
 /**
- * Пункт, который не ошибка, но о котором человеку стоит знать.
- * @param {{ summary: string; hint: string }} content Что найдено и подсказка.
- * @param {string} content.summary Что найдено.
- * @param {string} content.hint Что можно сделать.
- * @returns {CheckResult} Результат `notice`.
+ * An item that is not an error but is worth the human's attention.
+ * @param {{ summary: string; hint: string }} content What was found and a hint.
+ * @param {string} content.summary What was found.
+ * @param {string} content.hint What can be done.
+ * @returns {CheckResult} A `notice` result.
  */
 export function notice(content: { summary: string; hint: string }): CheckResult {
   return { status: "notice", ...content };
 }
 
-/** Что `doctor` знает о машине, не заглядывая в проект. */
+/** What `doctor` knows about the machine without looking into the project. */
 export interface Machine {
-  /** Версия Node, на которой запущен CLI, как в `process.versions.node`. */
+  /** Node version the CLI runs on, as in `process.versions.node`. */
   nodeVersion: string;
-  /** Где лежит токен галереи. */
+  /** Where the gallery token is stored. */
   credentials: CredentialsStore;
-  /** Есть ли программа в `PATH`, без запуска. */
+  /** Whether the program is in `PATH`, without running it. */
   isProgramAvailable(name: string): Promise<boolean>;
 }
 
-/** Результат запуска команды проверки: код выхода или причина, по которой она не стартовала. */
+/** Result of running a check command: the exit code or the reason it did not start. */
 export type CommandRun = { kind: "exited"; code: number } | { kind: "notStarted"; reason: string };
 
-/** Запускает команду оболочкой системы в корне проекта. */
+/** Runs a command with the system shell in the project root. */
 export type CommandRunner = (command: string, root: string) => CommandRun;
 
-/** Всё, что нужно проверкам проекта: сам проект, версия CLI, тексты и работа с программами. */
+/** Everything project checks need: the project itself, CLI version, texts and program access. */
 export interface ProjectContext {
   project: ProjectAt;
   installation: Installation;
   messages: CliMessages;
   claudeMessages: ClaudeMessages;
-  /** Есть ли программа: слово с `/` или `\` — файл от `root`, иначе поиск в `PATH`. */
+  /**
+   * Whether the program exists: a word with `/` or `\` is a file from `root`, otherwise a `PATH`
+   * lookup.
+   */
   isProgramAvailable(word: string, root: string): Promise<boolean>;
   runCommand: CommandRunner;
 }
 
-/** Проверка машины: не зависит от проекта. */
+/** A machine check: does not depend on the project. */
 export interface MachineCheck {
-  /** Код проверки в JSON-выводе: стабилен между версиями. */
+  /** Check code in JSON output: stable across versions. */
   id: string;
   run(machine: Machine, messages: CliMessages): Promise<CheckResult>;
 }
 
-/** Проверка подключённого проекта. */
+/** A check of a connected project. */
 export interface ProjectCheck {
-  /** Код проверки в JSON-выводе: стабилен между версиями. */
+  /** Check code in JSON output: stable across versions. */
   id: string;
   run(context: ProjectContext): Promise<CheckResult>;
 }

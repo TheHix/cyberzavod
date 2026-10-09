@@ -1,15 +1,15 @@
-// Хуки адаптера по именам: их вызывает `cyberzavod hook <имя>`, а настройки Claude Code
-// называют те же имена.
+// Adapter hooks by name: `cyberzavod hook <name>` calls them, and the Claude Code settings use the
+// same names.
 
 import type { HookContext, HookOutcome } from "./hook.ts";
 import { recordEvent } from "./record.ts";
 import { gateStop } from "./stop-gate.ts";
 import { startTurn } from "./turn-start.ts";
 
-/** Имена хуков адаптера. */
+/** Adapter hook names. */
 export const HOOK_NAMES = ["record", "turn-start", "stop"] as const;
 
-/** Имя хука адаптера. */
+/** Adapter hook name. */
 export type HookName = (typeof HOOK_NAMES)[number];
 
 const HOOKS: Readonly<Record<HookName, (context: HookContext) => Promise<HookOutcome>>> = {
@@ -19,19 +19,19 @@ const HOOKS: Readonly<Record<HookName, (context: HookContext) => Promise<HookOut
 };
 
 /**
- * Проверяет, что строка — имя хука адаптера.
- * @param {string} name Имя из командной строки.
- * @returns {boolean} true, если такой хук есть.
+ * Checks that a string is an adapter hook name.
+ * @param {string} name Name from the command line.
+ * @returns {boolean} true if such a hook exists.
  */
 export function isHookName(name: string): name is HookName {
   return (HOOK_NAMES as readonly string[]).includes(name);
 }
 
 /**
- * Выполняет хук адаптера.
- * @param {HookName} name Имя хука.
- * @param {HookContext} context Вызов хука.
- * @returns {Promise<HookOutcome>} Код выхода и вывод хука.
+ * Runs an adapter hook.
+ * @param {HookName} name Hook name.
+ * @param {HookContext} context Hook call.
+ * @returns {Promise<HookOutcome>} Exit code and output of the hook.
  */
 export async function runHook(name: HookName, context: HookContext): Promise<HookOutcome> {
   return HOOKS[name](context);

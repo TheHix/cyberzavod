@@ -1,36 +1,36 @@
-// Общее для хуков Claude Code: что хук получает при вызове и что отдаёт обратно.
+// Shared by Claude Code hooks: what a hook receives when called and what it returns.
 
 import type { ClaudeMessages } from "../messages/claude-messages.ts";
 
 /**
- * Вызов хука: полезная нагрузка события, корень проекта, каталог для состояния между вызовами
- * и тексты на выбранном языке.
+ * Hook call: the event payload, the project root, a directory for state between calls, and texts
+ * in the chosen language.
  */
 export interface HookContext {
-  /** JSON события Claude Code со stdin. */
+  /** Claude Code event JSON from stdin. */
   payload: string;
   projectDirectory: string;
   tmpDir: string;
   messages: ClaudeMessages;
 }
 
-/** Ответ хука Claude Code: код выхода и то, что он печатает в stdout и stderr. */
+/** Claude Code hook result: the exit code and what it prints to stdout and stderr. */
 export interface HookOutcome {
   exitCode: number;
   stdout: string;
   stderr: string;
 }
 
-/** Обычный выход хука: Claude Code продолжает как ни в чём не бывало. */
+/** Normal hook exit: Claude Code carries on as if nothing happened. */
 export const SILENT_EXIT: HookOutcome = { exitCode: 0, stdout: "", stderr: "" };
 
 const UNKNOWN_SESSION = "unknown";
 
 /**
- * Идентификатор сессии из полезной нагрузки хука.
- * @param {string} payload JSON события Claude Code.
- * @returns {string} `session_id` или `unknown`, если его нет.
- * @throws {SyntaxError} Если полезная нагрузка — не JSON.
+ * Session id from the hook payload.
+ * @param {string} payload Claude Code event JSON.
+ * @returns {string} `session_id`, or `unknown` if it is missing.
+ * @throws {SyntaxError} If the payload is not JSON.
  */
 export function sessionIdOf(payload: string): string {
   const parsed: unknown = JSON.parse(payload);

@@ -1,5 +1,5 @@
-// Harness на диске: каталог с `principles/*.md`, `stages/<этап>.md`, `workflows/*.json` и
-// `conductor.md`. Здесь — только чтение файлов; разбор текстов — в ядре.
+// Harness on disk: a directory with `principles/*.md`, `stages/<stage>.md`, `workflows/*.json` and
+// `conductor.md`. Here is only reading the files; parsing the texts is in the core.
 
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
@@ -12,9 +12,9 @@ import {
 } from "@cyberzavod/core";
 
 /**
- * Читает все файлы каталога harness: путь от каталога через `/` → текст.
- * @param {string} directory Каталог harness.
- * @returns {Promise<HarnessFiles>} Файлы harness.
+ * Reads all files of the harness directory: path from the directory with `/` → text.
+ * @param {string} directory Harness directory.
+ * @returns {Promise<HarnessFiles>} Harness files.
  */
 export async function readHarnessFiles(directory: string): Promise<HarnessFiles> {
   const entries = await readdir(directory, { recursive: true, withFileTypes: true });
@@ -33,10 +33,10 @@ export async function readHarnessFiles(directory: string): Promise<HarnessFiles>
 }
 
 /**
- * Читает harness из каталога.
- * @param {string} directory Каталог harness.
- * @returns {Promise<Harness>} Принципы по имени файла, все этапы, процессы и правила ведущего.
- * @throws {HarnessError} Если файл этапа или процесса не прошёл проверку.
+ * Reads the harness from a directory.
+ * @param {string} directory Harness directory.
+ * @returns {Promise<Harness>} Principles by file name, all stages, workflows and the lead's rules.
+ * @throws {HarnessError} If a stage or workflow file failed validation.
  */
 export async function loadHarness(directory: string): Promise<Harness> {
   const files = await readHarnessFiles(directory);
@@ -45,11 +45,11 @@ export async function loadHarness(directory: string): Promise<Harness> {
 }
 
 /**
- * Находит процесс по имени.
+ * Finds a workflow by name.
  * @param {Harness} harness Harness.
- * @param {string} name Имя процесса из конфига проекта.
- * @returns {Workflow} Процесс.
- * @throws {HarnessError} Если такого процесса нет.
+ * @param {string} name Workflow name from the project config.
+ * @returns {Workflow} The workflow.
+ * @throws {HarnessError} If there is no such workflow.
  */
 export function workflowOf(harness: Harness, name: string): Workflow {
   const workflow = harness.workflows.find((candidate) => candidate.name === name);
@@ -57,7 +57,7 @@ export function workflowOf(harness: Harness, name: string): Workflow {
   if (workflow === undefined) {
     const known = harness.workflows.map((candidate) => candidate.name).join(", ");
 
-    throw new HarnessError(`процесса ${name} нет в harness; есть: ${known}`);
+    throw new HarnessError(`process ${name} is not in the harness; available: ${known}`);
   }
 
   return workflow;

@@ -1,4 +1,4 @@
-# Контекст сборки образа сайта — корень репозитория. В образ идут исходники, записи журнала, карточки проектов и гайды.
+# Site image build context is the repo root: sources, recordings, project cards, guides go in.
 **/node_modules
 **/dist
 **/.astro
@@ -6,7 +6,7 @@
 .github
 .claude
 apps/api
-# Рабочие файлы адаптеров агентов: сырые журналы и черновики, сайт их не читает.
+# Agent adapters' working files: raw logs and drafts, the site does not read them.
 .cyberzavod/journal/capture
 *.md
 **/.env*

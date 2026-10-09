@@ -1,5 +1,5 @@
-// Кабинет мастера: стол с монитором и бумагами. Рисуется один раз и дальше не меняется;
-// сам мастер — действующее лицо из actors.ts, а табличка — из plaques.ts.
+// The foreman's office: a desk with a monitor and papers. Drawn once and does not change after;
+// the foreman is an actor from actors.ts, and the plaque comes from plaques.ts.
 
 import type { ForemanPlan } from "@cyberzavod/player";
 import { Container, Sprite } from "pixi.js";
@@ -8,7 +8,7 @@ import type { Palette } from "./palette.ts";
 import { textureOf } from "./textures.ts";
 import { PIXELS_PER_UNIT } from "./units.ts";
 
-/** Рисунок стола мастера 32×20: дерево, монитор с кодом, клавиатура и бумаги. */
+/** Foreman desk sprite 32×20: wood, a monitor with code, a keyboard and papers. */
 export const DESK_ART: SpriteArt = [
   ".kkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.",
   "kyyyyyyyyyyyyyyyyyyyyyyyyyyyyywk",
@@ -33,10 +33,10 @@ export const DESK_ART: SpriteArt = [
 ];
 
 /**
- * Рисует кабинет мастера: стол; координаты — в пикселях рисунка.
- * @param {ForemanPlan} plan Где стол и место мастера.
- * @param {Palette} palette Краски цеха.
- * @returns {Container} Кабинет без мастера и таблички.
+ * Draws the foreman's office: the desk; coordinates are in sprite pixels.
+ * @param {ForemanPlan} plan Where the desk and the foreman spot are.
+ * @param {Palette} palette Factory inks.
+ * @returns {Container} The office without the foreman and the plaque.
  */
 export function drawOffice(plan: ForemanPlan, palette: Palette): Container {
   const desk = new Sprite(textureOf(paintArt(DESK_ART, paletteInks(palette))));

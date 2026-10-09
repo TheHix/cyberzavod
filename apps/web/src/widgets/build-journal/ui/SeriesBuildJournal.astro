@@ -1,14 +1,14 @@
 ---
-// Журнал серии сборок на главной и на странице проекта: показывает ту сборку, что сейчас в цехе.
-// Полные записи грузятся файлами в браузере, поэтому весь журнал — один остров; пока панель
-// закрыта, его не видно, и острову хватает времени простоя.
+// Build series journal on the home page and the project page: shows the build that is on the floor
+// now. Full recordings load as files in the browser, so the whole journal is one island; while the
+// panel is closed it is not visible, and idle time is enough for the island.
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { SeriesJournal } from "./SeriesJournal.tsx";
 
 interface Props {
-  /** id сборок серии в порядке, в каком их проигрывает цех. */
+  /** Build ids of the series in the order the floor plays them. */
   recordingIds: readonly string[];
-  /** Язык страницы: на нём метки, подписи и сообщения журнала. */
+  /** Page language: journal labels, captions and messages are in it. */
   locale: Locale;
 }
 

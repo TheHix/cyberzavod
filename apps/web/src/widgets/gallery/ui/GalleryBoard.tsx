@@ -13,13 +13,13 @@ import { GalleryList } from "./GalleryList.tsx";
 import styles from "./GalleryBoard.module.css";
 
 interface Props {
-  /** Язык страницы. */
+  /** Page language. */
   locale: Locale;
-  /** Адрес сайта — `site` из конфига Astro: для строки бейджа в README. */
+  /** Site address, `site` from the Astro config: for the badge line in the README. */
   siteUrl: string;
   /**
-   * Примеры — проекты, которые цех собрал с нуля: статичная разметка, которую ставит Astro, над
-   * галереями пользователей в общем списке. В галерее автора их нет.
+   * Examples, the projects the factory built from scratch: static markup placed by Astro above
+   * user galleries in the shared list. An author's gallery does not have them.
    */
   examples?: JSX.Element;
 }
@@ -89,13 +89,13 @@ function AuthorView(props: { page: AuthorPage; siteUrl: string; locale: Locale }
 }
 
 /**
- * Страница галерей: общий список открытых галерей или, с `?user=<login>`, галерея автора с
- * бейджем для README. Данные приходят из API в браузере.
- * @param {Props} props Свойства компонента.
- * @param {Locale} props.locale Язык страницы.
- * @param {string} props.siteUrl Адрес сайта.
- * @param {JSX.Element} [props.examples] Примеры над галереями пользователей.
- * @returns {JSX.Element} Список галерей или галерея автора.
+ * The galleries page: the shared list of public galleries or, with `?user=<login>`, an author's
+ * gallery with a badge for the README. Data comes from the API in the browser.
+ * @param {Props} props Component props.
+ * @param {Locale} props.locale Page language.
+ * @param {string} props.siteUrl Site address.
+ * @param {JSX.Element} [props.examples] Examples above user galleries.
+ * @returns {JSX.Element} The list of galleries or an author's gallery.
  */
 export function GalleryBoard(props: Props): JSX.Element {
   const model = createGalleryPageModel({

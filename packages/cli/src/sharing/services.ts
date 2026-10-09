@@ -1,4 +1,5 @@
-// Всё, с чем команды публикации говорят вовне: сервер, GitHub, файл с токеном и часы.
+// Everything the sharing commands talk to outside: the server, GitHub, the token file and the
+// clock.
 
 import { setTimeout as delay } from "node:timers/promises";
 import { HttpCyberzavodApi, type CyberzavodApi } from "./api.ts";
@@ -10,17 +11,17 @@ import {
   type SettingsEnvironment,
 } from "./settings.ts";
 
-/** Сервер по умолчанию, если `CYBERZAVOD_API_URL` не задан. */
+/** The default server if `CYBERZAVOD_API_URL` is not set. */
 export const DEFAULT_API_URL = "https://cyberzavod.com";
 
-/** Переменная окружения с адресом сервера. */
+/** Environment variable with the server address. */
 export const API_URL_VARIABLE = "CYBERZAVOD_API_URL";
 
 const TRAILING_SLASHES = /\/+$/;
 
-/** Зависимости команд login, logout, share, unshare и gallery; в тестах — заглушки. */
+/** Dependencies of the login, logout, share, unshare and gallery commands; stubs in tests. */
 export interface Sharing {
-  /** Адрес сервера без завершающего «/»: от него строятся ссылки для человека. */
+  /** Server address without a trailing "/": links for the human are built from it. */
   siteUrl: string;
   api: CyberzavodApi;
   github: GithubDeviceAuth;
@@ -29,9 +30,10 @@ export interface Sharing {
 }
 
 /**
- * Настоящие зависимости: сервер из `CYBERZAVOD_API_URL`, GitHub, токен в каталоге настроек.
- * @param {SettingsEnvironment} environment Окружение, платформа и домашний каталог.
- * @returns {Sharing} Зависимости команд публикации.
+ * Real dependencies: the server from `CYBERZAVOD_API_URL`, GitHub, the token in the settings
+ * directory.
+ * @param {SettingsEnvironment} environment Environment, platform and home directory.
+ * @returns {Sharing} Dependencies of the sharing commands.
  */
 export function createSharing(environment: SettingsEnvironment): Sharing {
   const siteUrl = (environment.env[API_URL_VARIABLE] || DEFAULT_API_URL).replace(

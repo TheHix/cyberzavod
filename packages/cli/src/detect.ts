@@ -1,6 +1,6 @@
-// Что видно в каталоге проекта: имя, языки, фреймворки, менеджер пакетов, git и скрипты.
-// Найденное — справка для `init` и подсказка команд проверки, а не ограничение:
-// стек может смениться, и `sync` найдёт его заново.
+// What is visible in the project directory: name, languages, frameworks, package manager, git and
+// scripts. The findings are a reference for `init` and a hint for check commands, not a limit:
+// the stack may change, and `sync` will find it again.
 
 import { access } from "node:fs/promises";
 import path from "node:path";
@@ -10,21 +10,21 @@ import { readOptionalText } from "./files.ts";
 
 const PACKAGE_MANIFEST = "package.json";
 
-/** Найденное в каталоге проекта. */
+/** What was found in the project directory. */
 export interface DetectedProject {
-  /** Имя из манифеста или имя каталога. */
+  /** Name from the manifest, or the directory name. */
   name: string;
   languages: string[];
   frameworks: string[];
   packageManager?: string;
   git: boolean;
-  /** Скрипты `package.json` и цели Makefile. */
+  /** `package.json` scripts and Makefile targets. */
   scripts: string[];
-  /** Предлагаемые команды проверки. */
+  /** Suggested check commands. */
   verification: string[];
 }
 
-// Файл-признак языка: найден файл — язык есть в проекте.
+// A language marker file: the file is found, so the language is in the project.
 const LANGUAGE_MARKERS: readonly { file: string; language: string }[] = [
   { file: "package.json", language: "javascript" },
   { file: "tsconfig.json", language: "typescript" },
@@ -39,7 +39,7 @@ const LANGUAGE_MARKERS: readonly { file: string; language: string }[] = [
   { file: "composer.json", language: "php" },
 ];
 
-// Файл блокировки зависимостей называет менеджер пакетов; первый найденный выигрывает.
+// A dependency lock file names the package manager; the first one found wins.
 const LOCKFILES: readonly { file: string; packageManager: string }[] = [
   { file: "pnpm-lock.yaml", packageManager: "pnpm" },
   { file: "yarn.lock", packageManager: "yarn" },
@@ -52,7 +52,7 @@ const LOCKFILES: readonly { file: string; packageManager: string }[] = [
   { file: "go.sum", packageManager: "go" },
 ];
 
-// Зависимость `package.json`, по которой узнаётся фреймворк.
+// A `package.json` dependency that identifies the framework.
 const FRAMEWORK_DEPENDENCIES: Readonly<Record<string, string>> = {
   react: "react",
   vue: "vue",
@@ -66,13 +66,13 @@ const FRAMEWORK_DEPENDENCIES: Readonly<Record<string, string>> = {
   "@nestjs/core": "nest",
 };
 
-// Скрипты `package.json`, которые проверяют проект; `check` обычно уже включает остальные.
+// `package.json` scripts that check the project; `check` usually already includes the rest.
 const PACKAGE_CHECK_SCRIPT = "check";
 const PACKAGE_VERIFICATION_SCRIPTS = ["lint", "typecheck", "test"];
 const MAKE_CHECK_TARGET = "check";
 const MAKE_TARGET = /^([A-Za-z][\w-]*):(?!=)/gm;
 
-// Команды проверки по языку, если ни скриптов, ни цели Makefile нет.
+// Check commands by language, if there are neither scripts nor a Makefile target.
 const LANGUAGE_VERIFICATION: Readonly<Record<string, string[]>> = {
   go: ["go vet ./...", "go test ./..."],
   rust: ["cargo test"],
@@ -190,10 +190,10 @@ function verificationOf({
 }
 
 /**
- * Смотрит, что лежит в корне проекта.
- * @param {string} root Корень проекта.
- * @returns {Promise<DetectedProject>} Имя, стек, git, скрипты и предлагаемые проверки.
- * @throws {CommandError} Если `package.json` не JSON.
+ * Looks at what is in the project root.
+ * @param {string} root Project root.
+ * @returns {Promise<DetectedProject>} Name, stack, git, scripts and suggested checks.
+ * @throws {CommandError} If `package.json` is not JSON.
  */
 export async function detectProject(root: string): Promise<DetectedProject> {
   const manifest = await readManifest(root);
@@ -219,9 +219,9 @@ export async function detectProject(root: string): Promise<DetectedProject> {
 }
 
 /**
- * Выбирает из найденного справочный стек, который кладётся в конфиг проекта.
- * @param {DetectedProject} detected Найденное в проекте.
- * @returns {StackInfo} Языки, фреймворки и менеджер пакетов, если он найден.
+ * Picks from the findings the reference stack that goes into the project config.
+ * @param {DetectedProject} detected What was found in the project.
+ * @returns {StackInfo} Languages, frameworks and the package manager, if found.
  */
 export function stackOf(detected: DetectedProject): StackInfo {
   const { languages, frameworks, packageManager } = detected;
@@ -232,9 +232,9 @@ export function stackOf(detected: DetectedProject): StackInfo {
 }
 
 /**
- * Превращает имя проекта в идентификатор записи: строчные латинские буквы, цифры, «_» и «-».
- * @param {string} name Имя проекта, например `@acme/shop`.
- * @returns {string} Идентификатор, например `acme-shop`; `project`, если от имени ничего не осталось.
+ * Turns a project name into a record id: lowercase Latin letters, digits, "_" and "-".
+ * @param {string} name Project name, for example `@acme/shop`.
+ * @returns {string} The id, for example `acme-shop`; `project` if nothing is left of the name.
  */
 export function projectIdOf(name: string): string {
   const dashed = name.toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
