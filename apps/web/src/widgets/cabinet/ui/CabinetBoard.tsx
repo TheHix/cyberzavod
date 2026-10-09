@@ -6,17 +6,21 @@ import {
   AccountLink,
   loadAccount,
   reloadAccount,
+  type Account,
   type UnknownAccount,
 } from "@/features/sign-in";
 import { remoteNoticeOf } from "@/shared/api/remote-notice.ts";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
-import { useStoreValue } from "@/shared/lib/use-store-value.ts";
+import { useHydratedStoreValue, useStoreValue } from "@/shared/lib/use-store-value.ts";
 import { Title } from "@/shared/ui";
 import { createCabinetModel } from "../model/cabinet.ts";
 import { AuthorCabinet } from "./AuthorCabinet.tsx";
 import { CliHint } from "./CliHint.tsx";
 import styles from "./CabinetBoard.module.css";
+
+/** The page is built with nobody known to be signed in: the markup has the loading state. */
+const BUILT_ACCOUNT: Account = { status: "loading" };
 
 interface Props {
   /** Page language. */
@@ -41,7 +45,8 @@ export function CabinetBoard(props: Props): JSX.Element {
     signOut: () => signOut(),
     reloadAccount,
   });
-  const account = useStoreValue($account);
+  // The menu island may learn who is signed in before this larger island loads.
+  const account = useHydratedStoreValue($account, BUILT_ACCOUNT);
   const isBusy = useStoreValue(model.$isBusy);
   const hasFailed = useStoreValue(model.$hasFailed);
   const authorGallery = () => {

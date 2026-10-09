@@ -1,7 +1,7 @@
 import { atom } from "nanostores";
 import { createRoot } from "solid-js";
 import { describe, expect, it } from "vitest";
-import { useStoreValue } from "./use-store-value.ts";
+import { useHydratedStoreValue, useStoreValue } from "./use-store-value.ts";
 
 describe("useStoreValue", () => {
   it("отдаёт новое значение стора", () => {
@@ -21,5 +21,15 @@ describe("useStoreValue", () => {
     $point.set({ x: 2 });
 
     expect({ shared, current: point() }).toEqual({ shared: { x: 1 }, current: { x: 2 } });
+  });
+});
+
+describe("useHydratedStoreValue", () => {
+  it("до монтирования отдаёт значение сборки, даже если стор уже поменялся", () => {
+    const $account = atom("author");
+
+    const beforeMount = createRoot(() => useHydratedStoreValue($account, "loading")());
+
+    expect(beforeMount).toBe("loading");
   });
 });
