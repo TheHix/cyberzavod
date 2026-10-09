@@ -14,12 +14,12 @@ import (
 const (
 	authorizePath   = "/login/oauth/authorize"
 	accessTokenPath = "/login/oauth/access_token"
-	// maxAccessTokenResponseBytes — с запасом больше ответа на обмен кода.
+	// maxAccessTokenResponseBytes is comfortably larger than the code exchange response.
 	maxAccessTokenResponseBytes = 1 << 16
 )
 
-// OAuthApp — OAuth-приложение GitHub для входа на сайте: ссылка на страницу согласия
-// и обмен кода авторизации на токен.
+// OAuthApp is the GitHub OAuth app for sign-in on the site: a link to the consent page
+// and the exchange of an authorization code for a token.
 type OAuthApp struct {
 	oauthURL     string
 	clientID     string
@@ -27,15 +27,15 @@ type OAuthApp struct {
 	client       *http.Client
 }
 
-// accessTokenResponse — нужные поля ответа на обмен кода. Отказ GitHub приходит с кодом 200
-// и полем error.
+// accessTokenResponse holds the needed fields of the code exchange response. A GitHub refusal comes
+// with code 200 and an error field.
 type accessTokenResponse struct {
 	AccessToken string `json:"access_token"`
 	Error       string `json:"error"`
 }
 
-// NewOAuthApp создаёт OAuth-приложение с clientID и clientSecret на сервере GitHub по
-// адресу oauthURL, например https://github.com.
+// NewOAuthApp creates an OAuth app with clientID and clientSecret on the GitHub server at
+// oauthURL, for example https://github.com.
 func NewOAuthApp(oauthURL, clientID, clientSecret string) *OAuthApp {
 	return &OAuthApp{
 		oauthURL:     strings.TrimSuffix(oauthURL, "/"),
@@ -45,8 +45,8 @@ func NewOAuthApp(oauthURL, clientID, clientSecret string) *OAuthApp {
 	}
 }
 
-// AuthorizeURL возвращает адрес страницы согласия GitHub, откуда браузер вернётся на
-// redirectURI с кодом и state. Без scope: публичного профиля хватает.
+// AuthorizeURL returns the address of the GitHub consent page, from which the browser returns to
+// redirectURI with a code and state. No scope: the public profile is enough.
 func (a *OAuthApp) AuthorizeURL(state, redirectURI string) string {
 	query := url.Values{
 		"client_id":    {a.clientID},
@@ -57,8 +57,8 @@ func (a *OAuthApp) AuthorizeURL(state, redirectURI string) string {
 	return a.oauthURL + authorizePath + "?" + query.Encode()
 }
 
-// ExchangeCode меняет код авторизации на токен GitHub. Ни код, ни секрет, ни токен не
-// попадают в текст ошибки.
+// ExchangeCode exchanges an authorization code for a GitHub token. Neither the code, the secret nor
+// the token ends up in the error text.
 func (a *OAuthApp) ExchangeCode(ctx context.Context, code, redirectURI string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
@@ -82,7 +82,7 @@ func (a *OAuthApp) ExchangeCode(ctx context.Context, code, redirectURI string) (
 	if err != nil {
 		return "", fmt.Errorf("обмен кода GitHub: %w", err)
 	}
-	// Тело уже прочитано или не нужно: ошибка закрытия ничего не меняет в ответе.
+	// The body is already read or not needed: a close error changes nothing in the response.
 	defer func() { _ = response.Body.Close() }()
 
 	return accessTokenFromResponse(response)
@@ -99,7 +99,7 @@ func accessTokenFromResponse(response *http.Response) (string, error) {
 		return "", fmt.Errorf("разбор ответа GitHub на обмен кода: %w", err)
 	}
 
-	// Поле error — код отказа из перечня GitHub (bad_verification_code и т. п.), не секрет.
+	// The error field is a GitHub refusal code (bad_verification_code and the like), not a secret.
 	if exchanged.Error != "" {
 		return "", fmt.Errorf("GitHub отказал в обмене кода: %s", exchanged.Error)
 	}

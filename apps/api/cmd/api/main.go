@@ -1,8 +1,8 @@
-// Команда api — один бинарник с тремя подкомандами:
+// Command api is a single binary with three subcommands:
 //
-//	api serve        HTTP-сервер (по умолчанию)
-//	api migrate      применить миграции и выйти
-//	api healthcheck  проверить /api/health; нужна для healthcheck в контейнере без curl
+//	api serve        HTTP server (default)
+//	api migrate      apply migrations and exit
+//	api healthcheck  check /api/health; needed for the healthcheck in a container without curl
 package main
 
 import (
@@ -53,7 +53,7 @@ func main() {
 	}
 }
 
-// run выполняет подкоманду cmd. stop нужен только serve: см. комментарий к нему.
+// run runs the subcommand cmd. Only serve needs stop: see the comment on it.
 func run(ctx context.Context, stop context.CancelFunc, cmd string, logger *slog.Logger) error {
 	switch cmd {
 	case "serve":
@@ -67,8 +67,8 @@ func run(ctx context.Context, stop context.CancelFunc, cmd string, logger *slog.
 	}
 }
 
-// serve запускает HTTP-сервер и ждёт сигнала остановки.
-// stop отменяет подписку на сигналы: после первого сигнала второй завершает процесс сразу.
+// serve starts the HTTP server and waits for a stop signal.
+// stop cancels the signal subscription: after the first signal a second one ends the process.
 func serve(ctx context.Context, stop context.CancelFunc, logger *slog.Logger) error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -112,8 +112,8 @@ func serve(ctx context.Context, stop context.CancelFunc, logger *slog.Logger) er
 	return shutdown(srv, errCh)
 }
 
-// siteLogin возвращает OAuth-приложение для входа на сайте или nil, если вход не настроен.
-// nil возвращается явно: *github.OAuthApp, равный nil, в интерфейсе nil не был бы.
+// siteLogin returns the OAuth app for sign-in on the site, or nil if sign-in is not configured.
+// nil is returned explicitly: a nil *github.OAuthApp would not be nil inside an interface.
 func siteLogin(cfg config.Config) httpapi.OAuthApp {
 	if !cfg.HasSiteLogin() {
 		return nil
@@ -133,7 +133,7 @@ func newServer(addr string, handler http.Handler) *http.Server {
 	}
 }
 
-// shutdown останавливает сервер и дожидается завершения ListenAndServe.
+// shutdown stops the server and waits for ListenAndServe to finish.
 func shutdown(srv *http.Server, errCh <-chan error) error {
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
@@ -182,7 +182,7 @@ func healthcheck(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// Тело ответа healthcheck не читается: ошибка закрытия ничего не меняет в результате.
+	// The healthcheck response body is not read: a close error changes nothing in the result.
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {

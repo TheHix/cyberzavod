@@ -1,4 +1,4 @@
-// Package store хранит галереи в Postgres: авторов, их записи и сводку по открытым галереям.
+// Package store keeps galleries in Postgres: authors, their recordings, public gallery stats.
 package store
 
 import (
@@ -15,27 +15,27 @@ import (
 
 const (
 	queryTimeout = 5 * time.Second
-	// storageLockKey — ключ advisory-блокировки Postgres, под которой загрузки всех авторов
-	// по очереди сверяют общий объём с потолком. Число произвольное, лишь бы своё.
+	// storageLockKey is the key of the Postgres advisory lock under which all authors' uploads
+	// check the total size against the cap one at a time. The number is arbitrary, just unique.
 	storageLockKey int64 = 0x637a_7374_6f72_6167
 )
 
-// Store — галереи в Postgres. Каждый метод ограничен queryTimeout.
+// Store holds the galleries in Postgres. Each method is limited by queryTimeout.
 type Store struct {
 	pool *pgxpool.Pool
-	// storageLimitBytes — потолок суммы тел записей всех галерей.
+	// storageLimitBytes is the cap on the total size of recording bodies across all galleries.
 	storageLimitBytes int64
 }
 
-// New создаёт хранилище галерей поверх пула соединений с потолком storageLimitBytes на
-// сумму тел записей всех галерей (в работе — gallery.StorageLimitBytes).
+// New creates a gallery store on top of a connection pool, with a cap of storageLimitBytes on
+// the total body size of all galleries' recordings (in production, gallery.StorageLimitBytes).
 func New(pool *pgxpool.Pool, storageLimitBytes int64) *Store {
 	return &Store{pool: pool, storageLimitBytes: storageLimitBytes}
 }
 
 const summaryColumns = `record_id, slug, project_id, title, language, started_at, uploaded_at`
 
-// SaveUser заводит автора или обновляет его логин: логин на GitHub могут сменить.
+// SaveUser creates an author or updates their login: the GitHub login can change.
 func (s *Store) SaveUser(ctx context.Context, user gallery.User) error {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
@@ -54,9 +54,9 @@ func (s *Store) SaveUser(ctx context.Context, user gallery.User) error {
 	return nil
 }
 
-// releaseLogin снимает логин с другого автора, у которого он записан. Так бывает, когда
-// тот сменил логин на GitHub, а его старый логин занял кто-то ещё. Прежний владелец получает
-// метку "#<id>": такого логина на GitHub не бывает, а настоящий вернётся при его входе.
+// releaseLogin takes the login away from another author who has it recorded. This happens when
+// that author changed their GitHub login and someone else took the old one. The previous owner gets
+// the label "#<id>": GitHub has no such login, and the real one comes back when they sign in.
 func releaseLogin(ctx context.Context, tx pgx.Tx, user gallery.User) error {
 	_, err := tx.Exec(ctx, `
 		UPDATE users SET login = '#' || github_id::text, updated_at = now()
@@ -82,8 +82,8 @@ func upsertUser(ctx context.Context, tx pgx.Tx, user gallery.User) error {
 	return nil
 }
 
-// Account возвращает галерею автора с его записями, свежие сверху.
-// Если автора нет — gallery.ErrNotFound.
+// Account returns the author's gallery with their recordings, newest first.
+// If the author does not exist, it returns gallery.ErrNotFound.
 func (s *Store) Account(ctx context.Context, ownerID int64) (gallery.Account, error) {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
@@ -110,7 +110,7 @@ func (s *Store) Account(ctx context.Context, ownerID int64) (gallery.Account, er
 	return account, nil
 }
 
-// recordings возвращает записи автора, свежие сверху.
+// recordings returns the author's recordings, newest first.
 func (s *Store) recordings(ctx context.Context, ownerID int64) ([]gallery.Summary, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT `+summaryColumns+` FROM recordings
@@ -129,9 +129,9 @@ func (s *Store) recordings(ctx context.Context, ownerID int64) ([]gallery.Summar
 	return summaries, nil
 }
 
-// SaveRecording кладёт запись в галерею автора или заменяет её, если запись с тем же id уже
-// там. isNew — запись новая. Новая запись сверх gallery.RecordingLimit — gallery.ErrLimitReached;
-// запись, которая выросла и не помещается под потолок хранилища, — gallery.ErrStorageFull.
+// SaveRecording puts a recording into the author's gallery or replaces it if one with the same id
+// is there. isNew means the recording is new. A new recording beyond gallery.RecordingLimit gives
+// gallery.ErrLimitReached; one that grew past the storage cap gives gallery.ErrStorageFull.
 func (s *Store) SaveRecording(ctx context.Context, ownerID int64, recording gallery.Recording) (summary gallery.Summary, isNew bool, err error) {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
@@ -147,8 +147,8 @@ func (s *Store) SaveRecording(ctx context.Context, ownerID int64, recording gall
 	return summary, isNew, nil
 }
 
-// saveRecording сохраняет запись под блокировкой строки автора: параллельные загрузки
-// одного автора идут по очереди и не превышают предел вдвоём.
+// saveRecording saves a recording under a lock on the author's row: concurrent uploads by
+// one author go one at a time and do not exceed the limit together.
 func (s *Store) saveRecording(ctx context.Context, tx pgx.Tx, ownerID int64, recording gallery.Recording) (gallery.Summary, bool, error) {
 	if err := lockOwner(ctx, tx, ownerID); err != nil {
 		return gallery.Summary{}, false, err
@@ -183,7 +183,7 @@ func (s *Store) saveRecording(ctx context.Context, tx pgx.Tx, ownerID int64, rec
 	return summary, isNew, nil
 }
 
-// lockOwner блокирует строку автора до конца транзакции.
+// lockOwner locks the author's row until the end of the transaction.
 func lockOwner(ctx context.Context, tx pgx.Tx, ownerID int64) error {
 	var lockedID int64
 	err := tx.QueryRow(ctx, `SELECT github_id FROM users WHERE github_id = $1 FOR UPDATE`, ownerID).Scan(&lockedID)
@@ -198,8 +198,8 @@ func lockOwner(ctx context.Context, tx pgx.Tx, ownerID int64) error {
 	return nil
 }
 
-// slugForRecording возвращает ссылку уже лежащей записи или выдаёт новую, если в галерее
-// есть место.
+// slugForRecording returns the link of an already stored recording or issues a new one if
+// the gallery has room.
 func slugForRecording(ctx context.Context, tx pgx.Tx, ownerID int64, recordID string) (slug string, isNew bool, err error) {
 	err = tx.QueryRow(ctx,
 		`SELECT slug FROM recordings WHERE owner_id = $1 AND record_id = $2`, ownerID, recordID,
@@ -221,7 +221,7 @@ func slugForRecording(ctx context.Context, tx pgx.Tx, ownerID int64, recordID st
 	return slug, true, err
 }
 
-// ensureRoom проверяет, что в галерее автора есть место для новой записи.
+// ensureRoom checks that the author's gallery has room for a new recording.
 func ensureRoom(ctx context.Context, tx pgx.Tx, ownerID int64) error {
 	var count int
 	err := tx.QueryRow(ctx, `SELECT count(*) FROM recordings WHERE owner_id = $1`, ownerID).Scan(&count)
@@ -236,7 +236,7 @@ func ensureRoom(ctx context.Context, tx pgx.Tx, ownerID int64) error {
 	return nil
 }
 
-// recordingBytes возвращает размер тела уже лежащей записи; новой записи — 0.
+// recordingBytes returns the body size of an already stored recording; 0 for a new one.
 func recordingBytes(ctx context.Context, tx pgx.Tx, ownerID int64, recordID string) (int64, error) {
 	var size int64
 	err := tx.QueryRow(ctx,
@@ -253,14 +253,14 @@ func recordingBytes(ctx context.Context, tx pgx.Tx, ownerID int64, recordID stri
 	return size, nil
 }
 
-// savedRecording — строка записи после сохранения: сводка и размер тела.
+// savedRecording is a recording row after saving: the summary and the body size.
 type savedRecording struct {
 	gallery.Summary
 	BodyBytes int64
 }
 
-// upsertRecording пишет запись и возвращает её сводку и размер тела; у заменённой записи
-// ссылка остаётся прежней. Размер считает Postgres тем же выражением, что и миграция.
+// upsertRecording writes a recording and returns its summary and body size; a replaced recording
+// keeps its link. Postgres computes the size with the same expression as the migration.
 func upsertRecording(ctx context.Context, tx pgx.Tx, ownerID int64, slug string, recording gallery.Recording) (gallery.Summary, int64, error) {
 	rows, err := tx.Query(ctx, `
 		INSERT INTO recordings
@@ -289,9 +289,9 @@ func upsertRecording(ctx context.Context, tx pgx.Tx, ownerID int64, slug string,
 	return saved.Summary, saved.BodyBytes, nil
 }
 
-// ensureStorage проверяет, что тела записей всех галерей, уже со свежей записью, не выше
-// потолка. Advisory-блокировка до конца транзакции ставит загрузки разных авторов в очередь:
-// иначе две параллельные загрузки вместе перешагнули бы потолок.
+// ensureStorage checks that all galleries' recording bodies, the new one included, stay under
+// the cap. An advisory lock until the end of the transaction queues uploads of different authors:
+// otherwise two concurrent uploads together would step over the cap.
 func (s *Store) ensureStorage(ctx context.Context, tx pgx.Tx) error {
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, storageLockKey); err != nil {
 		return fmt.Errorf("блокировка хранилища: %w", err)
@@ -309,8 +309,8 @@ func (s *Store) ensureStorage(ctx context.Context, tx pgx.Tx) error {
 	return nil
 }
 
-// touchOwner отмечает, что галерея автора изменилась: по этому времени сортируется список
-// открытых галерей.
+// touchOwner marks that the author's gallery changed: the list of public galleries
+// is sorted by this time.
 func touchOwner(ctx context.Context, tx pgx.Tx, ownerID int64) error {
 	_, err := tx.Exec(ctx, `UPDATE users SET updated_at = now() WHERE github_id = $1`, ownerID)
 	if err != nil {
@@ -320,7 +320,7 @@ func touchOwner(ctx context.Context, tx pgx.Tx, ownerID int64) error {
 	return nil
 }
 
-// DeleteRecording убирает запись из галереи автора. Если такой записи нет — gallery.ErrNotFound.
+// DeleteRecording removes a recording from the author's gallery. Missing: gallery.ErrNotFound.
 func (s *Store) DeleteRecording(ctx context.Context, ownerID int64, recordID string) error {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
@@ -353,7 +353,7 @@ func deleteRecording(ctx context.Context, tx pgx.Tx, ownerID int64, recordID str
 	return nil
 }
 
-// SetGalleryPublic открывает или закрывает галерею автора. Если автора нет — gallery.ErrNotFound.
+// SetGalleryPublic makes the author's gallery public or private. No author: gallery.ErrNotFound.
 func (s *Store) SetGalleryPublic(ctx context.Context, ownerID int64, isPublic bool) error {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
@@ -372,7 +372,7 @@ func (s *Store) SetGalleryPublic(ctx context.Context, ownerID int64, isPublic bo
 	return nil
 }
 
-// PublicGalleries возвращает открытые галереи, недавно изменённые сверху.
+// PublicGalleries returns public galleries, recently changed first.
 func (s *Store) PublicGalleries(ctx context.Context) ([]gallery.Overview, error) {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
@@ -396,8 +396,8 @@ func (s *Store) PublicGalleries(ctx context.Context) ([]gallery.Overview, error)
 	return overviews, nil
 }
 
-// PublicGallery возвращает открытую галерею по логину без учёта регистра.
-// Закрытая и несуществующая галерея — gallery.ErrNotFound: посторонний их не различает.
+// PublicGallery returns a public gallery by login, case-insensitively.
+// A private or nonexistent gallery gives gallery.ErrNotFound: an outsider cannot tell them apart.
 func (s *Store) PublicGallery(ctx context.Context, login string) (gallery.Gallery, error) {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
@@ -425,7 +425,7 @@ func (s *Store) PublicGallery(ctx context.Context, login string) (gallery.Galler
 	return gallery.Gallery{Login: ownerLogin, Recordings: recordings}, nil
 }
 
-// SharedRecording возвращает запись по секретной ссылке. Если ссылки нет — gallery.ErrNotFound.
+// SharedRecording returns a recording by its secret link. No such link: gallery.ErrNotFound.
 func (s *Store) SharedRecording(ctx context.Context, slug string) (gallery.SharedRecording, error) {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()

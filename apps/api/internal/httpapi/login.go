@@ -20,38 +20,38 @@ const (
 	loginPath    = "/api/auth/github/login"
 	callbackPath = "/api/auth/github/callback"
 
-	// stateCookieName — кука с state входа и путём возврата; живёт только на путях входа.
+	// stateCookieName is the cookie with the sign-in state and return path; only on sign-in paths.
 	stateCookieName = "cz_oauth_state"
 	stateCookiePath = "/api/auth/github"
-	// stateLifetime — сколько ждать возвращения с GitHub: на согласие хватает с запасом.
+	// stateLifetime is how long to wait for the return from GitHub: plenty of time for the consent.
 	stateLifetime = 10 * time.Minute
-	// stateSeparator разделяет state и путь возврата в куке: в base64url его не бывает.
+	// stateSeparator separates state and return path in the cookie: base64url never contains it.
 	stateSeparator = "."
 
-	// sessionCookieName — кука с идентификатором сессии входа на сайте.
+	// sessionCookieName is the cookie with the site sign-in session id.
 	sessionCookieName = "cz_session"
 	sessionCookiePath = "/"
 
 	returnQueryParam   = "return"
 	defaultReturnPath  = "/"
 	maxReturnPathBytes = 512
-	// loginResultParam и loginFailedValue — отметка в адресе возврата, по которой сайт
-	// показывает, что вход не удался.
+	// loginResultParam and loginFailedValue are the mark in the return address by which the site
+	// shows that sign-in failed.
 	loginResultParam = "login"
 	loginFailedValue = "failed"
 )
 
-// errSiteLoginUnavailable — вход на сайте не настроен: нет client_id или секрета.
+// errSiteLoginUnavailable means sign-in on the site is not configured: no client_id or secret.
 var errSiteLoginUnavailable = errors.New("вход на сайте не настроен")
 
-// loginState — то, что браузер держит в куке между уходом на GitHub и возвращением.
+// loginState is what the browser keeps in a cookie between leaving for GitHub and coming back.
 type loginState struct {
 	state      string
 	returnPath string
 }
 
-// githubLogin ведёт браузер на страницу согласия GitHub, запомнив в куке state и путь,
-// куда вернуть после входа.
+// githubLogin sends the browser to the GitHub consent page, remembering in a cookie the state
+// and the path to return to after sign-in.
 func (a *api) githubLogin(w http.ResponseWriter, r *http.Request) {
 	if a.deps.OAuth == nil {
 		writeError(w, http.StatusServiceUnavailable, codeAuthUnavailable, "Вход через GitHub на этом сайте не настроен")
@@ -71,8 +71,8 @@ func (a *api) githubLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, authorizeURL, http.StatusFound)
 }
 
-// githubCallback принимает браузер с GitHub: проверяет state, узнаёт автора по коду,
-// открывает сессию и возвращает на сохранённый путь.
+// githubCallback receives the browser from GitHub: it checks state, finds the author by the code,
+// opens a session and returns to the saved path.
 func (a *api) githubCallback(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, expiredCookie(stateCookieName, stateCookiePath))
 
@@ -100,9 +100,9 @@ func (a *api) githubCallback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, returnPath, http.StatusFound)
 }
 
-// confirmLogin проверяет, что браузер вернулся с GitHub с кодом на вход, который начался
-// в нём же: state из адреса совпадает с кукой. Возвращает сохранённый путь возврата —
-// и при неудаче, чтобы вернуть человека на ту же страницу; без куки — главную.
+// confirmLogin checks that the browser came back from GitHub with a code for a sign-in that started
+// in this same browser: the state from the address matches the cookie. It returns the saved return
+// path, even on failure, to bring the human back to the same page; without a cookie, the home page.
 func confirmLogin(r *http.Request) (string, bool) {
 	cookie, err := r.Cookie(stateCookieName)
 	if err != nil {
@@ -121,8 +121,8 @@ func confirmLogin(r *http.Request) (string, bool) {
 	return saved.returnPath, isGranted && isSameState
 }
 
-// signIn меняет код на токен GitHub, узнаёт по нему автора и заводит его в хранилище.
-// Токен дальше не живёт: сессия держится на своём идентификаторе.
+// signIn exchanges the code for a GitHub token, finds its author and creates them in the store.
+// The token does not live on: the session rests on its own identifier.
 func (a *api) signIn(ctx context.Context, code string) (gallery.User, error) {
 	if a.deps.OAuth == nil {
 		return gallery.User{}, errSiteLoginUnavailable
@@ -145,7 +145,7 @@ func (a *api) signIn(ctx context.Context, code string) (gallery.User, error) {
 	return user, nil
 }
 
-// openSession открывает сессию автора и возвращает её идентификатор для куки.
+// openSession opens a session for the author and returns its identifier for the cookie.
 func (a *api) openSession(ctx context.Context, user gallery.User) (string, error) {
 	token, created, err := session.New(user.GitHubID, a.now())
 	if err != nil {
@@ -159,7 +159,7 @@ func (a *api) openSession(ctx context.Context, user gallery.User) (string, error
 	return token, nil
 }
 
-// logout закрывает сессию браузера. Без сессии отвечать нечего — тоже 204.
+// logout closes the browser session. Without a session there is nothing to close: also 204.
 func (a *api) logout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(sessionCookieName)
 	if err != nil {
@@ -189,8 +189,8 @@ func redirectLoginFailed(w http.ResponseWriter, r *http.Request, returnPath stri
 	http.Redirect(w, r, loginFailedURL(returnPath), http.StatusFound)
 }
 
-// loginFailedURL добавляет к пути возврата отметку о неудачном входе. Путь уже проверен
-// safeReturnPath; если он всё же не разбирается, человек попадает на главную с отметкой.
+// loginFailedURL adds the failed sign-in mark to the return path. The path is already checked by
+// safeReturnPath; if it still does not parse, the human lands on the home page with the mark.
 func loginFailedURL(returnPath string) string {
 	target, err := url.Parse(returnPath)
 	if err != nil {
@@ -204,9 +204,9 @@ func loginFailedURL(returnPath string) string {
 	return target.String()
 }
 
-// safeReturnPath оставляет путь возврата, только если он ведёт на этот же сайт; иначе — "/".
-// Обратная косая и управляющие символы запрещены, потому что браузер превращает "/\host"
-// и "/\t/host" в "//host" — адрес чужого сайта.
+// safeReturnPath keeps the return path only if it leads to this same site; otherwise "/".
+// Backslash and control characters are forbidden because the browser turns "/\host"
+// and "/\t/host" into "//host", the address of another site.
 func safeReturnPath(path string) string {
 	isRooted := strings.HasPrefix(path, "/") && !strings.HasPrefix(path, "//")
 	hasBackslash := strings.Contains(path, `\`)
@@ -224,8 +224,8 @@ func encodeLoginState(saved loginState) string {
 	return saved.state + stateSeparator + base64.RawURLEncoding.EncodeToString([]byte(saved.returnPath))
 }
 
-// decodeLoginState разбирает куку входа. Путь возврата проверяется заново: кука пришла
-// от браузера.
+// decodeLoginState parses the sign-in cookie. The return path is checked again: the cookie
+// came from the browser.
 func decodeLoginState(value string) (loginState, bool) {
 	state, encodedReturn, hasSeparator := strings.Cut(value, stateSeparator)
 	returnPath, err := base64.RawURLEncoding.DecodeString(encodedReturn)
@@ -237,8 +237,8 @@ func decodeLoginState(value string) (loginState, bool) {
 	return loginState{state: state, returnPath: safeReturnPath(string(returnPath))}, true
 }
 
-// newCookie собирает куку входа: недоступна скриптам, только по HTTPS и не уходит
-// с межсайтовыми запросами, кроме переходов по ссылке.
+// newCookie builds a sign-in cookie: inaccessible to scripts, HTTPS only, and not sent
+// with cross-site requests except link navigations.
 func newCookie(name, value, path string, lifetime time.Duration) *http.Cookie {
 	return &http.Cookie{
 		Name:     name,
@@ -251,7 +251,7 @@ func newCookie(name, value, path string, lifetime time.Duration) *http.Cookie {
 	}
 }
 
-// expiredCookie собирает куку, которая велит браузеру стереть куку name на пути path.
+// expiredCookie builds a cookie that tells the browser to erase cookie name on path path.
 func expiredCookie(name, path string) *http.Cookie {
 	cookie := newCookie(name, "", path, 0)
 	cookie.MaxAge = -1

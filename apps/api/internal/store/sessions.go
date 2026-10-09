@@ -11,8 +11,8 @@ import (
 	"github.com/bysavelii/cyberzavod/apps/api/internal/session"
 )
 
-// CreateSession сохраняет новую сессию автора и заодно удаляет просроченные, чтобы таблица
-// не росла без конца.
+// CreateSession saves a new author session and also deletes expired ones, so the table
+// does not grow forever.
 func (s *Store) CreateSession(ctx context.Context, created session.Session) error {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
@@ -50,8 +50,8 @@ func insertSession(ctx context.Context, tx pgx.Tx, created session.Session) erro
 	return nil
 }
 
-// SessionUser возвращает автора живой сессии по sha256 её идентификатора.
-// Нет сессии или она просрочена — session.ErrNotFound.
+// SessionUser returns the author of a live session by the sha256 of its identifier.
+// A missing or expired session gives session.ErrNotFound.
 func (s *Store) SessionUser(ctx context.Context, tokenHash []byte) (gallery.User, error) {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
@@ -75,7 +75,7 @@ func (s *Store) SessionUser(ctx context.Context, tokenHash []byte) (gallery.User
 	return user, nil
 }
 
-// DeleteSession удаляет сессию по sha256 её идентификатора. Удалить несуществующую — не ошибка.
+// DeleteSession deletes a session by the sha256 of its identifier. A missing one is not an error.
 func (s *Store) DeleteSession(ctx context.Context, tokenHash []byte) error {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()

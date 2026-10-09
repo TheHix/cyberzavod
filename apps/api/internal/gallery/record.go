@@ -9,7 +9,7 @@ import (
 
 const sessionType = "session"
 
-// InvalidRecordError — запись не прошла проверку конверта; Reason объясняет почему.
+// InvalidRecordError means the recording failed the envelope check; Reason explains why.
 type InvalidRecordError struct {
 	Reason string
 }
@@ -18,8 +18,8 @@ func (e *InvalidRecordError) Error() string {
 	return "запись не прошла проверку: " + e.Reason
 }
 
-// envelope — то, что сервер проверяет в записи. Полную проверку формата делает
-// TypeScript-ядро в CLI и в браузере; второго описания формата здесь нет.
+// envelope is what the server checks in a recording. The full format check is done by
+// the TypeScript core in the CLI and in the browser; there is no second format description here.
 type envelope struct {
 	Type      *string `json:"type"`
 	ID        *string `json:"id"`
@@ -32,11 +32,11 @@ type envelope struct {
 	} `json:"data"`
 }
 
-// ParseRecording проверяет конверт записи сессии и достаёт из него поля для списков.
-// Тело записи сохраняется как пришло.
+// ParseRecording checks the session recording envelope and extracts the fields for lists from it.
+// The recording body is stored as received.
 //
-// Возвращает *InvalidRecordError, если тело не JSON-объект, запись не сессия или в ней нет
-// нужных полей.
+// Returns *InvalidRecordError if the body is not a JSON object, the record is not a session or it
+// lacks required fields.
 func ParseRecording(body []byte) (Recording, error) {
 	var parsed envelope
 	if err := json.Unmarshal(body, &parsed); err != nil {
@@ -90,7 +90,7 @@ func recordingFromEnvelope(parsed envelope, body []byte) (Recording, error) {
 	}, nil
 }
 
-// decodeError переводит ошибку разбора JSON в понятную причину отказа.
+// decodeError turns a JSON parse error into a clear rejection reason.
 func decodeError(err error) error {
 	var typeErr *json.UnmarshalTypeError
 	if !errors.As(err, &typeErr) {

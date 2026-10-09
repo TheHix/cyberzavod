@@ -1,4 +1,4 @@
-# Линтер Go: запускается из `make check-api` и в CI.
+# Go linter: run from `make check-api` and in CI.
 version: "2"
 
 linters:
@@ -11,8 +11,8 @@ linters:
     - noctx
     - nilerr
     - copyloopvar
-  # revive — с набором правил по умолчанию: в него входят exported (комментарий на
-  # экспортируемом, начинается с имени) и package-comments.
+  # revive with the default rule set: it includes exported (a comment on
+  # an exported identifier, starting with its name) and package-comments.
 
 formatters:
   enable:

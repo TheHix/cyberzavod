@@ -9,8 +9,9 @@ import (
 	"github.com/bysavelii/cyberzavod/apps/api/internal/gallery"
 )
 
-// publicEventsSQL — записи открытых галерей и все события их сессий. Формат события сервер не
-// проверяет: что лежит в записи, то и считается, а значения не того типа пропускаются.
+// publicEventsSQL selects public galleries' recordings and all their session events. The server
+// does not check the event format: whatever the recording holds is counted, and values of
+// the wrong type are skipped.
 const publicEventsSQL = `
 	WITH public_recordings AS (
 		SELECT r.owner_id, r.body
@@ -23,16 +24,16 @@ const publicEventsSQL = `
 		CROSS JOIN LATERAL jsonb_array_elements(body -> 'data' -> 'events') AS event
 	)`
 
-// statsSnapshot — все запросы сводки видят одно и то же состояние базы.
+// statsSnapshot makes all summary queries see the same database state.
 var statsSnapshot = pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly}
 
-// eventCount — сколько событий одного типа пришлось на одно значение поля.
+// eventCount is how many events of one type fell on one field value.
 type eventCount struct {
 	Value string
 	Count int
 }
 
-// Stats считает сводку по записям открытых галерей.
+// Stats computes the summary of recordings in public galleries.
 func (s *Store) Stats(ctx context.Context) (gallery.Stats, error) {
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
@@ -73,7 +74,7 @@ func readStats(ctx context.Context, tx pgx.Tx) (gallery.Stats, error) {
 	return stats, nil
 }
 
-// readTotals считает записи, авторов, токены и исходы сборок.
+// readTotals counts recordings, authors, tokens and build outcomes.
 func readTotals(ctx context.Context, tx pgx.Tx) (gallery.Stats, error) {
 	var stats gallery.Stats
 	err := tx.QueryRow(ctx, publicEventsSQL+`
@@ -96,7 +97,7 @@ func readTotals(ctx context.Context, tx pgx.Tx) (gallery.Stats, error) {
 	return stats, nil
 }
 
-// countEventsBy считает события типа eventType по значениям поля field, частые сверху.
+// countEventsBy counts events of type eventType by the values of field, most frequent first.
 func countEventsBy(ctx context.Context, tx pgx.Tx, eventType, field string) ([]eventCount, error) {
 	rows, err := tx.Query(ctx, publicEventsSQL+`
 		SELECT event ->> $2::text AS value, count(*)

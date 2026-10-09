@@ -11,10 +11,10 @@ import (
 
 const bearerScheme = "bearer"
 
-// authorizedHandler — обработчик, которому нужен вошедший автор.
+// authorizedHandler is a handler that needs a signed-in author.
 type authorizedHandler func(w http.ResponseWriter, r *http.Request, user gallery.User)
 
-// githubAuth отдаёт CLI client_id OAuth-приложения для входа через GitHub по device flow.
+// githubAuth gives the CLI the client_id of the OAuth app for GitHub sign-in via device flow.
 func (a *api) githubAuth(w http.ResponseWriter, _ *http.Request) {
 	if a.deps.GitHubClientID == "" {
 		writeError(w, http.StatusServiceUnavailable, codeAuthUnavailable, "Вход через GitHub на этом сервере не настроен")
@@ -24,11 +24,11 @@ func (a *api) githubAuth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"clientId": a.deps.GitHubClientID})
 }
 
-// authorized пускает к next только вошедшего автора: по токену GitHub в заголовке
-// Authorization (CLI) или, если заголовка нет, по куке сессии (сайт).
+// authorized lets only a signed-in author through to next: by the GitHub token in the
+// Authorization header (CLI) or, if there is no header, by the session cookie (site).
 func (a *api) authorized(next authorizedHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Ответы несут данные автора: ни браузер, ни прокси не должны их хранить.
+		// Responses carry author data: neither the browser nor proxies may store them.
 		w.Header().Set("Cache-Control", "no-store")
 
 		hasAuthorization := r.Header.Get("Authorization") != ""
@@ -41,8 +41,8 @@ func (a *api) authorized(next authorizedHandler) http.HandlerFunc {
 	}
 }
 
-// authorizeByToken пускает автора с токеном, который принял GitHub, и заводит или обновляет
-// его в хранилище: логин на GitHub могут сменить.
+// authorizeByToken lets in an author whose token GitHub accepted, and creates or updates
+// them in the store: the GitHub login can change.
 func (a *api) authorizeByToken(w http.ResponseWriter, r *http.Request, next authorizedHandler) {
 	token, hasToken := bearerToken(r.Header.Get("Authorization"))
 	if !hasToken {
@@ -70,8 +70,8 @@ func (a *api) authorizeByToken(w http.ResponseWriter, r *http.Request, next auth
 	next(w, r, user)
 }
 
-// authorizeBySession пускает автора с живой сессией из куки. Меняющие запросы по куке
-// принимаются только со страниц самого сайта: иначе чужой сайт мог бы их подделать.
+// authorizeBySession lets in an author with a live session from the cookie. Changing requests by
+// cookie are accepted only from the site's own pages: otherwise another site could forge them.
 func (a *api) authorizeBySession(w http.ResponseWriter, r *http.Request, next authorizedHandler) {
 	cookie, err := r.Cookie(sessionCookieName)
 	if err != nil {
@@ -99,8 +99,8 @@ func (a *api) authorizeBySession(w http.ResponseWriter, r *http.Request, next au
 	next(w, r, user)
 }
 
-// isTrustedOrigin отвечает, можно ли выполнить запрос по куке: чтение — всегда, остальное —
-// только если Origin совпадает с адресом сайта.
+// isTrustedOrigin reports whether a cookie request may run: reads always, everything else
+// only if Origin matches the site address.
 func (a *api) isTrustedOrigin(r *http.Request) bool {
 	isReading := r.Method == http.MethodGet || r.Method == http.MethodHead
 	origin := r.Header.Get("Origin")
@@ -109,7 +109,7 @@ func (a *api) isTrustedOrigin(r *http.Request) bool {
 	return isReading || isSiteOrigin
 }
 
-// bearerToken достаёт токен из заголовка Authorization вида "Bearer <токен>".
+// bearerToken extracts the token from an Authorization header of the form "Bearer <token>".
 func bearerToken(header string) (string, bool) {
 	scheme, credentials, hasSeparator := strings.Cut(header, " ")
 	isBearer := hasSeparator && strings.EqualFold(scheme, bearerScheme)

@@ -15,8 +15,8 @@ const (
 	testRedirectURI  = "https://cyberzavod.test/api/auth/github/callback"
 )
 
-// fakeAccessTokenEndpoint — POST /login/oauth/access_token, как у GitHub: отвечает status и
-// body, только если пришли верные client_id, client_secret, code и redirect_uri.
+// fakeAccessTokenEndpoint serves POST /login/oauth/access_token like GitHub: it answers with status
+// and body only if the correct client_id, client_secret, code and redirect_uri arrived.
 func fakeAccessTokenEndpoint(t *testing.T, status int, body string) *OAuthApp {
 	t.Helper()
 

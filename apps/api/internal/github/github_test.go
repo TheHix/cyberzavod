@@ -13,8 +13,8 @@ import (
 
 const validToken = "gho_valid"
 
-// fakeGitHub — GET /user, как у GitHub: validToken принадлежит octocat, остальные отклоняются.
-// Считает запросы, чтобы было видно, когда сработал кэш.
+// fakeGitHub serves GET /user like GitHub: validToken belongs to octocat, the rest are rejected.
+// It counts requests, so that it is visible when the cache worked.
 type fakeGitHub struct {
 	status   int
 	body     string
@@ -44,7 +44,7 @@ func newFakeGitHub(t *testing.T, status int, body string) (*fakeGitHub, *Verifie
 	return fake, NewVerifier(server.URL + "/")
 }
 
-// fakeClock — часы, которые идут, только когда их переводят.
+// fakeClock is a clock that moves only when it is set forward.
 type fakeClock struct{ now time.Time }
 
 func (c *fakeClock) Now() time.Time { return c.now }

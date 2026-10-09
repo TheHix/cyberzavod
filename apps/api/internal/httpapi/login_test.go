@@ -23,11 +23,11 @@ const (
 	testClientSecret = "secret-test"
 	grantedCode      = "code-granted"
 	rejectedCode     = "code-rejected"
-	// brokenCode — код, на обмене которого GitHub падает.
+	// brokenCode is a code on whose exchange GitHub fails.
 	brokenCode = "code-broken"
 )
 
-// fakeSessions — хранилище сессий без базы; err — из CreateSession.
+// fakeSessions is a session store without a database; err comes from CreateSession.
 type fakeSessions struct {
 	err      error
 	sessions map[string]session.Session
@@ -62,7 +62,7 @@ func (f *fakeSessions) DeleteSession(_ context.Context, tokenHash []byte) error 
 	return nil
 }
 
-// open кладёт сессию автора, которая истекает через expiresIn, и возвращает её идентификатор.
+// open stores an author session that expires in expiresIn and returns its identifier.
 func (f *fakeSessions) open(t *testing.T, expiresIn time.Duration) string {
 	t.Helper()
 
@@ -77,8 +77,8 @@ func (f *fakeSessions) open(t *testing.T, expiresIn time.Duration) string {
 	return token
 }
 
-// newFakeGitHubServer — GitHub для входа на сайте: grantedCode меняется на токен автора,
-// rejectedCode GitHub отклоняет, на brokenCode падает; GET /user узнаёт автора по его токену.
+// newFakeGitHubServer is GitHub for site sign-in: grantedCode is exchanged for the author's token,
+// GitHub rejects rejectedCode and fails on brokenCode; GET /user finds the author by their token.
 func newFakeGitHubServer(t *testing.T) *httptest.Server {
 	t.Helper()
 
@@ -107,7 +107,7 @@ func newFakeGitHubServer(t *testing.T) *httptest.Server {
 	return server
 }
 
-// siteLoginHarness — API с входом на сайте поверх фейкового GitHub; журнал пишется в logs.
+// siteLoginHarness is the API with site sign-in on top of a fake GitHub; it logs to logs.
 type siteLoginHarness struct {
 	handler   http.Handler
 	galleries *fakeGalleries
@@ -115,7 +115,7 @@ type siteLoginHarness struct {
 	logs      *bytes.Buffer
 }
 
-// newSiteLoginHarness собирает API; isLoginConfigured — есть ли client_id и секрет.
+// newSiteLoginHarness assembles the API; isLoginConfigured: client_id and secret are set.
 func newSiteLoginHarness(t *testing.T, isLoginConfigured bool) siteLoginHarness {
 	t.Helper()
 
@@ -138,7 +138,7 @@ func newSiteLoginHarness(t *testing.T, isLoginConfigured bool) siteLoginHarness 
 	return harness
 }
 
-// do прогоняет запрос через API с куками cookies.
+// do runs a request through the API with cookies cookies.
 func (h siteLoginHarness) do(t *testing.T, request *http.Request, cookies ...*http.Cookie) *httptest.ResponseRecorder {
 	t.Helper()
 
@@ -152,8 +152,8 @@ func (h siteLoginHarness) do(t *testing.T, request *http.Request, cookies ...*ht
 	return recorder
 }
 
-// startLogin начинает вход с путём возврата returnPath и возвращает куку state и state из
-// адреса страницы согласия.
+// startLogin starts sign-in with return path returnPath and returns the state cookie and the
+// state from the consent page address.
 func (h siteLoginHarness) startLogin(t *testing.T, returnPath string) (*http.Cookie, string) {
 	t.Helper()
 
@@ -171,7 +171,7 @@ func (h siteLoginHarness) startLogin(t *testing.T, returnPath string) (*http.Coo
 	return responseCookie(t, recorder, stateCookieName), authorize.Query().Get("state")
 }
 
-// responseCookie достаёт из ответа куку name; нет куки — тест падает.
+// responseCookie extracts cookie name from the response; no cookie fails the test.
 func responseCookie(t *testing.T, recorder *httptest.ResponseRecorder, name string) *http.Cookie {
 	t.Helper()
 
@@ -349,7 +349,7 @@ func TestGitHubCallbackOpensSession(t *testing.T) {
 	}
 }
 
-// sessionRequest — запрос к API по куке сессии или токену.
+// sessionRequest is a request to the API by session cookie or token.
 type sessionRequest struct {
 	method    string
 	path      string

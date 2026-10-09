@@ -2,7 +2,7 @@ package httpapi
 
 import "net/http"
 
-// Коды ошибок API: по ним клиент решает, что делать; message — для человека.
+// API error codes: the client decides what to do by them; message is for the human.
 const (
 	codeUnauthorized      = "unauthorized"
 	codeForbiddenOrigin   = "forbidden_origin"
@@ -19,7 +19,7 @@ const (
 	codeInternal          = "internal"
 )
 
-// apiError — тело ответа с ошибкой.
+// apiError is the body of an error response.
 type apiError struct {
 	Code    string `json:"error"`
 	Message string `json:"message"`
@@ -33,7 +33,7 @@ func writeNotFound(w http.ResponseWriter, message string) {
 	writeError(w, http.StatusNotFound, codeNotFound, message)
 }
 
-// failInternal пишет ошибку в журнал и отвечает 500, не раскрывая подробностей клиенту.
+// failInternal logs the error and responds 500 without revealing details to the client.
 func (a *api) failInternal(w http.ResponseWriter, r *http.Request, err error) {
 	a.deps.Logger.ErrorContext(r.Context(), "ошибка запроса", "route", r.Pattern, "err", err)
 	writeError(w, http.StatusInternalServerError, codeInternal, "Внутренняя ошибка сервера, попробуйте позже")

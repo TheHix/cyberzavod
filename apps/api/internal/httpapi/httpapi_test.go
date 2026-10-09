@@ -16,7 +16,7 @@ import (
 const (
 	authorToken   = "gho_author"
 	rejectedToken = "gho_rejected"
-	// unreachableToken — токен, на котором GitHub не отвечает.
+	// unreachableToken is a token for which GitHub does not respond.
 	unreachableToken = "gho_unreachable"
 	testClientID     = "Iv1.test"
 )
@@ -27,8 +27,8 @@ type fakeDB struct{ err error }
 
 func (f fakeDB) Ping(context.Context) error { return f.err }
 
-// fakeVerifier — GitHub без сети: authorToken принадлежит author, unreachableToken
-// GitHub не может проверить, остальные он отклоняет.
+// fakeVerifier is GitHub without a network: authorToken belongs to author, unreachableToken
+// GitHub cannot verify, the rest it rejects.
 type fakeVerifier struct{}
 
 func (fakeVerifier) Verify(_ context.Context, token string) (gallery.User, error) {
@@ -42,8 +42,8 @@ func (fakeVerifier) Verify(_ context.Context, token string) (gallery.User, error
 	}
 }
 
-// fakeGalleries — хранилище без базы: отдаёт заданные значения, err — из любого метода,
-// кроме SaveUser. Запоминает авторов, которых заводили.
+// fakeGalleries is a store without a database: it returns the given values, err from any method
+// except SaveUser. It remembers the authors that were created.
 type fakeGalleries struct {
 	err           error
 	isNew         bool
@@ -94,14 +94,14 @@ func (f *fakeGalleries) Stats(context.Context) (gallery.Stats, error) {
 	return stats, f.err
 }
 
-// sessionBody — тело записи сессии с идентификатором id.
+// sessionBody is the body of a session recording with identifier id.
 func sessionBody(id string) string {
 	return `{"version":1,"type":"session","id":"` + id + `","timestamp":"2026-10-05T08:00:00.000Z",` +
 		`"projectId":"lab","source":{"type":"manual"},` +
 		`"data":{"title":"Галерея","language":"ru","workflow":"default","harness":"0.6.0","events":[]}}`
 }
 
-// apiRequest — запрос к API в тесте; пустой token — без заголовка Authorization.
+// apiRequest is a request to the API in a test; an empty token means no Authorization header.
 type apiRequest struct {
 	method string
 	path   string
@@ -109,7 +109,7 @@ type apiRequest struct {
 	body   string
 }
 
-// serve прогоняет запрос через маршруты API с хранилищем galleries и client_id clientID.
+// serve runs a request through the API routes with the galleries store and client_id clientID.
 func serve(t *testing.T, galleries *fakeGalleries, clientID string, request apiRequest) *httptest.ResponseRecorder {
 	t.Helper()
 

@@ -1,4 +1,4 @@
-// Package db отвечает за подключение к Postgres и миграции схемы.
+// Package db handles the Postgres connection and schema migrations.
 package db
 
 import (
@@ -14,7 +14,7 @@ import (
 	"github.com/bysavelii/cyberzavod/apps/api/migrations"
 )
 
-// Connect открывает пул соединений с Postgres.
+// Connect opens a Postgres connection pool.
 func Connect(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	pool, err := pgxpool.New(ctx, url)
 	if err != nil {
@@ -23,7 +23,7 @@ func Connect(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-// Migrate применяет все миграции из папки migrations, вшитой в бинарник.
+// Migrate applies all migrations from the migrations folder embedded in the binary.
 func Migrate(ctx context.Context, url string) (err error) {
 	cfg, err := pgxpool.ParseConfig(url)
 	if err != nil {
@@ -37,7 +37,7 @@ func Migrate(ctx context.Context, url string) (err error) {
 		}
 	}()
 
-	// Advisory-блокировка в Postgres: два одновременных migrate не применят миграции дважды.
+	// A Postgres advisory lock: two concurrent migrate runs will not apply migrations twice.
 	locker, err := lock.NewPostgresSessionLocker()
 	if err != nil {
 		return fmt.Errorf("блокировка миграций: %w", err)

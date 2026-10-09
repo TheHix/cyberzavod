@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// sessionJSON собирает тело записи сессии; replace подменяет в нём куски текста.
+// sessionJSON builds a session recording body; replace substitutes pieces of text in it.
 func sessionJSON(replace ...string) string {
 	body := `{"version":1,"type":"session","id":"2026-10-05-4365c610","timestamp":"2026-10-05T08:00:00.500Z",` +
 		`"projectId":"lab","source":{"type":"manual"},` +
