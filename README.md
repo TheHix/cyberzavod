@@ -1,23 +1,46 @@
 # Cyberzavod
 
-Cyberzavod is a local-first, model-agnostic development harness for AI-assisted software projects.
+Cyberzavod is a local-first development harness for AI coding agents: it gives the agent you already use a fixed process, checks that must be green before the agent stops, and a journal of what happened. It does not write code and it is not an agent.
 
-**Your stack can change. Your AI can change. Cyberzavod keeps the development process consistent.**
+**Why.** AI agents are fast, but every project, model and tool ends up with its own prompts, rules files and habits, and nothing records why the work went the way it did. Cyberzavod keeps the process, the checks and the record the same while your stack and your agent change.
 
-Cyberzavod owns the development process, not the technology stack. It does not write code and it is not an agent: it gives the agent you already use a process to follow, checks that the work is green before the agent stops, and keeps a journal of sessions and decisions next to your project.
+**See it work.** [cyberzavod.com](https://cyberzavod.com) replays recorded sessions on a top-down factory floor: AI agents building example projects from scratch, task by task, through this process.
 
-The site [cyberzavod.com](https://cyberzavod.com) is the visual side: a top-down factory floor that replays recorded sessions in which AI agents built example projects from scratch, task by task, through the Cyberzavod process.
+## Start in 3 minutes
 
-## Quickstart
+You need Node 22+, git and [Claude Code](https://claude.com/claude-code), in a git repository.
 
-You need Node 22+, git and Claude Code. The project must be a git repository (in an empty folder run `git init`): `/feature` wants a clean working tree and makes commits.
+```bash
+cd my-project
+npx cyberzavod init        # shows what it found, asks Continue? [Y/n]
+```
 
-1. `npx cyberzavod init` in the project root. If npx asks to download the package, answer `y`. `init` shows what it found and asks `Continue? [Y/n]`, then writes the config, `AGENTS.md` and the agent files and prints what to commit. Commit those files.
-2. Open Claude Code in the project **after** `init` (a session started earlier is recorded without its start) and run `/setup`. It fills in `AGENTS.md` from your repository, asks only what the code cannot tell, and runs the checks once (the commands that must pass before an agent can finish a turn). Commit the files it changed (it lists them).
-3. `/feature <task>`. The task goes through the stages: plan, code, review, verify, record (a stage is one step of the process; most stages have their own agent). You approve the plan; at the end you get commits.
-4. `/publish-recording` in the same session. It turns the session into a recording (a clean copy of the task: stages, prompts, messages, time, tokens) and asks you to review it. With your consent it sends the recording to your gallery (a personal page on the site; the first time you sign in with GitHub) and prints a link like `https://cyberzavod.com/r/?id=…`. The floor on the site plays the task from that link.
+Then open Claude Code in the project and run:
 
-A longer guide, with examples of finished builds, is on the site: https://cyberzavod.com/guides/connect-project/ (source: [guides/connect-project.en.md](guides/connect-project.en.md), in Russian: [guides/connect-project.ru.md](guides/connect-project.ru.md)).
+```text
+/setup                     # fills in AGENTS.md from your code, runs the checks once
+/feature "Add dark mode"   # one task through the whole workflow
+```
+
+Commit what `init` and `/setup` list. Optionally, `/publish-recording` turns the session into a recording and, only with your consent, shares it to your gallery on the site.
+
+Guides: [Cyberzavod in 3 minutes](https://cyberzavod.com/guides/getting-started/) · [full guide](https://cyberzavod.com/guides/connect-project/) (sources: [guides/](guides/), English and Russian).
+
+## The workflow
+
+**Plan → Implement → Review → Verify → Record.** You approve the plan; stage agents write the code, review it and verify it against the plan; the stop hook keeps the agent working while the project checks are red; at the end you get commits, and decisions go to the journal. Details are in [How it works](#how-it-works).
+
+## Current support
+
+Cyberzavod is agent-agnostic by design. Claude Code is currently the first fully supported adapter; other agents are not supported yet. The CLI is built for macOS, Linux and Windows, and CI checks the packed npm package on all three (on Windows, Claude Code runs the hooks through Git Bash).
+
+## Privacy
+
+Cyberzavod is local-first. Nothing is shared unless you explicitly use sharing or publishing functionality: only the gallery commands (`login`, `share`, `unshare`, `gallery`) talk to the server. `init`, `sync`, `status`, `doctor` and the hooks send nothing anywhere; npx only downloads the `cyberzavod` package from npm when it is not cached. Raw session logs, which contain your prompts, stay in the journal's `capture/` directory, which `init` keeps out of git.
+
+## Removing it
+
+`npx cyberzavod disconnect` shows what it will remove and what it will keep, asks to confirm, and removes only what Cyberzavod added. Your code, `AGENTS.md`, the journal and your own settings stay.
 
 ## What appears in your project
 
@@ -26,9 +49,10 @@ A longer guide, with examples of finished builds, is on the site: https://cyberz
 - `CLAUDE.md`: a thin entry point for Claude Code, generated: don't edit it by hand.
 - `.claude/agents/` and `.claude/skills/`: the stage agents, the recording editor, and the `/setup`, `/feature` and `/publish-recording` skills.
 - `.claude/settings.json`: the recording and stop hooks and a rule that forbids reading and editing `.env`. Your own settings and hooks in this file stay as they are.
+- `.cyberzavod/generated.json`: the generated files with their checksums, so Cyberzavod can tell its own file from one you edited.
 - A `.gitignore` line for the journal's `capture/` directory.
 
-`init` adds no tool to your project: the hooks run `npx cyberzavod@<version>` with the version from `.cyberzavod/project.json`, and the first hook run puts the package into the npm cache. Generated files carry a "Generated by `cyberzavod sync`" mark; `sync` overwrites only those files and refuses to touch yours. `init` takes `--yes`, `--id`, `--check` and `--journal` (see `npx cyberzavod init --help`) and leaves an already connected project alone.
+`init` adds no tool to your project: the hooks run `npx cyberzavod@<version>` with the version from `.cyberzavod/project.json`, and the first hook run puts the package into the npm cache. Generated files carry a "Generated by `cyberzavod sync`" mark. Cyberzavod never silently overwrites a file it does not own: `init`, `sync` and `disconnect` leave your files and generated files you edited by hand alone and say so. `init` takes `--yes`, `--id`, `--check` and `--journal` (see `npx cyberzavod init --help`); running it again changes nothing and says whether `sync` is needed.
 
 ## Commands
 
@@ -45,10 +69,11 @@ Run every command as `npx cyberzavod <command>`.
 | Gallery | `share` | Send a recording from the journal to your gallery |
 | Gallery | `unshare` | Remove a recording from your gallery |
 | Gallery | `gallery` | Your gallery: recordings, limit, links; open or close it |
-| Maintenance | `sync` | Detect the stack again and rebuild the agent files; `--check` only reports what is out of date, `--force` overwrites files you wrote |
+| Maintenance | `sync` | Detect the stack again and rebuild the agent files; `--diff` previews the changes, `--check` fails if anything is out of date, `--force` overwrites files you wrote |
 | Maintenance | `doctor` | Check the setup and say how to fix each problem |
+| Maintenance | `disconnect` | Remove Cyberzavod from the project: only what it added |
 
-`npx cyberzavod <command> --help` lists the flags of a command. The language is set by `--lang en|ru`, `CYBERZAVOD_LANG` or the system locale. To move to a newer release, run `npx cyberzavod@latest sync`: it rewrites the generated files and the hooks for the new version. `draft`, `publish` and `hook` are called by the skills and the hooks, not by you.
+`npx cyberzavod <command> --help` lists the flags of a command. The language is set by `--lang en|ru`, `CYBERZAVOD_LANG` or the system locale. To move to a newer release, run `npx cyberzavod@latest sync`: it rewrites the generated files and the hooks for the new version. `draft`, `publish` and `hook` are called by the skills and the hooks, not by you. For scripts and CI, `status --json`, `doctor --json` and `sync --check --json` print one JSON document with a `schemaVersion` and stable keys.
 
 ## If something doesn't work
 
@@ -65,6 +90,8 @@ Run `npx cyberzavod doctor`. It prints a line for each item (✓ fine, – note,
 - Claude Code was open before `init`: the session has no start in the journal. Start a new session.
 - The stop hook won't let the agent finish: the checks are red, fix what they print.
 - No network and no package in the npm cache: the recording hooks are skipped, and the stop hook lets the agent finish with a message that the checks were skipped.
+
+An unexpected error prints one line; run the command again with `CYBERZAVOD_DEBUG=1` to see the stack trace for a bug report.
 
 ## How it works
 
@@ -112,9 +139,9 @@ The record format is the whole contract between the tool and any viewer. [cyberz
 | `apps/web` | The site: Astro, SolidJS, PixiJS factory floor |
 | `apps/api` | The API: Go and Postgres |
 
-The tool and the site share this repository but not code: the site only reads the record format. Releases go to npm when a `vX.Y.Z` tag is pushed.
+The tool and the site share this repository but not code: the site only reads the record format. Releases go to npm when a `vX.Y.Z` tag is pushed; the steps are in [RELEASING.md](RELEASING.md).
 
-To work on Cyberzavod itself: `pnpm install`, then `pnpm cyberzavod <command>` builds the CLI from source and runs it. `make dev` starts the site on http://localhost:4321 and the API, `make check` runs every check, and `make help` lists the rest. The project rules are in [AGENTS.md](AGENTS.md). There is an isolated dev container for AI agents; see [.devcontainer/README.md](.devcontainer/README.md).
+To work on Cyberzavod itself: `pnpm install`, then `pnpm cyberzavod <command>` builds the CLI from source and runs it. `make dev` starts the site on http://localhost:4321 and the API, `make check` runs every check, `pnpm smoke` checks the real npm package from `init` to `disconnect`, and `make help` lists the rest. The project rules are in [AGENTS.md](AGENTS.md). There is an isolated dev container for AI agents; see [.devcontainer/README.md](.devcontainer/README.md).
 
 ## License
 
