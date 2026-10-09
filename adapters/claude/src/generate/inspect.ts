@@ -5,12 +5,12 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { isNotFound } from "@cyberzavod/storage";
 import { ClaudeError } from "../errors.ts";
-import { GenerateError } from "./claude.ts";
 import {
   inspectHooks,
   parseSettings,
   SETTINGS_FILE,
   SettingsError,
+  unparsedSettings,
   type HooksInspection,
 } from "./settings.ts";
 
@@ -25,16 +25,6 @@ async function readSettingsText(projectRoot: string): Promise<string | undefined
 
     throw err;
   }
-}
-
-// Диагностика `hooks` не того вида — текст формата, как и у `mergeSettings`; рамку даёт каталог.
-function unparsedHooks(err: SettingsError): GenerateError {
-  const reason = err.message;
-
-  return new GenerateError(
-    (messages) => messages.errors.settingsNotParsed({ file: SETTINGS_FILE, reason }),
-    { cause: err },
-  );
 }
 
 /**
@@ -58,7 +48,7 @@ export async function inspectClaudeHooks(
   } catch (err) {
     if (err instanceof ClaudeError) return { kind: "unreadable", error: err };
 
-    if (err instanceof SettingsError) return { kind: "unreadable", error: unparsedHooks(err) };
+    if (err instanceof SettingsError) return { kind: "unreadable", error: unparsedSettings(err) };
 
     throw err;
   }

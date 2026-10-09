@@ -432,6 +432,22 @@ describe("runCli", () => {
     expect(help).toContain("--private");
   });
 
+  it.each([["sync"], ["sync", "--check"]])(
+    "%s на hooks не того вида печатает одну строку и выходит с 1",
+    async (...argv) => {
+      await initialized();
+      await writeFile(path.join(root, ".claude/settings.json"), JSON.stringify({ hooks: [] }));
+
+      const code = await runCli(argv, root, NO_LOCALE);
+
+      expect({ code, error: printedError() }).toEqual({
+        code: 1,
+        error:
+          "cyberzavod sync: .claude/settings.json cannot be parsed: hooks должен быть объектом",
+      });
+    },
+  );
+
   it("--help после -- — аргумент команды, а не запрос справки", async () => {
     const code = await runCli(["note", "--", "--help"], root, NO_LOCALE);
 

@@ -22,6 +22,8 @@ import {
   mergeSettings,
   parseSettings,
   SETTINGS_FILE,
+  SettingsError,
+  unparsedSettings,
   type Settings,
 } from "./settings.ts";
 
@@ -135,12 +137,22 @@ function settingsText(settings: Settings): string {
   return `${JSON.stringify(settings, null, 2)}\n`;
 }
 
+function settingsWithAdapterHooks(current: Settings, version: string): Settings {
+  try {
+    return mergeSettings(current, adapterHooks(version));
+  } catch (err) {
+    if (err instanceof SettingsError) throw unparsedSettings(err);
+
+    throw err;
+  }
+}
+
 async function settingsFile(root: string, version: string): Promise<GeneratedFile> {
   const current = parseSettings(await readOptional(path.join(root, SETTINGS_FILE)), SETTINGS_FILE);
 
   return {
     path: SETTINGS_FILE,
-    content: settingsText(mergeSettings(current, adapterHooks(version))),
+    content: settingsText(settingsWithAdapterHooks(current, version)),
   };
 }
 

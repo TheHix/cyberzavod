@@ -82,7 +82,8 @@ describe("freshnessCheck", () => {
 
     expect(result).toEqual({
       status: "failed",
-      problem: "agent files cannot be checked: hooks должен быть объектом",
+      problem:
+        "agent files cannot be checked: .claude/settings.json cannot be parsed: hooks должен быть объектом",
       fix: "remove the cause above and run npx cyberzavod sync --check",
     });
   });

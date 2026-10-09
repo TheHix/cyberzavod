@@ -15,7 +15,7 @@ export {
 } from "./generate/sync.ts";
 export type { ClaudeTemplates } from "./generate/files.ts";
 export { inspectClaudeHooks, type HooksReading } from "./generate/inspect.ts";
-export { SETTINGS_FILE, SettingsError, type HooksInspection } from "./generate/settings.ts";
+export { SETTINGS_FILE, type HooksInspection } from "./generate/settings.ts";
 export {
   HOOK_NAMES,
   isHookName,

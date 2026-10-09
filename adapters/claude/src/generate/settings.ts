@@ -31,6 +31,20 @@ export class SettingsError extends Error {}
 /** Путь настроек Claude Code относительно корня проекта. */
 export const SETTINGS_FILE = ".claude/settings.json";
 
+/**
+ * Ошибка адаптера из диагностики настроек не того вида: текст формата, рамку даёт каталог.
+ * @param {SettingsError} err Диагностика `hooks` или `permissions` не того вида.
+ * @returns {GenerateError} Ошибка, которую CLI печатает одной строкой.
+ */
+export function unparsedSettings(err: SettingsError): GenerateError {
+  const reason = err.message;
+
+  return new GenerateError(
+    (messages) => messages.errors.settingsNotParsed({ file: SETTINGS_FILE, reason }),
+    { cause: err },
+  );
+}
+
 function parseJson(text: string, file: string): unknown {
   try {
     return JSON.parse(text);
