@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "projectId": "cyberzavod",
-  "harness": "0.9.0",
+  "harness": "0.9.1",
   "workflow": "default",
   "journal": ".cyberzavod/journal",
   "agents": {
