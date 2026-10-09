@@ -161,6 +161,7 @@ export const UI_TEXT = {
     },
     stagesLabel: { en: "Workflow stages", ru: "Этапы процесса" },
     gettingStarted: { en: "Get started in 3 minutes", ru: "Начать за 3 минуты" },
+    close: { en: "Hide the introduction", ru: "Скрыть описание" },
   },
   /** The "not found" page. */
   notFound: {
