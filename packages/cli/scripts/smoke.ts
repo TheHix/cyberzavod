@@ -49,6 +49,7 @@ const GENERATED_PATHS = [
 
 interface PackedPackage {
   filename: string;
+  version: string;
   size: number;
   unpackedSize: number;
   files: { path: string }[];
@@ -179,6 +180,14 @@ async function readText(root: string, file: string): Promise<string> {
 
 function countLines(text: string, line: string): number {
   return text.split(/\r?\n/).filter((candidate) => candidate === line).length;
+}
+
+function checkVersion(workspace: Workspace, packed: PackedPackage): void {
+  const run = cyberzavod(workspace, ["--version"]);
+
+  expectExit(run, SUCCESS, "--version");
+  assert.equal(run.stdout.trim(), packed.version, "--version не совпадает с версией пакета");
+  step(`--version: ${packed.version}`);
 }
 
 async function checkInit(workspace: Workspace): Promise<void> {
@@ -318,6 +327,7 @@ async function main(): Promise<void> {
     const workspace: Workspace = { tool, project, cli: await installPackage(tool, packed) };
 
     step(`npm pack и установка ${packed.filename}`);
+    checkVersion(workspace, packed);
     await checkInit(workspace);
     checkStatus(workspace);
     checkDoctor(workspace);

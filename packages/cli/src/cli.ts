@@ -33,7 +33,11 @@ import { confirmWithoutAsking, terminalConfirmation, type Confirmation } from ".
 import { CommandError } from "./errors.ts";
 import { commandHelp, generalHelp, listedCommandNames, type CommandPlacement } from "./help.ts";
 import type { InitOverrides } from "./initial-config.ts";
-import { readInstallation, type Installation } from "./installation/installation.ts";
+import {
+  HARNESS_VERSION,
+  readInstallation,
+  type Installation,
+} from "./installation/installation.ts";
 import { CLI_MESSAGES } from "./messages/catalog.ts";
 import { COMMAND_NAMES, type CliMessages, type CommandName } from "./messages/cli-messages.ts";
 import { extractLanguageFlag, languageOf, type Environment } from "./messages/language.ts";
@@ -45,6 +49,7 @@ const SUCCESS = 0;
 const FAILURE = 1;
 const GENERAL_HELP_REQUESTS: readonly string[] = ["help", "--help", "-h"];
 const COMMAND_HELP_FLAGS: readonly string[] = ["--help", "-h"];
+const VERSION_REQUESTS: readonly string[] = ["--version", "-v"];
 const OPTIONS_END = "--";
 const DEBUG_VARIABLE = "CYBERZAVOD_DEBUG";
 
@@ -503,6 +508,13 @@ export async function runCli(argv: string[], directory: string, env: Environment
 
   if (name === undefined || GENERAL_HELP_REQUESTS.includes(name)) {
     console.log(generalHelp(messages, COMMANDS));
+
+    return SUCCESS;
+  }
+
+  // Версия печатается голым числом, как у npm: её читают скрипты и сверка выпуска.
+  if (VERSION_REQUESTS.includes(name)) {
+    console.log(HARNESS_VERSION);
 
     return SUCCESS;
   }

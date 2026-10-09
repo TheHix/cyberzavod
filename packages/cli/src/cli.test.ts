@@ -85,6 +85,12 @@ describe("runCli", () => {
     expect(code).toBe(0);
   });
 
+  it("--version печатает версию пакета", async () => {
+    const code = await runCli(["--version"], root, NO_LOCALE);
+
+    expect({ code, log: printedLog() }).toEqual({ code: 0, log: HARNESS_VERSION });
+  });
+
   it("на неизвестную команду без подсказки сообщает об ошибке и зовёт --help", async () => {
     const code = await runCli(["deploy"], root, NO_LOCALE);
 
