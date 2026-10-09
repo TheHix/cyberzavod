@@ -1,7 +1,7 @@
 // Проверка файлов агента: то, что сгенерировано в проекте, совпадает с тем, что соберёт
 // запущенный CLI, — так же, как `sync --check`.
 
-import { ClaudeError, SettingsError } from "@cyberzavod/adapter-claude";
+import { ClaudeError } from "@cyberzavod/adapter-claude";
 import { PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
 import { inspectProjectFiles, type ProjectFilesInspection } from "../commands/sync.ts";
 import { RULES_FILE } from "../commands/init.ts";
@@ -54,10 +54,6 @@ export const freshnessCheck: ProjectCheck = {
           problem: files.cannotCheck(err.describe(claudeMessages)),
           fix: files.fixCause,
         });
-      }
-
-      if (err instanceof SettingsError) {
-        return failed({ problem: files.cannotCheck(err.message), fix: files.fixCause });
       }
 
       throw err;

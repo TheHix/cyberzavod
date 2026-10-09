@@ -142,6 +142,21 @@ describe("syncClaude", () => {
     expect(await exists(".claude/settings.json")).toBe(false);
   });
 
+  it("на hooks не того вида бросает ошибку адаптера с путём настроек", async () => {
+    await writeProjectFile(".claude/settings.json", JSON.stringify({ hooks: [] }));
+
+    const act = () => sync({ check: true });
+    const error = await act().then(
+      () => undefined,
+      (err: unknown) => err,
+    );
+
+    expect(error).toBeInstanceOf(ClaudeError);
+    expect((error as ClaudeError).describe(CLAUDE_MESSAGES.en)).toBe(
+      ".claude/settings.json cannot be parsed: hooks должен быть объектом",
+    );
+  });
+
   it("с force пишет поверх файла человека", async () => {
     await writeProjectFile("CLAUDE.md", "Мои правила\n");
 
