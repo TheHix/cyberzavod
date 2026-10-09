@@ -1,22 +1,22 @@
 import { arrayAt, countAt, objectAt, stringAt, type JsonObject } from "@/shared/api/fields.ts";
 
-/** Сколько раз встретилось значение: этап возврата или причина вмешательства. */
+/** How many times a value occurred: a rework stage or an intervention reason. */
 export interface TallyRow {
-  /** Значение из записей как есть: этап (`review`) или причина (`plan_review`). */
+  /** The value from recordings as is: a stage (`review`) or a reason (`plan_review`). */
   readonly key: string;
   readonly count: number;
 }
 
-/** Аналитика по записям открытых галерей — ответ `GET /api/stats`. */
+/** Stats over the recordings of public galleries, the `GET /api/stats` response. */
 export interface BuildStats {
   readonly recordings: number;
   readonly authors: number;
   readonly tokens: number;
-  /** Возвраты на доработку (`stage_fail`) по этапам. */
+  /** Reworks (`stage_fail`) by stage. */
   readonly returns: readonly TallyRow[];
-  /** Вмешательства человека по причинам. */
+  /** Human interventions by reason. */
   readonly interventions: readonly TallyRow[];
-  /** Исходы сборок по `build_end.ok`. */
+  /** Build outcomes by `build_end.ok`. */
   readonly outcomes: { readonly ok: number; readonly failed: number };
 }
 
@@ -31,11 +31,11 @@ function tallyRowsAt(stats: JsonObject, field: string, keyField: string): readon
 }
 
 /**
- * Разбирает ответ `GET /api/stats`. Этапы и причины не фильтруются: что в записях, то и
- * показывается.
- * @param {unknown} raw Тело ответа.
- * @returns {BuildStats} Аналитика.
- * @throws {import("@/shared/api/errors.ts").ApiResponseError} Если ответ не того вида.
+ * Parses the `GET /api/stats` response. Stages and reasons are not filtered: whatever is in the
+ * recordings is shown.
+ * @param {unknown} raw Response body.
+ * @returns {BuildStats} Stats.
+ * @throws {import("@/shared/api/errors.ts").ApiResponseError} If the response has the wrong shape.
  */
 export function parseStats(raw: unknown): BuildStats {
   const place = "ответ /api/stats";

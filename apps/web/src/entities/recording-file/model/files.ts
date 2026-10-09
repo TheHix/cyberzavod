@@ -1,31 +1,31 @@
-// Полные записи сайта, которые страница уже спросила. Их файлы грузятся лениво и по одному
-// разу: журнал серии берёт запись, которая сейчас в цехе, и заранее — следующую.
+// Full site recordings the page has already asked for. Their files load lazily and only once:
+// the series journal takes the recording now on the factory floor and, in advance, the next one.
 
 import { atom, type ReadableAtom } from "nanostores";
 import type { SessionRecord } from "@cyberzavod/core";
 import { LOADING, settle, type Remote } from "@/shared/api/remote.ts";
 import { fetchRecording } from "../api/requests.ts";
 
-/** Записи, которые уже спросили, по id: грузится, готова или почему её нет. */
+/** Recordings already asked for, by id: loading, ready, or why it is missing. */
 export type RecordingFiles = Readonly<Record<string, Remote<SessionRecord>>>;
 
-/** Кеш полных записей: стор и действие, которое спрашивает запись. */
+/** Cache of full recordings: the store and the action that asks for a recording. */
 export interface RecordingFilesModel {
-  /** Записи, которые уже спросили. */
+  /** Recordings already asked for. */
   readonly $files: ReadableAtom<RecordingFiles>;
   /**
-   * Спрашивает запись, если её ещё не спрашивали: повторный вызов второй запрос не шлёт. После
-   * сбоя сети следующий вызов спрашивает снова.
-   * @param {string} id id записи.
-   * @returns {Promise<void>} Когда запись получена или стало ясно, почему её нет.
+   * Asks for a recording if it has not been asked for yet: a repeated call sends no second request.
+   * After a network failure the next call asks again.
+   * @param {string} id Recording id.
+   * @returns {Promise<void>} When the recording is received or it is clear why it is missing.
    */
   request(id: string): Promise<void>;
 }
 
 /**
- * Создаёт кеш полных записей.
- * @param {(id: string) => Promise<SessionRecord>} fetchFile Запрос записи по id.
- * @returns {RecordingFilesModel} Пустой кеш.
+ * Creates a cache of full recordings.
+ * @param {(id: string) => Promise<SessionRecord>} fetchFile Recording request by id.
+ * @returns {RecordingFilesModel} An empty cache.
  */
 export function createRecordingFiles(
   fetchFile: (id: string) => Promise<SessionRecord>,
@@ -42,7 +42,7 @@ export function createRecordingFiles(
     const state = await settle(() => fetchFile(id));
 
     store(id, state);
-    // Сбой сети проходит: в следующий раз запись спросим снова, а 404 и битая запись — навсегда.
+    // A network failure passes: next time we ask again, but 404 and a broken recording are final.
     if (state.status === "failed") requests.delete(id);
   };
 
@@ -59,10 +59,10 @@ export function createRecordingFiles(
 }
 
 /**
- * Запись из кеша: ещё не спрошенная считается загружающейся.
- * @param {RecordingFiles} files Записи, которые уже спросили.
- * @param {string} id id записи.
- * @returns {Remote<SessionRecord>} Состояние записи.
+ * A recording from the cache: one not yet asked for counts as loading.
+ * @param {RecordingFiles} files Recordings already asked for.
+ * @param {string} id Recording id.
+ * @returns {Remote<SessionRecord>} Recording state.
  */
 export function recordingFileOf(files: RecordingFiles, id: string): Remote<SessionRecord> {
   return files[id] ?? LOADING;
@@ -70,13 +70,13 @@ export function recordingFileOf(files: RecordingFiles, id: string): Remote<Sessi
 
 const recordingFiles = createRecordingFiles((id) => fetchRecording(id));
 
-/** Полные записи сайта на этой странице: общий кеш для всех островов. */
+/** Full site recordings on this page: a cache shared by all islands. */
 export const $recordingFiles = recordingFiles.$files;
 
 /**
- * Спрашивает полную запись сайта, если её ещё не спрашивали на этой странице.
- * @param {string} id id записи.
- * @returns {Promise<void>} Когда запись получена или стало ясно, почему её нет.
+ * Asks for a full site recording if it has not been asked for on this page yet.
+ * @param {string} id Recording id.
+ * @returns {Promise<void>} When the recording is received or it is clear why it is missing.
  */
 export function requestRecordingFile(id: string): Promise<void> {
   return recordingFiles.request(id);

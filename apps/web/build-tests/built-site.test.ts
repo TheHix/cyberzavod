@@ -15,19 +15,19 @@ const ORIGIN = "https://example.test";
 const PAGE_PATHS = ["/", "/recordings/a/"];
 
 interface PageOptions {
-  /** Язык в `<html lang>`; по умолчанию правильный. */
+  /** Language in `<html lang>`; correct by default. */
   readonly lang?: string;
-  /** Адрес в `canonical`; по умолчанию сама страница. */
+  /** Address in `canonical`; the page itself by default. */
   readonly canonical?: string;
-  /** Языки, для которых `hreflang` не пишется. */
+  /** Languages for which `hreflang` is not written. */
   readonly withoutHreflang?: readonly string[];
-  /** Дополнительная разметка в теле страницы. */
+  /** Extra markup in the page body. */
   readonly body?: string;
-  /** Страница закрыта от поисковиков, как «не найдено»: вместо canonical и hreflang — noindex. */
+  /** Hidden from search engines like "not found": noindex instead of canonical and hreflang. */
   readonly noindex?: boolean;
 }
 
-// Страницы теста — всегда адреса одного из языков.
+// Test pages are always addresses of one of the languages.
 function localeOf(pageUrl: string): Locale {
   return localeOfPage(pageUrl) ?? DEFAULT_LOCALE;
 }
@@ -58,8 +58,8 @@ function pageHtml(pageUrl: string, options: PageOptions = {}): string {
   ].join("");
 }
 
-// Сайт из страниц обоих языков: у каждой верная разметка, ссылки остаются в своём языке, и все
-// страницы есть в карте сайта.
+// A site of pages in both languages: each has correct markup, links stay in their language, and all
+// pages are in the sitemap.
 function validSite(overrides: Readonly<Record<string, string>> = {}): BuiltSite {
   const pageUrls = LOCALES.flatMap((locale) =>
     PAGE_PATHS.map((path) => localizedPath(locale, path)),

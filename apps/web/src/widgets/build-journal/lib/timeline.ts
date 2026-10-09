@@ -7,7 +7,10 @@ import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { formatClock } from "@/shared/lib/format.ts";
 
-/** Запись журнала сборки: промпт, вмешательство или реплика с номером речи, как в цехе. */
+/**
+ * Build journal entry: a prompt, an intervention or a message with a speech number, as on the
+ * floor.
+ */
 export type TimelineEntry =
   | { kind: "prompt"; prompt: PromptEvent; speech: Extract<Speech, { kind: "prompt" }> }
   | {
@@ -17,22 +20,22 @@ export type TimelineEntry =
     }
   | { kind: "message"; message: MessageEvent; speech: Extract<Speech, { kind: "message" }> };
 
-/** Шапка записи журнала: якорь для «подробнее», время в сборке и маршрут. */
+/** Journal entry header: the anchor for "more", the time in the build and the route. */
 export interface EntryHeader {
-  /** id элемента журнала; у промпта его нет — к нему не ведёт «подробнее». */
+  /** Journal element id; a prompt has none, since no "more" leads to it. */
   readonly anchor: string | undefined;
-  /** Время записи в сборке, например `1:30`. */
+  /** Entry time in the build, e.g. `1:30`. */
   readonly clock: string;
-  /** От кого и кому или метка вмешательства. */
+  /** From whom to whom, or the intervention label. */
   readonly route: string;
 }
 
 /**
- * Собирает журнал сборки из событий записи: промпты, вмешательства и реплики одним списком по
- * времени. Номера — те же, что у пузырей в цехе: по ним цех и журнал находят друг друга, а по
- * номеру вмешательства или реплики «подробнее» находит запись.
- * @param {readonly SessionEvent[]} events События записи.
- * @returns {TimelineEntry[]} Записи журнала в порядке событий.
+ * Builds the build journal from the recording events: prompts, interventions and messages in one
+ * list by time. The numbers are the same as on the floor bubbles: by them the floor and the
+ * journal find each other, and "more" finds the entry by the intervention or message number.
+ * @param {readonly SessionEvent[]} events Recording events.
+ * @returns {TimelineEntry[]} Journal entries in event order.
  */
 export function timelineOf(events: readonly SessionEvent[]): TimelineEntry[] {
   let promptIndex = 0;
@@ -64,17 +67,17 @@ export function timelineOf(events: readonly SessionEvent[]): TimelineEntry[] {
       case "build_end":
         return [];
       default:
-        // Новый тип события не скомпилируется, пока здесь не решат, попадает ли он в журнал.
+        // A new event type will not compile until it is decided here whether it enters the journal.
         return event satisfies never;
     }
   });
 }
 
 /**
- * Шапка записи журнала на языке страницы.
- * @param {TimelineEntry} entry Запись журнала.
- * @param {Locale} locale Язык страницы.
- * @returns {EntryHeader} Якорь, время и маршрут.
+ * Journal entry header in the page language.
+ * @param {TimelineEntry} entry Journal entry.
+ * @param {Locale} locale Page language.
+ * @returns {EntryHeader} Anchor, time and route.
  */
 export function headerOf(entry: TimelineEntry, locale: Locale): EntryHeader {
   switch (entry.kind) {

@@ -1,4 +1,4 @@
-/* Выезжающая панель поверх цеха: нативный popover — закрывается по Esc и кликом мимо. */
+/* Slide-out panel over the factory floor: a native popover, closed by Esc or a click outside. */
 .drawer {
   inset: var(--gutter) auto var(--gutter) calc(var(--sidebar-width) + var(--gutter) * 2);
   width: min(var(--drawer-width), calc(100vw - var(--sidebar-width) - var(--gutter) * 3));

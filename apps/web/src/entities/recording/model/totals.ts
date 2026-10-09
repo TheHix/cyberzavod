@@ -1,20 +1,20 @@
 import { summarize, type BuildStats, type SessionRecord } from "@cyberzavod/core";
 
-/** Итоги нескольких сборок, например всех сборок проекта: суммы их счётчиков. */
+/** Totals of several builds, e.g. all builds of a project: the sums of their counters. */
 export interface RecordingTotals {
-  /** Сколько сборок в итогах. */
+  /** How many builds are in the totals. */
   readonly builds: number;
   readonly durationMs: number;
   readonly tokens: number;
   readonly prompts: number;
-  /** Возвраты на доработку во всех сборках. */
+  /** Reworks across all builds. */
   readonly reworks: number;
-  /** Сколько сборок прошли все этапы с первого раза. */
+  /** How many builds passed every stage on the first try. */
   readonly buildsWithoutReworks: number;
   readonly interventions: number;
 }
 
-/** Счётчик итогов, который можно разделить на сборки, чтобы получить среднее. */
+/** A totals counter that can be divided by builds to get an average. */
 export type SummedCount = Exclude<keyof RecordingTotals, "builds">;
 
 const NO_TOTALS: RecordingTotals = {
@@ -42,9 +42,9 @@ function withBuild(totals: RecordingTotals, build: BuildStats): RecordingTotals 
 }
 
 /**
- * Складывает счётчики сборок: так считаются итоги проекта при сборке сайта, без API.
- * @param {readonly SessionRecord[]} recordings Записи сборок в любом порядке.
- * @returns {RecordingTotals} Итоги; у пустого списка все счётчики нулевые.
+ * Sums build counters: this is how project totals are computed at site build time, without the API.
+ * @param {readonly SessionRecord[]} recordings Build recordings in any order.
+ * @returns {RecordingTotals} Totals; for an empty list all counters are zero.
  */
 export function totalsOf(recordings: readonly SessionRecord[]): RecordingTotals {
   const builds = recordings.map((recording) => summarize(recording));
@@ -53,10 +53,10 @@ export function totalsOf(recordings: readonly SessionRecord[]): RecordingTotals 
 }
 
 /**
- * Среднее значение счётчика на одну сборку. Округляет тот, кто показывает: время — до секунд.
- * @param {RecordingTotals} totals Итоги сборок.
- * @param {SummedCount} count Какой счётчик делить.
- * @returns {number} Частное без округления; у итогов без сборок — 0.
+ * Average counter value per build. Rounding is up to whoever displays it: time, to seconds.
+ * @param {RecordingTotals} totals Build totals.
+ * @param {SummedCount} count Which counter to divide.
+ * @returns {number} The unrounded quotient; 0 for totals without builds.
  */
 export function averagePerBuild(totals: RecordingTotals, count: SummedCount): number {
   if (totals.builds === 0) return 0;
@@ -65,9 +65,9 @@ export function averagePerBuild(totals: RecordingTotals, count: SummedCount): nu
 }
 
 /**
- * Участие человека в сборках: его промпты и вмешательства вместе.
- * @param {RecordingTotals} totals Итоги сборок.
- * @returns {number} Сколько раз человек что-то сказал цеху.
+ * Human participation in builds: their prompts and interventions together.
+ * @param {RecordingTotals} totals Build totals.
+ * @returns {number} How many times the human said something to the factory.
  */
 export function humanInputOf(totals: RecordingTotals): number {
   return totals.prompts + totals.interventions;

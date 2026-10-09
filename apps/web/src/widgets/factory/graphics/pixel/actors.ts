@@ -1,6 +1,6 @@
-// Рабочие, мастер и деталь: рисунки запекаются в текстуры один раз при встраивании, в кадре
-// у готовых спрайтов меняются только текстура кадра, место, зеркало, видимость, `tint`
-// и порядок по `y`. Новые объекты в кадре не создаются.
+// Workers, the foreman and the part: sprites are baked into textures once on embedding; in a
+// frame, the ready sprites change only the frame texture, position, mirroring, visibility, `tint`
+// and order by `y`. No new objects are created in a frame.
 
 import { STAGES, type Stage } from "@cyberzavod/core";
 import {
@@ -37,7 +37,7 @@ import type { Palette } from "./palette.ts";
 import { textureOf } from "./textures.ts";
 import { PIXELS_PER_UNIT } from "./units.ts";
 
-/** Деталь в руках и на станке: ящик 10×10. */
+/** The part in hands and on the machine: a 10×10 crate. */
 export const CRATE_ART: SpriteArt = [
   ".kkkkkkkk.",
   "kyyyyyyyyk",
@@ -51,7 +51,7 @@ export const CRATE_ART: SpriteArt = [
   ".kkkkkkkk.",
 ];
 
-/** Свечение под деталью: кольцо, белое — цвет состояния даёт `tint`. */
+/** Glow under the part: a ring, white, since `tint` gives the state color. */
 export const GLOW_ART: SpriteArt = [
   "......******......",
   "....**********....",
@@ -73,15 +73,18 @@ export const GLOW_ART: SpriteArt = [
   "......******......",
 ];
 
-/** Тень под ногами: чёрный овал, прозрачность ему даёт спрайт. */
+/** Shadow under the feet: a black oval, the sprite gives it transparency. */
 export const SHADOW_ART: SpriteArt = ["..kkkkkkkk..", ".kkkkkkkkkk."];
 
-// Центр рисунка человека 16×16 — его точка плана; тень начинается на пять пикселей ниже центра,
-// под ногами: ниже последнего ряда ступней.
+// The center of a 16×16 human sprite is its plan point; the shadow starts five pixels below the
+// center, under the feet: below the last row of the feet.
 const SHADOW_TOP = 5;
 const SHADOW_ALPHA = 0.28;
 
-/** Прямоугольник вокруг центра человека, пиксели: от центра до краёв видимой фигуры. */
+/**
+ * Rectangle around the human's center, in pixels: from the center to the edges of the visible
+ * figure.
+ */
 export interface FigureBox {
   readonly left: number;
   readonly top: number;
@@ -90,9 +93,9 @@ export interface FigureBox {
 }
 
 /**
- * Стоит ли человек на месте в этой позе. У таких поз видимая фигура считается для табличек:
- * на постах человек стоит, бьёт, тянется и жестикулирует, а шагает и несёт деталь мимо них.
- * Новая поза — новая строка: компилятор не даст её пропустить.
+ * Whether the human stands in place in this pose. For such poses the visible figure counts for
+ * plaques: at posts a human stands, strikes, reaches and gestures, but walks and carries the part
+ * past them. A new pose is a new row: the compiler will not let it be skipped.
  */
 const ACTOR_POSE_IN_PLACE: Readonly<Record<ActorPose, boolean>> = {
   stand: true,
@@ -115,9 +118,10 @@ function inkedCellsOf(art: SpriteArt): { column: number; row: number }[] {
   return cells.filter(({ letter }) => ART_LEGEND[letter] !== null);
 }
 
-// Видимая фигура человека на месте по всем сторонам и позам, в том числе с поднятыми руками.
-// Бок рисуется вправо, а влево зеркалится, поэтому по горизонтали берётся больший из двух краёв.
-// Шаг (на пиксель ниже), деталь в руках и тень не считаются: тень — затемнение пола.
+// The visible figure of a human in place across all sides and poses, including raised arms. The
+// side view is drawn facing right and mirrored for left, so horizontally the larger of the two
+// edges is taken. A step (one pixel lower), the part in hands and the shadow do not count: the
+// shadow is a darkening of the floor.
 function figureBoxOf(arts: readonly SpriteArt[]): FigureBox {
   const sizes = arts.map(artSize);
   const centerX = (sizes[0]?.width ?? 0) / 2;
@@ -141,13 +145,14 @@ const IN_PLACE_ARTS: SpriteArt[] = Object.values(ACTOR_ART).flatMap((poses) => {
   return inPlace.map(([, art]) => art);
 });
 
-/** Где человек занимает место вокруг своей точки плана: по ней таблички обходят фигуру. */
+/** Where a human takes up space around their plan point: plaques avoid the figure by it. */
 export const ACTOR_FIGURE: FigureBox = figureBoxOf(IN_PLACE_ARTS);
 
 /**
- * Лежит ли деталь в руках над несущим, когда он смотрит в эту сторону. Вниз ящик перед грудью
- * и закрывает руки, но не лицо; вверх и вбок руки рисуются поверх ящика. Новая сторона —
- * новая строка: компилятор не даст её пропустить.
+ * Whether the part in hands lies above the carrier when they face this side. Facing down, the
+ * crate is in front of the chest and covers the arms but not the face; facing up and sideways,
+ * the arms are drawn over the crate. A new side is a new row: the compiler will not let it be
+ * skipped.
  */
 const CARRIED_IN_FRONT: Readonly<Record<Facing, boolean>> = {
   down: true,
@@ -155,13 +160,13 @@ const CARRIED_IN_FRONT: Readonly<Record<Facing, boolean>> = {
   side: false,
 };
 
-// Слой людей — целый пиксель `y`, поэтому полпикселя ставят деталь вплотную к несущему,
-// но не между ним и соседом по соседнему ряду пикселей.
+// The human layer is a whole pixel of `y`, so half a pixel places the part right next to the
+// carrier, but not between them and a neighbor on the adjacent pixel row.
 const CARRIED_LAYER_STEP = 0.5;
 
 type PoseTextures = Readonly<Record<Facing, Readonly<Record<ActorPose, Texture>>>>;
 
-/** Запечённые текстуры действующих лиц. */
+/** Baked textures of the actors. */
 export interface ActorTextures {
   readonly workers: Readonly<Record<Stage, PoseTextures>>;
   readonly foreman: PoseTextures;
@@ -170,14 +175,17 @@ export interface ActorTextures {
   readonly glow: Texture;
 }
 
-/** Рабочий или мастер в кадре: тень на полу и тело, чью текстуру выбирает кадр. */
+/**
+ * A worker or the foreman in a frame: a shadow on the floor and a body whose texture the frame
+ * picks.
+ */
 export interface ActorSprites {
   readonly root: Container;
   readonly body: Sprite;
   readonly textures: PoseTextures;
 }
 
-/** Деталь в кадре: ящик, свечение состояния под ним и цвета свечения. */
+/** The part in a frame: the crate, the state glow under it, and the glow colors. */
 export interface CrateSprites {
   readonly root: Container;
   readonly crate: Sprite;
@@ -194,7 +202,8 @@ function uniformInks(palette: Palette, color: number): Inks {
   };
 }
 
-// Мастер — форма своего цвета и белая каска: его видно среди рабочих в жёлтых касках.
+// The foreman has a uniform of their own color and a white helmet: they stand out among workers in
+// yellow helmets.
 function foremanInks(palette: Palette): Inks {
   return { ...uniformInks(palette, palette.foreman), ...helmetInks(palette.foremanHelmet) };
 }
@@ -212,10 +221,10 @@ function bakePoses(inks: Inks): PoseTextures {
 }
 
 /**
- * Запекает рисунки действующих лиц в текстуры: каждому этапу своя форма, мастеру — свой цвет
- * и каска.
- * @param {Palette} palette Краски цеха.
- * @returns {ActorTextures} Текстуры рабочих, мастера и детали.
+ * Bakes actor sprites into textures: each stage gets its own uniform, the foreman gets their own
+ * color and helmet.
+ * @param {Palette} palette Factory inks.
+ * @returns {ActorTextures} Textures of the workers, the foreman and the part.
  */
 export function bakeActorTextures(palette: Palette): ActorTextures {
   const inks = paletteInks(palette);
@@ -240,9 +249,9 @@ function poseTextureList(poses: PoseTextures): Texture[] {
 }
 
 /**
- * Освобождает все запечённые текстуры действующих лиц вместе с их холстами: и те, что сейчас
- * на спрайтах, и кадры, которых на спрайтах нет. Уничтожение спрайтов вторых не затрагивает.
- * @param {ActorTextures} textures Текстуры из `bakeActorTextures`.
+ * Frees all baked actor textures together with their canvases: both those on sprites now and the
+ * frames not on sprites. Destroying the sprites does not affect the latter.
+ * @param {ActorTextures} textures Textures from `bakeActorTextures`.
  */
 export function destroyActorTextures(textures: ActorTextures): void {
   const all = [
@@ -256,7 +265,8 @@ export function destroyActorTextures(textures: ActorTextures): void {
   for (const texture of all) texture.destroy(true);
 }
 
-// Опора — целый пиксель в центре рисунка, а не доля `anchor`: место остаётся на сетке пикселей.
+// The anchor is a whole pixel at the sprite center, not a fraction of `anchor`: the position stays
+// on the pixel grid.
 function centered(texture: Texture): Sprite {
   const sprite = new Sprite(texture);
 
@@ -276,7 +286,7 @@ function createActor(textures: PoseTextures, shadow: Texture): ActorSprites {
   return { root: new Container({ children: [shadowSprite, body] }), body, textures };
 }
 
-// Слой по целому пикселю `y`: так сортируются люди, и деталь встаёт относительно них.
+// Layer by whole pixel of `y`: humans are sorted this way, and the part is placed relative to them.
 function layerOf(position: Point): number {
   return Math.round(position.y * PIXELS_PER_UNIT);
 }
@@ -291,47 +301,48 @@ function placeActor(sprites: ActorSprites, position: Point, frame: ActorFrame): 
 }
 
 /**
- * Собирает спрайты рабочего этапа.
- * @param {Stage} stage Этап — цвет формы.
- * @param {ActorTextures} textures Запечённые текстуры.
- * @returns {ActorSprites} Рабочий, ещё не поставленный на место.
+ * Assembles the sprites of a stage worker.
+ * @param {Stage} stage Stage, the uniform color.
+ * @param {ActorTextures} textures Baked textures.
+ * @returns {ActorSprites} A worker not yet put in place.
  */
 export function createWorker(stage: Stage, textures: ActorTextures): ActorSprites {
   return createActor(textures.workers[stage], textures.shadow);
 }
 
 /**
- * Ставит рабочего в кадр: место, сторона, зеркало и поза.
- * @param {ActorSprites} sprites Спрайты рабочего.
- * @param {WorkerFrame} worker Рабочий в кадре.
+ * Puts a worker into the frame: position, side, mirroring and pose.
+ * @param {ActorSprites} sprites Worker sprites.
+ * @param {WorkerFrame} worker Worker in the frame.
  */
 export function placeWorker(sprites: ActorSprites, worker: WorkerFrame): void {
   placeActor(sprites, worker.position, workerFrameOf(worker));
 }
 
 /**
- * Собирает спрайты мастера: тот же человек, но формы своего цвета и в белой каске.
- * @param {ActorTextures} textures Запечённые текстуры.
- * @returns {ActorSprites} Мастер, ещё не поставленный на место.
+ * Assembles the foreman's sprites: the same human, but in a uniform of their own color and a white
+ * helmet.
+ * @param {ActorTextures} textures Baked textures.
+ * @returns {ActorSprites} The foreman, not yet put in place.
  */
 export function createForeman(textures: ActorTextures): ActorSprites {
   return createActor(textures.foreman, textures.shadow);
 }
 
 /**
- * Ставит мастера в кадр: место, сторона, зеркало и поза.
- * @param {ActorSprites} sprites Спрайты мастера.
- * @param {ForemanFrame} foreman Мастер в кадре.
+ * Puts the foreman into the frame: position, side, mirroring and pose.
+ * @param {ActorSprites} sprites Foreman sprites.
+ * @param {ForemanFrame} foreman Foreman in the frame.
  */
 export function placeForeman(sprites: ActorSprites, foreman: ForemanFrame): void {
   placeActor(sprites, foreman.position, foremanFrameOf(foreman));
 }
 
 /**
- * Собирает спрайты детали.
- * @param {ActorTextures} textures Запечённые текстуры.
- * @param {Palette} palette Краски цеха — цвета свечения по состоянию детали.
- * @returns {CrateSprites} Деталь, ещё не поставленная на место.
+ * Assembles the part sprites.
+ * @param {ActorTextures} textures Baked textures.
+ * @param {Palette} palette Factory inks: glow colors by part state.
+ * @returns {CrateSprites} The part, not yet put in place.
  */
 export function createCrate(textures: ActorTextures, palette: Palette): CrateSprites {
   const glow = centered(textures.glow);
@@ -346,12 +357,12 @@ export function createCrate(textures: ActorTextures, palette: Palette): CrateSpr
 }
 
 /**
- * Слой детали для порядка рисования. На станке и без несущего деталь сортируется по своему `y`,
- * как всё в цехе; в руках она встаёт вплотную к несущему: над ним, если он смотрит вниз,
- * иначе под ним, чтобы его руки были поверх ящика.
- * @param {PartFrame} part Деталь в кадре.
- * @param {WorkerFrame | undefined} holder Рабочий, у которого деталь, если он есть в кадре.
- * @returns {number} Слой: чем больше, тем ближе к зрителю.
+ * Part layer for draw order. On the machine and without a carrier, the part is sorted by its own
+ * `y`, like everything on the floor; in hands it sits right next to the carrier: above them if they
+ * face down, otherwise below them, so their arms are over the crate.
+ * @param {PartFrame} part Part in the frame.
+ * @param {WorkerFrame | undefined} holder The worker holding the part, if they are in the frame.
+ * @returns {number} Layer: the larger, the closer to the viewer.
  */
 export function crateLayerOf(part: PartFrame, holder: WorkerFrame | undefined): number {
   if (!part.carried || holder === undefined) return layerOf(part.position);
@@ -362,10 +373,10 @@ export function crateLayerOf(part: PartFrame, holder: WorkerFrame | undefined): 
 }
 
 /**
- * Ставит деталь в кадр: место, слой относительно несущего и свечение состояния, которое мигает
- * своим цветом.
- * @param {CrateSprites} sprites Спрайты детали.
- * @param {Scene} scene Кадр цеха: деталь, её несущий и момент сцены для мигания.
+ * Puts the part into the frame: position, layer relative to the carrier, and the state glow that
+ * blinks in its color.
+ * @param {CrateSprites} sprites Part sprites.
+ * @param {Scene} scene Floor frame: the part, its carrier and the scene moment for blinking.
  */
 export function placeCrate(sprites: CrateSprites, scene: Scene): void {
   const { part } = scene;

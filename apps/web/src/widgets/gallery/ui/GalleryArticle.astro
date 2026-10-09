@@ -1,7 +1,7 @@
 ---
-// Страница галерей в поле: список и галерея автора приходят из API в браузере. При сборке
-// параметров адреса нет — в разметке общий список в загрузке. Примеры над списком собраны из
-// записей сайта при сборке.
+// The galleries page in the field: the list and an author's gallery come from the API in the
+// browser. At build time there are no address parameters, so the markup has the shared list
+// loading. The examples above the list are assembled from the site recordings at build time.
 import type { SessionRecord } from "@cyberzavod/core";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { Panel } from "@/shared/ui";
@@ -9,9 +9,9 @@ import { GalleryBoard } from "./GalleryBoard.tsx";
 import GalleryExamples from "./GalleryExamples.astro";
 
 interface Props {
-  /** Записи сборок сайта: по ним — примеры над галереями пользователей. */
+  /** Site build recordings: the examples above user galleries come from them. */
   recordings: readonly SessionRecord[];
-  /** Язык страницы. */
+  /** Page language. */
   locale: Locale;
 }
 

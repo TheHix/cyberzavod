@@ -23,17 +23,21 @@ import { prefersReducedMotion } from "./reduced-motion.ts";
 import styles from "./Factory.module.css";
 
 interface Props {
-  /** Модель цеха: одна запись или серия, её создаёт тот, кто ставит цех на страницу. */
+  /** Factory model: one recording or a series, created by whoever puts the floor on the page. */
   model: FactoryModel;
-  /** Язык страницы: на нём подписи цеха, HUD и пузырей. */
+  /** Page language: floor, HUD and bubble captions are in it. */
   locale: Locale;
-  /** Проект, который собирали, — в HUD; ссылка на его страницу или галерею автора, если есть. */
+  /**
+   * The project that was built, in the HUD; a link to its page or the author's gallery, if any.
+   */
   project: BuildProject;
-  /** Пометка о языке оригинала записи; нет, если запись на языке страницы. */
+  /**
+   * Note about the recording's original language; absent if the recording is in the page language.
+   */
   languageNote: string | undefined;
-  /** Место сборки в серии её проекта; нет у одиночной записи. */
+  /** Place of the build in its project's series; absent for a single recording. */
   position: SeriesPosition | undefined;
-  /** Уровень заголовка с названием сборки. */
+  /** Level of the heading with the build name. */
   titleLevel: "h1" | "h2";
 }
 
@@ -42,8 +46,8 @@ interface LaunchedFactory {
   readonly stop: () => void;
 }
 
-// Встраивает графику в холст и запускает цех: кадр рисуется по подписке на сцену модели —
-// идёт она или её перематывают, — а часы двигают модель.
+// Embeds the graphics into the canvas and starts the floor: a frame is drawn on subscription to the
+// model's scene, whether it runs or is being rewound, and the clock moves the model.
 async function launchFactory(
   model: FactoryModel,
   host: HTMLElement,
@@ -55,11 +59,11 @@ async function launchFactory(
     const mounted = model.$layout.get();
 
     await graphics.mount(host, mounted);
-    // Пока холст встраивался, форма поля могла сменить план: графика его ещё не знала.
-    // Вписывает его `fitToScreen` сразу после запуска.
+    // While the canvas was being embedded, the field shape may have changed the plan: the graphics
+    // did not know it yet. `fitToScreen` fits it right after the start.
     if (model.$layout.get() !== mounted) graphics.setLayout(model.$layout.get());
   } catch (err) {
-    // Холст и контекст видеокарты не должны остаться под надписью об ошибке.
+    // The canvas and the GPU context must not stay under the error message.
     graphics.destroy();
     throw err;
   }
@@ -77,7 +81,8 @@ async function launchFactory(
   };
 }
 
-// Поле в координатах холста: холст на всё окно, поле — свободное место между меню и HUD.
+// The field in canvas coordinates: the canvas fills the window, the field is the free space between
+// the menu and the HUD.
 function fieldWithin(host: HTMLElement, field: HTMLElement): Frame {
   const outer = host.getBoundingClientRect();
   const inner = field.getBoundingClientRect();
@@ -91,33 +96,34 @@ function fieldWithin(host: HTMLElement, field: HTMLElement): Frame {
 }
 
 /**
- * Живой цех на весь экран по готовой модели: рабочие у станков, бег с деталью, кабинет мастера,
- * промпты, вмешательства и реплики над говорящими, HUD сборки справа со ссылкой на проект.
- * Запись в модели может смениться — холст и графика при этом остаются. Графика грузится только
- * в браузере.
- * @param {Props} props Свойства компонента.
- * @param {FactoryModel} props.model Модель цеха.
- * @param {Locale} props.locale Язык страницы.
- * @param {BuildProject} props.project Проект, который собирали.
- * @param {string | undefined} props.languageNote Пометка о языке оригинала записи.
- * @param {SeriesPosition | undefined} props.position Место сборки в серии её проекта.
- * @param {"h1" | "h2"} props.titleLevel Уровень заголовка с названием сборки.
- * @returns {JSX.Element} Цех с HUD.
+ * A live full-screen factory from a ready model: workers at machines, running with the part, the
+ * foreman's office, prompts, interventions and messages above the speakers, the build HUD on the
+ * right with a project link. The recording in the model may change, while the canvas and graphics
+ * stay. The graphics load only in the browser.
+ * @param {Props} props Component props.
+ * @param {FactoryModel} props.model Factory model.
+ * @param {Locale} props.locale Page language.
+ * @param {BuildProject} props.project The project that was built.
+ * @param {string | undefined} props.languageNote Note about the recording's original language.
+ * @param {SeriesPosition | undefined} props.position Place of the build in its project's series.
+ * @param {"h1" | "h2"} props.titleLevel Level of the heading with the build name.
+ * @returns {JSX.Element} The factory with the HUD.
  */
 export function FactoryFloor(props: Props): JSX.Element {
-  // Модель у цеха не меняется: меняется запись внутри неё.
+  // The floor's model does not change: the recording inside it does.
   const model = untrack(() => props.model);
-  // Язык страницы известен при сборке и у островка не меняется.
+  // The page language is known at build time and does not change for the island.
   const locale = untrack(() => props.locale);
   const status = useStoreValue(model.$status);
   const recording = useStoreValue(model.$recording);
   const [graphics, setGraphics] = createSignal<FactoryGraphics>();
   const [field, setField] = createSignal<Frame>({ x: 0, y: 0, width: 0, height: 0 });
-  // Элементы задаются в разметке через ref и живут столько же, сколько компонент.
+  // The elements are set in the markup via ref and live as long as the component.
   let canvasHost!: HTMLDivElement;
   let fieldElement!: HTMLDivElement;
 
-  // У скрытого поля нет формы: план остаётся прежним. Холст на всё окно, его размер — экран.
+  // A hidden field has no shape: the plan stays the same. The canvas fills the window, its size is
+  // the screen.
   const layoutForField = (frame: Frame) => {
     const hasArea = frame.width > 0 && frame.height > 0;
 
@@ -126,10 +132,10 @@ export function FactoryFloor(props: Props): JSX.Element {
     return layoutFor(frame, { width: canvasHost.clientWidth, height: canvasHost.clientHeight });
   };
 
-  // Сначала графика подстраивается под размер, потом размер видят компоненты: иначе
-  // пузырь на паузе встал бы по старому масштабу. Форма поля и экрана может потребовать другой план:
-  // графика меняет его раньше модели, чтобы кадр не рисовался по чужому плану, а `resize`
-  // сразу вписывает его в поле.
+  // First the graphics adapt to the size, then the components see the size: otherwise a paused
+  // bubble would be placed by the old scale. The field and screen shape may require another plan:
+  // the graphics change it before the model, so a frame is not drawn by a wrong plan, and `resize`
+  // fits it into the field at once.
   const fitToScreen = () => {
     const frame = fieldWithin(canvasHost, fieldElement);
     const layout = layoutForField(frame);
@@ -145,7 +151,8 @@ export function FactoryFloor(props: Props): JSX.Element {
   };
 
   onMount(() => {
-    // План выбирается по полю и экрану до запуска графики: она сразу рисует нужный.
+    // The plan is chosen by the field and the screen before the graphics start: they draw the right
+    // one at once.
     model.setLayout(layoutForField(fieldWithin(canvasHost, fieldElement)));
     onCleanup(connectScene(model));
     let stop: (() => void) | undefined;
@@ -184,7 +191,8 @@ export function FactoryFloor(props: Props): JSX.Element {
     <LocaleProvider value={locale}>
       <FactoryModelProvider value={model}>
         <div class={styles.factory}>
-          {/* Картинка — только холст: пузыри промпта, вмешательства и реплики рядом, их читают программы чтения */}
+          {/* The picture is only the canvas: the prompt, intervention and message bubbles are next
+             to it, screen readers read them */}
           <div
             ref={(element) => (canvasHost = element)}
             class={styles.canvas}

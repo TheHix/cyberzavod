@@ -2,11 +2,11 @@ import { onMount } from "solid-js";
 import { withSearch } from "../lib/with-search.ts";
 
 /**
- * Остров без своей разметки для страниц, данные которых — в параметрах адреса (`/r/?id=…`,
- * `/gallery/?user=…`): переносит параметры в ссылки на другие языки, чтобы переключатель вёл
- * на ту же запись или галерею. Страница собирается заранее и параметров не знает; без JS ссылка
- * ведёт на страницу без них.
- * @returns {null} Своей разметки нет.
+ * An island without its own markup for pages whose data is in the address parameters (`/r/?id=…`,
+ * `/gallery/?user=…`): carries the parameters over to the links to other languages so the
+ * switcher leads to the same recording or gallery. The page is built ahead of time and does not
+ * know the parameters; without JS the link leads to the page without them.
+ * @returns {null} No markup of its own.
  */
 export function LanguageQuery(): null {
   onMount(() => {

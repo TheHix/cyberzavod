@@ -1,8 +1,8 @@
 ---
-// Записи сборок по проектам: блок на проект в порядке, в каком завод за них брался. Шапка блока —
-// название со ссылкой на страницу проекта, стек и итоги; итоги сворачивают и разворачивают
-// описание, ссылку на репозиторий и сборки по порядку задач. Ссылка на проект стоит вне
-// `<summary>`: внутри него она была бы кнопкой в кнопке.
+// Build recordings by project: a block per project in the order the factory took them on. The
+// block header is the name with a link to the project page, the stack and totals; the totals
+// collapse and expand the description, the repository link and the builds in task order. The
+// project link stands outside `<summary>`: inside it, it would be a button within a button.
 import type { SessionRecord } from "@cyberzavod/core";
 import { projectOf, projectUrl, publishedProjects } from "@/entities/project";
 import { projectSeriesOf, totalsOf } from "@/entities/recording";
@@ -13,9 +13,9 @@ import { ButtonLink, Card, ChipList, Disclosure, Title } from "@/shared/ui";
 import ProjectBuilds from "./ProjectBuilds.astro";
 
 interface Props {
-  /** Записи сборок в любом порядке. */
+  /** Build recordings in any order. */
   recordings: readonly SessionRecord[];
-  /** Язык страницы: на нём подписи, описания проектов и форматы чисел и дат. */
+  /** Page language: captions, project descriptions and number and date formats are in it. */
   locale: Locale;
 }
 

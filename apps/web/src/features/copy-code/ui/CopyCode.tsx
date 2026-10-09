@@ -5,19 +5,19 @@ import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { CopyButton, codeBlockClass } from "@/shared/ui";
 
 interface Props {
-  /** id элемента статьи, в блоки кода которого добавляются кнопки. */
+  /** Id of the article element whose code blocks get buttons. */
   scope: string;
-  /** Язык страницы: на нём подписана кнопка. */
+  /** Page language: the button is labeled in it. */
   locale: Locale;
 }
 
-// Блок кода получает обёртку и кнопку только в браузере; без JS остаётся прежний `<pre>`.
+// A code block gets the wrapper and button only in the browser; without JS the plain `<pre>` stays.
 function addCopyButton(code: HTMLElement, pre: HTMLElement, locale: Locale): () => void {
   const block = document.createElement("div");
   const buttonSlot = document.createElement("div");
 
   block.className = codeBlockClass();
-  // Статья может быть в оригинале на другом языке: кнопка подписана на языке страницы.
+  // The article may originally be in another language: the button is labeled in the page language.
   buttonSlot.lang = locale;
   pre.before(block);
   block.append(pre, buttonSlot);
@@ -49,13 +49,13 @@ function addCopyButtons(article: HTMLElement, locale: Locale): (() => void)[] {
 }
 
 /**
- * Остров без своей разметки: после загрузки страницы оборачивает каждый блок кода статьи
- * в обёртку и ставит рядом кнопку «копировать».
- * @param {Props} props Свойства компонента.
- * @param {string} props.scope id элемента статьи.
- * @param {Locale} props.locale Язык страницы для подписей кнопок.
- * @returns {null} Своей разметки нет.
- * @throws {Error} Если на странице нет элемента статьи с таким id.
+ * An island without its own markup: after the page loads it wraps every code block of the article
+ * in a wrapper and puts a "copy" button next to it.
+ * @param {Props} props Component props.
+ * @param {string} props.scope Article element id.
+ * @param {Locale} props.locale Page language for button labels.
+ * @returns {null} No markup of its own.
+ * @throws {Error} If the page has no article element with this id.
  */
 export function CopyCode(props: Props): null {
   onMount(() => {

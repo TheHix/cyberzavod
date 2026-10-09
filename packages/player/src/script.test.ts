@@ -123,7 +123,7 @@ describe("buildScript", () => {
 
     const script = buildScript(recording, LINE_LAYOUT, PLAIN_PACING);
 
-    // Рабочий кода отнёс деталь на проверки и вернулся только к 44 800.
+    // The code worker carried the part to checks and got back only by 44,800.
     expect(script.workers.verification[3]).toEqual(
       expect.objectContaining({ activity: "handoff", start: 44_800, end: 45_000 }),
     );
@@ -246,10 +246,11 @@ describe("buildScript", () => {
   });
 });
 
-// Мастер идёт из кабинета к станку постановки: до двери 2 с, в проход 4 с, по проходу 19 с
-// и к месту у станка 2 с.
+// The foreman walks from the office to the plan machine: 2 s to the door, 4 s into the aisle,
+// 19 s along the aisle and 2 s to the spot at the machine.
 const TRIP_TO_SPEC_MS = 27_000;
-// Обратно тем же путём: 2 с от станка в проход, 19 по проходу, 4 к двери и 2 до стола.
+// Back the same way: 2 s from the machine into the aisle, 19 along the aisle, 4 to the door and 2
+// to the desk.
 const TRIP_HOME_MS = 27_000;
 
 function talkingAt(script: { foreman: readonly ForemanMove[] }): ForemanMove[] {
@@ -528,7 +529,8 @@ describe("buildScript: реплики", () => {
 });
 
 describe("buildScript: обмен при передаче", () => {
-  // Рабочий кода отдаёт деталь проверкам: 2 с в проход, 10 по проходу и 1 с к месту встречи.
+  // The code worker hands the part to checks: 2 s into the aisle, 10 along the aisle and 1 s to the
+  // meeting spot.
   const meet = { x: 20, y: 1 };
 
   it("звучит у места встречи по порядку записи с прихода отдающего", () => {
@@ -636,16 +638,16 @@ interface Walk {
 }
 
 const SAME_POINT_TOLERANCE = 1e-9;
-// Шаг выборки кадров при поиске скачков детали, мс.
+// Frame sampling step when searching for part jumps, ms.
 const FRAME_STEP_MS = 20;
-// Самый большой честный сдвиг детали за шаг: бег 3,5 единицы в секунду даёт 0,07.
+// The largest honest part shift per step: running at 3.5 units per second gives 0.07.
 const MAX_PART_STEP = 0.25;
 
 function isSamePoint(a: Point, b: Point): boolean {
   return distance(a, b) <= SAME_POINT_TOLERANCE;
 }
 
-// Идущие отрезки, подряд и с одним началом пути, — это одна ходьба.
+// Walking segments in a row with one path start are a single walk.
 function walksOf(moves: readonly (Walk & { readonly activity: string })[]): Walk[][] {
   const walks: Walk[][] = [];
 

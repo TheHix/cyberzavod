@@ -9,19 +9,19 @@ import styles from "./GalleryBoard.module.css";
 
 interface Props {
   gallery: Gallery;
-  /** Адрес сайта — для строки бейджа. */
+  /** Site address, for the badge line. */
   siteUrl: string;
-  /** Язык страницы: на нём подписи и даты. */
+  /** Page language: captions and dates are in it. */
   locale: Locale;
 }
 
 /**
- * Открытая галерея автора: записи со ссылками на цех и бейдж для README.
- * @param {Props} props Свойства компонента.
- * @param {Gallery} props.gallery Галерея автора.
- * @param {string} props.siteUrl Адрес сайта.
- * @param {Locale} props.locale Язык страницы.
- * @returns {JSX.Element} Записи галереи и бейдж.
+ * An author's public gallery: recordings with links to the floor and a badge for the README.
+ * @param {Props} props Component props.
+ * @param {Gallery} props.gallery The author's gallery.
+ * @param {string} props.siteUrl Site address.
+ * @param {Locale} props.locale Page language.
+ * @returns {JSX.Element} Gallery recordings and the badge.
  */
 export function AuthorGallery(props: Props): JSX.Element {
   return (

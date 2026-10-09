@@ -3,18 +3,18 @@ import { splitProps, type JSX } from "solid-js";
 import { cx } from "@/shared/lib/cx.ts";
 import styles from "./Button.module.css";
 
-/** Вид кнопки: главная (жёлтая), обычная (светлая), без плашки или текстом внутри содержимого. */
+/** Button variant: primary (yellow), secondary (light), tileless, or as text inside content. */
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "link";
 
 /**
- * Раскладка кнопки: с текстом, квадратная под иконку, круглая, плитка меню с подписью или плитка
- * на половину строки меню — две такие стоят в ряд.
+ * Button layout: with text, square for an icon, round, a menu tile with a label, or a tile half
+ * a menu row wide, two of which stand side by side.
  */
 export type ButtonLayout = "text" | "icon" | "round" | "tile" | "halfTile";
 
 /**
- * Вид, размер и раскладка кнопки — общие для кнопки и ссылки-кнопки. Имена не совпадают
- * с атрибутами HTML (у `<a>` есть свой `shape`), чтобы не пересекаться с ними в типах.
+ * Button variant, size and layout, shared by the button and the button-styled link. The names
+ * differ from HTML attributes (`<a>` has its own `shape`) so they do not clash in the types.
  */
 export interface ButtonLook {
   variant?: ButtonVariant | undefined;
@@ -25,10 +25,10 @@ export interface ButtonLook {
 const LOOK_KEYS = ["variant", "size", "layout", "class"] as const;
 
 /**
- * Классы вида кнопки kit — для элементов, которые не могут быть кнопкой или ссылкой,
- * например подписи «подробнее» внутри `<summary>`.
- * @param {ButtonLook & { class?: string | undefined }} look Вид, размер, раскладка и свой класс.
- * @returns {string} Классы кнопки.
+ * Kit button look classes, for elements that cannot be a button or a link,
+ * such as the "more" label inside `<summary>`.
+ * @param {ButtonLook & { class?: string | undefined }} look Variant, size, layout and own class.
+ * @returns {string} Button classes.
  */
 export function buttonClass(look: ButtonLook & { class?: string | undefined }): string {
   return cx(
@@ -44,9 +44,10 @@ export function buttonClass(look: ButtonLook & { class?: string | undefined }): 
 }
 
 /**
- * Кнопка ui-kit на Kobalte: доступность и состояния — от библиотеки, вид — наш.
- * @param {ButtonLook & JSX.ButtonHTMLAttributes<HTMLButtonElement>} props Вид кнопки и атрибуты.
- * @returns {JSX.Element} Кнопка.
+ * ui-kit button on Kobalte: accessibility and states come from the library, the look is ours.
+ * @param {ButtonLook & JSX.ButtonHTMLAttributes<HTMLButtonElement>} props Button look and
+ * attributes.
+ * @returns {JSX.Element} Button.
  */
 export function Button(
   props: ButtonLook & JSX.ButtonHTMLAttributes<HTMLButtonElement>,
@@ -57,9 +58,9 @@ export function Button(
 }
 
 /**
- * Ссылка, которая выглядит как кнопка ui-kit.
- * @param {ButtonLook & JSX.AnchorHTMLAttributes<HTMLAnchorElement>} props Вид и атрибуты ссылки.
- * @returns {JSX.Element} Ссылка.
+ * A link that looks like a ui-kit button.
+ * @param {ButtonLook & JSX.AnchorHTMLAttributes<HTMLAnchorElement>} props Link look and attributes.
+ * @returns {JSX.Element} Link.
  */
 export function ButtonLink(
   props: ButtonLook & JSX.AnchorHTMLAttributes<HTMLAnchorElement>,

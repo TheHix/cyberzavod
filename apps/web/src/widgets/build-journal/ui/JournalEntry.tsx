@@ -14,10 +14,13 @@ import { Button, Card, Chip } from "@/shared/ui";
 import styles from "./JournalEntry.module.css";
 
 interface Props {
-  /** id записи, к которой относится речь: цех мог уже перейти к другой записи серии. */
+  /**
+   * Id of the recording the speech belongs to: the floor may have moved to another series
+   * recording.
+   */
   recordingId: string;
   speech: Speech;
-  /** Язык страницы: на нём кнопка «показать в цехе». */
+  /** Page language: the "show on floor" button is in it. */
   locale: Locale;
   clock: string;
   route: string;
@@ -25,17 +28,18 @@ interface Props {
 }
 
 /**
- * Запись журнала сборки: время, маршрут и тело записи. В браузере подсвечивается, когда цех
- * проигрывает эту запись и дошёл до этой речи, и получает кнопку «показать в цехе»: она
- * перематывает цех и закрывает журнал, чтобы сцена была видна. Без JS — та же разметка без них.
- * @param {Props} props Свойства компонента.
- * @param {string} props.recordingId id записи, к которой относится речь.
- * @param {Speech} props.speech Какой промпт, вмешательство или реплика записи.
- * @param {Locale} props.locale Язык страницы.
- * @param {string} props.clock Время записи в сборке, например `01:30`.
- * @param {string} props.route Маршрут: от кого и кому или метка вмешательства.
- * @param {JSX.Element} props.children Статичное тело записи из `.astro`.
- * @returns {JSX.Element} Запись журнала.
+ * Build journal entry: time, route and entry body. In the browser it is highlighted when the floor
+ * plays this recording and has reached this speech, and gets a "show on floor" button: it
+ * rewinds the floor and closes the journal so the scene is visible. Without JS, the same markup
+ * without them.
+ * @param {Props} props Component props.
+ * @param {string} props.recordingId Id of the recording the speech belongs to.
+ * @param {Speech} props.speech Which prompt, intervention or message of the recording.
+ * @param {Locale} props.locale Page language.
+ * @param {string} props.clock Entry time in the build, e.g. `01:30`.
+ * @param {string} props.route Route: from whom to whom, or the intervention label.
+ * @param {JSX.Element} props.children Static entry body from `.astro`.
+ * @returns {JSX.Element} Journal entry.
  */
 export function JournalEntry(props: Props): JSX.Element {
   const sceneRecordingId = useStoreValue($sceneRecordingId);
@@ -43,8 +47,8 @@ export function JournalEntry(props: Props): JSX.Element {
   const isSceneHere = () =>
     sceneRecordingId() === props.recordingId && isSameSpeech(sceneSpeech(), props.speech);
 
-  // Подсветка и кнопка только после монтирования: разметка с сервера совпадает с первым
-  // рендером в браузере, а без JS их нет вовсе.
+  // Highlighting and the button only after mounting: the server markup matches the first render in
+  // the browser, and without JS they do not exist at all.
   const [hydrated, setHydrated] = createSignal(false);
 
   onMount(() => setHydrated(true));

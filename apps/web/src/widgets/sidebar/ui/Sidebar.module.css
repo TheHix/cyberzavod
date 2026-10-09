@@ -1,7 +1,7 @@
 .sidebar {
   position: relative;
-  /* Выше пузырей речи (.overlay в Factory.module.css, z-index 2): пузырь не должен закрывать
-     меню и перехватывать его нажатия. */
+  /* Above the speech bubbles (.overlay in Factory.module.css, z-index 2): a bubble must not cover
+       the menu and intercept its clicks. */
   z-index: 3;
   display: flex;
   flex-direction: column;
@@ -15,9 +15,9 @@
   box-shadow: var(--lift-large);
 }
 
-/* Логотип — пиксельная табличка; на тесном экране вместо полной — сокращение. Пиксель таблички
-   — как задал kit, 3 CSS-пикселя: при нём ровно встаёт русская табличка (28 пикселей рисунка).
-   Бумага жёлтая: светлая слилась бы с меню. */
+/* The logo is a pixel plaque; on a cramped screen an abbreviation replaces the full one. The
+   plaque pixel is as the kit set it, 3 CSS pixels: with it the Russian plaque fits evenly (28
+   sprite pixels). The paper is yellow: a light one would blend with the menu. */
 .logo {
   --plaque-face: var(--sun);
 
@@ -38,8 +38,9 @@
   list-style: none;
 }
 
-/* Низ меню: вход через GitHub отдельной плиткой и под ним строка «Код» и язык. minmax(0, …):
-   иначе длинный логин в плитке входа расширяет колонку за край меню. */
+/* The bottom of the menu: GitHub sign-in as a separate tile and below it the "Code" and language
+   row. minmax(0, …): otherwise a long login in the sign-in tile widens the column past the menu
+   edge. */
 .footer {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -47,7 +48,8 @@
   margin-top: auto;
 }
 
-/* Нижняя строка: «Код» и язык стоят в ряд, поэтому второй плитки меню не прибавляет. */
+/* The bottom row: "Code" and the language stand in a row, so the menu does not gain a second tile.
+   */
 .bottom {
   display: flex;
   gap: var(--space-2xs);
@@ -58,7 +60,7 @@
   min-width: 0;
 }
 
-/* На узком и низком экране — короткая табличка. */
+/* On a narrow and short screen, the short plaque. */
 @media (max-width: 48rem), (max-height: 40rem) {
   .logo > .logoFull {
     display: none;
@@ -69,9 +71,10 @@
   }
 }
 
-/* На узком экране меню — строкой сверху; плитки сжимает сам kit. Логотип и поля меню сжаты, а
-   низа меню (вход, «Код» и язык) нет: вход есть в панели записей, ссылка на код и переключатель
-   языка — в панели «О заводе», а на 360px плитки иначе тесны. */
+/* On a narrow screen the menu is a row at the top; the kit itself shrinks the tiles. The logo and
+   menu padding are compressed, and the bottom of the menu (sign-in, "Code" and language) is gone:
+   sign-in is in the recordings panel, the code link and the language switch are in the "About"
+   panel, and otherwise the tiles are cramped at 360px. */
 @media (width <= 48rem) and (height > 40rem) {
   .sidebar {
     flex-direction: row;
@@ -88,7 +91,7 @@
     min-width: 0;
   }
 
-  /* Плитки делят ширину по длине подписи: «О заводе» длиннее «Цеха». */
+  /* Tiles share the width by label length: in Russian "About" is longer than "Floor". */
   .menu li {
     flex: 1 1 auto;
     min-width: 0;
@@ -99,15 +102,16 @@
   }
 }
 
-/* На низком экране меню остаётся слева, но должно поместиться без прокрутки: отступы меньше. */
+/* On a short screen the menu stays on the left but must fit without scrolling: smaller padding. */
 @media (height <= 40rem) {
   .sidebar {
     gap: var(--space-2xs);
     padding: var(--space-2xs) var(--space-xs);
   }
 
-  /* Строки «иконка + подпись» на низком экране не помещаются в ряд по две: остаётся «Код», а язык
-     переключается в панели «О заводе». Плитке входа нет места по высоте: вход — в панели записей. */
+  /* "Icon + label" rows do not fit two in a row on a short screen: "Code" stays, and the language
+       switches in the "About" panel. The sign-in tile has no room in height: sign-in is in the
+       recordings panel. */
   .bottom > .language,
   .account {
     display: none;

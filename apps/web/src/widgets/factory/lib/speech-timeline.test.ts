@@ -3,7 +3,7 @@ import { type SessionRecord } from "@cyberzavod/core";
 import { buildScript, type FactoryScript } from "@cyberzavod/player";
 import { speechAt, speechStart, speechTimeline } from "./speech-timeline.ts";
 
-// Промпты и реплики вперемешку: порядок в записи — реплика, промпт, реплика.
+// Prompts and messages mixed: the order in the recording is message, prompt, message.
 function validScript(): FactoryScript {
   const recording: SessionRecord = {
     version: 1,
@@ -140,7 +140,7 @@ describe("speechStart", () => {
   });
 });
 
-// Вмешательство между промптом и репликой: все три вида речи в одном списке.
+// An intervention between a prompt and a message: all three kinds of speech in one list.
 function scriptWithIntervention(): FactoryScript {
   const recording: SessionRecord = {
     version: 1,

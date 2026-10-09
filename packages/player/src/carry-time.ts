@@ -1,10 +1,10 @@
-// Перенос момента сцены между сценариями одной записи на разных планах: пока рабочие ходят
-// другими путями, время записи в той же точке сцены должно остаться тем же.
+// Carries a scene moment between scripts of one recording on different layouts: while workers walk
+// different paths, the recording time at the same point of the scene must stay the same.
 
 import { lastStartedIndex } from "./scene.ts";
 import type { FactoryScript, Mark } from "./script.ts";
 
-/** Сценарии построены по разным записям: их отметки не соответствуют друг другу. */
+/** The scripts were built from different recordings: their marks do not correspond. */
 export class ScriptMismatchError extends Error {}
 
 function assertSameRecording(source: FactoryScript, target: FactoryScript): void {
@@ -28,14 +28,14 @@ function atOf(mark: Mark): number {
 }
 
 /**
- * Переносит момент сцены в сценарий той же записи на другом плане: тот же отрезок между
- * отметками и та же его доля, поэтому время записи не меняется. До первой отметки и после
- * последней сохраняется смещение от неё.
- * @param {FactoryScript} source Сценарий, в котором задан момент.
- * @param {FactoryScript} target Сценарий той же записи на другом плане.
- * @param {number} time Момент сцены в `source`, мс.
- * @returns {number} Момент сцены в `target`, мс, в пределах его длительности.
- * @throws {ScriptMismatchError} Если сценарии построены по разным записям.
+ * Carries a scene moment into a script of the same recording on another layout: the same span
+ * between marks and the same share of it, so the recording time does not change. Before the first
+ * mark and after the last one, the offset from it is kept.
+ * @param {FactoryScript} source Script in which the moment is given.
+ * @param {FactoryScript} target Script of the same recording on another layout.
+ * @param {number} time Scene moment in `source`, ms.
+ * @returns {number} Scene moment in `target`, ms, within its duration.
+ * @throws {ScriptMismatchError} If the scripts were built from different recordings.
  */
 export function carryTime(source: FactoryScript, target: FactoryScript, time: number): number {
   assertSameRecording(source, target);

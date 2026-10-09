@@ -34,7 +34,7 @@ function pixelAt(image: ReturnType<typeof blankImage>, column: number, row: numb
   return [...image.pixels.slice(at, at + 4)];
 }
 
-// Все рисунки цеха с подписью: каждый должен краситься без ошибки.
+// All factory sprites with a caption: each must paint without an error.
 function namedArts(): [string, SpriteArt][] {
   return [
     ...Object.entries(ACTOR_ART).flatMap(([facing, poses]) =>
@@ -63,7 +63,7 @@ function namedArts(): [string, SpriteArt][] {
   ];
 }
 
-// Прозрачные пиксели рисунка, кроме четырёх срезанных углов: «столбец:строка».
+// Transparent sprite pixels except the four cut corners: "column:row".
 function holesInside(art: SpriteArt): string[] {
   const { width, height } = artSize(art);
   const corners = new Set([

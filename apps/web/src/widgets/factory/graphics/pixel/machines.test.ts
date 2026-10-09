@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 import type { MachineWork, WorkBeat } from "./frames.ts";
 import { MACHINE_WORK_ART, showMachineWork, type MachineSprites } from "./machines.ts";
 
-// Такты берутся по ключам таблицы накладок: новый такт попадает в тест сам.
+// Beats are taken by the keys of the overlay table: a new beat gets into the test by itself.
 const BEATS = Object.keys(MACHINE_WORK_ART.planning.frames) as WorkBeat[];
 
-// Настоящие спрайты Pixi без текстур: видимость — их собственное свойство, холст не нужен.
+// Real Pixi sprites without textures: visibility is their own property, no canvas needed.
 function machineSprites(lampOn = true): MachineSprites {
   const work = Object.fromEntries(BEATS.map((beat) => [beat, new Sprite()])) as Record<
     WorkBeat,

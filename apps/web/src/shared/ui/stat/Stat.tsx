@@ -2,11 +2,11 @@ import { For, Show, type JSX } from "solid-js";
 import { Card } from "../card/Card.tsx";
 import styles from "./Stat.module.css";
 
-/** Счётчик: подпись, значение и, если нужно, пояснение к нему мелким текстом. */
+/** Counter: a label, a value and, when needed, a note on it in small text. */
 export interface StatItem {
   readonly label: string;
   readonly value: string;
-  /** Пояснение под значением: «без возвратов 4 из 7». Переносится, если не помещается. */
+  /** Note under the value: "no rework 4 of 7". Wraps when it does not fit. */
   readonly detail?: string | undefined;
 }
 
@@ -15,11 +15,11 @@ interface Props {
 }
 
 /**
- * Счётчики ui-kit плашками в две колонки, в узком месте — в одну: «Время», «Токены» и т. п.; у
- * счётчика может быть пояснение под значением.
- * @param {Props} props Свойства компонента.
- * @param {readonly StatItem[]} props.items Счётчики по порядку.
- * @returns {JSX.Element} Список счётчиков.
+ * ui-kit counters as tiles in two columns, one column in a narrow spot: "Time", "Tokens" and so
+ * on; a counter can have a note under its value.
+ * @param {Props} props Component props.
+ * @param {readonly StatItem[]} props.items Counters in order.
+ * @returns {JSX.Element} List of counters.
  */
 export function StatList(props: Props): JSX.Element {
   return (

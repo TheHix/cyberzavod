@@ -1,4 +1,4 @@
-// Общие данные для тестов сценария и кадра.
+// Shared data for the script and frame tests.
 
 import { FACTORY_LAYOUTS, type FactoryLayout, type StationPlan } from "./layout.ts";
 import {
@@ -9,19 +9,20 @@ import {
 } from "@cyberzavod/core";
 import { DEFAULT_PACING, type Pacing } from "./script.ts";
 
-// Станки в ряд через 10 единиц, проход в двух единицах от рабочих мест, бег — единица
-// в секунду, работа у станка длится столько же, сколько в записи: моменты сцены считаются
-// в уме. Передача соседу: 0,2 с поднять деталь, 13 с пути (2 вниз в проход, 10 по проходу,
-// 1 вверх к получателю), 0,1 с из рук в руки, 0,2 с получатель кладёт её на станок.
+// Machines in a row 10 units apart, the aisle two units from the posts, running at one unit per
+// second, work at a machine lasts as long as in the recording: scene moments can be computed in
+// your head. Handover to a neighbor: 0.2 s to lift the part, 13 s of path (2 down into the aisle,
+// 10 along the aisle, 1 up to the receiver), 0.1 s hand to hand, 0.2 s for the receiver to put it
+// on the machine.
 
 const AISLE = 2;
 
 /**
- * Станок для тестов: рабочее место в точке, станок на единицу дальше от прохода, мастер встаёт
- * в трёх единицах правее рабочего.
- * @param {number} x Положение по горизонтали.
- * @param {number} y Положение рабочего места по вертикали.
- * @returns {StationPlan} Станок, у которого рабочий смотрит на станок.
+ * Machine for tests: the post at the point, the machine one unit further from the aisle, the
+ * foreman stands three units to the right of the worker.
+ * @param {number} x Horizontal position.
+ * @param {number} y Vertical position of the post.
+ * @returns {StationPlan} A machine whose worker faces it.
  */
 export function stationAt(x: number, y = 0): StationPlan {
   const toMachine = y > AISLE ? 1 : -1;
@@ -34,7 +35,7 @@ export function stationAt(x: number, y = 0): StationPlan {
   };
 }
 
-/** План для тестов: станки в ряд через 10 единиц, проход в двух единицах от них. */
+/** Layout for tests: machines in a row 10 units apart, the aisle two units from them. */
 export const LINE_LAYOUT: FactoryLayout = {
   width: 50,
   height: 10,
@@ -59,7 +60,7 @@ export const LINE_LAYOUT: FactoryLayout = {
   },
 };
 
-/** Темп для тестов: без сжатия, бег — единица в секунду. */
+/** Pacing for tests: no compression, running at one unit per second. */
 export const PLAIN_PACING: Pacing = {
   compression: 1,
   minWorkMs: 0,
@@ -77,9 +78,9 @@ export const PLAIN_PACING: Pacing = {
 };
 
 /**
- * Запись для тестов без разговоров: постановка → код → проверки с провалом → снова код.
- * @param {boolean} ok Итог сборки.
- * @returns {SessionRecord} Запись сборки.
+ * Recording for tests without talks: plan → code → checks with a failure → code again.
+ * @param {boolean} ok Build outcome.
+ * @returns {SessionRecord} Build recording.
  */
 export function reworkRecording(ok = true): SessionRecord {
   const events: SessionEvent[] = [
@@ -104,30 +105,31 @@ export function reworkRecording(ok = true): SessionRecord {
 }
 
 /**
- * Та же сессия с другими событиями.
- * @param {SessionRecord} session Сессия, у которой берётся всё, кроме событий.
- * @param {SessionEvent[]} events Новые события.
- * @returns {SessionRecord} Новая сессия.
+ * The same session with other events.
+ * @param {SessionRecord} session Session from which everything but the events is taken.
+ * @param {SessionEvent[]} events New events.
+ * @returns {SessionRecord} New session.
  */
 export function withEvents(session: SessionRecord, events: SessionEvent[]): SessionRecord {
   return { ...session, data: { ...session.data, events } };
 }
 
 /**
- * Реплика для тестов: строка и полный текст выводятся из момента.
- * @param {number} t Время записи, мс.
- * @param {Speaker} from Кто говорит.
- * @param {Speaker} to Кому адресована.
- * @returns {MessageEvent} Реплика.
+ * Message for tests: the line and the full text are derived from the moment.
+ * @param {number} t Recording time, ms.
+ * @param {Speaker} from Who speaks.
+ * @param {Speaker} to Who it is addressed to.
+ * @returns {MessageEvent} Message.
  */
 export function messageAt(t: number, from: Speaker, to: Speaker): MessageEvent {
   return { t, type: "message", from, to, line: `Реплика ${t}`, text: `Полный текст ${t}` };
 }
 
 /**
- * Запись для тестов с репликами: промпт и «принял» рабочего у станка постановки, у станка кода
- * мастер-слушатель и обмен кода с проверками при передаче, у станка проверок отчёт мастеру.
- * @returns {SessionRecord} Запись сборки.
+ * Recording for tests with messages: a prompt and the worker's "got it" at the plan machine, at the
+ * code machine the foreman listening and the code–checks exchange at handover, at the checks
+ * machine a report to the foreman.
+ * @returns {SessionRecord} Build recording.
  */
 export function chatRecording(): SessionRecord {
   const events: SessionEvent[] = [
@@ -147,9 +149,9 @@ export function chatRecording(): SessionRecord {
 }
 
 /**
- * Запись для тестов с обменом при возврате с браком: проверки и код говорят между собой
- * до и после провала, и деталь идёт на доработку с этим разговором.
- * @returns {SessionRecord} Запись сборки.
+ * Recording for tests with an exchange on rework with a defect: checks and code talk to each other
+ * before and after the failure, and the part goes back for rework with that talk.
+ * @returns {SessionRecord} Build recording.
  */
 export function defectExchangeRecording(): SessionRecord {
   const events: SessionEvent[] = [
@@ -166,9 +168,10 @@ export function defectExchangeRecording(): SessionRecord {
 }
 
 /**
- * Запись для тестов с репликой кода проверкам перед другой речью визита: она звучит у станка,
- * а не у места встречи, и обмен остаётся только у реплики после промпта и слов мастера.
- * @returns {SessionRecord} Запись сборки.
+ * Recording for tests with a code message to checks before other speech of the visit: it sounds at
+ * the machine, not at the meeting spot, and the exchange keeps only the message after the prompt
+ * and the foreman's words.
+ * @returns {SessionRecord} Build recording.
  */
 export function earlyExchangeRecording(): SessionRecord {
   const events: SessionEvent[] = [
@@ -186,9 +189,9 @@ export function earlyExchangeRecording(): SessionRecord {
 }
 
 /**
- * Запись для тестов с вмешательством человека: проверки провалились, ревью остановилось, и
- * мастер решает, что делать дальше, а потом ревью продолжает.
- * @returns {SessionRecord} Запись сборки.
+ * Recording for tests with a human intervention: checks failed, review stopped, and
+ * the foreman decides what to do next, and then review continues.
+ * @returns {SessionRecord} Build recording.
  */
 export function interventionRecording(): SessionRecord {
   const events: SessionEvent[] = [
@@ -210,7 +213,7 @@ export function interventionRecording(): SessionRecord {
   return withEvents(reworkRecording(), events);
 }
 
-/** Записи с речью для тестов времени: с обменом при передаче и без. */
+/** Recordings with speech for timing tests: with an exchange at handover and without. */
 export const SPEECH_RECORDINGS: readonly {
   readonly name: string;
   readonly recording: SessionRecord;
@@ -221,7 +224,9 @@ export const SPEECH_RECORDINGS: readonly {
   { name: "с вмешательством человека", recording: interventionRecording() },
 ];
 
-/** План и темп для тестов: свой для тестов и каждый план цеха в темпе по умолчанию. */
+/**
+ * Layout and pacing for tests: a test-specific one and each factory layout at the default pacing.
+ */
 export const PLAYBACK_SETUPS: readonly {
   readonly name: string;
   readonly layout: FactoryLayout;

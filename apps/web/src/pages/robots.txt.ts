@@ -1,14 +1,14 @@
 import type { APIRoute } from "astro";
 
-// Карту сайта собирает @astrojs/sitemap: индекс лежит в корне и ссылается на части.
+// @astrojs/sitemap builds the sitemap: the index is at the root and refers to the parts.
 const SITEMAP_INDEX = "sitemap-index.xml";
 
 /**
- * Правила для поисковых роботов: сайт открыт целиком, карта сайта — в корне.
- * @param {object} context Контекст маршрута Astro.
- * @param {URL | undefined} context.site Адрес сайта из `astro.config.ts`.
- * @returns {Response} Текст robots.txt.
- * @throws {Error} Если в `astro.config.ts` не задан `site`.
+ * Rules for search robots: the whole site is open, the sitemap is at the root.
+ * @param {object} context Astro route context.
+ * @param {URL | undefined} context.site Site address from `astro.config.ts`.
+ * @returns {Response} robots.txt text.
+ * @throws {Error} If `site` is not set in `astro.config.ts`.
  */
 export const GET: APIRoute = ({ site }) => {
   if (site === undefined) throw new Error("для robots.txt в astro.config.ts нужен site");

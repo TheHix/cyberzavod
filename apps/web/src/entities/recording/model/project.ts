@@ -2,10 +2,10 @@ import type { SessionRecord } from "@cyberzavod/core";
 import { projectSeriesOf } from "./series.ts";
 
 /**
- * Выбирает сборки одного проекта по порядку задач — в том же порядке, что в серии проекта.
- * @param {readonly SessionRecord[]} recordings Записи сборок в любом порядке.
- * @param {string} projectId Идентификатор проекта.
- * @returns {readonly SessionRecord[]} Записи этого проекта, начатые раньше — первыми.
+ * Picks the builds of one project in task order, the same order as in the project series.
+ * @param {readonly SessionRecord[]} recordings Build recordings in any order.
+ * @param {string} projectId Project id.
+ * @returns {readonly SessionRecord[]} This project's recordings, earliest started first.
  */
 export function recordingsOfProject(
   recordings: readonly SessionRecord[],

@@ -1,11 +1,11 @@
-// Отметки шкалы сцены: желаемое время сцены у события может оказаться раньше предыдущего,
-// потому что речь стоит в очереди. Здесь такие отметки выравниваются, чтобы время записи
-// на сцене не шло назад.
+// Scene timeline marks: the desired scene time of an event may come before the previous one,
+// because speech waits in a queue. Such marks are aligned here so that the recording time
+// on the scene never goes backwards.
 
 import type { Mark } from "./script.ts";
 
-// Опорная отметка держит своё время сцены: первая и каждая, что не раньше последней опорной.
-// Отметка того же времени с тем же временем записи ей тождественна и тоже опорная.
+// An anchor mark keeps its scene time: the first one and each one not earlier than the last anchor.
+// A mark at the same time with the same recording time is identical to it and is an anchor too.
 function isAnchor(mark: Mark, lastAnchor: Mark | undefined): boolean {
   if (lastAnchor === undefined) return true;
   if (mark.at > lastAnchor.at) return true;
@@ -27,8 +27,8 @@ function anchorIndexesOf(marks: readonly Mark[]): number[] {
   return indexes;
 }
 
-// Место отметки между опорными слева и справа по доле времени записи; без правой опорной
-// или при том же времени записи — на опорной слева.
+// Place of a mark between the left and right anchors by share of recording time; with no right
+// anchor or with the same recording time, at the left anchor.
 function placedBetween(mark: Mark, left: Mark, right: Mark | undefined): number {
   if (right === undefined || right.recordingTime === left.recordingTime) return left.at;
 
@@ -40,11 +40,13 @@ function placedBetween(mark: Mark, left: Mark, right: Mark | undefined): number 
 }
 
 /**
- * Выравнивает отметки так, чтобы их время сцены не убывало: отметка, которую обогнала
- * очередь речи, встаёт между опорными по доле времени записи. Наружу пакета не выходит.
- * @param {readonly Mark[]} marks Отметки в порядке записи: время записи не убывает, `at` — желаемое.
- * @returns {Mark[]} Те же отметки в том же порядке, с теми же временем записи и счётчиками.
- * @throws {Error} Если у неопорной отметки нет опорной слева: это ошибка программы, первая отметка опорная.
+ * Aligns marks so that their scene time never decreases: a mark overtaken by the speech queue
+ * is placed between anchors by share of recording time. Does not leave the package.
+ * @param {readonly Mark[]} marks Marks in recording order: recording time never decreases, `at`
+ * is desired.
+ * @returns {Mark[]} The same marks in the same order, with the same recording time and counters.
+ * @throws {Error} If a non-anchor mark has no anchor on its left: a program error, the first mark
+ * is an anchor.
  */
 export function alignMarks(marks: readonly Mark[]): Mark[] {
   const anchors = anchorIndexesOf(marks);

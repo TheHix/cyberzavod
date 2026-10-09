@@ -11,7 +11,7 @@
   display: none;
 }
 
-/* Раскрытый промпт сворачивается кликом по нему же — подсказка больше не нужна. */
+/* An expanded prompt collapses by clicking it again, so the hint is no longer needed. */
 .details[open] .more {
   display: none;
 }

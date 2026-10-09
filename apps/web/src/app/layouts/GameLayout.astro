@@ -1,8 +1,9 @@
 ---
-// Игровой экран: цех на всё окно, меню слева, панели записей, гайдов и «о заводе» поверх. Вход
-// в галереи и аналитику — в панели записей: плитка в меню на 360px уже не помещается. Вход через
-// GitHub — плитка в меню на широком экране и кнопка в панели записей на любом.
-// Содержимое страницы — цех со своим HUD — встаёт в поле справа от меню.
+// Game screen: the factory floor fills the window, the menu on the left, recordings, guides and
+// "about" panels on top. Galleries and stats are entered from the recordings panel: a menu tile no
+// longer fits at 360px. GitHub sign-in is a menu tile on a wide screen and a button in the
+// recordings panel on any.
+// The page content, the factory floor with its HUD, sits in the field to the right of the menu.
 import BaseLayout from "./BaseLayout.astro";
 import { GuideList } from "@/widgets/guide-list";
 import { RecordingsByProject } from "@/widgets/recording-list";
@@ -20,20 +21,21 @@ import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { ButtonLink, Drawer } from "@/shared/ui";
 
 interface Props {
-  /** Язык страницы: на нём интерфейс, панели и мета-теги. */
+  /** Page language: the interface, panels and meta tags are in it. */
   locale: Locale;
   title?: string;
   description?: string;
-  /** Есть ли на странице журнал сборки (слот drawers) — тогда он в меню. */
+  /** Whether the page has a build journal (drawers slot); then it is in the menu. */
   journal?: boolean;
-  /** Есть ли на странице карточка проекта (слот drawers) — тогда она в меню. */
+  /** Whether the page has a project card (drawers slot); then it is in the menu. */
   project?: boolean;
   /**
-   * Главный заголовок страницы, если его нет в содержимом: на главной HUD называет сборку
-   * заголовком второго уровня, а первый — сайт. Виден только программам чтения и поисковикам.
+   * The page's main heading, if the content has none: on the home page the HUD names the build with
+   * a second-level heading, and the first one is the site. Visible only to screen readers and
+   * search engines.
    */
   heading?: string | undefined;
-  /** Страница «не найдено»: nginx отдаёт её на любой неизвестный адрес, поисковикам она не нужна. */
+  /** "Not found" page: nginx serves it for any unknown address; search engines do not need it. */
   notFound?: boolean;
 }
 
@@ -46,7 +48,8 @@ const {
   heading,
   notFound = false,
 } = Astro.props;
-// У страницы «не найдено» нет пары на другом языке по адресу: переключатель ведёт в цех.
+// The "not found" page has no counterpart in another language by address: the switcher leads to
+// the factory floor.
 const path = notFound ? "/" : pathWithoutLocale(Astro.url.pathname);
 const closeLabel = UI_TEXT.panels.close[locale];
 ---

@@ -6,9 +6,9 @@
   margin: 0;
 }
 
-/* Две плашки в узком месте (панель на телефоне) не вмещают значение вроде «21 мин 47 с», а
-   значение не переносится: там счётчики встают в одну колонку. В HUD шириной 25rem колонок две.
-   Переменные CSS в условии запроса не работают — порог числом. */
+/* Two tiles in a narrow spot (a panel on a phone) do not fit a value like "21 min 47 s", and the
+   value does not wrap, so there the counters stack in one column. In the 25rem-wide HUD there are
+   two columns. CSS variables do not work in the query condition, so the threshold is a number. */
 @container (width < 22rem) {
   .stat {
     grid-column: 1 / -1;

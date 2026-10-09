@@ -1,5 +1,5 @@
-// Геометрия прохода: прямоугольники вдоль отрезков ломаной. Чистые расчёты без Pixi — рисует
-// их floor.ts. Диагонали пиксель-арт не умеет: ступеньки не складываются в плитку.
+// Aisle geometry: rectangles along the segments of a polyline. Pure calculations without Pixi;
+// floor.ts draws them. Pixel art cannot do diagonals: the steps do not tile.
 
 import type { Aisle, Point } from "@cyberzavod/player";
 import type { PlanBounds } from "./bounds.ts";
@@ -13,10 +13,10 @@ function direction(from: Point, to: Point): Point {
 }
 
 /**
- * Продолжает крайние отрезки ломаной за её концы по их направлению.
- * @param {Aisle} aisle Проход.
- * @param {number} reach На сколько продолжить каждый конец.
- * @returns {Point[]} Вершины продолженной ломаной.
+ * Extends the end segments of a polyline beyond its ends in their direction.
+ * @param {Aisle} aisle Aisle.
+ * @param {number} reach How far to extend each end.
+ * @returns {Point[]} Vertices of the extended polyline.
  */
 export function extendedAisle(aisle: Aisle, reach: number): Point[] {
   const points = [...aisle];
@@ -33,13 +33,13 @@ export function extendedAisle(aisle: Aisle, reach: number): Point[] {
 }
 
 /**
- * Прямоугольники полосы прохода: по одному на отрезок продолженной ломаной. Внутренние стыки
- * перекрываются на полуширину, чтобы в углу не осталось щели.
- * @param {Aisle} aisle Проход.
- * @param {number} reach На сколько продолжить крайние отрезки за концы.
- * @param {number} halfWidth Полуширина полосы.
- * @returns {PlanBounds[]} Прямоугольники в тех же единицах, что и проход.
- * @throws {Error} Если какой-то отрезок идёт по диагонали.
+ * Rectangles of the aisle strip: one per segment of the extended polyline. Inner joints overlap
+ * by the half width, so no gap remains in a corner.
+ * @param {Aisle} aisle Aisle.
+ * @param {number} reach How far to extend the end segments beyond the ends.
+ * @param {number} halfWidth Half width of the strip.
+ * @returns {PlanBounds[]} Rectangles in the same units as the aisle.
+ * @throws {Error} If some segment runs diagonally.
  */
 export function laneRects(aisle: Aisle, reach: number, halfWidth: number): PlanBounds[] {
   const points = extendedAisle(aisle, reach);
@@ -75,7 +75,8 @@ interface Segment {
   readonly isHorizontal: boolean;
 }
 
-// Отрезок с запасом на стыках: `before` — у начала, `after` — у конца, по ходу отрезка.
+// A segment with a margin at the joints: `before` at the start, `after` at the end, along the
+// segment.
 function segmentRect(
   { from, to, isHorizontal }: Segment,
   halfWidth: number,

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TokenSource } from "@/shared/lib/css-tokens.ts";
 import { readPalette } from "./palette.ts";
 
-// Все токены, которые читает цех, — каждый своим цветом, чтобы было видно, что откуда взято.
+// All tokens the factory reads, each in its own color, so it is visible what comes from where.
 function tokens(overrides: Record<string, string> = {}): TokenSource {
   const names = [
     "--ink",

@@ -9,20 +9,20 @@ import { JournalEntry } from "./JournalEntry.tsx";
 import styles from "./Timeline.module.css";
 
 interface Props {
-  /** Полная запись: в журнале, в отличие от цеха, есть полные тексты реплик. */
+  /** Full recording: unlike the floor, the journal has the full message texts. */
   recording: SessionRecord;
-  /** Язык страницы: на нём метки и подписи журнала. */
+  /** Page language: journal labels and captions are in it. */
   locale: Locale;
 }
 
 /**
- * Журнал сборки, который рисуется в браузере, — для записи, пришедшей из API. Та же разметка,
- * что у `BuildJournal.astro` на странице записи из журнала проекта, но целиком внутри одного
- * острова: тексты уже в браузере, и слотом их передавать незачем.
- * @param {Props} props Свойства компонента.
- * @param {SessionRecord} props.recording Полная запись.
- * @param {Locale} props.locale Язык страницы.
- * @returns {JSX.Element} Пометка о языке записи и список записей журнала.
+ * Build journal rendered in the browser, for a recording that came from the API. The same markup
+ * as `BuildJournal.astro` on the page of a recording from the project journal, but entirely inside
+ * one island: the texts are already in the browser, so there is no point passing them via a slot.
+ * @param {Props} props Component props.
+ * @param {SessionRecord} props.recording Full recording.
+ * @param {Locale} props.locale Page language.
+ * @returns {JSX.Element} Recording language note and the list of journal entries.
  */
 export function JournalTimeline(props: Props): JSX.Element {
   const entries = createMemo(() => timelineOf(props.recording.data.events));

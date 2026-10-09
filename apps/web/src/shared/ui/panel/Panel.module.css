@@ -1,4 +1,4 @@
-/* Панель-наклейка: светлая бумага, толстый контур, тень вниз. */
+/* Sticker panel: light paper, a thick outline, a drop shadow. */
 .panel {
   padding: var(--space-l);
   background: var(--paper);
@@ -7,16 +7,16 @@
   box-shadow: var(--lift-large);
 }
 
-/* Длинный текст прокручивается внутри панели; без min-height панель выросла бы по содержимому.
-   position: relative держит внутри панели скрытые абсолютные элементы (статусы кнопок): иначе
-   они встают по месту в тексте и растягивают страницу, и на телефоне она прокручивается. */
+/* Long text scrolls inside the panel; without min-height the panel would grow with its content.
+   position: relative keeps hidden absolute elements (button statuses) inside the panel: otherwise
+   they take their place in the text flow and stretch the page, which then scrolls on a phone. */
 .scrollable {
   position: relative;
   min-height: 0;
   overflow-y: auto;
 }
 
-/* Ярлык над содержимым: «СБОРКА», «ЖУРНАЛ». */
+/* Label above the content: "BUILD", "JOURNAL". */
 .label {
   display: inline-block;
   margin-bottom: var(--space-m);
@@ -32,7 +32,7 @@
   border-radius: var(--radius-round);
 }
 
-/* На узком или низком экране каждая строка на счету: панели хватает содержимого. */
+/* On a narrow or short screen every line counts: the panel is sized to its content. */
 @media (max-width: 48rem), (max-height: 40rem) {
   .label {
     display: none;

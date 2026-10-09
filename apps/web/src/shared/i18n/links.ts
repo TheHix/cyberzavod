@@ -1,21 +1,22 @@
 import type { Locale } from "./locale.ts";
 import { localizedPath, pathWithoutLocale } from "./path.ts";
 
-// Атрибут ищется только внутри открывающего тега `<a …>`: в тексте блоков кода `<` экранирован
-// как `&lt;`, а кавычки нет, поэтому ` href="` в примере кода тегом не считается.
+// The attribute is matched only inside an opening `<a …>` tag: in code block text `<` is escaped
+// as `&lt;` but the quote is not, so ` href="` in a code sample does not count as a tag.
 const ANCHOR_HREF = /(<a\b[^>]*?\shref=")([^"]*)(")/g;
 const QUERY_OR_FRAGMENT = /[?#]/;
-// Файлы (`/favicon.svg`, `/files/a.pdf`) не локализуются: у них одна версия на все языки.
+// Files (`/favicon.svg`, `/files/a.pdf`) are not localized: one version serves all languages.
 const FILE_EXTENSION = /\.[^/.]+$/;
 
 /**
- * Переводит ссылку на страницу этого же сайта на язык страницы: содержимое, написанное один
- * раз (гайды, карточки проектов), не знает, на каком языке его покажут. Чужие адреса, якоря
- * и ссылки, где язык уже указан, остаются как есть.
- * @param {string} href Адрес из содержимого: `/projects/x/`, `https://cyberzavod.com/` или внешний.
- * @param {Locale} locale Язык страницы, на которой стоит ссылка.
- * @param {string} origin Адрес сайта: `https://cyberzavod.com`.
- * @returns {string} Адрес на языке страницы.
+ * Switches a link to a page of this same site to the page language: content written once
+ * (guides, project cards) does not know which language it will be shown in. External addresses,
+ * anchors and links that already name a language stay as they are.
+ * @param {string} href Address from the content: `/projects/x/`, `https://cyberzavod.com/` or
+ * an external one.
+ * @param {Locale} locale Language of the page the link is on.
+ * @param {string} origin Site address: `https://cyberzavod.com`.
+ * @returns {string} Address in the page language.
  */
 export function localizeHref(href: string, locale: Locale, origin: string): string {
   const host = origin.replace(/\/$/, "");
@@ -37,11 +38,11 @@ export function localizeHref(href: string, locale: Locale, origin: string): stri
 }
 
 /**
- * Переводит на язык страницы все ссылки на этот же сайт в готовой разметке.
- * @param {string} html Разметка содержимого, например гайда.
- * @param {Locale} locale Язык страницы, на которой стоит содержимое.
- * @param {string} origin Адрес сайта: `https://cyberzavod.com`.
- * @returns {string} Разметка со ссылками на языке страницы.
+ * Switches all links to this same site in ready-made markup to the page language.
+ * @param {string} html Content markup, for example a guide.
+ * @param {Locale} locale Language of the page the content is on.
+ * @param {string} origin Site address: `https://cyberzavod.com`.
+ * @returns {string} Markup with links in the page language.
  */
 export function localizeLinks(html: string, locale: Locale, origin: string): string {
   return html.replace(

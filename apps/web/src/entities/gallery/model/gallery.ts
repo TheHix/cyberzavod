@@ -1,33 +1,33 @@
 import type { SessionRecord } from "@cyberzavod/core";
 
-/** Запись в галерее автора — `Summary` из ответа API: без событий, со ссылкой по `slug`. */
+/** A recording in an author's gallery, the API `Summary`: no events, linked by `slug`. */
 export interface RecordingSummary {
   readonly id: string;
-  /** Секретная часть ссылки на запись: `/r/?id=<slug>`. */
+  /** The secret part of the recording link: `/r/?id=<slug>`. */
   readonly slug: string;
   readonly projectId: string;
   readonly title: string;
-  /** Язык оригинала записи: код ISO 639. */
+  /** The recording's original language: an ISO 639 code. */
   readonly language: string;
-  /** Начало сборки — `timestamp` записи. */
+  /** Build start, the recording's `timestamp`. */
   readonly startedAt: string;
   readonly uploadedAt: string;
 }
 
-/** Открытая галерея в общем списке: автор, сколько у него записей и когда галерея менялась. */
+/** A public gallery in the shared list: the author, their recording count and when it changed. */
 export interface GalleryListing {
   readonly login: string;
   readonly recordingCount: number;
   readonly updatedAt: string;
 }
 
-/** Открытая галерея автора: его записи, свежие сверху. */
+/** An author's public gallery: their recordings, newest first. */
 export interface Gallery {
   readonly login: string;
   readonly recordings: readonly RecordingSummary[];
 }
 
-/** Запись из галереи по секретной ссылке: сама сессия, её автор и открыта ли его галерея. */
+/** A recording by secret link: the session, its author and whether their gallery is public. */
 export interface SharedRecording {
   readonly owner: string;
   readonly galleryPublic: boolean;
@@ -35,13 +35,13 @@ export interface SharedRecording {
 }
 
 /**
- * Своя галерея вошедшего автора — ответ `GET /api/me`: открыта ли она, сколько записей можно
- * держать и сами записи, в том числе в закрытой галерее.
+ * The signed-in author's own gallery, the `GET /api/me` response: whether it is public, how many
+ * recordings it can hold and the recordings themselves, including in a private gallery.
  */
 export interface OwnGallery {
   readonly login: string;
   readonly galleryPublic: boolean;
-  /** Сколько записей помещается в галерею. */
+  /** How many recordings fit in the gallery. */
   readonly limit: number;
   readonly recordings: readonly RecordingSummary[];
 }

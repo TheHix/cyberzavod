@@ -14,7 +14,8 @@ import { MACHINE_SIZE } from "./machines.ts";
 import { plaquePlacements, plaqueRect } from "./plaques.ts";
 import { PIXELS_PER_UNIT } from "./units.ts";
 
-// Рисунок встаёт на целый пиксель, а ожидание в единицах плана — нет: допуск в полпикселя.
+// A sprite lands on a whole pixel, but the expectation in plan units does not: half a pixel of
+// tolerance.
 const SLACK = 0.5 / PIXELS_PER_UNIT;
 const RESOLUTIONS = [1, 1.5, 2, 3];
 
@@ -54,7 +55,7 @@ function spotRect(center: { x: number; y: number }): PlanBounds {
   return rectAround(center, 1, 1);
 }
 
-// Что обязано попасть в кадр: станки и стол, места рабочих и мастера, дверь.
+// What must get into the frame: machines and the desk, worker and foreman spots, the door.
 function neededRects(layout: FactoryLayout): PlanBounds[] {
   const stations = STAGES.map((stage) => layout.stations[stage]);
 
@@ -82,7 +83,7 @@ interface PlanCase {
   readonly height: number;
 }
 
-// Каждый план цеха на каждом языке: от языка зависит ширина табличек.
+// Every floor plan in every language: plaque width depends on the language.
 const PLAN_CASES: readonly PlanCase[] = LOCALES.flatMap((locale) =>
   FACTORY_LAYOUTS.map((layout) => ({
     locale,
@@ -213,7 +214,8 @@ describe("fitPixelPlan", () => {
   });
 
   it("берёт множитель 4 на поле десктопа при плотности 1", () => {
-    // Около 1000×800 остаётся от окна 1440×900 между меню слева и HUD справа.
+    // About 1000×800 remains of a 1440×900 window between the menu on the left and the HUD on the
+    // right.
     const field = { x: 0, y: 0, width: 1000, height: 800 };
 
     const { scale } = fitPixelPlan(bounds, field, 1);

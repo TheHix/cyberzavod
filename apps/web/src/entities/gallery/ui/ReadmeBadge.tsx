@@ -6,22 +6,22 @@ import { badgeImageUrl, badgeMarkdown } from "../model/url.ts";
 import styles from "./ReadmeBadge.module.css";
 
 interface Props {
-  /** Логин автора открытой галереи. */
+  /** Login of the public gallery's author. */
   login: string;
-  /** Адрес сайта — `site` из конфига Astro: строка Markdown живёт в чужом README. */
+  /** Site address, `site` from the Astro config: the Markdown line lives in another's README. */
   siteUrl: string;
-  /** Язык страницы. */
+  /** Page language. */
   locale: Locale;
 }
 
 /**
- * Бейдж «Built at Cyberzavod» для README: картинка из API и строка Markdown со ссылкой на
- * галерею, с кнопкой «копировать». Его показывают галерея автора и личный кабинет.
- * @param {Props} props Свойства компонента.
- * @param {string} props.login Логин автора.
- * @param {string} props.siteUrl Адрес сайта.
- * @param {Locale} props.locale Язык страницы.
- * @returns {JSX.Element} Раздел с бейджем.
+ * The "Built at Cyberzavod" badge for a README: the image from the API and a Markdown line linking
+ * to the gallery, with a "copy" button. Shown by the author's gallery and the account page.
+ * @param {Props} props Component props.
+ * @param {string} props.login Author login.
+ * @param {string} props.siteUrl Site address.
+ * @param {Locale} props.locale Page language.
+ * @returns {JSX.Element} Section with the badge.
  */
 export function ReadmeBadge(props: Props): JSX.Element {
   return (

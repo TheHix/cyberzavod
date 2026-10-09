@@ -7,30 +7,34 @@ import { FactoryFloor } from "./FactoryFloor.tsx";
 
 interface Props {
   recording: BriefSessionRecord;
-  /** Язык страницы: на нём подписи цеха, HUD и пузырей. */
+  /** Page language: floor, HUD and bubble captions are in it. */
   locale: Locale;
-  /** Проект, который собирали, — в HUD; ссылка на его страницу или галерею автора, если есть. */
+  /**
+   * The project that was built, in the HUD; a link to its page or the author's gallery, if any.
+   */
   project: BuildProject;
-  /** Пометка о языке оригинала записи; нет, если запись на языке страницы. */
+  /**
+   * Note about the recording's original language; absent if the recording is in the page language.
+   */
   languageNote: string | undefined;
-  /** Уровень заголовка с названием сборки; по умолчанию — главный заголовок страницы. */
+  /** Level of the heading with the build name; by default the main page heading. */
   titleLevel?: "h1" | "h2" | undefined;
 }
 
 /**
- * Живой цех на весь экран, который проигрывает одну запись сборки: рабочие у станков, бег с
- * деталью, кабинет мастера, промпты, вмешательства и реплики над говорящими, HUD сборки справа
- * со ссылкой на проект. Графика грузится только в браузере.
- * @param {Props} props Свойства компонента.
- * @param {BriefSessionRecord} props.recording Запись сборки, которую проигрывает цех.
- * @param {Locale} props.locale Язык страницы.
- * @param {BuildProject} props.project Проект, который собирали.
- * @param {string | undefined} props.languageNote Пометка о языке оригинала записи.
- * @param {"h1" | "h2"} [props.titleLevel] Уровень заголовка с названием сборки.
- * @returns {JSX.Element} Цех с HUD.
+ * A live full-screen factory that plays one build recording: workers at machines, running with the
+ * part, the foreman's office, prompts, interventions and messages above the speakers, the build
+ * HUD on the right with a project link. The graphics load only in the browser.
+ * @param {Props} props Component props.
+ * @param {BriefSessionRecord} props.recording The build recording the floor plays.
+ * @param {Locale} props.locale Page language.
+ * @param {BuildProject} props.project The project that was built.
+ * @param {string | undefined} props.languageNote Note about the recording's original language.
+ * @param {"h1" | "h2"} [props.titleLevel] Level of the heading with the build name.
+ * @returns {JSX.Element} The factory with the HUD.
  */
 export function Factory(props: Props): JSX.Element {
-  // Запись у островка не меняется: модель создаётся один раз.
+  // The island's recording does not change: the model is created once.
   const model = createFactoryModel(untrack(() => props.recording));
 
   return (

@@ -4,21 +4,22 @@ import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { CopyableCode, Title } from "@/shared/ui";
 import styles from "./CabinetBoard.module.css";
 
-/** Команда, которой запись из журнала проекта уходит в галерею. */
+/** Command that sends a recording from the project journal to the gallery. */
 const SHARE_COMMAND = "npx cyberzavod share <id>";
-/** Команда входа в CLI: у CLI свой вход, кука сайта ему не нужна. */
+/** CLI sign-in command: the CLI has its own sign-in and does not need the site cookie. */
 const LOGIN_COMMAND = "npx cyberzavod login";
 
 interface Props {
-  /** Язык страницы. */
+  /** Page language. */
   locale: Locale;
 }
 
 /**
- * Подсказка, откуда берутся записи: сайт их не загружает, их отправляет CLI из проекта.
- * @param {Props} props Свойства компонента.
- * @param {Locale} props.locale Язык страницы.
- * @returns {JSX.Element} Раздел с командами CLI.
+ * Hint on where recordings come from: the site does not upload them, the CLI sends them from the
+ * project.
+ * @param {Props} props Component props.
+ * @param {Locale} props.locale Page language.
+ * @returns {JSX.Element} Section with CLI commands.
  */
 export function CliHint(props: Props): JSX.Element {
   return (

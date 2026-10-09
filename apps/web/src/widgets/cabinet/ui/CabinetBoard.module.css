@@ -11,7 +11,7 @@
   justify-items: start;
 }
 
-/* justify-items: start ставит элементы по их ширине, но не шире колонки раздела. */
+/* justify-items: start sizes elements by their width, but no wider than the section column. */
 .section > * {
   max-width: 100%;
 }
@@ -29,7 +29,8 @@
   align-items: center;
 }
 
-/* Логин занимает остаток строки, кнопка «Выйти» прижата вправо; длинный логин переносится. */
+/* The login takes the rest of the row, the "Sign out" button is pushed right; a long login wraps.
+   */
 .login {
   flex: 1;
   min-width: 0;

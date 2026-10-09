@@ -19,19 +19,20 @@ import { CliHint } from "./CliHint.tsx";
 import styles from "./CabinetBoard.module.css";
 
 interface Props {
-  /** Язык страницы. */
+  /** Page language. */
   locale: Locale;
-  /** Адрес сайта — `site` из конфига Astro: для строки бейджа в README. */
+  /** Site address, `site` from the Astro config: for the badge line in the README. */
   siteUrl: string;
 }
 
 /**
- * Личный кабинет: гостю — объяснение и вход через GitHub, автору — его галерея и записи. Кто
- * вошёл, кабинет узнаёт из общего с меню стора; данные приходят из API в браузере.
- * @param {Props} props Свойства компонента.
- * @param {Locale} props.locale Язык страницы.
- * @param {string} props.siteUrl Адрес сайта.
- * @returns {JSX.Element} Кабинет.
+ * Personal cabinet: for a guest, an explanation and GitHub sign-in; for an author, their gallery
+ * and recordings. The cabinet learns who is signed in from the store shared with the menu; data
+ * comes from the API in the browser.
+ * @param {Props} props Component props.
+ * @param {Locale} props.locale Page language.
+ * @param {string} props.siteUrl Site address.
+ * @returns {JSX.Element} Cabinet.
  */
 export function CabinetBoard(props: Props): JSX.Element {
   const model = createCabinetModel({

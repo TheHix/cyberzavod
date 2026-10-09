@@ -11,7 +11,7 @@ import { createStatsPageModel } from "../model/stats-page.ts";
 import styles from "./StatsBoard.module.css";
 
 interface Props {
-  /** Язык страницы: на нём подписи, числа и сообщения. */
+  /** Page language: captions, numbers and messages are in it. */
   locale: Locale;
 }
 
@@ -77,11 +77,12 @@ function StatsCharts(props: FilledProps): JSX.Element {
 }
 
 /**
- * Аналитика по записям открытых галерей: числа и диаграммы возвратов по этапам, вмешательств по
- * причинам и исходов сборок. Данные приходят из API в браузере; пока сборок нет — заглушка.
- * @param {Props} props Свойства компонента.
- * @param {Locale} props.locale Язык страницы.
- * @returns {JSX.Element} Аналитика или сообщение, почему её нет.
+ * Analytics on recordings from public galleries: numbers and charts of rework by stage,
+ * interventions by reason and build outcomes. Data comes from the API in the browser; while there
+ * are no builds, a placeholder.
+ * @param {Props} props Component props.
+ * @param {Locale} props.locale Page language.
+ * @returns {JSX.Element} Analytics, or a message saying why there are none.
  */
 export function StatsBoard(props: Props): JSX.Element {
   const model = createStatsPageModel(() => fetchStats());
@@ -89,7 +90,8 @@ export function StatsBoard(props: Props): JSX.Element {
 
   onMount(() => void model.load());
 
-  // Аналитика есть всегда, даже пустая: 404 значит, что API её не отдаёт, — это неудача запроса.
+  // Analytics always exist, even empty: a 404 means the API does not serve them, so the request
+  // failed.
   return (
     <Show
       when={readyValue(state())}

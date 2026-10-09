@@ -7,26 +7,27 @@ import { FactoryFloor } from "./FactoryFloor.tsx";
 import { prefersReducedMotion } from "./reduced-motion.ts";
 
 interface Props {
-  /** Сборки серии по порядку проигрывания; хотя бы одна. */
+  /** Series builds in playback order; at least one. */
   builds: readonly SeriesBuild[];
-  /** Язык страницы: на нём подписи цеха, HUD и пузырей. */
+  /** Page language: floor, HUD and bubble captions are in it. */
   locale: Locale;
-  /** Уровень заголовка с названием сборки; по умолчанию — главный заголовок страницы. */
+  /** Level of the heading with the build name; by default the main page heading. */
   titleLevel?: "h1" | "h2" | undefined;
 }
 
 /**
- * Цех, который проигрывает серию сборок по кругу: досмотренную запись сменяет следующая, в HUD —
- * её проект и «сборка 2 из 7». Холст и графика при смене записи остаются. Пауза человеком серию
- * останавливает; при просьбе уменьшить движение серия сама не идёт и не переходит дальше.
- * @param {Props} props Свойства компонента.
- * @param {readonly SeriesBuild[]} props.builds Сборки серии по порядку проигрывания.
- * @param {Locale} props.locale Язык страницы.
- * @param {"h1" | "h2"} [props.titleLevel] Уровень заголовка с названием сборки.
- * @returns {JSX.Element} Цех с HUD.
+ * A factory that plays a build series in a loop: a finished recording is followed by the next, the
+ * HUD shows its project and "build 2 of 7". The canvas and graphics stay when the recording
+ * changes. A pause by the human stops the series; when reduced motion is requested, the series
+ * neither runs nor moves on by itself.
+ * @param {Props} props Component props.
+ * @param {readonly SeriesBuild[]} props.builds Series builds in playback order.
+ * @param {Locale} props.locale Page language.
+ * @param {"h1" | "h2"} [props.titleLevel] Level of the heading with the build name.
+ * @returns {JSX.Element} The factory with the HUD.
  */
 export function SeriesFactory(props: Props): JSX.Element {
-  // Серия у островка не меняется: модель цеха и серия создаются один раз.
+  // The island's series does not change: the factory model and the series are created once.
   const series = createFactorySeries(untrack(() => props.builds));
   const current = useStoreValue(series.$current);
 

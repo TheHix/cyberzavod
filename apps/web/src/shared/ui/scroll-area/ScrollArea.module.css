@@ -1,11 +1,11 @@
-/* Содержимое прокручивается в высоте, которую блоку отвели снаружи: без min-height блок во
-   флекс-колонке вырос бы по содержимому. Прокрутка у края блока не переходит на страницу и на то,
-   что под ним. */
+/* Content scrolls within the height given to the block from outside: without min-height the block
+   would grow with its content in a flex column. Scrolling at the block's edge does not pass on to
+   the page or whatever is beneath it. */
 .area {
   --scroll-shadow-size: var(--space-s);
   --scroll-shadow-color: color-mix(in srgb, var(--ink) 35%, transparent);
-  /* Заплатка вдвое выше тени: сплошной половиной она закрывает тень целиком, а второй половиной
-     сходит на нет, чтобы у края не было ступеньки. */
+  /* The cover is twice the shadow's height: its solid half hides the shadow completely, and its
+     other half fades out so there is no step at the edge. */
   --scroll-cover-size: calc(2 * var(--scroll-shadow-size));
 
   min-height: 0;
@@ -13,12 +13,12 @@
   overscroll-behavior: contain;
 }
 
-/* Тени — только когда текст не помещается: без прокрутки показывать им нечего, а на дробной
-   координате блока тень и заплатка расходятся на пиксель и оставляют у края серую полоску. */
+/* Shadows only when the text does not fit: without scrolling they have nothing to show, and at a
+   fractional block coordinate the shadow and cover drift a pixel apart, leaving a gray strip. */
 .area[data-overflowing] {
-  /* Тени у краёв стоят на месте, а бумажные заплатки едут вместе с текстом: у края, до которого
-     текст уже дошёл, заплатка закрывает тень. Так тень видна только там, где есть ещё текст, и без
-     слежки за прокруткой. */
+  /* The edge shadows stay in place while the paper covers move with the text: at an edge the text
+     has already reached, the cover hides the shadow. So the shadow shows only where there is more
+     text, without tracking the scroll. */
   background:
     linear-gradient(var(--paper) 50%, transparent) top / 100% var(--scroll-cover-size) no-repeat
       local,

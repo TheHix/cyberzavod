@@ -1,5 +1,6 @@
-// Форматирование чисел, времени и дат для страниц записей и счётчиков над цехом. Язык приходит
-// параметром: страницы собираются заранее, и язык зрителя им неизвестен.
+// Formatting of numbers, times and dates for recording pages and the counters over the factory
+// floor. The language comes as a parameter: pages are built ahead of time and do not know the
+// viewer's language.
 
 import { byLocale, LOCALE_TAGS, type Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
@@ -12,17 +13,18 @@ function twoDigits(value: number): string {
   return String(value).padStart(2, "0");
 }
 
-// Счётчик времени и часы шкалы показывают одну длительность: секунды у них округляются одинаково,
-// иначе «17 мин 22 с» в итогах стояло бы рядом с «17:21» на шкале.
+// The time counter and the timeline clock show the same duration, so their seconds round the same
+// way; otherwise "17 min 22 s" in the totals would sit next to "17:21" on the timeline.
 function wholeSecondsOf(ms: number): number {
   return Math.round(ms / SECOND_MS);
 }
 
 /**
- * Форматирует длительность для счётчика: секунды, минуты с секундами или часы с минутами.
- * @param {number} ms Длительность в миллисекундах.
- * @param {Locale} locale Язык подписей единиц.
- * @returns {string} Строка вида «42 с», «2 мин 05 с» или «1 ч 05 мин»; по-английски «42 s», «2 min 05 s», «1 h 05 min».
+ * Formats a duration for a counter: seconds, minutes with seconds, or hours with minutes.
+ * @param {number} ms Duration in milliseconds.
+ * @param {Locale} locale Language of the unit labels.
+ * @returns {string} A string like "42 s", "2 min 05 s" or "1 h 05 min"; in Russian «42 с»,
+ * «2 мин 05 с», «1 ч 05 мин».
  */
 export function formatDuration(ms: number, locale: Locale): string {
   const { hour, minute, second } = UI_TEXT.duration;
@@ -41,10 +43,10 @@ export function formatDuration(ms: number, locale: Locale): string {
 }
 
 /**
- * Форматирует момент сборки от её начала, как время на шкале проигрывателя. Секунды округляются
- * так же, как в `formatDuration`.
- * @param {number} ms Миллисекунды от начала сборки.
- * @returns {string} Строка вида «2:05» или «1:02:05».
+ * Formats a moment of a build from its start, like the time on the player's timeline. Seconds
+ * round the same way as in `formatDuration`.
+ * @param {number} ms Milliseconds from the start of the build.
+ * @returns {string} A string like "2:05" or "1:02:05".
  */
 export function formatClock(ms: number): string {
   const totalSeconds = wholeSecondsOf(ms);
@@ -60,26 +62,27 @@ export function formatClock(ms: number): string {
 const NUMBER_FORMATTERS = byLocale((locale) => new Intl.NumberFormat(LOCALE_TAGS[locale]));
 
 /**
- * Форматирует число с разбиением по разрядам.
- * @param {number} value Число.
- * @param {Locale} locale Язык, по правилам которого разбиваются разряды.
- * @returns {string} Строка вида «12 345»; по-английски «12,345».
+ * Formats a number with digit grouping.
+ * @param {number} value Number.
+ * @param {Locale} locale Language whose rules group the digits.
+ * @returns {string} A string like "12,345"; in Russian "12 345".
  */
 export function formatNumber(value: number, locale: Locale): string {
   return NUMBER_FORMATTERS[locale].format(value);
 }
 
 /**
- * Форматирует число токенов с разбиением по разрядам.
- * @param {number} tokens Число токенов.
- * @param {Locale} locale Язык, по правилам которого разбиваются разряды.
- * @returns {string} Строка вида «1 234 567»; по-английски «1,234,567».
+ * Formats a token count with digit grouping.
+ * @param {number} tokens Token count.
+ * @param {Locale} locale Language whose rules group the digits.
+ * @returns {string} A string like "1,234,567"; in Russian "1 234 567".
  */
 export function formatTokens(tokens: number, locale: Locale): string {
   return formatNumber(tokens, locale);
 }
 
-// Страницы собираются заранее, без часового пояса зрителя, поэтому день — по UTC, как и в id записи.
+// Pages are built ahead of time without the viewer's time zone, so the day is in UTC, as in the
+// recording id.
 const DATE_FORMATTERS = byLocale(
   (locale) =>
     new Intl.DateTimeFormat(LOCALE_TAGS[locale], {
@@ -91,23 +94,23 @@ const DATE_FORMATTERS = byLocale(
 );
 
 /**
- * Форматирует день начала записи для подписи.
- * @param {string} startedAt Время в ISO 8601: `2026-10-04T09:52:13.000Z`.
- * @param {Locale} locale Язык названия месяца и порядка частей даты.
- * @returns {string} Строка вида «4 октября 2026 г.»; по-английски «October 4, 2026».
+ * Formats the start day of a recording for a caption.
+ * @param {string} startedAt Time in ISO 8601: `2026-10-04T09:52:13.000Z`.
+ * @param {Locale} locale Language of the month name and the order of the date parts.
+ * @returns {string} A string like "October 4, 2026"; in Russian «4 октября 2026 г.».
  */
 export function formatDate(startedAt: string, locale: Locale): string {
   return DATE_FORMATTERS[locale].format(new Date(startedAt));
 }
 
-// id модели Claude: `claude-opus-5-5`; у старых — с датой выпуска, иногда без младшей версии:
+// Claude model id: `claude-opus-5-5`; older ones carry a release date, sometimes no minor version:
 // `claude-haiku-4-5-20251001`, `claude-sonnet-4-20250514`.
 const CLAUDE_MODEL_ID = /^claude-([a-z]+)-(\d{1,2})(?:-(\d{1,2}))?(?:-\d{8})?$/;
 
 /**
- * Превращает id модели в название для подписи; незнакомый id показывается как есть.
- * @param {string} id Идентификатор модели: `claude-opus-5-5`.
- * @returns {string} Название вида «Claude Opus 5.5» или «Claude Sonnet 4».
+ * Turns a model id into a name for a caption; an unknown id is shown as is.
+ * @param {string} id Model id: `claude-opus-5-5`.
+ * @returns {string} A name like "Claude Opus 5.5" or "Claude Sonnet 4".
  */
 export function formatModel(id: string): string {
   const [, family, major, minor] = CLAUDE_MODEL_ID.exec(id) ?? [];
@@ -120,9 +123,9 @@ export function formatModel(id: string): string {
   return `Claude ${familyName} ${version}`;
 }
 
-/** Формы слова для числа на каждом языке: русский различает три формы, английский две. */
+/** Word forms for a number in each language: Russian has three forms, English two. */
 export interface PluralWords {
-  /** «1 промпт», «2 промпта», «5 промптов». */
+  /** «1 промпт», «2 промпта», «5 промптов» (1, 2 and 5 prompts). */
   readonly ru: { readonly one: string; readonly few: string; readonly many: string };
   /** «1 prompt», «2 prompts». */
   readonly en: { readonly one: string; readonly other: string };
@@ -151,17 +154,18 @@ function wordFor(count: number, words: PluralWords, locale: Locale): string {
     case "en":
       return PLURAL_RULES.en.select(count) === "one" ? words.en.one : words.en.other;
     default:
-      // Новый язык не скомпилируется, пока для него не опишут формы слова.
+      // A new language will not compile until its word forms are described.
       return locale satisfies never;
   }
 }
 
 /**
- * Пишет число со словом в нужной форме.
- * @param {number} count Целое число.
- * @param {PluralWords} words Формы слова на каждом языке.
- * @param {Locale} locale Язык, по правилам которого выбирается форма и пишется число.
- * @returns {string} Строка вида «5 промптов» или «2 875 954 токена»; по-английски «1 prompt», «2 prompts».
+ * Writes a number with a word in the right form.
+ * @param {number} count Integer.
+ * @param {PluralWords} words Word forms in each language.
+ * @param {Locale} locale Language whose rules choose the form and write the number.
+ * @returns {string} A string like "1 prompt" or "2 prompts"; in Russian «5 промптов» or
+ * «2 875 954 токена».
  */
 export function formatCount(count: number, words: PluralWords, locale: Locale): string {
   return `${COUNT_FORMATTERS[locale].format(count)} ${wordFor(count, words, locale)}`;
@@ -172,10 +176,11 @@ const LANGUAGE_NAMES = byLocale(
 );
 
 /**
- * Называет язык по коду на языке страницы: так зритель узнаёт, на каком языке запись.
- * @param {string} code Код языка ISO 639: `ru`, `en`.
- * @param {Locale} locale Язык страницы.
- * @returns {string} Название языка: «Russian», «английский»; незнакомый код — как есть.
+ * Names a language by its code in the page language: this tells the viewer the recording's
+ * language.
+ * @param {string} code ISO 639 language code: `ru`, `en`.
+ * @param {Locale} locale Page language.
+ * @returns {string} Language name: "Russian", «английский»; an unknown code as is.
  */
 export function formatLanguage(code: string, locale: Locale): string {
   return LANGUAGE_NAMES[locale].of(code) ?? code;

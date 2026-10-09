@@ -10,22 +10,23 @@ import { useFactoryModel } from "./model-context.ts";
 import { showInterventionDetails, showMessageDetails } from "./open-journal.ts";
 import styles from "./SpeechDock.module.css";
 
-/** Сколько строк текста держит полка: остальное — в журнале или под «подробнее». */
+/** How many lines of text the shelf holds: the rest is in the journal or under "more". */
 const LINE_COUNT = 2;
 
 interface Props {
-  /** Название сборки: его показывает полка, пока никто не говорит. */
+  /** Build name: the shelf shows it while nobody is speaking. */
   title: string;
 }
 
 /**
- * Полка речи в HUD: то, что на широком экране висит пузырём над говорящим, на узком стоит над
- * управлением, а на низком рядом с ним, чтобы не закрывать станки. Высота постоянная: поле цеха не
- * прыгает от смены реплик. «Подробнее» у промпта показывает указание целиком и уточнения: они
- * прокручиваются вместе в ограниченной высоте, и полка не забирает у цеха всё поле.
- * @param {Props} props Свойства компонента.
- * @param {string} props.title Название сборки для паузы между репликами.
- * @returns {JSX.Element} Полка с вмешательством, промптом, репликой или названием сборки.
+ * The speech shelf in the HUD: what hangs as a bubble above the speaker on a wide screen stands
+ * above the controls on a narrow one, and next to them on a short one, so as not to cover the
+ * machines. The height is constant: the floor field does not jump when messages change. "More" on
+ * a prompt shows the whole instruction and the details: they scroll together within a limited
+ * height, and the shelf does not take the whole field from the factory.
+ * @param {Props} props Component props.
+ * @param {string} props.title Build name for the pause between messages.
+ * @returns {JSX.Element} The shelf with an intervention, prompt, message or the build name.
  */
 export function SpeechDock(props: Props): JSX.Element {
   const model = useFactoryModel();

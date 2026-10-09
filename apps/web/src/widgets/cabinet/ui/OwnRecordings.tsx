@@ -9,7 +9,7 @@ import styles from "./CabinetBoard.module.css";
 
 interface RecordingCardProps {
   recording: RecordingSummary;
-  /** Идёт действие в кабинете: кнопки выключены. */
+  /** An action is running in the cabinet: buttons are disabled. */
   isBusy: boolean;
   locale: Locale;
   onDelete: (id: string) => void;
@@ -17,14 +17,14 @@ interface RecordingCardProps {
 
 interface Props {
   recordings: readonly RecordingSummary[];
-  /** Сколько записей помещается в галерею. */
+  /** How many recordings fit in the gallery. */
   limit: number;
   isBusy: boolean;
   locale: Locale;
   onDelete: (id: string) => void;
 }
 
-// «Удалить» сначала спрашивает: удалённую запись не вернуть, а ссылка на неё перестанет работать.
+// "Delete" asks first: a deleted recording cannot be restored, and its link will stop working.
 function DeleteControl(props: RecordingCardProps): JSX.Element {
   const [isConfirming, setConfirming] = createSignal(false);
 
@@ -82,14 +82,15 @@ function RecordingCard(props: RecordingCardProps): JSX.Element {
 }
 
 /**
- * Записи своей галереи: сколько занято из предела и карточки со ссылкой на цех и удалением.
- * @param {Props} props Свойства компонента.
- * @param {readonly RecordingSummary[]} props.recordings Записи, свежие сверху.
- * @param {number} props.limit Сколько записей помещается в галерею.
- * @param {boolean} props.isBusy Идёт ли действие в кабинете.
- * @param {Locale} props.locale Язык страницы.
- * @param {(id: string) => void} props.onDelete Удаляет запись по id.
- * @returns {JSX.Element} Раздел с записями.
+ * Recordings of the own gallery: how much of the limit is used, and cards with a link to the floor
+ * and deletion.
+ * @param {Props} props Component props.
+ * @param {readonly RecordingSummary[]} props.recordings Recordings, newest on top.
+ * @param {number} props.limit How many recordings fit in the gallery.
+ * @param {boolean} props.isBusy Whether an action is running in the cabinet.
+ * @param {Locale} props.locale Page language.
+ * @param {(id: string) => void} props.onDelete Deletes a recording by id.
+ * @returns {JSX.Element} Section with recordings.
  */
 export function OwnRecordings(props: Props): JSX.Element {
   return (

@@ -11,7 +11,7 @@ const VERTICAL: Aisle = [
   { x: 3, y: 10 },
 ];
 
-// Вниз на 10, затем вправо на 10: угол в (0, 10).
+// Down by 10, then right by 10: the corner is at (0, 10).
 const CORNER: Aisle = [
   { x: 0, y: 0 },
   { x: 0, y: 10 },

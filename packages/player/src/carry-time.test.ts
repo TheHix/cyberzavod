@@ -5,7 +5,7 @@ import { sceneAt } from "./scene.ts";
 import { chatRecording, reworkRecording, withEvents } from "./script.fixtures.ts";
 import { buildScript, DEFAULT_PACING } from "./script.ts";
 
-// Смещение после последней отметки, мс: внутри финала, который длится `finaleMs`.
+// Offset after the last mark, ms: inside the finale, which lasts `finaleMs`.
 const AFTER_LAST_MARK_MS = DEFAULT_PACING.finaleMs / 2;
 const BEFORE_FIRST_MARK_MS = 500;
 

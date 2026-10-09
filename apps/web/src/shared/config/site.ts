@@ -1,6 +1,6 @@
 import type { Translated } from "@/shared/i18n/locale.ts";
 
-/** Название, описание, автор, ссылки и картинки сайта — для заголовков, мета-тегов и панели «О заводе». */
+/** Site name, description, author, links and images: for titles, meta tags and the About panel. */
 export const site = {
   name: { en: "Cyberzavod", ru: "Киберзавод" },
   description: {
@@ -9,7 +9,8 @@ export const site = {
   },
   repoUrl: "https://github.com/bysavelii/cyberzavod",
   author: { name: "bysavelii", url: "https://bysavelii.com" },
-  // Картинки собирают маршруты `src/pages/[...lang]/<имя>.ts`; у каждого языка — свои, с его надписью.
+  // Images are built by the `src/pages/[...lang]/<name>.ts` routes; each language has its own,
+  // with its own text.
   images: {
     favicon: "/favicon.svg",
     touchIcon: "/apple-touch-icon.png",

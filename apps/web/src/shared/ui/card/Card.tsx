@@ -9,13 +9,14 @@ interface Props {
 }
 
 /**
- * Карточка ui-kit внутри панели: запись в списке, промпт в журнале. Текущая карточка списка
- * выделена, например запись журнала, до которой дошёл цех.
- * @param {Props} props Свойства компонента.
- * @param {string} [props.class] Дополнительный класс для раскладки снаружи.
- * @param {boolean} [props.current] Текущая ли карточка списка: ставит `aria-current` и выделяет её.
- * @param {JSX.Element} props.children Содержимое.
- * @returns {JSX.Element} Карточка.
+ * ui-kit card inside a panel: a recording in a list, a prompt in the journal. The current card in
+ * a list is highlighted, for example the journal entry the factory floor has reached.
+ * @param {Props} props Component props.
+ * @param {string} [props.class] Extra class for layout from outside.
+ * @param {boolean} [props.current] Whether this is the current list card: sets `aria-current`
+ * and highlights it.
+ * @param {JSX.Element} props.children Content.
+ * @returns {JSX.Element} Card.
  */
 export function Card(props: Props): JSX.Element {
   return (

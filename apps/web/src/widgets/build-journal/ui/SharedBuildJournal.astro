@@ -1,11 +1,12 @@
 ---
-// Журнал сборки записи из галереи: запись приходит из API в браузере, и весь журнал — один
-// остров. Пока панель закрыта, его не видно: острову хватает времени простоя.
+// Build journal of a gallery recording: the recording comes from the API in the browser, and the
+// whole journal is one island. While the panel is closed it is not visible: idle time is enough
+// for the island.
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { SharedJournal } from "./SharedJournal.tsx";
 
 interface Props {
-  /** Язык страницы: на нём метки, подписи и сообщения журнала. */
+  /** Page language: journal labels, captions and messages are in it. */
   locale: Locale;
 }
 

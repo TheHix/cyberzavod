@@ -3,18 +3,18 @@ import { CopyButton, type CopyLabels } from "../copy-button/CopyButton.tsx";
 import { codeBlockClass, Prose } from "../prose/Prose.tsx";
 
 interface Props {
-  /** Строка кода: команда или Markdown, который читатель вставит к себе. */
+  /** A line of code: a command or Markdown the reader pastes into their own project. */
   code: string;
-  /** Подписи кнопки «копировать» по состояниям на языке страницы: kit словаря не знает. */
+  /** Copy button labels per state in the page language: the kit does not know the dictionary. */
   labels: CopyLabels;
 }
 
 /**
- * Блок кода ui-kit с кнопкой «копировать» рядом: команда для терминала, строка для README.
- * @param {Props} props Свойства компонента.
- * @param {string} props.code Строка кода.
- * @param {CopyLabels} props.labels Подписи кнопки по состояниям.
- * @returns {JSX.Element} Блок кода с кнопкой.
+ * ui-kit code block with a copy button beside it: a terminal command, a line for a README.
+ * @param {Props} props Component props.
+ * @param {string} props.code Line of code.
+ * @param {CopyLabels} props.labels Button labels per state.
+ * @returns {JSX.Element} Code block with a button.
  */
 export function CopyableCode(props: Props): JSX.Element {
   return (

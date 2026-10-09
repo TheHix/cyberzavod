@@ -1,5 +1,5 @@
-// Серия сборок в одном цехе: записи идут одна за другой по кругу. Цех при этом не
-// пересоздаётся — его модель получает следующую запись через `load`, графика остаётся той же.
+// A build series on one floor: recordings go one after another in a loop. The floor is not
+// recreated: its model gets the next recording via `load`, and the graphics stay the same.
 
 import { computed, type ReadableAtom } from "nanostores";
 import { nextIndexInCircle } from "@/shared/lib/circle.ts";
@@ -7,25 +7,27 @@ import type { SeriesBuild } from "../lib/series-builds.ts";
 import { createFactoryModel, type FactoryModel } from "./factory.ts";
 import { isAtEnd } from "./playback.ts";
 
-/** Серия сборок в одном цехе: модель цеха и то, какая сборка серии в нём сейчас. */
+/** A build series on one floor: the factory model and which series build is on it now. */
 export interface FactorySeries {
-  /** Модель цеха, которая проигрывает серию; запись в ней меняет серия. */
+  /** The factory model that plays the series; the series changes the recording in it. */
   readonly model: FactoryModel;
-  /** Сборка серии, которую сейчас проигрывает цех. */
+  /** The series build the floor is playing now. */
   readonly $current: ReadableAtom<SeriesBuild>;
   /**
-   * Следит за цехом: когда запись сама доиграла до конца, ставит следующую по кругу и
-   * продолжает. Пауза человеком серию не двигает — серия ждёт.
-   * @returns {() => void} Перестаёт следить.
+   * Follows the floor: when a recording has played to the end by itself, puts the next one in the
+   * loop and continues. A pause by the human does not move the series: the series waits.
+   * @returns {() => void} Stops following.
    */
   follow(): () => void;
 }
 
 /**
- * Создаёт серию сборок: цех начинает с первой, а по `follow` сам переходит к следующим.
- * @param {readonly SeriesBuild[]} builds Сборки серии по порядку проигрывания.
- * @returns {FactorySeries} Серия на первой сборке; модель цеха ещё ждёт готовности графики.
- * @throws {Error} Если в серии нет сборок.
+ * Creates a build series: the floor starts with the first one and moves to the next ones by itself
+ * via `follow`.
+ * @param {readonly SeriesBuild[]} builds Series builds in playback order.
+ * @returns {FactorySeries} The series at the first build; the factory model still waits for the
+ *   graphics.
+ * @throws {Error} If the series has no builds.
  */
 export function createFactorySeries(builds: readonly SeriesBuild[]): FactorySeries {
   const [first] = builds;
@@ -36,7 +38,7 @@ export function createFactorySeries(builds: readonly SeriesBuild[]): FactorySeri
   const indexOf = (recordingId: string) =>
     builds.findIndex((build) => build.recording.id === recordingId);
   const $index = computed(model.$recordingId, indexOf);
-  // Запись в цех ставит только серия, поэтому номер всегда в её пределах.
+  // Only the series puts a recording on the floor, so the number is always within its bounds.
   const $current = computed($index, (index) => builds[index] ?? first);
 
   const playNext = () => {
@@ -51,8 +53,9 @@ export function createFactorySeries(builds: readonly SeriesBuild[]): FactorySeri
     model,
     $current,
     follow: () =>
-      // Сцена сама встаёт только в конце записи. Пауза человека ставит её раньше конца, а
-      // перемотка на паузе не пускает сцену — в обоих случаях серия ждёт.
+      // The scene stops by itself only at the end of the recording. A human's pause stops it before
+      // the end, and rewinding while paused does not start the scene: in both cases the series
+      // waits.
       model.$playing.listen((playing) => {
         const hasFinished = !playing && isAtEnd(model.$playback.get());
 

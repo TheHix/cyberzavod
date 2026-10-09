@@ -2,17 +2,17 @@ import type { Locale } from "@/shared/i18n/locale.ts";
 import type { PublishedProject } from "./published.ts";
 import { projectUrl } from "./url.ts";
 
-/** Ссылка на страницу проекта: всё, что нужно острову цеха, без описания и ссылок карточки. */
+/** Link to a project page: what the factory floor island needs, without the card's description. */
 export interface ProjectLink {
   name: string;
   url: string;
 }
 
 /**
- * Собирает ссылку на страницу проекта: в остров цеха уходит она, а не вся карточка.
- * @param {PublishedProject} project Карточка проекта.
- * @param {Locale} locale Язык страницы, на которую ведёт ссылка.
- * @returns {ProjectLink} Название проекта на языке страницы и адрес его страницы.
+ * Builds a link to a project page: the factory floor island gets this, not the whole card.
+ * @param {PublishedProject} project Project card.
+ * @param {Locale} locale Language of the page the link leads to.
+ * @returns {ProjectLink} Project name in the page language and its page address.
  */
 export function projectLinkOf(project: PublishedProject, locale: Locale): ProjectLink {
   return { name: project.name[locale], url: projectUrl(project.id, locale) };

@@ -2,14 +2,14 @@ import * as ToggleGroup from "@kobalte/core/toggle-group";
 import { For, type JSX } from "solid-js";
 import styles from "./SegmentedControl.module.css";
 
-/** Вариант выбора: значение и подпись на кнопке. */
+/** A choice option: the value and the label on the button. */
 export interface SegmentOption<T extends string> {
   readonly value: T;
   readonly label: string;
 }
 
 interface Props<T extends string> {
-  /** Подпись группы для программ чтения с экрана. */
+  /** Group label for screen readers. */
   label: string;
   options: readonly SegmentOption<T>[];
   value: T;
@@ -18,18 +18,18 @@ interface Props<T extends string> {
 }
 
 /**
- * Переключатель из нескольких кнопок, выбрана всегда одна, — на ToggleGroup из Kobalte.
+ * A switch of several buttons with exactly one always selected, built on Kobalte's ToggleGroup.
  * @template T
- * @param {Props<T>} props Свойства компонента.
- * @param {string} props.label Подпись группы.
- * @param {readonly SegmentOption<T>[]} props.options Варианты по порядку.
- * @param {T} props.value Выбранное значение.
- * @param {boolean} [props.disabled] Выключен ли.
- * @param {(value: T) => void} props.onChange Вызывается при выборе другого варианта.
- * @returns {JSX.Element} Переключатель.
+ * @param {Props<T>} props Component props.
+ * @param {string} props.label Group label.
+ * @param {readonly SegmentOption<T>[]} props.options Options in order.
+ * @param {T} props.value Selected value.
+ * @param {boolean} [props.disabled] Whether it is disabled.
+ * @param {(value: T) => void} props.onChange Called when another option is chosen.
+ * @returns {JSX.Element} Switch.
  */
 export function SegmentedControl<T extends string>(props: Props<T>): JSX.Element {
-  // Повторное нажатие на выбранный вариант снимает выбор — у переключателя он всегда есть.
+  // Clicking the selected option again clears the selection, but this switch always has one.
   const choose = (value: string | null) => {
     const option = props.options.find((candidate) => candidate.value === value);
 

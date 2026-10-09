@@ -1,12 +1,13 @@
 ---
-// Личный кабинет в поле: кто вошёл и его галерея приходят из API в браузере. При сборке никто не
-// вошёл и ничего не известно — в разметке заголовок, загрузка и подсказка про CLI.
+// Personal cabinet in the field: who is signed in and their gallery come from the API in the
+// browser. At build time nobody is signed in and nothing is known, so the markup has the title,
+// a loading state and the CLI hint.
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { Panel } from "@/shared/ui";
 import { CabinetBoard } from "./CabinetBoard.tsx";
 
 interface Props {
-  /** Язык страницы. */
+  /** Page language. */
   locale: Locale;
 }
 

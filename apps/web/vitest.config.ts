@@ -1,8 +1,8 @@
 /// <reference types="vitest/config" />
 import { getViteConfig } from "astro/config";
 
-// Тесты сайта идут через Vite-конфиг Astro: работают те же алиасы @/…, что и в сборке.
-// CSS в тестах по умолчанию пустой; tokens.css нужен текстом — из него собираются иконки сайта.
+// Site tests run through Astro's Vite config: the same @/… aliases work as in the build.
+// CSS is empty in tests by default; tokens.css is needed as text, the site icons are built from it.
 export default getViteConfig({
   test: { include: ["src/**/*.{test,spec}.{ts,tsx}"], css: { include: [/tokens\.css/] } },
 });

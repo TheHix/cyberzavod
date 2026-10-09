@@ -1,7 +1,7 @@
-// Кадр цеха в момент сцены: где каждый рабочий и мастер, чем заняты, где деталь, какие промпт,
-// вмешательство и реплика висят.
-// Считается из сценария двоичным поиском, без состояния: перемотка в любую точку бесплатна,
-// а кадр стоит O(log n) от длины записи.
+// Factory frame at a scene moment: where each worker and the foreman are, what they are busy with,
+// where the part is, which prompt, intervention and message are showing.
+// Computed from the script by binary search, without state: seeking to any point is free,
+// and a frame costs O(log n) in the recording length.
 
 import { pointBetween, type Point } from "./layout.ts";
 import { type Tally, STAGES, type Stage } from "@cyberzavod/core";
@@ -19,7 +19,7 @@ import type {
   WorkerMove,
 } from "./script.ts";
 
-/** Рабочий в кадре; `elapsed` — сколько мс он уже занят текущим делом, для анимации. */
+/** A worker in the frame; `elapsed` is ms spent on the current task, for animation. */
 export interface WorkerFrame {
   readonly station: Stage;
   readonly position: Point;
@@ -29,7 +29,7 @@ export interface WorkerFrame {
   readonly carrying: boolean;
 }
 
-/** Деталь в кадре: где она, у чьего станка и в каком состоянии. */
+/** The part in the frame: where it is, at whose machine and in what status. */
 export interface PartFrame {
   readonly position: Point;
   readonly holder: Stage;
@@ -37,25 +37,25 @@ export interface PartFrame {
   readonly status: PartStatus;
 }
 
-/** Промпт, который сейчас висит над рабочим, и сколько мс он уже виден. */
+/** The prompt now showing above a worker, and how many ms it has been visible. */
 export interface PromptFrame {
   readonly cue: PromptCue;
   readonly elapsed: number;
 }
 
-/** Вмешательство, которое мастер сейчас говорит у станции, и сколько мс оно уже видно. */
+/** The intervention the foreman is now saying at a station, and how many ms it has been visible. */
 export interface InterventionFrame {
   readonly cue: InterventionCue;
   readonly elapsed: number;
 }
 
-/** Реплика, которая сейчас висит над говорящим, и сколько мс она уже видна. */
+/** The message now showing above the speaker, and how many ms it has been visible. */
 export interface MessageFrame {
   readonly cue: MessageCue;
   readonly elapsed: number;
 }
 
-/** Мастер в кадре; `elapsed` — сколько мс он уже занят текущим делом, для анимации. */
+/** The foreman in the frame; `elapsed` is ms spent on the current task, for animation. */
 export interface ForemanFrame {
   readonly position: Point;
   readonly heading: number;
@@ -63,13 +63,13 @@ export interface ForemanFrame {
   readonly elapsed: number;
 }
 
-/** Кадр цеха в момент сцены. */
+/** Factory frame at a scene moment. */
 export interface Scene {
-  /** Момент сцены, мс. */
+  /** Scene moment, ms. */
   readonly time: number;
-  /** Соответствующий момент записи, мс от начала сборки. */
+  /** The matching recording moment, ms from the start of the build. */
   readonly recordingTime: number;
-  /** Рабочие в порядке этапов. */
+  /** Workers in stage order. */
   readonly workers: readonly WorkerFrame[];
   readonly part: PartFrame;
   readonly prompt: PromptFrame | null;
@@ -80,16 +80,16 @@ export interface Scene {
   readonly finished: boolean;
 }
 
-// Деталь в руках — чуть впереди рабочего, по направлению взгляда.
+// A carried part sits slightly ahead of the worker, in the direction they face.
 const CARRY_DISTANCE = 0.45;
 
 /**
- * Номер последнего элемента, начавшегося не позже момента. Элементы отсортированы по началу —
- * так их кладёт сценарий. Наружу пакета не выходит.
- * @param {readonly T[]} items Элементы сценария по возрастанию начала.
- * @param {number} time Момент сцены, мс.
- * @param {(item: T) => number} startOf Начало элемента, мс сцены.
- * @returns {number} Номер элемента; -1, если ни один ещё не начался.
+ * Index of the last element that started no later than the moment. Elements are sorted by start,
+ * as the script lays them out. Does not leave the package.
+ * @param {readonly T[]} items Script elements in ascending order of start.
+ * @param {number} time Scene moment, ms.
+ * @param {(item: T) => number} startOf Start of an element, scene ms.
+ * @returns {number} Element index; -1 if none has started yet.
  */
 export function lastStartedIndex<T>(
   items: readonly T[],
@@ -115,7 +115,7 @@ export function lastStartedIndex<T>(
   return found;
 }
 
-// Куда смотрит действующий: к направлению действия он поворачивается за `turnMs` с его начала.
+// Where the actor faces: they turn toward the action's direction within `turnMs` of its start.
 function headingAt(move: WorkerMove | ForemanMove, turnMs: number, time: number): number {
   const turn = progressOf(move.start, move.start + turnMs, time);
 
@@ -129,7 +129,7 @@ function workerAt(script: FactoryScript, station: Stage, time: number): WorkerFr
   const move: WorkerMove | undefined = moves[index];
 
   if (move === undefined || time >= move.end) {
-    // Между действиями рабочий стоит у своего станка: каждое действие кончается там.
+    // Between actions a worker stands at their machine: every action ends there.
     return {
       station,
       position: plan.post,
@@ -191,7 +191,7 @@ function partAt(script: FactoryScript, workers: readonly WorkerFrame[], time: nu
   };
 }
 
-// Пузырь, который висит в этот момент: промпт, вмешательство или реплика; `null` — никакой.
+// The bubble showing at this moment: a prompt, an intervention or a message; `null` means none.
 function visibleCueAt<Cue extends { readonly start: number; readonly end: number }>(
   cues: readonly Cue[],
   time: number,
@@ -213,7 +213,7 @@ function foremanAt(script: FactoryScript, time: number): ForemanFrame {
     return { position: post, heading: facing, activity: "idle", elapsed: time };
   }
   if (time >= move.end) {
-    // Между действиями мастер стоит там, где кончилось последнее, лицом туда же.
+    // Between actions the foreman stands where the last one ended, facing the same way.
     return {
       position: move.to,
       heading: move.heading,
@@ -230,7 +230,7 @@ function foremanAt(script: FactoryScript, time: number): ForemanFrame {
   };
 }
 
-// Время записи между отметками идёт равномерно; пока рабочий бежит, запись стоит.
+// Recording time between marks runs evenly; while a worker runs, the recording stands still.
 function recordingTimeAt(script: FactoryScript, index: number, time: number): number {
   const mark = script.marks[index];
 
@@ -246,10 +246,11 @@ function recordingTimeAt(script: FactoryScript, index: number, time: number): nu
 }
 
 /**
- * Считает кадр цеха в момент сцены.
- * @param {FactoryScript} script Сценарий цеха.
- * @param {number} time Момент сцены, мс; вне сцены прижимается к её началу или концу.
- * @returns {Scene} Кадр: рабочие, мастер, деталь, промпт, вмешательство, реплика, счётчики и время записи.
+ * Computes the factory frame at a scene moment.
+ * @param {FactoryScript} script Factory script.
+ * @param {number} time Scene moment, ms; outside the scene it clamps to its start or end.
+ * @returns {Scene} Frame: workers, foreman, part, prompt, intervention, message, counters and
+ * recording time.
  */
 export function sceneAt(script: FactoryScript, time: number): Scene {
   const clamped = Math.min(script.duration, Math.max(0, time));

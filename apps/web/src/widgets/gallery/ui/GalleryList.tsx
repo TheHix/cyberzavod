@@ -8,16 +8,17 @@ import styles from "./GalleryBoard.module.css";
 
 interface Props {
   galleries: readonly GalleryListing[];
-  /** Язык страницы: на нём подписи и даты. */
+  /** Page language: captions and dates are in it. */
   locale: Locale;
 }
 
 /**
- * Общий список открытых галерей: автор, число сборок и когда галерея менялась.
- * @param {Props} props Свойства компонента.
- * @param {readonly GalleryListing[]} props.galleries Открытые галереи, свежие сверху.
- * @param {Locale} props.locale Язык страницы.
- * @returns {JSX.Element} Список галерей или заглушка, если их нет.
+ * The shared list of public galleries: the author, the number of builds and when the gallery
+ * changed.
+ * @param {Props} props Component props.
+ * @param {readonly GalleryListing[]} props.galleries Public galleries, newest on top.
+ * @param {Locale} props.locale Page language.
+ * @returns {JSX.Element} The list of galleries, or a placeholder if there are none.
  */
 export function GalleryList(props: Props): JSX.Element {
   return (

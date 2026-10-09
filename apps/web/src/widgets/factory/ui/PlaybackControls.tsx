@@ -10,7 +10,7 @@ import { SPEEDS, speedFrom, type Speed } from "../model/playback.ts";
 import { useFactoryModel } from "./model-context.ts";
 import styles from "./PlaybackControls.module.css";
 
-// Шкала перематывается шагами по 0,1 с сцены — точнее глаз не различит.
+// The scale rewinds in steps of 0.1 s of scene: the eye cannot tell finer.
 const SCRUB_STEP_MS = 100;
 const ICON_SIZE = 30;
 const SPEED_OPTIONS: readonly SegmentOption<`${Speed}`>[] = SPEEDS.map((speed) => ({
@@ -19,8 +19,8 @@ const SPEED_OPTIONS: readonly SegmentOption<`${Speed}`>[] = SPEEDS.map((speed) =
 }));
 
 /**
- * Управление проигрыванием цеха: пуск и пауза, шкала со временем записи, скорость.
- * @returns {JSX.Element} Панель управления.
+ * Factory playback controls: play and pause, a scale with the recording time, speed.
+ * @returns {JSX.Element} Control panel.
  */
 export function PlaybackControls(): JSX.Element {
   const model = useFactoryModel();

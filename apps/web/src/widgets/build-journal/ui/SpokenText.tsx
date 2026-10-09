@@ -4,21 +4,22 @@ import { Title } from "@/shared/ui";
 import styles from "./SpokenText.module.css";
 
 interface Props {
-  /** Строка, которую говорящий произносит над станком. */
+  /** The line the speaker says above the machine. */
   line: string;
-  /** Полный текст: абзацы разделены пустой строкой. */
+  /** Full text: paragraphs are separated by a blank line. */
   text: string;
-  /** Язык записи: тексты не переводятся и несут свой `lang`. */
+  /** Recording language: texts are not translated and carry their own `lang`. */
   language: string;
 }
 
 /**
- * Реплика или вмешательство в журнале: строка из цеха и полный текст абзацами.
- * @param {Props} props Свойства компонента.
- * @param {string} props.line Строка над говорящим.
- * @param {string} props.text Полный текст.
- * @param {string} props.language Язык записи.
- * @returns {JSX.Element} Строка и абзацы текста.
+ * A message or intervention in the journal: the line from the floor and the full text in
+ * paragraphs.
+ * @param {Props} props Component props.
+ * @param {string} props.line Line above the speaker.
+ * @param {string} props.text Full text.
+ * @param {string} props.language Recording language.
+ * @returns {JSX.Element} The line and text paragraphs.
  */
 export function SpokenText(props: Props): JSX.Element {
   return (

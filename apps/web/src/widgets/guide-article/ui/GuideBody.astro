@@ -1,11 +1,11 @@
 ---
-// Тело гайда: ссылки на страницы сайта в Markdown пишутся от корня, без языка, — так оба перевода
-// ссылаются одинаково, а язык страницы ссылки получают уже в готовой разметке.
+// Guide body: links to site pages in Markdown are written from the root, without the language, so
+// both translations link the same way, and the links get the page language in the ready markup.
 import { localizeLinks } from "@/shared/i18n/links.ts";
 import type { Locale } from "@/shared/i18n/locale.ts";
 
 interface Props {
-  /** Язык страницы, на которой стоит гайд. */
+  /** Language of the page the guide is on. */
   locale: Locale;
 }
 

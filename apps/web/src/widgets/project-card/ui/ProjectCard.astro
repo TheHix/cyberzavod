@@ -1,5 +1,6 @@
 ---
-// Карточка проекта: описание и ссылки. Название — в заголовке панели, где карточку показывают.
+// Project card: the description and links. The name is in the header of the panel where the card is
+// shown.
 import type { PublishedProject } from "@/entities/project";
 import { localizeHref } from "@/shared/i18n/links.ts";
 import type { Locale } from "@/shared/i18n/locale.ts";
@@ -8,7 +9,7 @@ import { ButtonLink } from "@/shared/ui";
 
 interface Props {
   project: PublishedProject;
-  /** Язык страницы: на нём карточка и интерфейс вокруг неё. */
+  /** Page language: the card and the interface around it are in it. */
   locale: Locale;
 }
 

@@ -6,7 +6,7 @@
   margin: 0 0 var(--space-xs);
 }
 
-/* Кнопка уходит в конец строки: время и маршрут остаются слева. */
+/* The button goes to the end of the row: the time and route stay on the left. */
 .seek {
   margin-left: auto;
 }

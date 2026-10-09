@@ -26,8 +26,8 @@
   border-radius: var(--radius-round);
 }
 
-/* Kobalte ставит ползунку inline transform по горизонтали; по вертикали центрируем
-   отдельным свойством translate — оно с ним не спорит. */
+/* Kobalte sets an inline horizontal transform on the thumb; we center it vertically with
+   the separate translate property, which does not conflict with it. */
 .thumb {
   top: 50%;
   display: block;

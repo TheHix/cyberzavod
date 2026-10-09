@@ -1,7 +1,7 @@
-// Цех в пиксель-арте на PixiJS. Рисунки запекаются в текстуры при встраивании (пол, станки,
-// кабинет, таблички, рабочие, мастер и деталь), план перерисовывается только при смене плана;
-// в кадре у готовых спрайтов меняются текстура кадра, место, зеркало, видимость и `tint` —
-// без перерисовки и без новых объектов. Масштаб мира — целый в пикселях устройства.
+// The factory in pixel art on PixiJS. Sprites are baked into textures on embedding (floor,
+// machines, office, plaques, workers, foreman and the part), the plan is redrawn only when the plan
+// changes; in a frame, the ready sprites change the frame texture, position, mirroring, visibility
+// and `tint`, without redrawing and without new objects. The world scale is whole in device pixels.
 
 import { STAGES, type Stage } from "@cyberzavod/core";
 import { type FactoryLayout, type Point, type Scene } from "@cyberzavod/player";
@@ -32,17 +32,19 @@ import { createRenderer, type FactoryRenderer } from "./renderer.ts";
 import { PIXELS_PER_UNIT } from "./units.ts";
 
 /**
- * Графика цеха в пиксель-арте: рисунки строками, запечённые в текстуры. Надписи табличек —
- * на языке, который задан при создании.
+ * Pixel art factory graphics: sprites as strings, baked into textures. Plaque labels are in the
+ * language set at creation.
  */
 export class PixelGraphics implements FactoryGraphics {
   readonly #renderer: FactoryRenderer = createRenderer(isWebGLSupported());
   readonly #stage = new Container();
   readonly #world = new Container();
-  // Рабочие, мастер и деталь сортируются по y: кто ниже на экране, тот ближе к зрителю. Деталь в
-  // руках — от y несущего, на полпикселя над ним или под ним (crateLayerOf).
+  // Workers, the foreman and the part are sorted by y: whoever is lower on the screen is closer to
+  // the viewer. The part in hands goes by the carrier's y, half a pixel above or below them
+  // (crateLayerOf).
   readonly #actors = new Container({ sortableChildren: true });
-  // Неподвижный план — пол, станки, кабинет, таблички: при смене плана он заменяется целиком.
+  // The static plan: floor, machines, office, plaques; it is replaced entirely when the plan
+  // changes.
   #plan: Container | undefined;
   #palette: Palette | undefined;
   readonly #workers = new Map<Stage, ActorSprites>();
@@ -54,39 +56,40 @@ export class PixelGraphics implements FactoryGraphics {
   #scale = 1;
   #offset: ScreenPoint = { x: 0, y: 0 };
   #mounted = false;
-  // Язык страницы не меняется, пока открыт цех,
-  // поэтому графика хранит его, а не получает в `setLayout`.
+  // The page language does not change while the factory is open,
+  // so the graphics stores it rather than receiving it in `setLayout`.
   readonly #locale: Locale;
 
   /**
-   * Создаёт графику; надписи табличек будут на этом языке.
-   * @param {Locale} locale Язык страницы.
+   * Creates the graphics; plaque labels will be in this language.
+   * @param {Locale} locale Page language.
    */
   constructor(locale: Locale) {
     this.#locale = locale;
   }
 
   /**
-   * Встраивает холст в контейнер и рисует неподвижный цех: пол, станки, кабинет мастера, таблички.
-   * @param {HTMLElement} container Элемент, в который встаёт холст.
-   * @param {FactoryLayout} layout План цеха.
-   * @returns {Promise<void>} Готово, когда холст встроен.
-   * @throws {Error} Если не удалось создать рендерер или нарисовать план.
+   * Embeds the canvas into the container and draws the static factory: floor, machines, foreman's
+   * office, plaques.
+   * @param {HTMLElement} container Element the canvas goes into.
+   * @param {FactoryLayout} layout Floor plan.
+   * @returns {Promise<void>} Resolves when the canvas is embedded.
+   * @throws {Error} If the renderer could not be created or the plan could not be drawn.
    */
   async mount(container: HTMLElement, layout: FactoryLayout): Promise<void> {
     await this.#renderer.init({
       width: container.clientWidth,
       height: container.clientHeight,
       backgroundAlpha: 0,
-      // Пиксели не сглаживаются и не уходят на полпикселя: край спрайта остаётся резким.
+      // Pixels are not smoothed and do not shift by half a pixel: the sprite edge stays sharp.
       antialias: false,
       roundPixels: true,
       autoDensity: true,
-      // Без потолка: иначе браузер растянет холст и замылит его.
+      // No cap: otherwise the browser would stretch the canvas and blur it.
       resolution: window.devicePixelRatio,
-      // Расширения Pixi для браузера (события, доступность, DOM, фильтры) цеху не нужны:
-      // холст скрыт от доступности, а текст и клики живут в HTML поверх. Понадобится какое-то —
-      // подключать явным импортом `pixi.js/<модуль>`.
+      // The factory does not need Pixi's browser extensions (events, accessibility, DOM, filters):
+      // the canvas is hidden from accessibility, and text and clicks live in HTML on top. If one is
+      // needed, add it with an explicit `pixi.js/<module>` import.
       manageImports: false,
     });
     this.#mounted = true;
@@ -96,7 +99,7 @@ export class PixelGraphics implements FactoryGraphics {
     canvas.style.imageRendering = "pixelated";
     container.append(canvas);
 
-    // Краски — из токенов оформления, как у интерфейса.
+    // Inks come from the design tokens, as for the interface.
     const palette = readPalette(getComputedStyle(container));
 
     this.#palette = palette;
@@ -110,9 +113,9 @@ export class PixelGraphics implements FactoryGraphics {
   }
 
   /**
-   * Заменяет неподвижный план — пол, станки, кабинет и таблички. Рабочие, мастер и деталь
-   * остаются. Вписывает новый план следующий `resize`: вызывающий всё равно меряет поле заново.
-   * @param {FactoryLayout} layout Новый план цеха.
+   * Replaces the static plan: floor, machines, office and plaques. Workers, the foreman and the
+   * part stay. The next `resize` fits the new plan: the caller measures the field again anyway.
+   * @param {FactoryLayout} layout New floor plan.
    */
   setLayout(layout: FactoryLayout): void {
     if (!this.#mounted) return;
@@ -123,8 +126,8 @@ export class PixelGraphics implements FactoryGraphics {
   }
 
   /**
-   * Рисует кадр сцены.
-   * @param {Scene} scene Кадр цеха.
+   * Draws a scene frame.
+   * @param {Scene} scene Floor frame.
    */
   render(scene: Scene): void {
     this.#placeWorkers(scene);
@@ -137,10 +140,10 @@ export class PixelGraphics implements FactoryGraphics {
   }
 
   /**
-   * Подстраивает холст под контейнер и вписывает план в поле целым множителем.
-   * @param {number} width Ширина контейнера, CSS-пиксели.
-   * @param {number} height Высота контейнера, CSS-пиксели.
-   * @param {Frame} frame Поле, свободное от меню и HUD, — туда встаёт план.
+   * Fits the canvas to the container and fits the plan into the field with a whole multiplier.
+   * @param {number} width Container width, CSS pixels.
+   * @param {number} height Container height, CSS pixels.
+   * @param {Frame} frame Field free of the menu and HUD, where the plan goes.
    */
   resize(width: number, height: number, frame: Frame): void {
     const bounds = this.#bounds;
@@ -148,7 +151,7 @@ export class PixelGraphics implements FactoryGraphics {
     if (!this.#mounted || bounds === undefined) return;
 
     this.#renderer.resize(width, height);
-    // Вписывается нарисованный цех, а не план с пустыми краями: так он крупнее.
+    // The drawn factory is fitted, not the plan with empty margins: this way it is larger.
     const fit = fitPixelPlan(bounds, frame, this.#renderer.resolution);
 
     this.#scale = fit.scale;
@@ -158,9 +161,9 @@ export class PixelGraphics implements FactoryGraphics {
   }
 
   /**
-   * Переводит точку плана в координаты контейнера.
-   * @param {Point} point Точка плана.
-   * @returns {ScreenPoint} Точка в CSS-пикселях от левого верхнего угла контейнера.
+   * Converts a plan point to container coordinates.
+   * @param {Point} point Plan point.
+   * @returns {ScreenPoint} Point in CSS pixels from the top left corner of the container.
    */
   toScreen(point: Point): ScreenPoint {
     return { x: this.#offset.x + point.x * this.#scale, y: this.#offset.y + point.y * this.#scale };
@@ -206,7 +209,7 @@ export class PixelGraphics implements FactoryGraphics {
     this.#actors.addChild(this.#crate.root);
   }
 
-  // План рисуется под рабочими, мастером и деталью: он первый в мире.
+  // The plan is drawn under the workers, the foreman and the part: it is first in the world.
   #drawPlan(layout: FactoryLayout): void {
     const palette = this.#palette;
 
@@ -231,15 +234,15 @@ export class PixelGraphics implements FactoryGraphics {
   }
 
   /**
-   * Убирает холст и освобождает все запечённые текстуры: плана и действующих лиц, в том числе
-   * кадры, которых сейчас нет на спрайтах.
+   * Removes the canvas and frees all baked textures, of the plan and the actors, including frames
+   * not on sprites now.
    */
   destroy(): void {
     if (!this.#mounted) return;
 
     this.#plan?.destroy({ children: true, texture: true, textureSource: true });
-    // Текстуры действующих лиц принадлежат не спрайтам, а `#actorTextures`: на спрайтах висит
-    // лишь по одному кадру, остальные освобождаются отдельно.
+    // Actor textures belong not to the sprites but to `#actorTextures`: each sprite holds only one
+    // frame, the rest are freed separately.
     this.#stage.destroy({ children: true });
     if (this.#actorTextures !== undefined) destroyActorTextures(this.#actorTextures);
 

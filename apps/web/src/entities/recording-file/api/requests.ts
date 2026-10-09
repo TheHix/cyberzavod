@@ -4,12 +4,12 @@ import { parseRecordingFile } from "../model/parse.ts";
 import { recordingFileUrl } from "../model/url.ts";
 
 /**
- * Запрашивает полную запись сайта из её файла.
- * @param {string} id id записи.
- * @param {ApiRequest} [request] Запрос; по умолчанию `fetch` браузера.
- * @returns {Promise<SessionRecord>} Запись, прошедшая проверку ядра.
- * @throws {Error} `ApiRequestError`, если файла нет или сервер ответил ошибкой;
- *   `ApiResponseError`, если файл не JSON, запись битая или не сессия.
+ * Requests a full site recording from its file.
+ * @param {string} id Recording id.
+ * @param {ApiRequest} [request] Request; the browser `fetch` by default.
+ * @returns {Promise<SessionRecord>} A recording that passed the core's check.
+ * @throws {Error} `ApiRequestError` if the file is missing or the server responded with an error;
+ *   `ApiResponseError` if the file is not JSON or the recording is broken or not a session.
  */
 export async function fetchRecording(id: string, request?: ApiRequest): Promise<SessionRecord> {
   const body = await getJson(recordingFileUrl(id), request);

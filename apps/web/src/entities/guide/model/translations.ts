@@ -7,21 +7,21 @@ import {
 } from "@/shared/i18n/locale.ts";
 import { GuideError, type GuideMeta } from "./guide.ts";
 
-/** Гайд на одном языке: заголовок, описание и тело. */
+/** A guide in one language: title, description and body. */
 export interface GuideTranslation<Body> {
   title: string;
   description: string;
   body: Body;
 }
 
-/** Гайд со всеми переводами: id и место в списке общие, тексты — на каждом языке сайта. */
+/** A guide with all translations: id and list place are shared, texts are in every language. */
 export interface Guide<Body> {
   id: string;
   order: number;
   translations: Translated<GuideTranslation<Body>>;
 }
 
-/** Один файл гайда: проверенный frontmatter, язык из имени файла и тело. */
+/** One guide file: checked frontmatter, the language from the file name, and the body. */
 export interface GuideFile<Body> {
   meta: GuideMeta;
   locale: Locale;
@@ -76,13 +76,13 @@ function guideOf<Body>(id: string, group: FilesByLocale<Body>): Guide<Body> {
 }
 
 /**
- * Собирает файлы гайдов в гайды: по одному файлу на каждый язык сайта с общим id. Сайт не
- * показывает гайд только на одном языке, поэтому непереведённый гайд — ошибка, как битый
+ * Assembles guide files into guides: one file per site language with a shared id. The site does
+ * not show a guide in only one language, so an untranslated guide is an error, like broken
  * frontmatter.
- * @param {readonly GuideFile<Body>[]} files Файлы гайдов всех языков.
- * @returns {Guide<Body>[]} Гайды в порядке первого появления id.
- * @throws {GuideError} Если у гайда нет перевода на язык сайта, есть два файла одного языка
- *   или у переводов разный `order`.
+ * @param {readonly GuideFile<Body>[]} files Guide files in all languages.
+ * @returns {Guide<Body>[]} Guides in order of each id's first appearance.
+ * @throws {GuideError} If a guide lacks a translation into a site language, has two files in one
+ *   language, or its translations have different `order`.
  */
 export function pairTranslations<Body>(files: readonly GuideFile<Body>[]): Guide<Body>[] {
   return [...groupById(files)].map(([id, group]) => guideOf(id, group));

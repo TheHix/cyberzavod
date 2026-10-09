@@ -1,10 +1,10 @@
-// Сценарий цеха: запись сборки, разложенная на действия рабочих во времени сцены.
-// Строится один раз; кадр в любой момент потом берётся из него двоичным поиском (scene.ts).
+// Factory script: a build recording laid out as worker actions in scene time.
+// Built once; the frame at any moment is then taken from it by binary search (scene.ts).
 //
-// Время сцены — не время записи. Работа у станка сжимается: пятичасовая сессия идёт
-// пару минут. А бег и передача детали идут в естественном темпе, даже если в записи этапы
-// сменились за миллисекунды. Поэтому сценарий строится по порядку: следующая передача
-// начинается, когда работа закончена и получатель вернулся на своё место.
+// Scene time is not recording time. Work at a machine is compressed: a five-hour session plays
+// in a couple of minutes. But running and passing the part go at a natural pace, even if stages
+// changed within milliseconds in the recording. So the script is built in order: the next handover
+// starts when the work is done and the receiver is back at their spot.
 
 import { aisleStop, aisleWalk, type Aisle } from "./aisle.ts";
 import { alignMarks } from "./marks.ts";
@@ -34,37 +34,40 @@ import {
   type Stage,
 } from "@cyberzavod/core";
 
-/** Темп сцены: как сжимается работа и как быстро двигаются рабочие. */
+/** Scene pacing: how work is compressed and how fast workers move. */
 export interface Pacing {
-  /** Во сколько раз работа у станка короче, чем в записи. */
+  /** How many times shorter work at a machine is than in the recording. */
   readonly compression: number;
-  /** Самая короткая работа у станка, мс: даже мгновенный этап должно быть видно. */
+  /** Shortest work at a machine, ms: even an instant stage must be visible. */
   readonly minWorkMs: number;
-  /** Самая долгая работа у станка, мс: долгое ожидание человека не тормозит сцену. */
+  /** Longest work at a machine, ms: a long wait for the human does not stall the scene. */
   readonly maxWorkMs: number;
-  /** Скорость бега, единиц плана в секунду. */
+  /** Running speed, layout units per second. */
   readonly walkSpeed: number;
-  /** Сколько длится передача детали из рук в руки, мс. */
+  /** How long passing the part from hand to hand takes, ms. */
   readonly handoffMs: number;
-  /** За сколько единиц плана до получателя останавливается бегущий. */
+  /** How many layout units short of the receiver the runner stops. */
   readonly handoffGap: number;
-  /** Сколько рабочий берёт деталь со станка или кладёт на него, мс. */
+  /** How long a worker takes to pick the part up from a machine or put it down, ms. */
   readonly liftMs: number;
-  /** За сколько мс рабочий разворачивается в новую сторону. */
+  /** How many ms a worker takes to turn to a new direction. */
   readonly turnMs: number;
-  /** Сколько промпт висит над рабочим, мс. */
+  /** How long a prompt shows above a worker, ms. */
   readonly promptMs: number;
-  /** Сколько вмешательство человека висит над мастером, мс. */
+  /** How long a human intervention shows above the foreman, ms. */
   readonly interventionMs: number;
-  /** Сколько реплика висит над говорящим, мс. */
+  /** How long a message shows above the speaker, ms. */
   readonly messageMs: number;
-  /** Сколько мастер стоит у станка после разговора, прежде чем уйти в кабинет, мс. */
+  /** How long the foreman stays at a machine after a talk before going to the office, ms. */
   readonly foremanLingerMs: number;
-  /** Сколько сцена показывает итог после конца сборки, мс. */
+  /** How long the scene shows the outcome after the build ends, ms. */
   readonly finaleMs: number;
 }
 
-/** Темп по умолчанию: минута записи — секунда у станка, вся сессия идёт несколько минут. */
+/**
+ * Default pacing: a minute of recording is a second at the machine, a whole session takes a few
+ * minutes.
+ */
 export const DEFAULT_PACING: Pacing = {
   compression: 60,
   minWorkMs: 1_600,
@@ -81,36 +84,43 @@ export const DEFAULT_PACING: Pacing = {
   finaleMs: 2_500,
 };
 
-/** Чем занят рабочий. */
+/** What a worker is busy with. */
 export type Activity = "idle" | "work" | "walk" | "handoff";
 
-/** Действие рабочего от `start` до `end` мс сцены: что делает, откуда и куда, с деталью ли. */
+/**
+ * A worker action from `start` to `end` scene ms: what they do, from where to where, with the part
+ * or not.
+ */
 export interface WorkerMove {
   readonly start: number;
   readonly end: number;
-  /** Когда рабочий взялся за это дело: у отрезков одного пути — начало пути. */
+  /** When the worker took up this task: for segments of one path, the start of the path. */
   readonly since: number;
   readonly activity: Exclude<Activity, "idle">;
   readonly from: Point;
   readonly to: Point;
   readonly heading: number;
-  /** Куда рабочий смотрел в начале действия: к `heading` он поворачивается за `Pacing.turnMs`. */
+  /**
+   * Where the worker faced at the start of the action: they turn to `heading` within
+   * `Pacing.turnMs`.
+   */
   readonly turnFrom: number;
   readonly carrying: boolean;
 }
 
-/** Состояние детали: в работе, с браком после проваленной проверки, готова или списана. */
+/** Part status: in progress, defective after a failed check, done or scrapped. */
 export type PartStatus = "ok" | "defect" | "done" | "scrap";
 
-/** Где деталь: на станке этапа или в руках рабочего этого станка. */
+/** Where the part is: on a stage's machine or in the hands of that machine's worker. */
 export interface PartPlace {
   readonly on: "machine" | "hands";
   readonly station: Stage;
 }
 
 /**
- * С `start` до `end` мс сцены деталь переходит из `from` в `to` — со станка в руки, из рук
- * в руки, из рук на станок; после `end` она в `to`. У неподвижной детали `from` и `to` совпадают.
+ * From `start` to `end` scene ms the part moves from `from` to `to`: from the machine to hands,
+ * from hands to hands, from hands to the machine; after `end` it is at `to`. For a still part
+ * `from` and `to` match.
  */
 export interface PartMove {
   readonly start: number;
@@ -120,105 +130,114 @@ export interface PartMove {
   readonly status: PartStatus;
 }
 
-/** Промпт человека, который мастер говорит рабочему станции, от `start` до `end` мс сцены. */
+/** A human prompt the foreman says to a station's worker, from `start` to `end` scene ms. */
 export interface PromptCue {
   readonly start: number;
   readonly end: number;
   readonly station: Stage;
   readonly prompt: PromptEvent;
-  /** Номер промпта в записи, с нуля. */
+  /** Index of the prompt in the recording, from zero. */
   readonly index: number;
 }
 
 /**
- * Вмешательство человека, которое мастер говорит у станции текущего визита, от `start` до `end`
- * мс сцены: работа на станции стоит до решения.
+ * A human intervention the foreman says at the station of the current visit, from `start` to `end`
+ * scene ms: work at the station stops until the decision.
  */
 export interface InterventionCue {
   readonly start: number;
   readonly end: number;
   readonly station: Stage;
   readonly intervention: BriefInterventionEvent;
-  /** Номер вмешательства в записи, с нуля. */
+  /** Index of the intervention in the recording, from zero. */
   readonly index: number;
 }
 
-/** Реплика над говорящим от `start` до `end` мс сцены; промпты, вмешательства и реплики идут по одному. */
+/**
+ * A message above the speaker from `start` to `end` scene ms; prompts, interventions and messages
+ * go one at a time.
+ */
 export interface MessageCue {
   readonly start: number;
   readonly end: number;
   readonly speaker: Speaker;
   readonly message: BriefMessageEvent;
-  /** Номер реплики в записи, с нуля. */
+  /** Index of the message in the recording, from zero. */
   readonly index: number;
 }
 
-/** Чем занят мастер: стоит, идёт, говорит рабочему или слушает его. */
+/** What the foreman is busy with: standing, walking, talking to a worker or listening to them. */
 export type ForemanActivity = "idle" | "walk" | "talk" | "listen";
 
-/** Действие мастера от `start` до `end` мс сцены: что делает, откуда и куда. */
+/** A foreman action from `start` to `end` scene ms: what they do, from where to where. */
 export interface ForemanMove {
   readonly start: number;
   readonly end: number;
-  /** Когда мастер взялся за это дело: у отрезков одного пути — начало пути. */
+  /** When the foreman took up this task: for segments of one path, the start of the path. */
   readonly since: number;
   readonly activity: ForemanActivity;
   readonly from: Point;
   readonly to: Point;
   readonly heading: number;
-  /** Куда мастер смотрел в начале действия: к `heading` он поворачивается за `Pacing.turnMs`. */
+  /**
+   * Where the foreman faced at the start of the action: they turn to `heading` within
+   * `Pacing.turnMs`.
+   */
   readonly turnFrom: number;
 }
 
 /**
- * Отметка на шкале сцены: какое время записи ей соответствует и счётчики на этот момент.
- * У речи `at` — начало её пузыря, а `recordingTime` — время события в журнале.
+ * A mark on the scene timeline: which recording time it matches and the counters at that moment.
+ * For speech `at` is the start of its bubble, and `recordingTime` is the event time in the journal.
  */
 export interface Mark extends Tally {
   readonly at: number;
   readonly recordingTime: number;
 }
 
-/** Сценарий цеха: всё, что произойдёт в сцене, по времени. */
+/** Factory script: everything that will happen in the scene, by time. */
 export interface FactoryScript {
   readonly layout: FactoryLayout;
   readonly pacing: Pacing;
-  /** Длительность сцены, мс. */
+  /** Scene duration, ms. */
   readonly duration: number;
-  /** Когда сборка закончилась и деталь получила итог, мс сцены. */
+  /** When the build ended and the part got its outcome, scene ms. */
   readonly finishAt: number;
-  /** Действия каждого рабочего по времени; между ними рабочий стоит у своего станка. */
+  /** Each worker's actions by time; between them the worker stands at their machine. */
   readonly workers: Readonly<Record<Stage, readonly WorkerMove[]>>;
   readonly part: readonly PartMove[];
   readonly prompts: readonly PromptCue[];
   readonly interventions: readonly InterventionCue[];
   readonly messages: readonly MessageCue[];
   /**
-   * Ходьба и разговоры мастера; вне них он стоит там, где кончилось последнее действие, а до
-   * первого — в кабинете у стола лицом к `layout.foreman.facing`.
+   * The foreman's walks and talks; outside them they stand where the last action ended, and before
+   * the first one in the office at the desk, facing `layout.foreman.facing`.
    */
   readonly foreman: readonly ForemanMove[];
-  /** Отметки в порядке записи: `at` и `recordingTime` не убывают, у речи `at` — начало пузыря. */
+  /**
+   * Marks in recording order: `at` and `recordingTime` never decrease; for speech `at` is the
+   * bubble start.
+   */
   readonly marks: readonly Mark[];
 }
 
-// Визит — отрезок записи, пока деталь лежит у одного станка.
+// A visit is a stretch of the recording while the part lies at one machine.
 interface Visit {
   readonly station: Stage;
   readonly from: number;
   readonly to: number;
-  /** События визита, которые идут в работу у станка: обмен звучит позже. */
+  /** Visit events that go into the work at the machine: the exchange sounds later. */
   readonly events: readonly BriefSessionEvent[];
-  /** Все события визита в порядке записи, обмен тоже. */
+  /** All visit events in recording order, the exchange included. */
   readonly recorded: readonly BriefSessionEvent[];
-  /** Реплики с рабочим следующего визита: они звучат у места передачи детали. */
+  /** Messages with the worker of the next visit: they sound at the handover spot. */
   readonly exchange: readonly BriefMessageEvent[];
 }
 
-// Итог сборки для детали: готова или списана.
+// The build outcome for the part: done or scrapped.
 type FinalPartStatus = Extract<PartStatus, "done" | "scrap">;
 
-// Деталь начинает путь у станка постановки: с него берут заказ.
+// The part starts its path at the plan machine: the order is taken from it.
 const FIRST_STATION: Stage = "planning";
 
 function splitIntoVisits(events: readonly BriefSessionEvent[]): Visit[] {
@@ -263,8 +282,8 @@ function isBetween(message: BriefMessageEvent, a: Stage, b: Stage): boolean {
   return (message.from === a && message.to === b) || (message.from === b && message.to === a);
 }
 
-// Речь визита, кроме разговора отдающего с получателем: промпт, вмешательство или реплика
-// не между станциями.
+// Speech of a visit other than the giver's talk with the receiver: a prompt, an intervention or a
+// message not between stations.
 function isOtherSpeech(event: BriefSessionEvent, a: Stage, b: Stage): boolean {
   return (
     event.type === "prompt" ||
@@ -273,9 +292,9 @@ function isOtherSpeech(event: BriefSessionEvent, a: Stage, b: Stage): boolean {
   );
 }
 
-// Разговор отдающего с получателем звучит у места передачи, а не в работе: переносим его из
-// событий визита в обмен. Но только после последней другой речи визита: очередь пузырей
-// общая, и обмен раньше неё поставил бы речь на сцене не в том порядке, что в записи.
+// The giver's talk with the receiver sounds at the handover spot, not during work: we move it from
+// the visit events into the exchange. But only after the visit's last other speech: the bubble
+// queue is shared, and an earlier exchange would put speech on the scene out of recording order.
 function withExchanges(visits: readonly Visit[]): Visit[] {
   return visits.map((visit, index) => {
     const next = visits[index + 1];
@@ -318,16 +337,16 @@ function handsOf(station: Stage): PartPlace {
   return { on: "hands", station };
 }
 
-// Действие рабочего без поворота: направление в начале проставляет режиссёр.
+// A worker action without a turn: the director fills in the starting heading.
 type Action = Omit<WorkerMove, "turnFrom">;
 
-// То же для мастера.
+// The same for the foreman.
 type ForemanAction = Omit<ForemanMove, "turnFrom">;
 
-// Перемещение детали без состояния: его проставляет режиссёр.
+// A part move without a status: the director fills it in.
 type PartTransfer = Omit<PartMove, "status">;
 
-// Стоянка рабочего на месте: там же, где и начал, с деталью в руках или без.
+// A worker standing in place: where they started, with the part in hand or not.
 interface Standing {
   readonly start: number;
   readonly end: number;
@@ -337,7 +356,7 @@ interface Standing {
   readonly carrying?: boolean;
 }
 
-// Путь рабочего с момента `start`, с деталью в руках или без.
+// A worker's path from moment `start`, with the part in hand or not.
 interface Walk {
   readonly worker: Stage;
   readonly route: readonly Point[];
@@ -345,8 +364,9 @@ interface Walk {
   readonly carrying: boolean;
 }
 
-// Передача из рук в руки у места встречи `meet`: `start` — отдающий взялся за деталь, `arrive` —
-// подошёл, `handover` — деталь пошла в руки получателя, `release` — отпущена.
+// Hand-to-hand handover at meeting spot `meet`: `start` is when the giver picks up the part,
+// `arrive` when they come up, `handover` when the part goes into the receiver's hands, `release`
+// when let go.
 interface Passing {
   readonly giver: Stage;
   readonly taker: Stage;
@@ -357,7 +377,8 @@ interface Passing {
   readonly release: number;
 }
 
-// Передача детали: кто отдаёт и кому, когда отдающий готов и какие реплики звучат при встрече.
+// A part handover: who gives and to whom, when the giver is ready and which messages sound at the
+// meeting.
 interface Handoff {
   readonly giver: Stage;
   readonly taker: Stage;
@@ -365,7 +386,7 @@ interface Handoff {
   readonly exchange: readonly BriefMessageEvent[];
 }
 
-// Отрезок пути: от точки до точки с направлением взгляда.
+// A path segment: from point to point with a heading.
 interface Leg {
   readonly start: number;
   readonly end: number;
@@ -374,14 +395,14 @@ interface Leg {
   readonly heading: number;
 }
 
-// Время, когда пузырь висит: от начала до конца.
+// The time a bubble shows: from start to end.
 interface Span {
   readonly start: number;
   readonly end: number;
 }
 
-// Отрезки работы между паузами: пауза стоит, пока ждут решения человека. Паузы идут по порядку
-// и могут налезать друг на друга, потому что пузыри стоят в очереди; отрезков нулевой длины нет.
+// Work spans between pauses: a pause stands while the human's decision is awaited. Pauses come in
+// order and may overlap, because bubbles wait in a queue; there are no zero-length spans.
 function workSegments(start: number, end: number, pauses: readonly Span[]): Span[] {
   const segments: Span[] = [];
   let from = start;
@@ -397,13 +418,14 @@ function workSegments(start: number, end: number, pauses: readonly Span[]): Span
   return segments;
 }
 
-// Как мастер участвует в реплике: у какой станции стоит и говорит он или слушает.
+// How the foreman takes part in a message: at which station they stand and whether they speak or
+// listen.
 interface ForemanTalk {
   readonly station: Stage;
   readonly activity: "talk" | "listen";
 }
 
-// Что мастер говорит или слушает, у какой станции, когда готов и сколько длится пузырь.
+// What the foreman says or hears, at which station, when ready and how long the bubble lasts.
 interface ForemanSpeech {
   readonly station: Stage;
   readonly activity: ForemanTalk["activity"];
@@ -422,42 +444,46 @@ function foremanTalkIn(message: BriefMessageEvent): ForemanTalk | undefined {
   return undefined;
 }
 
-// Режиссёр раскладывает визиты по времени сцены. Состояние живёт только внутри buildScript.
+// The director lays visits out in scene time. State lives only inside buildScript.
 class Director {
   readonly #layout: FactoryLayout;
   readonly #pacing: Pacing;
-  // Реплики записи по порядку: номер реплики в журнале не должен зависеть от порядка звучания.
+  // Recording messages in order: a message's index in the journal must not depend on the order they
+  // sound.
   readonly #recordedMessages: readonly BriefMessageEvent[];
   readonly #workers = perStation<WorkerMove[]>(() => []);
-  // Куда смотрит рабочий после последнего действия — с этого начинается следующий поворот.
+  // Where the worker faces after their last action: the next turn starts from here.
   readonly #headings: Record<Stage, number>;
-  // Когда рабочий снова у своего станка: раньше этого ему нельзя передать деталь.
+  // When the worker is back at their machine: the part cannot be passed to them earlier.
   readonly #homeAt = perStation(() => 0);
   readonly #part: PartMove[] = [];
   readonly #prompts: PromptCue[] = [];
   readonly #interventions: InterventionCue[] = [];
   readonly #messages: MessageCue[] = [];
   readonly #foreman: ForemanMove[] = [];
-  // Паузы станции текущего визита: от доли работы, на которую пришлось вмешательство, до конца пузыря.
+  // Pauses of the current visit's station: from the share of work the intervention fell on to the
+  // bubble end.
   #pauses: Span[] = [];
-  // Когда событие видно на сцене: для речи — начало пузыря, для остальных — доля работы.
+  // When an event is visible on the scene: for speech, the bubble start; for others, the share of
+  // work.
   readonly #shownAt = new Map<BriefSessionEvent, number>();
-  // Визиты и когда у них кончилась работа: из них в конце собираются отметки.
+  // Visits and when their work ended: marks are assembled from them at the end.
   readonly #worked: { readonly visit: Visit; readonly workEnd: number }[] = [];
   #partStatus: PartStatus = "ok";
   #clock = 0;
-  // Когда кончился последний пузырь, промпт или реплика: следующий не начнётся раньше.
+  // When the last bubble, prompt or message, ended: the next one does not start earlier.
   #speechEnd = 0;
-  // У какой станции стоит мастер; null — в кабинете.
+  // Which station the foreman stands at; null means the office.
   #foremanStation: Stage | null = null;
   #foremanHeading: number;
-  // Когда кончилось последнее действие мастера: новое не начнётся раньше.
+  // When the foreman's last action ended: a new one does not start earlier.
   #foremanBusyUntil = 0;
-  // Когда мастер договорил последний раз: от этого момента он ждёт, не позовут ли снова.
+  // When the foreman last finished speaking: from then on they wait to see if they are called
+  // again.
   #foremanFreeAt = 0;
 
   constructor(layout: FactoryLayout, pacing: Pacing, events: readonly BriefSessionEvent[]) {
-    // Своя копия плана: сценарий замораживается, а план вызывающего кода остаётся его.
+    // Own copy of the layout: the script is frozen, while the caller's layout stays theirs.
     this.#layout = structuredClone(layout);
     this.#pacing = pacing;
     this.#recordedMessages = events.filter((event) => event.type === "message");
@@ -480,9 +506,9 @@ class Director {
     this.#part.push({ ...transfer, status: this.#partStatus });
   }
 
-  // Работа у станка на весь визит; события визита ложатся на время работы пропорционально.
-  // Пока у станка говорят, работа не кончается: деталь не уходит посреди разговора. Пока ждут
-  // решения человека, рабочий стоит: работа идёт отрезками вокруг пауз.
+  // Work at the machine for the whole visit; visit events fall on the work time proportionally.
+  // While people talk at the machine, the work does not end: the part does not leave mid-talk.
+  // While the human's decision is awaited, the worker stands: work goes in spans around the pauses.
   work(visit: Visit): number {
     const { station } = visit;
     const plan = this.#layout.stations[station];
@@ -517,7 +543,7 @@ class Director {
     return workEnd;
   }
 
-  // Что событие записи меняет на сцене, кроме счётчиков.
+  // What a recording event changes on the scene, besides counters.
   #cue(event: BriefSessionEvent, at: number, station: Stage): void {
     switch (event.type) {
       case "prompt":
@@ -546,12 +572,12 @@ class Director {
 
         return;
       default:
-        // Новый тип события не скомпилируется, пока не решат, как он выглядит в цехе.
+        // A new event type will not compile until it is decided how it looks on the factory floor.
         event satisfies never;
     }
   }
 
-  // Промпт говорит мастер рабочему станции: он приходит и говорит, когда дойдёт его очередь.
+  // The foreman says a prompt to a station's worker: they come and speak when its turn comes.
   #sayPrompt(prompt: PromptEvent, at: number, station: Stage): void {
     const { start, end } = this.#foremanSpeaks({
       station,
@@ -570,7 +596,8 @@ class Director {
     });
   }
 
-  // Вмешательство говорит мастер рабочему станции, как промпт; станция стоит до конца пузыря.
+  // The foreman says an intervention to a station's worker, like a prompt; the station stands until
+  // the bubble ends.
   #intervene(intervention: BriefInterventionEvent, at: number, station: Stage): void {
     const span = this.#foremanSpeaks({
       station,
@@ -589,7 +616,7 @@ class Director {
     });
   }
 
-  // Реплика встаёт в общую очередь. Если в ней участвует мастер, он идёт к собеседнику.
+  // A message joins the shared queue. If the foreman takes part, they walk to the other party.
   #sayMessage(message: BriefMessageEvent, at: number): Span {
     const { messageMs } = this.#pacing;
     const foremanTalk = foremanTalkIn(message);
@@ -609,7 +636,7 @@ class Director {
     return span;
   }
 
-  // Пузыри идут по одному: если предыдущий ещё висит, этот ждёт своей очереди.
+  // Bubbles go one at a time: if the previous one is still showing, this one waits its turn.
   #queueSpeech(readyAt: number, duration: number): Span {
     const start = Math.max(readyAt, this.#speechEnd);
     const end = start + duration;
@@ -619,7 +646,8 @@ class Director {
     return { start, end };
   }
 
-  // Мастер приходит к станции, ждёт очереди и стоит у рабочего лицом к его посту, пока идёт пузырь.
+  // The foreman comes to the station, waits their turn and stands at the worker facing their post
+  // while the bubble lasts.
   #foremanSpeaks({ station, activity, readyAt, duration }: ForemanSpeech): Span {
     const { foremanPost, post } = this.#layout.stations[station];
     const span = this.#queueSpeech(this.#comeTo(station, readyAt), duration);
@@ -637,8 +665,9 @@ class Director {
     return span;
   }
 
-  // Мастер приходит к станции к моменту `at` и возвращает, когда он на месте. Если разговоров
-  // давно не было, он успел вернуться в кабинет и выходит оттуда; иначе идёт напрямую.
+  // The foreman comes to the station by moment `at` and returns when they are there. If there have
+  // been no talks for a while, they have gone back to the office and leave from there; otherwise
+  // they walk directly.
   #comeTo(station: Stage, at: number): number {
     const departure = this.#foremanFreeAt + this.#pacing.foremanLingerMs;
     const hasLingeredLongEnough = at > departure;
@@ -661,7 +690,7 @@ class Director {
     return this.#walkForeman(route, start);
   }
 
-  // Мастер возвращается в кабинет тем же путём, каким пришёл, и у стола поворачивается к `facing`.
+  // The foreman returns to the office the way they came and turns to `facing` at the desk.
   #goHome(departure: number): void {
     if (this.#foremanStation === null) return;
 
@@ -682,7 +711,7 @@ class Director {
     this.#foremanStation = null;
   }
 
-  // Из кабинета мастер выходит в обход стола, через дверь, а дальше идёт как рабочий.
+  // The foreman leaves the office around the desk, through the door, and then walks like a worker.
   #routeFromCabinet(target: Point): Point[] {
     const { post, door } = this.#layout.foreman;
     const fromDoor = routeBetween(door, target, this.#layout.aisle);
@@ -700,9 +729,10 @@ class Director {
     return legs.at(-1)?.end ?? start;
   }
 
-  // Рабочий берёт деталь со станка, несёт следующему, отдаёт из рук в руки и возвращается
-  // к себе; получатель кладёт её на свой станок. Передача — перед получателем, со стороны прохода.
-  // Если рабочие говорили между собой, то у места встречи, и деталь переходит после разговора.
+  // A worker takes the part from the machine, carries it to the next one, hands it over and returns
+  // to their place; the receiver puts it on their machine. The handover is in front of the
+  // receiver, on the aisle side. If the workers talked to each other, it happens at the meeting
+  // spot, and the part passes after the talk.
   handOff({ giver, taker, readyAt, exchange }: Handoff): void {
     const { aisle } = this.#layout;
     const { handoffGap, handoffMs } = this.#pacing;
@@ -731,7 +761,7 @@ class Director {
     this.#clock = placed;
   }
 
-  // Отдающий берёт деталь со станка; возвращает, когда она у него в руках.
+  // The giver takes the part from the machine; returns when it is in their hands.
   #liftPart(giver: Stage, start: number): number {
     const { post, facing } = this.#layout.stations[giver];
     const lifted = start + this.#pacing.liftMs;
@@ -742,8 +772,8 @@ class Director {
     return lifted;
   }
 
-  // Деталь переходит из рук в руки у места встречи. Получатель поворачивается к подходящему
-  // заранее и встречает его лицом.
+  // The part passes from hand to hand at the meeting spot. The receiver turns toward the
+  // approaching giver in advance and meets them face to face.
   #passPart({ giver, taker, meet, start, arrive, handover, release }: Passing): void {
     const takerPost = this.#layout.stations[taker].post;
     const greet = Math.max(start, arrive - this.#pacing.turnMs);
@@ -772,7 +802,7 @@ class Director {
     this.#movePart({ start: handover, end: release, from: handsOf(giver), to: handsOf(taker) });
   }
 
-  // Получатель кладёт деталь на свой станок; возвращает, когда он закончил.
+  // The receiver puts the part on their machine; returns when they are done.
   #placePart(taker: Stage, start: number): number {
     const { post, facing } = this.#layout.stations[taker];
     const placed = start + this.#pacing.liftMs;
@@ -793,7 +823,7 @@ class Director {
     return placed;
   }
 
-  // Реплики при встрече звучат одна за другой; возвращает, когда договорила последняя.
+  // Messages at the meeting sound one after another; returns when the last one has finished.
   #sayExchange(exchange: readonly BriefMessageEvent[], arrive: number): number {
     let spokenAt = arrive;
 
@@ -804,7 +834,7 @@ class Director {
     return spokenAt;
   }
 
-  // Путь рабочего: каждый отрезок — отдельное действие со своим направлением взгляда.
+  // A worker's path: each segment is a separate action with its own heading.
   #walk({ worker, route, start, carrying }: Walk): number {
     const legs = legsOf(route, start, this.#pacing.walkSpeed);
 
@@ -815,8 +845,8 @@ class Director {
     return legs.at(-1)?.end ?? start;
   }
 
-  // Отметки по порядку записи: каждому событию — счётчики после него и момент, когда его видно;
-  // после событий визита — его конец. Обогнанные очередью речи отметки выравнивает alignMarks.
+  // Marks in recording order: each event gets the counters after it and the moment it is visible;
+  // after a visit's events, its end. alignMarks aligns marks overtaken by the speech queue.
   #marks(): Mark[] {
     let counts = NO_TALLY;
     const marks: Mark[] = [];
@@ -863,8 +893,8 @@ class Director {
     });
   }
 
-  // Сцена длится, пока не кончится финал, не вернутся рабочие, не доиграет очередь пузырей и
-  // не закончит мастер.
+  // The scene lasts until the finale ends, the workers return, the bubble queue plays out and
+  // the foreman finishes.
   #sceneEnd(finishAt: number): number {
     const workersHomeAt = Math.max(...Object.values(this.#homeAt));
     const finaleEnd = finishAt + this.#pacing.finaleMs;
@@ -873,8 +903,8 @@ class Director {
   }
 }
 
-// Сценарий неизменяем: кадры отдают его объекты наружу как есть, и правка на месте —
-// например, в интерфейсе — испортила бы сцену. Замороженный объект правку не пропустит.
+// The script is immutable: frames hand its objects out as they are, and an in-place edit (in the
+// interface, for example) would spoil the scene. A frozen object does not let an edit through.
 function deepFreeze<T>(value: T): T {
   if (typeof value !== "object" || value === null || Object.isFrozen(value)) return value;
 
@@ -884,7 +914,7 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-// Отрезки нулевой длины в пути выпадают: по ним никто не идёт.
+// Zero-length path segments drop out: nobody walks them.
 function withoutStandstills(points: readonly Point[]): Point[] {
   return points.filter((point, index) => {
     const previous = points[index - 1];
@@ -893,8 +923,8 @@ function withoutStandstills(points: readonly Point[]): Point[] {
   });
 }
 
-// Путь идущего: со своего места в проход, по проходу (через его повороты) и из прохода к цели —
-// так он не проходит сквозь чужие станки.
+// A walker's path: from their spot into the aisle, along the aisle (through its corners) and from
+// the aisle to the target, so they never pass through other machines.
 function routeBetween(from: Point, to: Point, aisle: Aisle): Point[] {
   const entry = aisleStop(aisle, from);
   const exit = aisleStop(aisle, to);
@@ -903,7 +933,7 @@ function routeBetween(from: Point, to: Point, aisle: Aisle): Point[] {
   return withoutStandstills([from, entry.point, ...corners, exit.point, to]);
 }
 
-// Путь из отрезков с моментами прохождения при заданной скорости.
+// A path of segments with passing moments at the given speed.
 function legsOf(route: readonly Point[], start: number, walkSpeed: number): Leg[] {
   const legs: Leg[] = [];
   let time = start;
@@ -927,12 +957,12 @@ function stand({ start, end, activity, at, heading, carrying = false }: Standing
 }
 
 /**
- * Раскладывает запись сборки на действия рабочих и мастера: кто когда работает, бежит,
- * передаёт деталь, говорит и слушает.
- * @param {BriefSessionRecord} recording Проверенная запись сборки.
- * @param {FactoryLayout} layout План цеха.
- * @param {Pacing} pacing Темп сцены.
- * @returns {FactoryScript} Сценарий, по которому считается кадр в любой момент.
+ * Lays a build recording out into worker and foreman actions: who works, runs, passes the part,
+ * speaks and listens, and when.
+ * @param {BriefSessionRecord} recording Validated build recording.
+ * @param {FactoryLayout} layout Factory layout.
+ * @param {Pacing} pacing Scene pacing.
+ * @returns {FactoryScript} Script from which the frame at any moment is computed.
  */
 export function buildScript(
   recording: BriefSessionRecord,

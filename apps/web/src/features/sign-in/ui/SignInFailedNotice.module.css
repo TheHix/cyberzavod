@@ -1,5 +1,6 @@
-/* Внизу экрана, а не вверху: на узком экране сверху меню, и сообщение закрыло бы его. Над полем,
-   меню и HUD (у них z-index до 3), но под панелями: они в верхнем слое popover. */
+/* At the bottom of the screen, not the top: on a narrow screen the menu is at the top, and the
+   message would cover it. Above the field, menu and HUD (their z-index is up to 3), but below the
+   panels: they are in the popover top layer. */
 .notice {
   --notice-width: 28rem;
 

@@ -15,9 +15,9 @@ function isUnauthorized(err: unknown): boolean {
 }
 
 /**
- * Запрашивает открытые галереи.
- * @param {ApiRequest} [request] Запрос; по умолчанию `fetch` браузера.
- * @returns {Promise<readonly GalleryListing[]>} Галереи, свежие сверху.
+ * Requests the public galleries.
+ * @param {ApiRequest} [request] Request; the browser `fetch` by default.
+ * @returns {Promise<readonly GalleryListing[]>} Galleries, newest first.
  */
 export async function fetchGalleries(request?: ApiRequest): Promise<readonly GalleryListing[]> {
   const body = await getJson("/api/galleries", request);
@@ -26,10 +26,10 @@ export async function fetchGalleries(request?: ApiRequest): Promise<readonly Gal
 }
 
 /**
- * Запрашивает открытую галерею автора.
- * @param {string} login Логин автора на GitHub.
- * @param {ApiRequest} [request] Запрос; по умолчанию `fetch` браузера.
- * @returns {Promise<Gallery>} Галерея; закрытая и несуществующая — ошибка 404.
+ * Requests an author's public gallery.
+ * @param {string} login Author's GitHub login.
+ * @param {ApiRequest} [request] Request; the browser `fetch` by default.
+ * @returns {Promise<Gallery>} The gallery; a private or nonexistent one is a 404 error.
  */
 export async function fetchGallery(login: string, request?: ApiRequest): Promise<Gallery> {
   const body = await getJson(`/api/galleries/${encodeURIComponent(login)}`, request);
@@ -38,10 +38,10 @@ export async function fetchGallery(login: string, request?: ApiRequest): Promise
 }
 
 /**
- * Запрашивает запись по секретной ссылке.
- * @param {string} slug Секретная часть ссылки.
- * @param {ApiRequest} [request] Запрос; по умолчанию `fetch` браузера.
- * @returns {Promise<SharedRecording>} Запись, прошедшая проверку ядра.
+ * Requests a recording by secret link.
+ * @param {string} slug The secret part of the link.
+ * @param {ApiRequest} [request] Request; the browser `fetch` by default.
+ * @returns {Promise<SharedRecording>} A recording that passed the core's check.
  */
 export async function fetchSharedRecording(
   slug: string,
@@ -53,10 +53,11 @@ export async function fetchSharedRecording(
 }
 
 /**
- * Запрашивает свою галерею вошедшего автора: вход — по куке сайта.
- * @param {ApiRequest} [request] Запрос; по умолчанию `fetch` браузера.
- * @returns {Promise<OwnGallery | undefined>} Галерея или `undefined`, если никто не вошёл (401).
- * @throws {ApiRequestError} Если API ответил другой ошибкой; ответ не того вида — `ApiResponseError`.
+ * Requests the signed-in author's own gallery: sign-in is by the site cookie.
+ * @param {ApiRequest} [request] Request; the browser `fetch` by default.
+ * @returns {Promise<OwnGallery | undefined>} The gallery, or `undefined` if nobody signed in (401).
+ * @throws {ApiRequestError} If the API responded with another error; a wrong-shape response is
+ *   `ApiResponseError`.
  */
 export async function fetchOwnGallery(request?: ApiRequest): Promise<OwnGallery | undefined> {
   try {
@@ -71,10 +72,10 @@ export async function fetchOwnGallery(request?: ApiRequest): Promise<OwnGallery 
 }
 
 /**
- * Открывает или закрывает свою галерею.
- * @param {boolean} isPublic Открыть ли галерею.
- * @param {ApiRequest} [request] Запрос; по умолчанию `fetch` браузера.
- * @returns {Promise<void>} Когда API принял изменение.
+ * Makes one's own gallery public or private.
+ * @param {boolean} isPublic Whether to make the gallery public.
+ * @param {ApiRequest} [request] Request; the browser `fetch` by default.
+ * @returns {Promise<void>} When the API has accepted the change.
  */
 export function setGalleryPublic(isPublic: boolean, request?: ApiRequest): Promise<void> {
   return sendCommand(
@@ -84,10 +85,10 @@ export function setGalleryPublic(isPublic: boolean, request?: ApiRequest): Promi
 }
 
 /**
- * Удаляет запись из своей галереи; ссылка на неё перестаёт работать.
- * @param {string} id id записи — имя файла в журнале автора.
- * @param {ApiRequest} [request] Запрос; по умолчанию `fetch` браузера.
- * @returns {Promise<void>} Когда API удалил запись.
+ * Removes a recording from one's own gallery; its link stops working.
+ * @param {string} id Recording id, the file name in the author's journal.
+ * @param {ApiRequest} [request] Request; the browser `fetch` by default.
+ * @returns {Promise<void>} When the API has removed the recording.
  */
 export function deleteOwnRecording(id: string, request?: ApiRequest): Promise<void> {
   const path = `/api/me/recordings/${encodeURIComponent(id)}`;

@@ -11,23 +11,23 @@ import { JournalTimeline } from "./JournalTimeline.tsx";
 import styles from "./Timeline.module.css";
 
 interface Props {
-  /** id сборок серии в порядке, в каком их проигрывает цех. */
+  /** Build ids of the series in the order the floor plays them. */
   recordingIds: readonly string[];
-  /** Язык страницы: на нём метки, подписи и сообщения журнала. */
+  /** Page language: journal labels, captions and messages are in it. */
   locale: Locale;
 }
 
 /**
- * Журнал серии сборок: полная запись той сборки, что сейчас в цехе. Записи приходят файлами в
- * браузере, следующая грузится заранее; пока записи нет — сообщение, почему. В журнале всегда
- * одна запись, поэтому якоря реплик и вмешательств однозначны.
- * @param {Props} props Свойства компонента.
- * @param {readonly string[]} props.recordingIds id сборок серии по порядку проигрывания.
- * @param {Locale} props.locale Язык страницы.
- * @returns {JSX.Element} Журнал или сообщение.
+ * Build series journal: the full recording of the build on the floor now. Recordings come as files
+ * in the browser, the next one loads ahead of time; while there is no recording, a message says
+ * why. The journal always holds one recording, so message and intervention anchors are unambiguous.
+ * @param {Props} props Component props.
+ * @param {readonly string[]} props.recordingIds Build ids of the series in playback order.
+ * @param {Locale} props.locale Page language.
+ * @returns {JSX.Element} Journal or message.
  */
 export function SeriesJournal(props: Props): JSX.Element {
-  // Серия у островка не меняется: журнал создаётся один раз.
+  // The island's series does not change: the journal is created once.
   const journal = createSeriesJournal({
     recordingIds: untrack(() => props.recordingIds),
     $sceneRecordingId,
@@ -36,7 +36,7 @@ export function SeriesJournal(props: Props): JSX.Element {
   });
   const state = useStoreValue(journal.$recording);
   const recording = () => readyValue(state());
-  // Элемент задаётся в разметке через ref и живёт столько же, сколько компонент.
+  // The element is set in the markup via ref and lives as long as the component.
   let journalElement!: HTMLDivElement;
 
   onMount(() => {

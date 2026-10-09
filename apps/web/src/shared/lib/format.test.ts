@@ -73,7 +73,7 @@ describe("formatNumber", () => {
   ] as const)("разбивает число по разрядам по правилам языка (%s)", (locale, expected) => {
     const result = formatNumber(12_345, locale);
 
-    // Intl ставит неразрывные пробелы — сравниваем с обычными.
+    // Intl inserts non-breaking spaces, so we compare against regular ones.
     expect(result.replace(/\s/g, " ")).toBe(expected);
   });
 });
@@ -85,7 +85,7 @@ describe("formatTokens", () => {
   ] as const)("разбивает число по разрядам по правилам языка (%s)", (locale, expected) => {
     const result = formatTokens(1_234_567, locale);
 
-    // Intl ставит неразрывные пробелы — сравниваем с обычными.
+    // Intl inserts non-breaking spaces, so we compare against regular ones.
     expect(result.replace(/\s/g, " ")).toBe(expected);
   });
 });
@@ -130,7 +130,7 @@ describe("formatCount", () => {
   ])("пишет %i со словом в нужной форме по-русски: %s", (count, expected) => {
     const result = formatCount(count, prompts, "ru");
 
-    // Intl ставит неразрывные пробелы — сравниваем с обычными.
+    // Intl inserts non-breaking spaces, so we compare against regular ones.
     expect(result.replace(/\s/g, " ")).toBe(expected);
   });
 

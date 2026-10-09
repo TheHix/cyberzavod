@@ -1,23 +1,23 @@
 import { isLocale, LOCALES, type Locale } from "@/shared/i18n/locale.ts";
 
-/** Заголовочные данные гайда: то, что сайт показывает в списке и в шапке страницы. */
+/** Guide header data: what the site shows in the list and in the page header. */
 export interface GuideMeta {
-  /** Общий для всех языков id из имени файла: часть адреса страницы. */
+  /** An id shared by all languages, from the file name: part of the page address. */
   id: string;
   title: string;
-  /** Описание одной строкой: для списка гайдов и мета-тега страницы. */
+  /** One-line description: for the guide list and the page meta tag. */
   description: string;
-  /** Место в списке: меньшие числа идут раньше. */
+  /** Place in the list: smaller numbers come first. */
   order: number;
 }
 
-/** Что говорит о гайде имя его файла `<id>.<язык>.md`. */
+/** What a guide's file name `<id>.<language>.md` says about it. */
 export interface GuideFileName {
   id: string;
   locale: Locale;
 }
 
-/** Ошибка гайда: файл пришёл извне и не прошёл проверку. */
+/** Guide error: a file came from outside and failed the check. */
 export class GuideError extends Error {}
 
 const GUIDE_FILE_EXTENSION = ".md";
@@ -29,11 +29,11 @@ function isLine(value: unknown): value is string {
 }
 
 /**
- * Разбирает путь файла гайда: имя `<id>.<язык>.md`. Id становится частью адреса страницы,
- * поэтому он из строчных латинских букв и цифр через дефис.
- * @param {string} file Путь файла гайда, как его отдаёт `import.meta.glob`.
- * @returns {GuideFileName} Id гайда и язык файла.
- * @throws {GuideError} Если это не `.md`, нет языка сайта или имя не подходит для адреса.
+ * Parses a guide file path: the name is `<id>.<language>.md`. The id becomes part of the page
+ * address, so it is lowercase Latin letters and digits separated by hyphens.
+ * @param {string} file Guide file path, as `import.meta.glob` gives it.
+ * @returns {GuideFileName} Guide id and file language.
+ * @throws {GuideError} If it is not `.md`, has no site language, or the name does not fit a URL.
  */
 export function guideFileOf(file: string): GuideFileName {
   const name = file.slice(file.lastIndexOf("/") + 1);
@@ -64,11 +64,11 @@ export function guideFileOf(file: string): GuideFileName {
 }
 
 /**
- * Проверяет frontmatter гайда, пришедший извне, и возвращает заголовочные данные.
- * @param {string} id Id гайда из `guideFileOf`.
- * @param {unknown} frontmatter Разобранный YAML из начала файла.
- * @returns {GuideMeta} Проверенные данные; неизвестные поля отброшены.
- * @throws {GuideError} Если frontmatter не соответствует формату.
+ * Checks a guide's frontmatter that came from outside and returns the header data.
+ * @param {string} id Guide id from `guideFileOf`.
+ * @param {unknown} frontmatter Parsed YAML from the start of the file.
+ * @returns {GuideMeta} Checked data; unknown fields are dropped.
+ * @throws {GuideError} If the frontmatter does not match the format.
  */
 export function parseGuideMeta(id: string, frontmatter: unknown): GuideMeta {
   if (typeof frontmatter !== "object" || frontmatter === null) {

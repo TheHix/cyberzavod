@@ -1,12 +1,12 @@
-/* Токены оформления — единственное место, где заданы цвета, контуры, тени, шрифты и размеры.
-   Компоненты ui-kit, виджеты и графика цеха (она читает краски отсюда при встраивании) берут
-   значения отсюда и своих «голых» значений не заводят.
-   Стиль — яркий тайкун: насыщенные краски, толстый тёмный контур и жёсткая тень вниз,
-   как у наклейки или игровой кнопки. */
+/* Design tokens: the only place where colors, outlines, shadows, fonts and sizes are set.
+   ui-kit components, widgets and the factory floor graphics (they read colors from here when
+   embedded) take values from here and do not introduce "bare" values of their own.
+   The style is a bright tycoon: saturated colors, a thick dark outline and a hard drop shadow,
+   like a sticker or a game button. */
 :root {
   color-scheme: light;
 
-  /* Краски */
+  /* Colors */
   --ink: #1d1b33;
   --ink-soft: #57537a;
   --paper: #fff6e0;
@@ -21,7 +21,7 @@
   --bubblegum: #ff5ca8;
   --danger: #ff4d6d;
 
-  /* Краски, которые есть только у графики цеха: пол, станки, рабочие, деталь */
+  /* Colors used only by the factory floor graphics: floor, machines, workers, part */
   --floor-tile-alt: #8797ea;
   --floor-grout: #6c7dd4;
   --floor-lane: #6676cf;
@@ -35,10 +35,10 @@
   --crate-plank: #d9822b;
   --foreman: #d7263d;
   --foreman-helmet: #f2f2f2;
-  /* Белый: стекло, блики и свечение под деталью — его красит `tint`, поэтому он чистый */
+  /* White: glass, highlights and the glow under the part; `tint` colors it, so it is pure */
   --white: #ffffff;
 
-  /* Контур и тени: обводка вокруг всего, «приподнятые» элементы отбрасывают тень вниз */
+  /* Outline and shadows: everything is outlined, "raised" elements cast a shadow downward */
   --outline-width: 3px;
   --outline: var(--outline-width) solid var(--ink);
   --lift: 0 0.3rem 0 var(--ink);
@@ -51,10 +51,10 @@
   --radius-l: 1.5rem;
   --radius-round: 999px;
 
-  /* Шрифты: заголовки и кнопки — плотный Rubik, текст — округлый Nunito */
+  /* Fonts: headings and buttons in dense Rubik, body text in rounded Nunito */
   --font-display: "Rubik Variable", "Rubik", system-ui, sans-serif;
   --font-body: "Nunito Variable", "Nunito", system-ui, sans-serif;
-  /* Код: системный моноширинный шрифт, отдельный шрифт ради блоков кода не грузится */
+  /* Code: the system monospace font; no separate font is loaded just for code blocks */
   --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Code", Menlo, Consolas, monospace;
   --text-2xs: 0.625rem;
   --text-xs: 0.6875rem;
@@ -63,7 +63,7 @@
   --text-l: 1.375rem;
   --text-xl: 1.875rem;
 
-  /* Отступы */
+  /* Spacing */
   --space-2xs: 0.25rem;
   --space-xs: 0.4rem;
   --space-s: 0.6rem;
@@ -71,13 +71,13 @@
   --space-l: 1.25rem;
   --space-xl: 1.5rem;
 
-  /* Подъём при наведении и нажатие кнопок; «уменьшить движение» их выключает */
+  /* Button lift on hover and press; "reduce motion" turns them off */
   --press-shift: 0.22rem;
   --hover-shift: -2px;
   --motion-fast: 80ms;
   --motion-slide: 160ms;
 
-  /* Размеры раскладки и элементов управления */
+  /* Layout and control sizes */
   --gutter: 1.25rem;
   --sidebar-width: 7rem;
   --hud-width: 25rem;
@@ -97,7 +97,7 @@
   }
 }
 
-/* На узком или низком экране всё компактнее: кегль заголовков, отступы, элементы управления. */
+/* On a narrow or short screen everything is more compact: heading size, spacing, controls. */
 @media (max-width: 48rem), (max-height: 40rem) {
   :root {
     --text-xl: 1.375rem;

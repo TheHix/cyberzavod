@@ -1,7 +1,7 @@
 import type { Stage } from "@cyberzavod/core";
 import type { Translated } from "@/shared/i18n/locale.ts";
 
-/** Названия этапов в интерфейсе: таблички станков и маршруты реплик. */
+/** Stage names in the interface: machine plaques and message routes. */
 export const STAGE_LABELS: Readonly<Record<Stage, Translated>> = {
   planning: { en: "Plan", ru: "Постановка" },
   implementation: { en: "Code", ru: "Код" },
@@ -10,5 +10,5 @@ export const STAGE_LABELS: Readonly<Record<Stage, Translated>> = {
   record: { en: "Record", ru: "Фиксация" },
 };
 
-/** Название мастера цеха (в коде `foreman`) — на табличке кабинета и в маршрутах реплик. */
+/** Name of the factory foreman (`foreman` in code): on the office plaque and in message routes. */
 export const FOREMAN_LABEL: Translated = { en: "Foreman", ru: "Мастер" };

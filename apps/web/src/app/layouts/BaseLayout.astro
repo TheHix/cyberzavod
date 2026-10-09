@@ -1,5 +1,5 @@
 ---
-// Шрифты раздаются с нашего сервера; браузер грузит только нужные начертания и алфавиты.
+// Fonts are served from our own server; the browser loads only the needed styles and scripts.
 import "@fontsource-variable/rubik";
 import "@fontsource-variable/nunito";
 import "@/app/styles/global.css";
@@ -16,15 +16,15 @@ import { localizedPath } from "@/shared/i18n/path.ts";
 import { PREVIEW_IMAGE_SIZE, siteThemeColor } from "@/shared/lib/site-images.ts";
 
 interface Props {
-  /** Язык страницы: ставится в `<html lang>` и выбирает название и описание сайта. */
+  /** Page language: set in `<html lang>` and picks the site name and description. */
   locale: Locale;
-  /** Путь страницы без языка: по нему строятся адрес страницы и её версии на других языках. */
+  /** Page path without the language: the page URL and its other-language versions come from it. */
   path: string;
   title?: string | undefined;
   description?: string | undefined;
   /**
-   * Страница «не найдено»: у неё нет своего адреса — nginx отдаёт её на любой неизвестный, —
-   * поэтому нет `canonical`, `hreflang` и `og:url`, и поисковики её не индексируют.
+   * The "not found" page: it has no address of its own (nginx serves it for any unknown one),
+   * so there is no `canonical`, `hreflang` or `og:url`, and search engines do not index it.
    */
   notFound?: boolean | undefined;
 }
@@ -36,8 +36,8 @@ const {
   description = site.description[locale],
   notFound = false,
 } = Astro.props;
-// Страница записи из галереи открыта только по секретной ссылке: своего адреса для поисковиков у неё
-// тоже нет.
+// A gallery recording page is open only by secret link: it has no address of its own for search
+// engines either.
 const isIndexed = !notFound && !isUnindexedPath(path);
 const siteName = site.name[locale];
 const fullTitle = title ? `${title} — ${siteName}` : siteName;
@@ -48,10 +48,10 @@ const alternates = LOCALES.map((alternate) => ({
 }));
 const defaultAlternate = new URL(localizedPath(DEFAULT_LOCALE, path), Astro.site);
 const preview = new URL(localizedPath(locale, site.images.preview), Astro.site);
-// Open Graph пишет язык через подчёркивание: ru_RU, а не ru-RU.
+// Open Graph writes the language with an underscore: ru_RU, not ru-RU.
 const openGraphLocale = (of: Locale) => LOCALE_TAGS[of].replace("-", "_");
-// Разметка schema.org: поисковик видит сайт, его язык и автора. `<` экранируется, чтобы текст
-// не закрыл тег script.
+// schema.org markup: the search engine sees the site, its language and author. `<` is escaped so
+// the text does not close the script tag.
 const structuredData = JSON.stringify({
   "@context": "https://schema.org",
   "@type": "WebSite",

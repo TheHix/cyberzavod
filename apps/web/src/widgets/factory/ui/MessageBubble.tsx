@@ -10,19 +10,19 @@ import { showMessageDetails } from "./open-journal.ts";
 import { SpeechBubble } from "./SpeechBubble.tsx";
 
 interface Props {
-  /** Графика цеха — переводит место говорящего в координаты пола; нет, пока не загрузилась. */
+  /** Factory graphics: converts the speaker's spot to floor coordinates; absent until loaded. */
   graphics: FactoryGraphics | undefined;
-  /** Поле цеха, свободное от меню и HUD: пузырь не выходит за его края. */
+  /** Floor field free of the menu and HUD: the bubble does not go past its edges. */
   field: Frame;
 }
 
 /**
- * Реплика над говорящим — мастером или рабочим: кто кому, одна строка и «подробнее», которое
- * ставит цех на паузу и открывает журнал на полном тексте.
- * @param {Props} props Свойства компонента.
- * @param {FactoryGraphics | undefined} props.graphics Графика цеха, если уже загружена.
- * @param {Frame} props.field Поле цеха, свободное от меню и HUD.
- * @returns {JSX.Element} Пузырь реплики или ничего, если сейчас никто не говорит.
+ * A message above the speaker, the foreman or a worker: who to whom, one line, and "more", which
+ * pauses the floor and opens the journal at the full text.
+ * @param {Props} props Component props.
+ * @param {FactoryGraphics | undefined} props.graphics Factory graphics, if already loaded.
+ * @param {Frame} props.field Floor field free of the menu and HUD.
+ * @returns {JSX.Element} The message bubble, or nothing if nobody is speaking now.
  */
 export function MessageBubble(props: Props): JSX.Element {
   const model = useFactoryModel();

@@ -1,8 +1,8 @@
 import { ApiRequestError, ApiResponseError } from "./errors.ts";
 
 /**
- * Данные из API на странице: ещё грузятся, готовы, их нет (404 или нечего спрашивать), ответ
- * битый или запрос не удался — у каждого исхода своё сообщение.
+ * API data on a page: still loading, ready, missing (404 or nothing to ask for), a broken
+ * response, or a failed request; each outcome has its own message.
  */
 export type Remote<T> =
   | { readonly status: "loading" }
@@ -11,10 +11,10 @@ export type Remote<T> =
   | { readonly status: "broken" }
   | { readonly status: "failed" };
 
-/** Данные ещё грузятся: начальное состояние страницы. */
+/** The data is still loading: the page's initial state. */
 export const LOADING: Remote<never> = { status: "loading" };
 
-/** Данных нет: API ответил 404 или в адресе страницы нечего спрашивать. */
+/** There is no data: the API responded 404 or the page address has nothing to ask for. */
 export const MISSING: Remote<never> = { status: "missing" };
 
 const NOT_FOUND_STATUS = 404;
@@ -28,11 +28,11 @@ function failureOf(err: unknown): Remote<never> {
 }
 
 /**
- * Выполняет запрос к API и превращает исход в состояние страницы: ошибку не бросает, а
- * называет, чтобы страница показала понятное сообщение.
+ * Runs an API request and turns the outcome into a page state: it does not throw an error but
+ * names it, so the page can show a clear message.
  * @template T
- * @param {() => Promise<T>} request Запрос с разбором ответа.
- * @returns {Promise<Remote<T>>} Готовые данные или причина, почему их нет.
+ * @param {() => Promise<T>} request Request with response parsing.
+ * @returns {Promise<Remote<T>>} Ready data or the reason it is missing.
  */
 export async function settle<T>(request: () => Promise<T>): Promise<Remote<T>> {
   try {
@@ -43,10 +43,10 @@ export async function settle<T>(request: () => Promise<T>): Promise<Remote<T>> {
 }
 
 /**
- * Готовые данные, если они есть.
+ * Ready data, if there is any.
  * @template T
- * @param {Remote<T>} state Состояние данных.
- * @returns {T | undefined} Данные или `undefined`, пока их нельзя показать.
+ * @param {Remote<T>} state Data state.
+ * @returns {T | undefined} The data, or `undefined` while it cannot be shown.
  */
 export function readyValue<T>(state: Remote<T>): T | undefined {
   return state.status === "ready" ? state.value : undefined;

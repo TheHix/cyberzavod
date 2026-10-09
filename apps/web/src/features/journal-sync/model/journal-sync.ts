@@ -1,26 +1,26 @@
-// Связь журнала сборки с цехом. Это разные виджеты и друг друга они не знают: цех
-// подключает свою сцену, журнал читает, какую запись она проигрывает и до какой речи дошла,
-// и просит перемотку. Запись в цехе может смениться (серия сборок), поэтому речь журнала
-// сверяется с ней по id записи.
+// Link between the build journal and the factory floor. They are separate widgets that do not
+// know each other: the factory floor connects its scene, the journal reads which recording it
+// plays and which speech it has reached, and asks to seek. The recording on the floor may change
+// (a build series), so the journal's speech is matched to it by recording id.
 
 import { atom, type ReadableAtom } from "nanostores";
 
-/** Промпт, вмешательство или реплика записи: `index` — номер среди таких же, с нуля, как в цехе. */
+/** A recording's prompt, intervention or message: `index` is its number among its kind, from 0. */
 export type Speech =
   | { readonly kind: "prompt"; readonly index: number }
   | { readonly kind: "intervention"; readonly index: number }
   | { readonly kind: "message"; readonly index: number };
 
 /**
- * То, что журналу нужно от цеха: какую запись проигрывает сцена, до какой речи дошла и как
- * перемотать к речи.
+ * What the journal needs from the factory floor: which recording the scene plays, which speech it
+ * has reached and how to seek to a speech.
  */
 export interface JournalScene {
-  /** id записи, которую сейчас проигрывает сцена. */
+  /** Id of the recording the scene is playing now. */
   readonly $recordingId: ReadableAtom<string>;
-  /** Последний промпт, вмешательство или реплика, начавшиеся к моменту сцены. */
+  /** The last prompt, intervention or message started by the scene's moment. */
   readonly $speech: ReadableAtom<Speech | null>;
-  /** Перематывает сцену к началу речи. */
+  /** Seeks the scene to the start of a speech. */
   seekToSpeech(speech: Speech): void;
 }
 
@@ -33,24 +33,24 @@ const $currentRecordingId = atom<string | null>(null);
 const $currentSpeech = atom<Speech | null>(null);
 let connection: Connection | null = null;
 
-/** id записи, которую проигрывает подключённый цех; `null` — цеха нет. */
+/** Id of the recording the connected factory floor plays; `null` means no factory floor. */
 export const $sceneRecordingId: ReadableAtom<string | null> = $currentRecordingId;
 
-/** Речь, до которой дошёл подключённый цех; `null` — речи ещё не было или цеха нет. */
+/** The speech the connected factory floor has reached; `null` means no speech yet or no floor. */
 export const $sceneSpeech: ReadableAtom<Speech | null> = $currentSpeech;
 
 /**
- * Сравнивает речи по смыслу, а не по ссылке: пропсы острова Astro приходят через Solid-стор
- * и ссылке не равны.
- * @param {Speech | null} current Речь, до которой дошла сцена, или `null`.
- * @param {Speech} candidate Речь записи журнала.
- * @returns {boolean} Совпадают ли вид и номер.
+ * Compares speeches by meaning, not by reference: Astro island props arrive through a Solid store
+ * and are not reference-equal.
+ * @param {Speech | null} current The speech the scene has reached, or `null`.
+ * @param {Speech} candidate A journal entry's speech.
+ * @returns {boolean} Whether the kind and number match.
  */
 export function isSameSpeech(current: Speech | null, candidate: Speech): boolean {
   return current !== null && current.kind === candidate.kind && current.index === candidate.index;
 }
 
-// Переносит запись и речь сцены в сторы журнала; отписка — одна на обе подписки.
+// Carries the scene's recording and speech into the journal stores; one unsubscribe for both.
 function followScene(scene: JournalScene): () => void {
   const stopRecording = scene.$recordingId.subscribe((id) => $currentRecordingId.set(id));
   const stopSpeech = scene.$speech.subscribe((speech) => $currentSpeech.set(speech));
@@ -62,11 +62,12 @@ function followScene(scene: JournalScene): () => void {
 }
 
 /**
- * Подключает цех к журналу: переносит его `$recordingId` и `$speech` в `$sceneRecordingId` и
- * `$sceneSpeech` и запоминает сцену для перемотки. Новое подключение заменяет прежнее.
- * @param {JournalScene} scene Сцена цеха.
- * @returns {() => void} Отключение: сбрасывает запись и речь и забывает сцену, если она всё
- *   ещё эта.
+ * Connects the factory floor to the journal: carries its `$recordingId` and `$speech` into
+ * `$sceneRecordingId` and `$sceneSpeech` and remembers the scene for seeking. A new connection
+ * replaces the old one.
+ * @param {JournalScene} scene Factory floor scene.
+ * @returns {() => void} Disconnect: resets the recording and speech and forgets the scene if it is
+ *   still this one.
  */
 export function connectScene(scene: JournalScene): () => void {
   connection?.unsubscribe();
@@ -86,10 +87,11 @@ export function connectScene(scene: JournalScene): () => void {
 }
 
 /**
- * Просит подключённый цех перемотать сцену к речи записи. Без цеха или если цех уже проигрывает
- * другую запись, ничего не делает: номер речи имеет смысл только внутри своей записи.
- * @param {string} recordingId id записи, к речи которой нужно перемотать.
- * @param {Speech} speech Промпт, вмешательство или реплика этой записи.
+ * Asks the connected factory floor to seek the scene to a recording's speech. Without a floor, or
+ * if the floor is already playing another recording, does nothing: a speech number only means
+ * something within its recording.
+ * @param {string} recordingId Id of the recording whose speech to seek to.
+ * @param {Speech} speech A prompt, intervention or message of this recording.
  */
 export function seekScene(recordingId: string, speech: Speech): void {
   const scene = connection?.scene;

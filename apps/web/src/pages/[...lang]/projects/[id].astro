@@ -30,13 +30,13 @@ export const getStaticPaths = (() =>
 interface Props {
   locale: Locale;
   project: PublishedProject;
-  /** Сборки проекта по порядку задач. */
+  /** Project builds in task order. */
   recordings: readonly SessionRecord[];
 }
 
 const { locale, project, recordings } = Astro.props;
 const closeLabel = UI_TEXT.panels.close[locale];
-// Серия этого проекта по кругу: с первой сборки по порядку задач.
+// This project's series on a loop: from the first build, in task order.
 const seriesBuilds = seriesBuildsOf(recordings, projectLinkOf(project, locale), locale);
 const recordingIds = seriesBuilds.map((build) => build.recording.id);
 const hasBuilds = seriesBuilds.length > 0;

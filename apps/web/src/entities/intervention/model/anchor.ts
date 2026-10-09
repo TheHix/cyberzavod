@@ -1,7 +1,7 @@
 /**
- * Якорь вмешательства в журнале: по нему «подробнее» над цехом находит нужную запись.
- * @param {number} index Номер вмешательства в записи, с нуля.
- * @returns {string} id элемента журнала, например `intervention-1` для первого вмешательства.
+ * Intervention anchor in the journal: "more" above the factory floor finds the entry by it.
+ * @param {number} index Intervention number in the recording, from zero.
+ * @returns {string} Journal element id, e.g. `intervention-1` for the first intervention.
  */
 export function interventionAnchor(index: number): string {
   return `intervention-${index + 1}`;

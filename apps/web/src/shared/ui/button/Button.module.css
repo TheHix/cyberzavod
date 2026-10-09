@@ -1,4 +1,4 @@
-/* Игровая кнопка: плашка с контуром и тенью вниз; при нажатии «вдавливается». */
+/* Game button: an outlined tile with a drop shadow; it "presses in" when clicked. */
 .button {
   --button-face: var(--paper);
 
@@ -25,7 +25,7 @@
     background-color var(--motion-fast) ease;
 }
 
-/* Подъём при наведении — только там, где есть мышь: на сенсорном экране он «залипает». */
+/* Hover lift only where there is a mouse: on a touch screen it "sticks". */
 @media (hover: hover) {
   .button:hover {
     transform: translateY(var(--hover-shift));
@@ -63,8 +63,8 @@
   box-shadow: none;
 }
 
-/* Текстовая кнопка внутри содержимого: «подробнее», «свернуть». В тесной строке не сжимается:
-   уступают соседи, а действие остаётся видно и кликабельно целиком. */
+/* Text button inside content: "more", "collapse". It does not shrink in a tight row:
+   the neighbors give way, and the action stays fully visible and clickable. */
 .link {
   flex: none;
   min-height: auto;
@@ -107,7 +107,7 @@
   border-radius: var(--radius-round);
 }
 
-/* Плитка меню: иконка над подписью. На узком или низком экране сжимается. */
+/* Menu tile: an icon above a label. Shrinks on a narrow or short screen. */
 .tile {
   --tile-icon-size: 1.25rem;
 
@@ -119,9 +119,10 @@
   font-size: var(--text-s);
 }
 
-/* Плитка на половину строки меню: две в ряд делят ширину меню (около 40px на плитку), и подпись
-   «Code» в кегле обычной плитки не помещается. Поэтому кегль мельче и нет боковых полей. На узком
-   и низком экране правила плитки ниже идут позже и перекрывают эти: там плитка как обычная. */
+/* Half-row menu tile: two in a row share the menu width (about 40px per tile), and the "Code"
+   label does not fit at the regular tile font size. So the font is smaller and there is no side
+   padding. On a narrow and short screen the tile rules below come later and override these:
+   there the tile is a regular one. */
 .halfTile {
   --half-tile-text-size: var(--text-xs);
 
@@ -129,8 +130,9 @@
   font-size: var(--half-tile-text-size);
 }
 
-/* На узком или низком экране плитки плоские, как вкладки: без своей рамки и тени, иконка меньше.
-   Рамку даёт меню вокруг них, а ряд толстых плашек на телефоне выглядит громоздко. */
+/* On a narrow or short screen tiles are flat, like tabs: no frame or shadow of their own, a
+   smaller icon. The menu around them provides the frame, and a row of thick tiles looks bulky
+   on a phone. */
 @media (max-width: 48rem), (max-height: 40rem) {
   .tile {
     padding: var(--space-xs) var(--space-2xs);
@@ -154,7 +156,7 @@
   }
 }
 
-/* Подсветка при наведении — только там, где есть мышь: на телефоне она «залипла» бы после нажатия. */
+/* Hover highlight only where there is a mouse: on a phone it would "stick" after a tap. */
 @media (hover: hover) and ((max-width: 48rem) or (max-height: 40rem)) {
   .tile:hover {
     background: var(--paper-deep);
@@ -163,8 +165,8 @@
   }
 }
 
-/* Плитки делят строку на 360px: без боковых отступов и с мелким кеглем, а подпись из двух слов
-   («О заводе») переносится, вместо того чтобы прижиматься к рамке. */
+/* Tiles share a 360px row: no side padding and a small font, and a two-word label
+   (the Russian "About") wraps instead of pressing against the frame. */
 @media (width <= 48rem) and (height > 40rem) {
   .tile {
     padding-inline: 0;
@@ -173,8 +175,8 @@
   }
 }
 
-/* На низком экране столбик «иконка над подписью» не помещает семь пунктов меню в 360px:
-   плитка становится строкой, подпись остаётся видимой. */
+/* On a short screen an "icon above label" column does not fit seven menu items into 360px:
+   the tile becomes a row, and the label stays visible. */
 @media (height <= 40rem) {
   .tile {
     flex-direction: row;

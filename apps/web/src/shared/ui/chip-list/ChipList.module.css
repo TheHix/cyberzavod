@@ -1,4 +1,4 @@
-/* Метки строкой: не помещаются — переносятся, а не сжимаются до многоточия. */
+/* Chips in a row: when they do not fit, they wrap rather than shrink to an ellipsis. */
 .list {
   display: flex;
   flex-wrap: wrap;

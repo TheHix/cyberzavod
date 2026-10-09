@@ -1,7 +1,7 @@
 ---
-// Примеры на странице галерей: проекты, которые цех собрал с нуля, карточками, как галереи ниже.
-// Собираются при сборке сайта и уходят в остров GalleryBoard слотом: записи журнала в его пропсы
-// и в клиентский чанк не попадают.
+// Examples on the galleries page: projects the factory built from scratch, as cards like the
+// galleries below. Assembled at site build time and passed to the GalleryBoard island via a slot:
+// journal records do not get into its props or the client chunk.
 import type { SessionRecord } from "@cyberzavod/core";
 import { projectOf, projectUrl, publishedProjects } from "@/entities/project";
 import { projectSeriesOf, totalsOf } from "@/entities/recording";
@@ -11,9 +11,9 @@ import { formatCount, formatDuration } from "@/shared/lib/format.ts";
 import { Card, ChipList, Title } from "@/shared/ui";
 
 interface Props {
-  /** Записи сборок сайта в любом порядке. */
+  /** Site build recordings in any order. */
   recordings: readonly SessionRecord[];
-  /** Язык страницы: на нём подписи, названия проектов и длительность. */
+  /** Page language: captions, project names and duration are in it. */
   locale: Locale;
 }
 

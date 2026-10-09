@@ -1,35 +1,36 @@
-// Адреса страниц, которые собираются из ответов API в браузере. Файл без импортов с алиасами: его
-// читает и `astro.config.ts` — фильтр карты сайта.
+// Addresses of pages built from API responses in the browser. The file has no aliased imports:
+// `astro.config.ts` reads it too, for the sitemap filter.
 
 /**
- * Пути страниц без языка, данные которых приходят из API в браузере: страница одна на все
- * галереи и записи, а что показывать — в параметрах запроса.
+ * Language-free paths of pages whose data comes from the API in the browser: one page serves all
+ * galleries and recordings, and what to show is in the query parameters.
  */
 export const API_PAGES = {
   sharedRecording: "/r/",
   galleries: "/gallery/",
   stats: "/stats/",
-  /** Личный кабинет вошедшего автора: его галерея и записи. */
+  /** The signed-in author's account page: their gallery and recordings. */
   cabinet: "/me/",
 } as const;
 
-/** Имена параметров запроса у страниц из `API_PAGES`. */
+/** Query parameter names of the pages in `API_PAGES`. */
 export const QUERY_PARAMS = {
-  /** Секретный slug записи из галереи: `/r/?id=<slug>`. */
+  /** Secret slug of a gallery recording: `/r/?id=<slug>`. */
   recording: "id",
-  /** Логин автора открытой галереи: `/gallery/?user=<login>`. */
+  /** Login of the public gallery's author: `/gallery/?user=<login>`. */
   galleryOwner: "user",
 } as const;
 
-// Запись из галереи видна только по секретной ссылке, а кабинет у каждого автора свой: поисковикам
-// эти страницы не нужны, а без параметра запроса или входа на них ничего нет.
+// A gallery recording is visible only by its secret link, and each author has their own account
+// page: search engines do not need these pages, and without a query parameter or sign-in they
+// are empty.
 const UNINDEXED_PATHS: readonly string[] = [API_PAGES.sharedRecording, API_PAGES.cabinet];
 
 /**
- * Закрыта ли страница от поисковиков: такая страница получает `noindex` и не попадает в карту
- * сайта.
- * @param {string} path Путь страницы без языка: `/r/`, `/gallery/`, `/me/`.
- * @returns {boolean} `true`, если страницу не индексируют.
+ * Whether the page is hidden from search engines: such a page gets `noindex` and stays out of the
+ * sitemap.
+ * @param {string} path Language-free page path: `/r/`, `/gallery/`, `/me/`.
+ * @returns {boolean} `true` if the page is not indexed.
  */
 export function isUnindexedPath(path: string): boolean {
   return UNINDEXED_PATHS.includes(path);

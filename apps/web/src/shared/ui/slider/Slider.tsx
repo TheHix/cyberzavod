@@ -3,28 +3,28 @@ import type { JSX } from "solid-js";
 import styles from "./Slider.module.css";
 
 interface Props {
-  /** Подпись для программ чтения с экрана. */
+  /** Label for screen readers. */
   label: string;
   value: number;
   max: number;
   step?: number;
   disabled?: boolean;
-  /** Как озвучить значение: «29:04» вместо числа миллисекунд. */
+  /** How to announce the value: "29:04" instead of a number of milliseconds. */
   valueText?: (value: number) => string;
   onChange: (value: number) => void;
 }
 
 /**
- * Слайдер ui-kit на Kobalte: мышь, касание и клавиатура (стрелки, Home, End) — от библиотеки.
- * @param {Props} props Свойства компонента.
- * @param {string} props.label Подпись для программ чтения с экрана.
- * @param {number} props.value Текущее значение.
- * @param {number} props.max Наибольшее значение; наименьшее — ноль.
- * @param {number} [props.step] Шаг.
- * @param {boolean} [props.disabled] Выключен ли.
- * @param {(value: number) => string} [props.valueText] Как озвучить значение.
- * @param {(value: number) => void} props.onChange Вызывается при каждом сдвиге.
- * @returns {JSX.Element} Слайдер.
+ * ui-kit slider on Kobalte: mouse, touch and keyboard (arrows, Home, End) come from the library.
+ * @param {Props} props Component props.
+ * @param {string} props.label Label for screen readers.
+ * @param {number} props.value Current value.
+ * @param {number} props.max Largest value; the smallest is zero.
+ * @param {number} [props.step] Step.
+ * @param {boolean} [props.disabled] Whether it is disabled.
+ * @param {(value: number) => string} [props.valueText] How to announce the value.
+ * @param {(value: number) => void} props.onChange Called on every move.
+ * @returns {JSX.Element} Slider.
  */
 export function Slider(props: Props): JSX.Element {
   return (
@@ -38,7 +38,8 @@ export function Slider(props: Props): JSX.Element {
     >
       <KobalteSlider.Track class={styles.track}>
         <KobalteSlider.Fill class={styles.fill} />
-        {/* Без KobalteSlider.Input: формы нет, а скрытое поле читалось бы вторым слайдером. */}
+        {/* No KobalteSlider.Input: there is no form, and a hidden field would be announced as
+            a second slider. */}
         <KobalteSlider.Thumb
           class={styles.thumb}
           aria-label={props.label}

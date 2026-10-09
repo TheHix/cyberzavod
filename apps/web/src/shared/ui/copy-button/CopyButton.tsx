@@ -7,17 +7,17 @@ import { Button } from "../button/Button.tsx";
 
 type CopyState = "idle" | "copied" | "failed";
 
-/** Подписи кнопки «копировать» по состояниям: обычная, скопировано, не удалось. */
+/** Copy button labels per state: idle, copied, failed. */
 export type CopyLabels = Readonly<Record<CopyState, string>>;
 
 interface Props {
-  /** Текст для копирования; читается в момент нажатия, а не при показе кнопки. */
+  /** Text to copy; read at the moment of the click, not when the button is shown. */
   text: () => string;
-  /** Подписи по состояниям на языке страницы: kit словаря не знает. */
+  /** Labels per state in the page language: the kit does not know the dictionary. */
   labels: CopyLabels;
 }
 
-/** Сколько кнопка показывает итог копирования, прежде чем вернуться в обычный вид. */
+/** How long the button shows the copy result before returning to its idle look. */
 const COPY_FEEDBACK_MS = 2000;
 const ICON_STROKE = 3;
 
@@ -28,12 +28,12 @@ const ICONS: Record<CopyState, Component<{ "stroke-width": number }>> = {
 };
 
 /**
- * Кнопка «копировать» ui-kit: кладёт текст в буфер обмена и на пару секунд показывает итог —
- * удачу или неудачу копирования.
- * @param {Props} props Свойства компонента.
- * @param {() => string} props.text Текст для копирования, читается в момент нажатия.
- * @param {CopyLabels} props.labels Подписи кнопки по состояниям.
- * @returns {JSX.Element} Кнопка-иконка и скрытый статус с итогом для экранных дикторов.
+ * ui-kit copy button: puts text on the clipboard and for a couple of seconds shows the result,
+ * success or failure.
+ * @param {Props} props Component props.
+ * @param {() => string} props.text Text to copy, read at the moment of the click.
+ * @param {CopyLabels} props.labels Button labels per state.
+ * @returns {JSX.Element} Icon button and a hidden status with the result for screen readers.
  */
 export function CopyButton(props: Props): JSX.Element {
   const [state, setState] = createSignal<CopyState>("idle");
@@ -60,8 +60,8 @@ export function CopyButton(props: Props): JSX.Element {
 
   onCleanup(() => clearTimeout(resetTimer));
 
-  // Смену aria-label у кнопки в фокусе экранные дикторы часто не произносят — итог
-  // объявляет отдельный статус.
+  // Screen readers often do not announce an aria-label change on a focused button, so a
+  // separate status announces the result.
   return (
     <>
       <Button

@@ -1,10 +1,11 @@
 ---
-// Журнал сборки на странице записи из журнала проекта: промпты и вмешательства человека и
-// реплики цеха одним списком по времени. Каждая запись — остров client:visible со статичным
-// телом в слоте: пока журнал закрыт, его не видно и JS не грузится. Подсветка записи, до
-// которой дошёл цех, и кнопка «показать в цехе» появляются только с JS, когда запись на экране;
-// без него остаётся эта же разметка. Острова создаёт только Astro, поэтому список собран здесь,
-// а тело записи, шапка и стили — общие с `JournalTimeline`, журналом записи из API.
+// Build journal on the page of a recording from the project journal: the human's prompts and
+// interventions and the floor's messages in one list by time. Each entry is a client:visible
+// island with a static body in a slot: while the journal is closed it is not visible and no JS
+// loads. Highlighting of the entry the floor has reached and the "show on floor" button appear
+// only with JS, when the entry is on screen; without it the same markup remains. Only Astro
+// creates islands, so the list is assembled here, while the entry body, header and styles are
+// shared with `JournalTimeline`, the journal of a recording from the API.
 import type { SessionRecord } from "@cyberzavod/core";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
@@ -15,9 +16,9 @@ import { JournalEntry } from "./JournalEntry.tsx";
 import styles from "./Timeline.module.css";
 
 interface Props {
-  /** Полная запись: в журнале, в отличие от цеха, есть полные тексты реплик. */
+  /** Full recording: unlike the floor, the journal has the full message texts. */
   recording: SessionRecord;
-  /** Язык страницы: на нём метки и подписи журнала. */
+  /** Page language: journal labels and captions are in it. */
   locale: Locale;
 }
 

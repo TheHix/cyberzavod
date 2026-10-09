@@ -1,15 +1,18 @@
-// Рисунки человека: все стороны и позы в одном месте, чтобы actors.ts не разрастался. Рисунки
-// 16×16, краски — только буквы `ART_LEGEND`. Кто и когда в какой позе, решает frames.ts.
+// Human sprites: all sides and poses in one place, so that actors.ts does not grow. Sprites are
+// 16×16, inks are only the letters of `ART_LEGEND`. frames.ts decides who is in which pose and
+// when.
 
 import type { SpriteArt } from "./art.ts";
 import type { ActorPose, Facing } from "./frames.ts";
 
 /**
- * Рисунки человека 16×16 по сторонам и позам: каска, форма, кожа, контур. Буквы — по `ART_LEGEND`:
- * `u`, `U`, `v` — форма, её тень и блик; `h`, `H`, `j` — каска, её тень и блик; `i` и `*` — головка
- * молотка и её блик, `W` — рукоять. Ящик рисуется в 0,45 клетки (около 7 пикселей) перед несущим:
- * вниз над фигурой, вверх и вбок под ней, где руки поверх ящика. Поэтому у `carryA`/`carryB`
- * руки по краям от ящика, а ноги как у `walkA`/`walkB`.
+ * Human sprites 16×16 by side and pose: helmet, uniform, skin, outline. Letters follow
+ * `ART_LEGEND`: `u`, `U`, `v` are the uniform, its shade and highlight; `h`, `H`, `j` are the
+ * helmet, its shade and highlight; `i` and `*` are the hammer head and its highlight, `W` is the
+ * handle. The crate is drawn 0.45 of a cell (about 7 pixels) in front of the carrier: above the
+ * figure when facing down, below it when facing up or sideways, where the arms are over the crate.
+ * So in `carryA`/`carryB` the arms are at the sides of the crate, and the legs are as in
+ * `walkA`/`walkB`.
  */
 export const ACTOR_ART: Readonly<Record<Facing, Readonly<Record<ActorPose, SpriteArt>>>> = {
   down: {

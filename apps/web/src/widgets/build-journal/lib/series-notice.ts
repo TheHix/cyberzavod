@@ -4,11 +4,11 @@ import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 
 /**
- * Сообщение в журнале серии, пока полную запись сборки нельзя показать: грузится, не нашлась,
- * битая или не загрузилась.
- * @param {Remote<SessionRecord>} state Состояние полной записи.
- * @param {Locale} locale Язык страницы.
- * @returns {string | undefined} Текст сообщения или `undefined`, если запись готова.
+ * Series journal message while the full build recording cannot be shown: it is loading, was not
+ * found, is broken, or failed to load.
+ * @param {Remote<SessionRecord>} state State of the full recording.
+ * @param {Locale} locale Page language.
+ * @returns {string | undefined} Message text, or `undefined` if the recording is ready.
  */
 export function seriesJournalNoticeOf(
   state: Remote<SessionRecord>,

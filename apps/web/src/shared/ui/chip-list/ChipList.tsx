@@ -7,10 +7,10 @@ interface Props {
 }
 
 /**
- * Справочные метки ui-kit строкой с переносом: стек проекта и подобные короткие перечни.
- * @param {Props} props Свойства компонента.
- * @param {readonly string[]} props.items Подписи меток по порядку.
- * @returns {JSX.Element} Список меток.
+ * ui-kit reference chips in a wrapping row: the project stack and similar short lists.
+ * @param {Props} props Component props.
+ * @param {readonly string[]} props.items Chip labels in order.
+ * @returns {JSX.Element} Chip list.
  */
 export function ChipList(props: Props): JSX.Element {
   return (

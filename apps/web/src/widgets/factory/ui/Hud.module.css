@@ -1,7 +1,7 @@
 .hud {
   position: relative;
-  /* Выше пузырей речи (.overlay в Factory.module.css, z-index 2): пузырь не должен закрывать
-     HUD и перехватывать его нажатия. */
+  /* Above the speech bubbles (.overlay in Factory.module.css, z-index 2): a bubble must not cover
+     the HUD and intercept its clicks. */
   z-index: 3;
   align-self: start;
   display: grid;
@@ -17,20 +17,20 @@
   font-weight: 700;
 }
 
-/* Части строки под заголовком переносятся целиком: от даты не отрывается «г.», от номера —
-   «из 7». */
+/* Parts of the line under the title wrap whole: the year suffix does not break off the date,
+   "of 7" does not break off the number. */
 .part {
   white-space: nowrap;
 }
 
-/* Полка речи нужна только там, где пузыри скрыты: на узком и низком экране. */
+/* The speech shelf is needed only where bubbles are hidden: on a narrow and short screen. */
 .speech {
   display: none;
 }
 
-/* На узком и низком экране HUD — полка речи и управление: место отдаётся цеху. Название сборки
-   уступает место полке; оно остаётся в разметке для программ чтения: на странице записи это
-   главный заголовок. */
+/* On a narrow and short screen the HUD is the speech shelf and controls: the space goes to the
+   factory. The build name gives way to the shelf; it stays in the markup for screen readers: on
+   the recording page it is the main heading. */
 @media (max-width: 48rem), (max-height: 40rem) {
   .hud {
     gap: var(--space-m);
@@ -56,8 +56,8 @@
   }
 }
 
-/* На низком экране HUD лежит полосой под полем: полка речи и управление — две равные колонки в
-   одной строке. Неравные колонки сливали подписи времени на 640px. */
+/* On a short screen the HUD lies as a strip under the field: the speech shelf and controls are two
+   equal columns in one row. Unequal columns merged the time captions at 640px. */
 @media (height <= 40rem) {
   .hud {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

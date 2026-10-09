@@ -1,7 +1,7 @@
 import { parseRecord, type JournalRecord, type SessionRecord } from "@cyberzavod/core";
 import { ApiResponseError } from "@/shared/api/errors.ts";
 
-// Формат записи проверяет только ядро: второго описания формата у сайта нет.
+// Only the core checks the recording format: the site has no second description of the format.
 function checkedRecord(raw: unknown): JournalRecord {
   try {
     return parseRecord(raw);
@@ -11,10 +11,11 @@ function checkedRecord(raw: unknown): JournalRecord {
 }
 
 /**
- * Разбирает файл полной записи сайта: запись проходит `parseRecord` ядра, как при сборке сайта.
- * @param {unknown} raw Тело ответа.
- * @returns {SessionRecord} Сессия сборки.
- * @throws {ApiResponseError} Если запись битая или не сессия.
+ * Parses a full site recording file: the recording goes through the core's `parseRecord`, as at
+ * site build time.
+ * @param {unknown} raw Response body.
+ * @returns {SessionRecord} The build session.
+ * @throws {ApiResponseError} If the recording is broken or not a session.
  */
 export function parseRecordingFile(raw: unknown): SessionRecord {
   const record = checkedRecord(raw);

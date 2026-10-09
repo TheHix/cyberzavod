@@ -6,7 +6,7 @@
   list-style: none;
 }
 
-/* Вмешательство или реплику, к которой пришли по «подробнее», не прячет под край панели. */
+/* Does not hide the intervention or message reached via "more" under the panel edge. */
 .timeline > li {
   scroll-margin: var(--space-l);
 }
