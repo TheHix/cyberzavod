@@ -149,6 +149,19 @@ export const UI_TEXT = {
     minute: { en: "min", ru: "мин" },
     second: { en: "s", ru: "с" },
   },
+  /** What Cyberzavod is: a short note above the floor on the home page. */
+  intro: {
+    product: {
+      en: "Cyberzavod gives AI coding agents a repeatable development process.",
+      ru: "Киберзавод даёт ИИ-агентам для кода повторяемый процесс разработки.",
+    },
+    floor: {
+      en: "The floor below replays real builds that went through it.",
+      ru: "Цех ниже проигрывает настоящие сборки, прошедшие через него.",
+    },
+    stagesLabel: { en: "Workflow stages", ru: "Этапы процесса" },
+    gettingStarted: { en: "Get started in 3 minutes", ru: "Начать за 3 минуты" },
+  },
   /** The "not found" page. */
   notFound: {
     title: { en: "Page not found", ru: "Страница не найдена" },

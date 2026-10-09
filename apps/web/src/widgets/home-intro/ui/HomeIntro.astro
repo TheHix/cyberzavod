@@ -1,0 +1,100 @@
+---
+// What Cyberzavod is, in two lines above the floor on the home page: the floor alone does not say
+// that it replays a development process, and a first visitor needs the way to try it.
+import { STAGES } from "@cyberzavod/core";
+import { guideUrl } from "@/entities/guide";
+import { STAGE_LABELS } from "@/shared/config/stages.ts";
+import type { Locale } from "@/shared/i18n/locale.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
+import { ButtonLink, Panel } from "@/shared/ui";
+
+interface Props {
+  /** Page language. */
+  locale: Locale;
+}
+
+/** The short guide a first visitor starts from: `guides/getting-started.<language>.md`. */
+const GETTING_STARTED_GUIDE_ID = "getting-started";
+
+const { locale } = Astro.props;
+const stageLabels = STAGES.map((stage) => STAGE_LABELS[stage][locale]);
+---
+
+<div class="host">
+  <Panel>
+    <div class="intro">
+      <div class="text">
+        <p>
+          {UI_TEXT.intro.product[locale]}{" "}
+          <span class="floor-note">{UI_TEXT.intro.floor[locale]}</span>
+        </p>
+        <ol class="stages" aria-label={UI_TEXT.intro.stagesLabel[locale]}>
+          {stageLabels.map((label) => (
+            <li>{label}</li>
+          ))}
+        </ol>
+      </div>
+      <ButtonLink variant="primary" href={guideUrl(GETTING_STARTED_GUIDE_ID, locale)}>
+        {UI_TEXT.intro.gettingStarted[locale]}
+      </ButtonLink>
+    </div>
+  </Panel>
+</div>
+
+<style>
+  /* Above the floor canvas and the speech bubbles (.overlay in Factory.module.css, z-index 2), like
+     the menu and the HUD. */
+  .host {
+    position: relative;
+    z-index: 3;
+  }
+
+  .intro {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-s) var(--space-l);
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .text {
+    display: grid;
+    flex: 1 1 24rem;
+    gap: var(--space-2xs);
+  }
+
+  p {
+    margin: 0;
+  }
+
+  .stages {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-display);
+    font-weight: 800;
+    list-style: none;
+  }
+
+  .stages li + li::before {
+    content: "→";
+    padding: 0 var(--space-xs);
+  }
+
+  /* On a narrow screen every line is taken from the floor: its machine plaques name the stages. */
+  @media (width <= 48rem) {
+    .floor-note,
+    .stages {
+      display: none;
+    }
+  }
+
+  /* On a short screen the floor and the HUD strip take the whole height; the guide stays in the
+     menu. */
+  @media (height <= 40rem) {
+    .host {
+      display: none;
+    }
+  }
+</style>
