@@ -45,6 +45,12 @@ export interface ProjectConfig {
   stack?: StackInfo;
 }
 
+/**
+ * Версия формата `.cyberzavod/project.json`; не путать с версией CLI и harness. Конфиг без поля
+ * записан версиями до 0.9.0 и читается как версия 1.
+ */
+export const PROJECT_CONFIG_SCHEMA_VERSION = 1;
+
 /** Ошибка конфига проекта: файл не прошёл проверку. */
 export class ProjectConfigError extends Error {}
 
@@ -112,7 +118,19 @@ function parseStack(raw: unknown): StackInfo | undefined {
 export function parseProjectConfig(raw: unknown): ProjectConfig {
   if (!isObject(raw)) throw new ProjectConfigError("конфиг проекта должен быть объектом");
 
-  const { projectId, harness, workflow, journal } = raw;
+  const {
+    schemaVersion = PROJECT_CONFIG_SCHEMA_VERSION,
+    projectId,
+    harness,
+    workflow,
+    journal,
+  } = raw;
+
+  if (schemaVersion !== PROJECT_CONFIG_SCHEMA_VERSION) {
+    throw new ProjectConfigError(
+      `schemaVersion ${String(schemaVersion)} не поддерживается: обновите Cyberzavod (npx cyberzavod@latest sync)`,
+    );
+  }
 
   if (!isRecordId(projectId)) {
     throw new ProjectConfigError("projectId должен состоять из букв, цифр, «_» и «-»");
