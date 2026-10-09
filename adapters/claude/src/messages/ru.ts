@@ -60,9 +60,11 @@ export const ru: ClaudeMessages = {
     unsupportedAgent: ({ stage, requested, supported }) =>
       `этап ${stage}: ${requested} не поддерживается, пока есть только адаптер ${supported}`,
     fileConflicts: (files) =>
-      `эти файлы написаны не генератором, перенесите их содержимое в AGENTS.md или запустите с --force: ${files}`,
+      `ничего не изменено: эти файлы ваши (написаны не генератором или исправлены руками после генерации): ${files}. Перенесите правки в AGENTS.md и удалите файлы или перезапишите их командой ${CLI_COMMAND} sync --force`,
     settingsNotObject: (file) => `${file} не разобран: настройки должны быть объектом`,
     settingsNotParsed: ({ file, reason }) => `${file} не разобран: ${reason}`,
+    manifestNotParsed: ({ file, reason }) =>
+      `${file} не разобран: ${reason}. Верните его из git или удалите и запустите ${CLI_COMMAND} sync`,
     unknownPlaceholder: (placeholder) => `в шаблоне неизвестная подстановка ${placeholder}`,
     projectNotFound: (directory) =>
       `${directory} не в проекте Cyberzavod: сначала ${CLI_COMMAND} init`,

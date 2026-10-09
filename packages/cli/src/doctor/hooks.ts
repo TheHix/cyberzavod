@@ -48,6 +48,7 @@ function resultOf({ reading, version, doctor, claudeMessages }: HooksOutcome): C
 
 /** Хуки адаптера в настройках проекта соответствуют версии из конфига. */
 export const hooksCheck: ProjectCheck = {
+  id: "hooks",
   run: async ({ project, messages, claudeMessages }) => {
     const version = project.config.harness;
     const reading = await inspectClaudeHooks(project.root, version);

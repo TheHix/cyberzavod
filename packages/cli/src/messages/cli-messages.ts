@@ -9,6 +9,7 @@ export const COMMAND_NAMES = [
   "init",
   "sync",
   "doctor",
+  "disconnect",
   "status",
   "decision",
   "note",
@@ -54,12 +55,14 @@ export interface HelpMessages {
   quickStart: string;
   /** Заголовки разделов списка команд. */
   sections: Readonly<Record<CommandSection, string>>;
-  /** Строка о том, как узнать подробности команды. */
-  commandHelpHint: string;
+
   /** Заголовок списка параметров в справке команды. */
   parametersTitle: string;
-  /** Строка про выбор языка; `languages` — поддерживаемые коды через «|». */
-  languageOption(languages: string): string;
+  /**
+   * Последняя строка справки: как узнать подробности команды и выбрать язык; `languages` —
+   * поддерживаемые коды через «|». Остальные способы выбрать язык — в справке и README.
+   */
+  footer(languages: string): string;
 }
 
 /** Тексты команды `init`: сводка перед вопросом, вопрос и итог. Строки сводки — без отступа. */
@@ -83,17 +86,36 @@ export interface InitMessages {
   /** Что закоммитить; `paths` — через запятую. */
   commit(paths: string): string;
   nextSteps: string;
+  /** Повторный `init` в подключённом проекте. */
+  alreadyConnected: string;
+  configValid: string;
+  filesCurrent: string;
+  filesOutdated: string;
+  nothingToDo: string;
+  runSync: string;
 }
 
 /** Тексты команды `sync`. */
 export interface SyncMessages {
-  written: string;
+  /** Заголовки списков после записи. */
+  added: string;
+  updated: string;
   removed: string;
-  writtenByHuman: string;
-  outdated: string;
-  extra: string;
+  /** Заголовки списков предпросмотра. */
+  willAdd: string;
+  willUpdate: string;
+  willRemove: string;
+  /** Файлы человека на месте сгенерированных. */
+  yours: string;
+  /** Сгенерированные файлы, исправленные руками. */
+  edited: string;
+  /** Что sync не трогает никогда. */
+  neverTouched: string;
+  upToDate: string;
   harnessMismatch(params: { file: string; configVersion: string; cliVersion: string }): string;
   filesOutdated: string;
+  /** Sync остановится на файлах человека: что делать. */
+  blocked: string;
 }
 
 /**
@@ -113,6 +135,7 @@ export interface DoctorMessages {
     install(minimum: number): string;
   };
   git: { passed: string; missing: string; install: string };
+  claudeCode: { passed: string; missing: string; install: string };
   gallery: {
     signedIn: string;
     notSignedIn: string;
@@ -174,6 +197,24 @@ export interface DoctorMessages {
     missing(entry: string): string;
     add(params: { entry: string; file: string }): string;
   };
+}
+
+/** Тексты команды `disconnect`: план, вопрос и итог. Строки плана — без отступа. */
+export interface DisconnectMessages {
+  willRemove: string;
+  willKeep: string;
+  settingsUpdated(file: string): string;
+  settingsRemoved(file: string): string;
+  keepSource: string;
+  keepJournal(path: string): string;
+  keepIgnoreEntry(entry: string): string;
+  keepSettings: string;
+  editedFile(file: string): string;
+  confirm: string;
+  cancelled: string;
+  /** Запуск без терминала и без `--yes`: спросить негде. */
+  needsConfirmation: string;
+  done(rulesFile: string): string;
 }
 
 /** Тексты команды `status`. */
@@ -238,7 +279,12 @@ export interface ErrorMessages {
   languageFlagWithoutValue: string;
   unsupportedLanguage(params: { value: string; supported: string }): string;
   projectNotFound(directory: string): string;
-  alreadyConnected(file: string): string;
+  jsonNeedsPreview: string;
+  packageJsonInvalid(params: { file: string; reason: string }): string;
+  unexpected(reason: string): string;
+  /** Как увидеть трассу стека; `variable` — переменная окружения. */
+  debugHint(variable: string): string;
+  initBlocked(params: { files: string; rulesFile: string }): string;
   blankOption(option: string): string;
   absoluteJournal(path: string): string;
   journalIsProjectRoot(path: string): string;
@@ -269,6 +315,7 @@ export interface CliMessages {
   init: InitMessages;
   sync: SyncMessages;
   doctor: DoctorMessages;
+  disconnect: DisconnectMessages;
   status: StatusMessages;
   journal: JournalMessages;
   login: LoginMessages;

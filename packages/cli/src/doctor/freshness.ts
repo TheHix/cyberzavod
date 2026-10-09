@@ -12,7 +12,8 @@ import { failed, LIST_SEPARATOR, passed, type CheckResult, type ProjectCheck } f
 function resultOf(inspection: ProjectFilesInspection, doctor: DoctorMessages): CheckResult {
   const { files } = doctor;
   const { report, configVersion, isHarnessOutdated } = inspection;
-  const outdatedCount = report.changed.length + report.removed.length;
+  const outdatedCount = report.added.length + report.updated.length + report.removed.length;
+  const blocked = [...report.conflicts, ...report.edited];
 
   if (isHarnessOutdated) {
     return failed({
@@ -25,9 +26,9 @@ function resultOf(inspection: ProjectFilesInspection, doctor: DoctorMessages): C
     });
   }
 
-  if (report.conflicts.length > 0) {
+  if (blocked.length > 0) {
     return failed({
-      problem: files.writtenByHuman(report.conflicts.join(LIST_SEPARATOR)),
+      problem: files.writtenByHuman(blocked.join(LIST_SEPARATOR)),
       fix: files.moveToRules(RULES_FILE),
     });
   }
@@ -41,6 +42,7 @@ function resultOf(inspection: ProjectFilesInspection, doctor: DoctorMessages): C
 
 /** Файлы агента актуальны для запущенной версии; версии в конфиге и CLI не расходятся. */
 export const freshnessCheck: ProjectCheck = {
+  id: "files",
   run: async ({ project, installation, messages, claudeMessages }) => {
     const { files } = messages.doctor;
 

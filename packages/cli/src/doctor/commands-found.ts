@@ -29,6 +29,7 @@ async function missingPrograms(
 
 /** Программы всех `verification.commands` найдены; команды не запускаются. */
 export const commandsFoundCheck: ProjectCheck = {
+  id: "commands",
   run: async (context) => {
     const { commands } = context.messages.doctor;
     const configured = context.project.config.verification.commands;

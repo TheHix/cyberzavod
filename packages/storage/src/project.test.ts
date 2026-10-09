@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { temporaryDirectory, validConfig } from "./fixtures.ts";
@@ -19,6 +19,16 @@ describe("readProjectConfig", () => {
     const config = await readProjectConfig(root);
 
     expect(config).toEqual(validConfig());
+  });
+
+  it("writeProjectConfig первым полем пишет версию формата файла", async () => {
+    const root = await temporaryDirectory();
+
+    await writeProjectConfig(root, validConfig());
+
+    const text = await readFile(path.join(root, PROJECT_CONFIG_FILE), "utf8");
+
+    expect(Object.keys(JSON.parse(text) as object)[0]).toBe("schemaVersion");
   });
 
   it("без маркера возвращает undefined", async () => {

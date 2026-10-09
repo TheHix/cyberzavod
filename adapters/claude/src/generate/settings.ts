@@ -312,3 +312,77 @@ export function inspectHooks(settings: Settings, version: string): HooksInspecti
 
   return events.length === 0 ? { kind: "installed" } : { kind: "incomplete", events };
 }
+
+function denyOf(permissions: unknown): string[] {
+  if (permissions !== undefined && !isObject(permissions)) {
+    throw new SettingsError("permissions должен быть объектом");
+  }
+
+  const { deny = [] } = permissions ?? {};
+
+  if (!Array.isArray(deny) || !deny.every((rule) => typeof rule === "string")) {
+    throw new SettingsError("permissions.deny должен быть списком строк");
+  }
+
+  return deny;
+}
+
+/**
+ * Запреты адаптера, которых в настройках проекта ещё нет: их допишет sync.
+ * @param {Settings} settings Настройки проекта; пустой объект, если файла нет.
+ * @returns {string[]} Недостающие запреты по порядку `ADAPTER_DENY`.
+ * @throws {SettingsError} Если `permissions` в настройках не того вида.
+ */
+export function missingAdapterDeny(settings: Settings): string[] {
+  const deny = denyOf(settings.permissions);
+
+  return ADAPTER_DENY.filter((rule) => !deny.includes(rule));
+}
+
+function withoutOwnHooks(hooks: unknown): Record<string, HookGroup[]> {
+  if (hooks !== undefined && !isObject(hooks)) {
+    throw new SettingsError("hooks должен быть объектом");
+  }
+
+  const entries = Object.entries(hooks ?? {}).map(
+    ([event, groups]) => [event, withoutOwnHandlers(groupsOf(event, groups))] as const,
+  );
+  const nonEmpty = entries.filter(([, groups]) => groups.length > 0);
+
+  return Object.fromEntries(nonEmpty);
+}
+
+function withoutRules(permissions: unknown, rules: readonly string[]): Record<string, unknown> {
+  const deny = denyOf(permissions).filter((rule) => !rules.includes(rule));
+  const others = Object.entries(isObject(permissions) ? permissions : {}).filter(
+    ([key]) => key !== "deny",
+  );
+  const rest = Object.fromEntries(others);
+
+  return deny.length === 0 ? rest : { ...rest, deny };
+}
+
+function isEmptyObject(value: unknown): boolean {
+  return isObject(value) && Object.keys(value).length === 0;
+}
+
+/**
+ * Убирает из настроек проекта то, что поставил адаптер: свои обработчики хуков и перечисленные
+ * запреты. Чужие обработчики, запреты и прочие настройки остаются; опустевшие `hooks` и
+ * `permissions` убираются.
+ * @param {Settings} settings Настройки проекта.
+ * @param {readonly string[]} deny Запреты, которые дописал адаптер.
+ * @returns {Settings} Настройки без адаптера; пустой объект, если в них больше ничего нет.
+ * @throws {SettingsError} Если `hooks` или `permissions` в настройках не того вида.
+ */
+export function withoutAdapterSettings(settings: Settings, deny: readonly string[]): Settings {
+  const { hooks, permissions, ...rest } = settings;
+  const remainingHooks = withoutOwnHooks(hooks);
+  const remainingPermissions = withoutRules(permissions, deny);
+
+  return {
+    ...rest,
+    ...(isEmptyObject(remainingPermissions) ? {} : { permissions: remainingPermissions }),
+    ...(isEmptyObject(remainingHooks) ? {} : { hooks: remainingHooks }),
+  };
+}

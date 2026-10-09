@@ -23,6 +23,7 @@ export {
 } from "./stage.ts";
 export { AgentConfigError, DEFAULT_MODEL, parseAgentConfig, type AgentConfig } from "./agent.ts";
 export {
+  PROJECT_CONFIG_SCHEMA_VERSION,
   ProjectConfigError,
   parseProjectConfig,
   type ProjectConfig,

@@ -72,6 +72,7 @@ export interface ClaudeErrorMessages {
   fileConflicts(files: string): string;
   settingsNotObject(file: string): string;
   settingsNotParsed(params: { file: string; reason: string }): string;
+  manifestNotParsed(params: { file: string; reason: string }): string;
   unknownPlaceholder(placeholder: string): string;
   projectNotFound(directory: string): string;
   noDrafts: string;

@@ -34,6 +34,8 @@ jobs:
             exit 1
           fi
       - run: make check-web
+      # Тот же путь человека на архиве, который уйдёт в npm, — до публикации.
+      - run: pnpm smoke
       # Пакеты монорепозитория уже собраны внутрь dist/cyberzavod.mjs, а версий у них нет:
       # подставить их вместо workspace:* нельзя.
       # Пользователю пакета devDependencies не нужны, поэтому из публикуемого манифеста они убраны.
@@ -43,3 +45,14 @@ jobs:
       - name: Публикация
         working-directory: packages/cli
         run: npm publish --access public
+      # Реестр отдаёт новую версию не сразу: ждём, пока latest станет версией тега.
+      - name: Версия видна в npm как latest
+        run: |
+          version=$(node -p 'require("./packages/cli/package.json").version')
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            latest=$(npm view cyberzavod dist-tags.latest)
+            if [[ "$latest" == "$version" ]]; then exit 0; fi
+            sleep 15
+          done
+          echo "npm отдаёт latest $latest, а выпущена $version" >&2
+          exit 1

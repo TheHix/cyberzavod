@@ -14,8 +14,8 @@ import { SECRET_TOKEN } from "./sharing/fixtures.ts";
 import { credentialsFile, FileCredentialsStore } from "./sharing/settings.ts";
 
 const SESSION_ID = "cli-test-hook-language";
-const EN_TITLE = "Cyberzavod — an AI-agent development process, local-first.";
-const RU_TITLE = "Cyberzavod — процесс разработки с ИИ-агентами, локально.";
+const EN_TITLE = "Cyberzavod — a local-first development harness for AI coding agents.";
+const RU_TITLE = "Cyberzavod — локальный harness разработки с ИИ-агентами.";
 // Справка должна помещаться в экран терминала по умолчанию.
 const SCREEN_ROWS = 24;
 const SCREEN_COLUMNS = 80;
@@ -85,6 +85,12 @@ describe("runCli", () => {
     expect(code).toBe(0);
   });
 
+  it("--version печатает версию пакета", async () => {
+    const code = await runCli(["--version"], root, NO_LOCALE);
+
+    expect({ code, log: printedLog() }).toEqual({ code: 0, log: HARNESS_VERSION });
+  });
+
   it("на неизвестную команду без подсказки сообщает об ошибке и зовёт --help", async () => {
     const code = await runCli(["deploy"], root, NO_LOCALE);
 
@@ -145,7 +151,7 @@ describe("runCli", () => {
 
     const help = printedLog();
 
-    expect(help).toContain("Cyberzavod — an AI-agent development process");
+    expect(help).toContain("Cyberzavod — a local-first development harness");
     expect(help).toContain("--lang en|ru");
   });
 
@@ -154,7 +160,7 @@ describe("runCli", () => {
 
     const help = printedLog();
 
-    expect(help).toContain("процесс разработки с ИИ-агентами");
+    expect(help).toContain("локальный harness разработки");
     expect(help).toContain("--lang en|ru");
   });
 
@@ -252,6 +258,7 @@ describe("runCli", () => {
       "gallery",
       "sync",
       "doctor",
+      "disconnect",
     ]);
   });
 
@@ -636,12 +643,27 @@ describe("runCli", () => {
     expect(rules).toBe("# Мои правила\n");
   });
 
-  it("второй init отказывает", async () => {
+  it("второй init ничего не меняет и говорит, что делать нечего", async () => {
     await initialized();
 
     const code = await runCli(["init", "--yes"], root, NO_LOCALE);
 
-    expect(code).toBe(1);
+    expect({ code, output: printedLog() }).toMatchObject({
+      code: 0,
+      output: expect.stringContaining("Nothing to do.") as string,
+    });
+  });
+
+  it("второй init в устаревшем проекте зовёт sync и выходит с 1", async () => {
+    await initialized();
+    await rm(path.join(root, ".claude/agents/coder.md"));
+
+    const code = await runCli(["init", "--yes"], root, NO_LOCALE);
+
+    expect({ code, output: printedLog() }).toMatchObject({
+      code: 1,
+      output: expect.stringContaining("npx cyberzavod sync") as string,
+    });
   });
 
   it("sync --check после init не находит расхождений, а после правки — находит", async () => {
@@ -788,5 +810,158 @@ describe("runCli", () => {
     const code = await runCli(["status"], root, NO_LOCALE);
 
     expect(code).toBe(0);
+  });
+
+  it("status --json печатает стабильный документ без цветов", async () => {
+    await initialized();
+    vi.mocked(console.log).mockClear();
+
+    const code = await runCli(["status", "--json"], root, NO_LOCALE);
+
+    const document = JSON.parse(printedLog()) as Record<string, unknown>;
+
+    expect({ code, keys: Object.keys(document) }).toEqual({
+      code: 0,
+      keys: [
+        "schemaVersion",
+        "command",
+        "status",
+        "project",
+        "harness",
+        "workflow",
+        "checks",
+        "journal",
+      ],
+    });
+  });
+
+  it("sync --check --json после init говорит current и выходит с 0", async () => {
+    await initialized();
+    vi.mocked(console.log).mockClear();
+
+    const code = await runCli(["sync", "--check", "--json"], root, NO_LOCALE);
+
+    const document = JSON.parse(printedLog()) as { status: string; files: object };
+
+    expect({ code, status: document.status, files: document.files }).toEqual({
+      code: 0,
+      status: "current",
+      files: { added: [], updated: [], removed: [], conflicts: [], edited: [] },
+    });
+  });
+
+  it("sync --diff показывает, что изменится, ничего не меняет и выходит с 0", async () => {
+    await initialized();
+    await rm(path.join(root, ".claude/agents/coder.md"));
+    vi.mocked(console.log).mockClear();
+
+    const code = await runCli(["sync", "--diff"], root, NO_LOCALE);
+
+    expect({
+      code,
+      listed: printedLog().includes("Will add:\n  .claude/agents/coder.md"),
+      restored: await exists(path.join(root, ".claude/agents/coder.md")),
+    }).toEqual({ code: 0, listed: true, restored: false });
+  });
+
+  it("sync не трогает сгенерированный файл, исправленный руками, и не меняет конфиг", async () => {
+    await initialized();
+    const coder = path.join(root, ".claude/agents/coder.md");
+
+    await writeFile(coder, `${await readFile(coder, "utf8")}\nmine\n`);
+    const config = await readFile(path.join(root, PROJECT_CONFIG_FILE), "utf8");
+
+    await writeFile(
+      path.join(root, "package.json"),
+      JSON.stringify({ dependencies: { vue: "3" } }),
+    );
+
+    const code = await runCli(["sync"], root, NO_LOCALE);
+
+    expect({
+      code,
+      coder: (await readFile(coder, "utf8")).endsWith("mine\n"),
+      config: await readFile(path.join(root, PROJECT_CONFIG_FILE), "utf8"),
+    }).toEqual({ code: 1, coder: true, config });
+  });
+
+  it("init при файле человека на месте CLAUDE.md ничего не пишет и говорит, как починить", async () => {
+    await writeFile(path.join(root, "AGENTS.md"), "# Rules\n");
+    await writeFile(path.join(root, "CLAUDE.md"), "# Mine\n");
+
+    const code = await runCli(["init", "--yes"], root, NO_LOCALE);
+
+    expect({
+      code,
+      config: await exists(path.join(root, PROJECT_CONFIG_FILE)),
+      gitignore: await exists(path.join(root, ".gitignore")),
+      error: printedError(),
+    }).toMatchObject({
+      code: 1,
+      config: false,
+      gitignore: false,
+      error: expect.stringContaining("Nothing was changed.") as string,
+    });
+  });
+
+  it("disconnect --yes убирает Cyberzavod и оставляет код, AGENTS.md и журнал", async () => {
+    await initialized();
+    await runCli(["note", "keep me"], root, NO_LOCALE);
+
+    const code = await runCli(["disconnect", "--yes"], root, NO_LOCALE);
+
+    expect({
+      code,
+      config: await exists(path.join(root, PROJECT_CONFIG_FILE)),
+      claudeMd: await exists(path.join(root, "CLAUDE.md")),
+      claude: await exists(path.join(root, ".claude")),
+      rules: await exists(path.join(root, "AGENTS.md")),
+      packageJson: await exists(path.join(root, "package.json")),
+      notes: (await journalFiles("notes")).length,
+    }).toEqual({
+      code: 0,
+      config: false,
+      claudeMd: false,
+      claude: false,
+      rules: true,
+      packageJson: true,
+      notes: 1,
+    });
+  });
+
+  it("disconnect без терминала и без --yes показывает план и ничего не меняет", async () => {
+    await initialized();
+    vi.mocked(console.log).mockClear();
+
+    const code = await runCli(["disconnect"], root, NO_LOCALE);
+
+    expect({
+      code,
+      config: await exists(path.join(root, PROJECT_CONFIG_FILE)),
+      plan: printedLog().includes("Cyberzavod will remove:"),
+    }).toEqual({ code: 1, config: true, plan: true });
+  });
+
+  it("битый package.json — понятная ошибка: ничего не изменено", async () => {
+    await writeFile(path.join(root, "package.json"), "{ not json");
+
+    const code = await runCli(["init", "--yes"], root, NO_LOCALE);
+
+    expect({ code, error: printedError() }).toMatchObject({
+      code: 1,
+      error: expect.stringContaining("package.json is not valid JSON") as string,
+    });
+  });
+
+  it("неожиданная ошибка — сообщение без трассы стека и подсказка, как её увидеть", async () => {
+    await writeFile(path.join(root, ".claude"), "a file where a directory goes");
+
+    const code = await runCli(["init", "--yes"], root, NO_LOCALE);
+
+    expect({ code, error: printedError() }).toMatchObject({
+      code: 1,
+      error: expect.stringMatching(/unexpected error[^]*CYBERZAVOD_DEBUG=1/) as string,
+    });
+    expect(printedError()).not.toMatch(/\n\s+at /);
   });
 });

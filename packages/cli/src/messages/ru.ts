@@ -7,7 +7,7 @@ import type { CliMessages } from "./cli-messages.ts";
 /** Тексты CLI на русском. */
 export const ru: CliMessages = {
   help: {
-    title: "Cyberzavod — процесс разработки с ИИ-агентами, локально.",
+    title: "Cyberzavod — локальный harness разработки с ИИ-агентами.",
     quickStart: `Старт: ${CLI_COMMAND} init, затем в Claude Code /setup и /feature <задача>.`,
     sections: {
       start: "Начало",
@@ -15,9 +15,9 @@ export const ru: CliMessages = {
       gallery: "Галерея",
       maintenance: "Обслуживание",
     },
-    commandHelpHint: `Подробнее о команде: ${CLI_COMMAND} <команда> --help`,
     parametersTitle: "Параметры:",
-    languageOption: (languages) => `Язык: --lang ${languages}, CYBERZAVOD_LANG или локаль системы.`,
+    footer: (languages) =>
+      `Подробнее о команде: ${CLI_COMMAND} <команда> --help · язык: --lang ${languages}`,
   },
   commands: {
     init: {
@@ -34,27 +34,38 @@ export const ru: CliMessages = {
       ],
     },
     sync: {
-      usage: "sync [--check] [--force]",
+      usage: "sync [--check | --diff] [--json] [--force]",
       summary: "заново распознать стек и пересобрать файлы агента",
       parameters: [
-        { name: "--check", description: "только сообщить, что устарело; выход 1, если есть" },
-        { name: "--force", description: "перезаписать файлы, написанные человеком" },
+        { name: "--check", description: "только показать, что изменится; выход 1, если что-то" },
+        { name: "--diff", description: "только показать, что изменится; выход 0" },
+        { name: "--json", description: "с --check или --diff: вывод в JSON для скриптов" },
+        {
+          name: "--force",
+          description: "перезаписать ваши файлы и сгенерированные, исправленные руками",
+        },
       ],
     },
     doctor: {
-      usage: "doctor [--run-checks]",
+      usage: "doctor [--run-checks] [--json]",
       summary: "проверить подключение и подсказать, как починить",
       parameters: [
         {
           name: "--run-checks",
           description: "запустить команды проверок, а не только искать их",
         },
+        { name: "--json", description: "вывод в JSON для скриптов" },
       ],
     },
+    disconnect: {
+      usage: "disconnect [--yes]",
+      summary: "убрать Cyberzavod из проекта; код, AGENTS.md и журнал остаются",
+      parameters: [{ name: "--yes, -y", description: "не спрашивать подтверждения" }],
+    },
     status: {
-      usage: "status",
+      usage: "status [--json]",
       summary: "проект, процесс, агенты этапов, проверки и журнал",
-      parameters: [],
+      parameters: [{ name: "--json", description: "вывод в JSON для скриптов" }],
     },
     decision: {
       usage: 'decision "<что решили>" [--why "<почему>"]',
@@ -142,16 +153,29 @@ export const ru: CliMessages = {
     done: "Готово: проект подключён.",
     commit: (paths) => `Закоммитьте: ${paths}`,
     nextSteps: "Дальше: откройте Claude Code и запустите /setup, затем /feature <задача>.",
+    alreadyConnected: "Cyberzavod уже подключён к этому проекту.",
+    configValid: "✓ Конфиг в порядке",
+    filesCurrent: "✓ Сгенерированные файлы актуальны",
+    filesOutdated: "✗ Сгенерированные файлы устарели",
+    nothingToDo: "Делать нечего.",
+    runSync: `Запустите:\n  ${CLI_COMMAND} sync`,
   },
   sync: {
-    written: "записаны",
-    removed: "удалены",
-    writtenByHuman: "написаны человеком",
-    outdated: "устарели",
-    extra: "лишние",
+    added: "Добавлены",
+    updated: "Обновлены",
+    removed: "Удалены",
+    willAdd: "Появятся",
+    willUpdate: "Обновятся",
+    willRemove: "Удалятся",
+    yours: "НЕ тронет (ваши файлы на месте сгенерированных)",
+    edited: "НЕ тронет (сгенерированные файлы, исправленные руками)",
+    neverTouched:
+      "Не трогает никогда: AGENTS.md, ваши настройки и хуки Claude Code, журнал, ваш код.",
+    upToDate: "Всё актуально: менять нечего.",
     harnessMismatch: ({ file, configVersion, cliVersion }) =>
       `${file}: harness ${configVersion}, а CLI — ${cliVersion}`,
-    filesOutdated: `Файлы агента устарели: запустите ${CLI_COMMAND} sync`,
+    filesOutdated: `Файлы устарели. Запустите:\n  ${CLI_COMMAND} sync`,
+    blocked: `sync остановится на файлах выше и ничего не изменит. Как починить: перенесите правки в AGENTS.md и удалите эти файлы или перезапишите их:\n  ${CLI_COMMAND} sync --force`,
   },
   doctor: {
     fix: (text) => `Как починить: ${text}`,
@@ -168,6 +192,12 @@ export const ru: CliMessages = {
       passed: "git установлен",
       missing: "git не найден в PATH",
       install: "установите git и убедитесь, что он в PATH",
+    },
+    claudeCode: {
+      passed: "Claude Code установлен",
+      missing:
+        "Claude Code (claude) не найден в PATH: это нормально, если вы работаете в приложении или расширении IDE",
+      install: "установите Claude Code: https://claude.com/claude-code",
     },
     gallery: {
       signedIn: "галерея: вход выполнен",
@@ -201,7 +231,7 @@ export const ru: CliMessages = {
         `выполните ${CLI_COMMAND} sync или запустите ${CLI_COMMAND}@${configVersion} doctor`,
       outdated: (count) => `файлы агента устарели или лишние: ${count}`,
       sync: `выполните ${CLI_COMMAND} sync (список файлов — ${CLI_COMMAND} sync --check)`,
-      writtenByHuman: (files) => `файлы агента написаны человеком: ${files}`,
+      writtenByHuman: (files) => `файлы агента ваши или исправлены руками: ${files}`,
       moveToRules: (rulesFile) =>
         `перенесите правки в ${rulesFile} и выполните ${CLI_COMMAND} sync --force`,
       cannotCheck: (reason) => `файлы агента не проверить: ${reason}`,
@@ -236,6 +266,23 @@ export const ru: CliMessages = {
         `в .gitignore нет строки ${entry}: сырые журналы сессий могут попасть в коммит`,
       add: ({ entry, file }) => `допишите строку ${entry} в ${file}`,
     },
+  },
+  disconnect: {
+    willRemove: "Cyberzavod удалит:",
+    willKeep: "Останется:",
+    settingsUpdated: (file) => `хуки и запреты Cyberzavod в ${file} (остальное в файле останется)`,
+    settingsRemoved: (file) => `${file} (в нём только хуки и запреты Cyberzavod)`,
+    keepSource: "код проекта",
+    keepJournal: (path) => `журнал: ${path} (сессии, решения, заметки)`,
+    keepIgnoreEntry: (entry) =>
+      `строка ${entry} в .gitignore (сырые журналы сессий не попадут в git)`,
+    keepSettings: "ваши настройки, хуки и запреты Claude Code",
+    editedFile: (file) => `${file} (сгенерирован, но вы исправили его руками)`,
+    confirm: "Продолжить? [Y/n]",
+    cancelled: "Отменено: ничего не изменено.",
+    needsConfirmation: `Ничего не изменено: спросить негде, терминала нет. Чтобы удалить без вопроса, запустите:\n  ${CLI_COMMAND} disconnect --yes`,
+    done: (rulesFile) =>
+      `Готово: Cyberzavod убран из проекта. Просмотрите и закоммитьте изменения.\nClaude Code читает CLAUDE.md: чтобы правила ${rulesFile} остались в Claude Code, создайте CLAUDE.md с одной строкой @${rulesFile}.`,
   },
   status: {
     recordTypes: { session: "сессии", decision: "решения", note: "заметки" },
@@ -292,7 +339,14 @@ export const ru: CliMessages = {
       `язык «${value}» не поддерживается: доступны ${supported}`,
     projectNotFound: (directory) =>
       `${directory} не в проекте Cyberzavod: сначала ${CLI_COMMAND} init`,
-    alreadyConnected: (file) => `${file} уже есть: проект подключён, используйте sync`,
+    unexpected: (reason) => `неожиданная ошибка: ${reason}`,
+    debugHint: (variable) =>
+      `Проверьте подключение: ${CLI_COMMAND} doctor. Полная трасса — при запуске с ${variable}=1; сообщите о ней: https://github.com/bysavelii/cyberzavod/issues`,
+    packageJsonInvalid: ({ file, reason }) =>
+      `${file} — не JSON (${reason}). Ничего не изменено. Исправьте ${file} и запустите команду снова`,
+    jsonNeedsPreview: `--json работает только с --check или --diff: ${CLI_COMMAND} sync --check --json`,
+    initBlocked: ({ files, rulesFile }) =>
+      `проект не подключён.\n\nЭти файлы уже есть, и Cyberzavod ими не управляет: ${files}\n\nНичего не изменено.\n\nКак починить: перенесите их содержимое в ${rulesFile}, удалите их и запустите снова:\n  ${CLI_COMMAND} init`,
     blankOption: (option) => `${option} пуст: укажите значение`,
     journalIsProjectRoot: (path) =>
       `--journal ${path} — это корень проекта: укажите каталог журнала, например .cyberzavod/journal`,

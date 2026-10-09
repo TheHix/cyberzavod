@@ -22,6 +22,14 @@ describe("parseProjectConfig", () => {
     expect(config).toEqual(raw);
   });
 
+  it("принимает конфиг с известной версией формата", () => {
+    const raw = { schemaVersion: 1, ...validConfig() };
+
+    const config = parseProjectConfig(raw);
+
+    expect(config.projectId).toBe("lab");
+  });
+
   it("без agents и verification даёт пустые значения", () => {
     const raw = validConfig();
 
@@ -37,6 +45,7 @@ describe("parseProjectConfig", () => {
 
   it.each([
     ["projectId с пробелом", { projectId: "my lab" }, /projectId/],
+    ["версия формата новее известной", { schemaVersion: 2 }, /schemaVersion 2/],
     ["без harness", { harness: undefined }, /harness/],
     ["без workflow", { workflow: "" }, /workflow/],
     ["без journal", { journal: undefined }, /journal/],

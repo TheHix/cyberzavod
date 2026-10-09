@@ -5,7 +5,10 @@
 import { access } from "node:fs/promises";
 import path from "node:path";
 import type { StackInfo } from "@cyberzavod/core";
+import { CommandError } from "./errors.ts";
 import { readOptionalText } from "./files.ts";
+
+const PACKAGE_MANIFEST = "package.json";
 
 /** Найденное в каталоге проекта. */
 export interface DetectedProject {
@@ -94,8 +97,20 @@ function keysOf(value: unknown): string[] {
   return typeof value === "object" && value !== null ? Object.keys(value) : [];
 }
 
+function parseJsonManifest(text: string): Record<string, unknown> {
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch (err) {
+    const reason = (err as Error).message;
+
+    throw new CommandError((m) => m.errors.packageJsonInvalid({ file: PACKAGE_MANIFEST, reason }), {
+      cause: err,
+    });
+  }
+}
+
 function parseManifest(text: string): PackageManifest {
-  const raw = JSON.parse(text) as Record<string, unknown>;
+  const raw = parseJsonManifest(text);
 
   return {
     ...(typeof raw.name === "string" ? { name: raw.name } : {}),
@@ -106,7 +121,7 @@ function parseManifest(text: string): PackageManifest {
 }
 
 async function readManifest(root: string): Promise<PackageManifest | undefined> {
-  const text = await readOptionalText(path.join(root, "package.json"));
+  const text = await readOptionalText(path.join(root, PACKAGE_MANIFEST));
 
   return text === undefined ? undefined : parseManifest(text);
 }
@@ -178,7 +193,7 @@ function verificationOf({
  * Смотрит, что лежит в корне проекта.
  * @param {string} root Корень проекта.
  * @returns {Promise<DetectedProject>} Имя, стек, git, скрипты и предлагаемые проверки.
- * @throws {SyntaxError} Если `package.json` не JSON.
+ * @throws {CommandError} Если `package.json` не JSON.
  */
 export async function detectProject(root: string): Promise<DetectedProject> {
   const manifest = await readManifest(root);

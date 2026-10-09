@@ -43,32 +43,32 @@ describe("inspectProjectFiles", () => {
     const inspection = await inspectProjectFiles(project, installation);
 
     expect(inspection).toEqual({
-      report: { changed: [], removed: [], conflicts: [] },
+      report: { added: [], updated: [], removed: [], conflicts: [], edited: [] },
       configVersion: HARNESS_VERSION,
       isHarnessOutdated: false,
     });
   });
 
-  it("находит устаревший файл, ничего не записывая", async () => {
+  it("находит исправленный руками файл, ничего не записывая", async () => {
     await appendFile(path.join(root, "CLAUDE.md"), "\nstale\n");
     const project = await requireProjectAt(root);
 
     const first = await inspectProjectFiles(project, installation);
     const second = await inspectProjectFiles(project, installation);
 
-    expect({ changed: first.report.changed, again: second.report.changed }).toEqual({
-      changed: ["CLAUDE.md"],
+    expect({ edited: first.report.edited, again: second.report.edited }).toEqual({
+      edited: ["CLAUDE.md"],
       again: ["CLAUDE.md"],
     });
   });
 
-  it("называет файл человека конфликтом", async () => {
+  it("называет заменённый человеком сгенерированный файл исправленным руками", async () => {
     await writeFile(path.join(root, "CLAUDE.md"), "# Mine\n");
     const project = await requireProjectAt(root);
 
     const inspection = await inspectProjectFiles(project, installation);
 
-    expect(inspection.report.conflicts).toEqual(["CLAUDE.md"]);
+    expect(inspection.report.edited).toEqual(["CLAUDE.md"]);
   });
 
   it("находит прежний вшитый CLI как лишний файл", async () => {

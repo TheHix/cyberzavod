@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "files": {
+    ".claude/agents/analyst.md": "sha256:9938cba27761df3ad56f28def581d74b148a3591b1663e1cf9e795b5c05f8d6e",
+    ".claude/agents/coder.md": "sha256:8b749784d8237c5b919a659aedbbfdfe7833dfab6b9811e0e34dd526b02b545f",
+    ".claude/agents/recording-editor.md": "sha256:6748da27becb1781074f7f8c170ed0e97e20eec9f788a156d6c4afc5736b3a54",
+    ".claude/agents/reviewer.md": "sha256:e2b2674bd92ee5a66150b1ce534851513c77159e220b331a7ca920cfe594efe8",
+    ".claude/agents/tester.md": "sha256:eaeabd30b516447e0c4d7aeb89eb01b359ca7ca9e8e7061cf72dfcea82705fc3",
+    ".claude/skills/feature/SKILL.md": "sha256:41eced3037f5485c581cb6fa639c2910bbc5b13b395c756b4c5f914df63d7726",
+    ".claude/skills/publish-recording/SKILL.md": "sha256:36140f5d7bbf81eef221d649c08c313cc4c209a122bfbb8e1787b5bbe65ece79",
+    ".claude/skills/setup/SKILL.md": "sha256:d4bb8155d66ef1ba4b8769df945c26ea11bc333eaa915181d722e78f4a45d3c9",
+    "CLAUDE.md": "sha256:61df438f3099c8d89b1ec5e71e9d9314bf1b5ce6d460dd3794f220d35f89225b",
+    "adapters/claude/CLAUDE.md": "sha256:76491f484c64a98559a9edb1eda994709a7a41e193e5f10476d139ed1bcf3d98",
+    "apps/api/CLAUDE.md": "sha256:76491f484c64a98559a9edb1eda994709a7a41e193e5f10476d139ed1bcf3d98",
+    "apps/web/CLAUDE.md": "sha256:76491f484c64a98559a9edb1eda994709a7a41e193e5f10476d139ed1bcf3d98",
+    "packages/cli/CLAUDE.md": "sha256:76491f484c64a98559a9edb1eda994709a7a41e193e5f10476d139ed1bcf3d98",
+    "packages/core/CLAUDE.md": "sha256:76491f484c64a98559a9edb1eda994709a7a41e193e5f10476d139ed1bcf3d98",
+    "packages/player/CLAUDE.md": "sha256:76491f484c64a98559a9edb1eda994709a7a41e193e5f10476d139ed1bcf3d98",
+    "packages/storage/CLAUDE.md": "sha256:76491f484c64a98559a9edb1eda994709a7a41e193e5f10476d139ed1bcf3d98"
+  },
+  "settings": {
+    "deny": []
+  }
+}

@@ -8,11 +8,21 @@ export { ClaudeError } from "./errors.ts";
 export { CLAUDE_MESSAGES } from "./messages/catalog.ts";
 export type { ClaudeMessages } from "./messages/claude-messages.ts";
 export {
+  previewClaude,
+  requireWritable,
   syncClaude,
   type ClaudeInstallation,
+  type PlannedProject,
   type SyncOptions,
   type SyncReport,
 } from "./generate/sync.ts";
+export {
+  disconnectClaude,
+  type DisconnectOptions,
+  type DisconnectPlan,
+  type SettingsOutcome,
+} from "./generate/disconnect.ts";
+export { MANIFEST_FILE } from "./generate/manifest.ts";
 export type { ClaudeTemplates } from "./generate/files.ts";
 export { inspectClaudeHooks, type HooksReading } from "./generate/inspect.ts";
 export { SETTINGS_FILE, type HooksInspection } from "./generate/settings.ts";

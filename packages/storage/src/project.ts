@@ -3,7 +3,11 @@
 
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { parseProjectConfig, type ProjectConfig } from "@cyberzavod/core";
+import {
+  parseProjectConfig,
+  PROJECT_CONFIG_SCHEMA_VERSION,
+  type ProjectConfig,
+} from "@cyberzavod/core";
 
 /** Каталог маркера относительно корня проекта. */
 export const MARKER_DIRECTORY = ".cyberzavod";
@@ -97,12 +101,15 @@ async function isFile(file: string): Promise<boolean> {
 }
 
 /**
- * Записывает конфиг проекта в его корень, создавая каталог маркера.
+ * Записывает конфиг проекта в его корень, создавая каталог маркера; первым полем идёт версия
+ * формата файла.
  * @param {string} root Корень проекта.
  * @param {ProjectConfig} config Проверенный конфиг.
  * @returns {Promise<void>} Готово, когда файл записан.
  */
 export async function writeProjectConfig(root: string, config: ProjectConfig): Promise<void> {
   await mkdir(path.join(root, MARKER_DIRECTORY), { recursive: true });
-  await writeFile(path.join(root, PROJECT_CONFIG_FILE), `${JSON.stringify(config, null, 2)}\n`);
+  const document = { schemaVersion: PROJECT_CONFIG_SCHEMA_VERSION, ...config };
+
+  await writeFile(path.join(root, PROJECT_CONFIG_FILE), `${JSON.stringify(document, null, 2)}\n`);
 }
