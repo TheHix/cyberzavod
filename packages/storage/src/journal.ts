@@ -60,7 +60,7 @@ async function readRecord(file: string): Promise<JournalRecord> {
 
     return parseRecord(JSON.parse(text));
   } catch (err) {
-    throw new JournalError(`запись ${file} не прошла проверку: ${(err as Error).message}`, {
+    throw new JournalError(`record ${file} failed validation: ${(err as Error).message}`, {
       cause: err,
     });
   }

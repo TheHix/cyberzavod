@@ -60,12 +60,12 @@ function isLines(value: unknown): value is string[] {
 
 function parseAgents(raw: unknown): Partial<Record<Stage, AgentConfig>> {
   if (raw === undefined) return {};
-  if (!isObject(raw)) throw new ProjectConfigError("agents должны быть объектом");
+  if (!isObject(raw)) throw new ProjectConfigError("agents must be an object");
 
   const agents: Partial<Record<Stage, AgentConfig>> = {};
 
   for (const [stage, agent] of Object.entries(raw)) {
-    if (!isStage(stage)) throw new ProjectConfigError(`agents: неизвестный этап ${stage}`);
+    if (!isStage(stage)) throw new ProjectConfigError(`agents: unknown stage ${stage}`);
 
     try {
       agents[stage] = parseAgentConfig(agent);
@@ -79,32 +79,34 @@ function parseAgents(raw: unknown): Partial<Record<Stage, AgentConfig>> {
 
 function parseVerification(raw: unknown): VerificationConfig {
   if (raw === undefined) return { commands: [], paths: [] };
-  if (!isObject(raw)) throw new ProjectConfigError("verification должна быть объектом");
+  if (!isObject(raw)) throw new ProjectConfigError("verification must be an object");
 
   const { commands = [], paths = [] } = raw;
 
   if (!isLines(commands)) {
-    throw new ProjectConfigError("verification.commands должны быть списком строк");
+    throw new ProjectConfigError("verification.commands must be a list of strings");
   }
-  if (!isLines(paths)) throw new ProjectConfigError("verification.paths должны быть списком строк");
+  if (!isLines(paths)) throw new ProjectConfigError("verification.paths must be a list of strings");
 
   return { commands: [...commands], paths: [...paths] };
 }
 
 function parseStack(raw: unknown): StackInfo | undefined {
   if (raw === undefined) return undefined;
-  if (!isObject(raw)) throw new ProjectConfigError("stack должен быть объектом");
+  if (!isObject(raw)) throw new ProjectConfigError("stack must be an object");
 
   const { languages = [], frameworks = [], packageManager } = raw;
 
   if (!isLines(languages) || !isLines(frameworks)) {
-    throw new ProjectConfigError("stack.languages и stack.frameworks должны быть списками строк");
+    throw new ProjectConfigError("stack.languages and stack.frameworks must be lists of strings");
   }
 
   const stack: StackInfo = { languages: [...languages], frameworks: [...frameworks] };
 
   if (packageManager === undefined) return stack;
-  if (!isLine(packageManager)) throw new ProjectConfigError("stack.packageManager — строка");
+  if (!isLine(packageManager)) {
+    throw new ProjectConfigError("stack.packageManager must be a string");
+  }
 
   return { ...stack, packageManager };
 }
@@ -116,7 +118,7 @@ function parseStack(raw: unknown): StackInfo | undefined {
  * @throws {ProjectConfigError} Если конфиг не соответствует формату.
  */
 export function parseProjectConfig(raw: unknown): ProjectConfig {
-  if (!isObject(raw)) throw new ProjectConfigError("конфиг проекта должен быть объектом");
+  if (!isObject(raw)) throw new ProjectConfigError("project config must be an object");
 
   const {
     schemaVersion = PROJECT_CONFIG_SCHEMA_VERSION,
@@ -128,16 +130,18 @@ export function parseProjectConfig(raw: unknown): ProjectConfig {
 
   if (schemaVersion !== PROJECT_CONFIG_SCHEMA_VERSION) {
     throw new ProjectConfigError(
-      `schemaVersion ${String(schemaVersion)} не поддерживается: обновите Cyberzavod (npx cyberzavod@latest sync)`,
+      `schemaVersion ${String(schemaVersion)} is not supported: update Cyberzavod (npx cyberzavod@latest sync)`,
     );
   }
 
   if (!isRecordId(projectId)) {
-    throw new ProjectConfigError("projectId должен состоять из букв, цифр, «_» и «-»");
+    throw new ProjectConfigError(
+      "projectId must contain only letters, digits, underscores and hyphens",
+    );
   }
-  if (!isHarnessVersion(harness)) throw new ProjectConfigError("harness должна быть строкой");
-  if (!isLine(workflow)) throw new ProjectConfigError("workflow должен быть непустой строкой");
-  if (!isLine(journal)) throw new ProjectConfigError("journal должен быть путём к каталогу");
+  if (!isHarnessVersion(harness)) throw new ProjectConfigError("harness must be a string");
+  if (!isLine(workflow)) throw new ProjectConfigError("workflow must be a non-empty string");
+  if (!isLine(journal)) throw new ProjectConfigError("journal must be a directory path");
 
   const config: ProjectConfig = {
     projectId,

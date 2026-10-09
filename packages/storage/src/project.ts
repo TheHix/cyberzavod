@@ -64,7 +64,7 @@ export async function readProjectConfig(root: string): Promise<ProjectConfig | u
   } catch (err) {
     if (isMissing(err)) return undefined;
 
-    throw new ProjectFileError(`${configPath} не читается`, { cause: err });
+    throw new ProjectFileError(`${configPath} cannot be read`, { cause: err });
   }
 
   try {

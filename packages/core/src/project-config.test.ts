@@ -49,7 +49,7 @@ describe("parseProjectConfig", () => {
     ["без harness", { harness: undefined }, /harness/],
     ["без workflow", { workflow: "" }, /workflow/],
     ["без journal", { journal: undefined }, /journal/],
-    ["агент неизвестного этапа", { agents: { deploy: {} } }, /неизвестный этап deploy/],
+    ["агент неизвестного этапа", { agents: { deploy: {} } }, /unknown stage deploy/],
     ["агент с неверной моделью", { agents: { review: { model: 5 } } }, /agents\.review: model/],
     ["команды проверки не строками", { verification: { commands: [1] } }, /commands/],
     ["пути проверки не списком", { verification: { paths: "src" } }, /paths/],

@@ -77,7 +77,7 @@ function firstBuildsOfProjects(builds: readonly DraftBuild[]): Map<string, strin
 export function eventBuilds(draft: Draft): string[] {
   const firstBuild = draft.builds[0]?.id;
 
-  if (firstBuild === undefined) throw new Error("в черновике нет сборок");
+  if (firstBuild === undefined) throw new Error("draft has no builds");
 
   const runBuilds = draft.builds.flatMap(({ id, runs }) =>
     runs.map((run): [string, string] => [run, id]),

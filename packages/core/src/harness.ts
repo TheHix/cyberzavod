@@ -55,14 +55,16 @@ const FRONTMATTER_LINE = /^([a-z]+):\s*(.*)$/;
 function frontmatterOf(text: string, stage: Stage): { fields: Map<string, string>; body: string } {
   const match = FRONTMATTER.exec(text);
 
-  if (match === null) throw new HarnessError(`этап ${stage}: нет шапки между строками ---`);
+  if (match === null) throw new HarnessError(`stage ${stage}: no front matter between --- lines`);
 
   const fields = new Map<string, string>();
 
   for (const line of (match[1] ?? "").split("\n")) {
     const field = FRONTMATTER_LINE.exec(line);
 
-    if (field === null) throw new HarnessError(`этап ${stage}: строка шапки «${line}» не поле`);
+    if (field === null) {
+      throw new HarnessError(`stage ${stage}: front matter line «${line}» is not a field`);
+    }
 
     fields.set(field[1] ?? "", (field[2] ?? "").trim());
   }
@@ -79,13 +81,15 @@ function roleOf(fields: ReadonlyMap<string, string>, stage: Stage): StageRole | 
 
   if (name === undefined) return undefined;
   if (!/^[a-z][a-z-]*$/.test(name)) {
-    throw new HarnessError(`этап ${stage}: role — строчные латинские буквы и «-»`);
+    throw new HarnessError(
+      `stage ${stage}: role must contain only lowercase Latin letters and «-»`,
+    );
   }
 
   const access = fields.get("access");
 
   if (!isStageAccess(access)) {
-    throw new HarnessError(`этап ${stage}: access должен быть ${STAGE_ACCESS.join(" или ")}`);
+    throw new HarnessError(`stage ${stage}: access must be ${STAGE_ACCESS.join(" or ")}`);
   }
 
   return { name, access };
@@ -104,7 +108,7 @@ export function parseStageGuide(stage: Stage, text: string): StageGuide {
   const description = fields.get("description");
 
   if (!isLine(title) || !isLine(description)) {
-    throw new HarnessError(`этап ${stage}: в шапке нужны title и description`);
+    throw new HarnessError(`stage ${stage}: front matter needs title and description`);
   }
 
   const role = roleOf(fields, stage);
@@ -130,7 +134,7 @@ const CONDUCTOR = "conductor.md";
 function requiredFile(files: HarnessFiles, name: string): string {
   const text = files[name];
 
-  if (text === undefined) throw new HarnessError(`в harness нет файла ${name}`);
+  if (text === undefined) throw new HarnessError(`harness has no file ${name}`);
 
   return text;
 }
@@ -163,13 +167,13 @@ function workflowFrom(name: string, text: string): Workflow {
   try {
     raw = JSON.parse(text);
   } catch (err) {
-    throw new HarnessError(`процесс ${name}: не JSON`, { cause: err });
+    throw new HarnessError(`workflow ${name}: not JSON`, { cause: err });
   }
 
   const workflow = parseWorkflow(raw);
 
   if (workflow.name !== name) {
-    throw new HarnessError(`процесс ${name}: name должен совпадать с именем файла`);
+    throw new HarnessError(`workflow ${name}: name must match the file name`);
   }
 
   return workflow;

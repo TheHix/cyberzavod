@@ -157,7 +157,7 @@ describe("syncClaude", () => {
 
     expect(error).toBeInstanceOf(ClaudeError);
     expect((error as ClaudeError).describe(CLAUDE_MESSAGES.en)).toBe(
-      ".claude/settings.json cannot be parsed: hooks должен быть объектом",
+      ".claude/settings.json cannot be parsed: hooks must be an object",
     );
   });
 

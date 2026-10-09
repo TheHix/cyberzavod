@@ -68,7 +68,7 @@ export async function recordEvent(context: HookContext): Promise<HookOutcome> {
   const sessionId = (payload as { session_id?: unknown }).session_id;
 
   if (!isSafeSessionId(sessionId)) {
-    throw new RecordHookError(`недопустимый session_id: ${String(sessionId)}`);
+    throw new RecordHookError(`invalid session_id: ${String(sessionId)}`);
   }
 
   const stampedEvent = withProject(hookEvent, project);

@@ -31,7 +31,7 @@ const AGENT_FIELDS = ["provider", "agent", "model"] as const;
  * @throws {AgentConfigError} Если описание не объект или поле не строка в одну строку.
  */
 export function parseAgentConfig(raw: unknown): AgentConfig {
-  if (!isObject(raw)) throw new AgentConfigError("агент должен быть объектом");
+  if (!isObject(raw)) throw new AgentConfigError("agent must be an object");
 
   const config: AgentConfig = {};
 
@@ -39,7 +39,7 @@ export function parseAgentConfig(raw: unknown): AgentConfig {
     const value = raw[field];
 
     if (value === undefined) continue;
-    if (!isLine(value)) throw new AgentConfigError(`${field} должен быть непустой строкой`);
+    if (!isLine(value)) throw new AgentConfigError(`${field} must be a non-empty string`);
 
     config[field] = value;
   }

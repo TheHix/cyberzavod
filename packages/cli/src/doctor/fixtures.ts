@@ -70,7 +70,7 @@ export async function connectedProject(checks = [PROJECT_CHECK_COMMAND]): Promis
 export async function projectAt(root: string): Promise<ProjectAt> {
   const config = await readProjectConfig(root);
 
-  if (config === undefined) throw new Error(`в ${root} нет проекта`);
+  if (config === undefined) throw new Error(`no project in ${root}`);
 
   return { root, config, journal: journalDirectory(root, config) };
 }

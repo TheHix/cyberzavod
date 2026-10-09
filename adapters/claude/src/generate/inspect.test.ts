@@ -68,7 +68,7 @@ describe("inspectClaudeHooks", () => {
 
     expect(reading).toMatchObject({
       kind: "unreadable",
-      error: { message: ".claude/settings.json cannot be parsed: hooks должен быть объектом" },
+      error: { message: ".claude/settings.json cannot be parsed: hooks must be an object" },
     });
   });
 });

@@ -249,15 +249,15 @@ type Fail = (why: string) => RecordError;
 function parsePrompt(raw: Record<string, unknown>, t: number, fail: Fail): PromptEvent {
   const { goal, requirements, model } = raw;
 
-  if (!isLine(goal)) throw fail("goal должен быть непустой строкой без переводов строки");
+  if (!isLine(goal)) throw fail("goal must be a non-empty single-line string");
   if (!isLines(requirements)) {
-    throw fail("requirements должны быть списком непустых строк без переводов строки");
+    throw fail("requirements must be a list of non-empty single-line strings");
   }
 
   const prompt: PromptEvent = { t, type: "prompt", goal, requirements: [...requirements] };
 
   if (model === undefined) return prompt;
-  if (!isLine(model)) throw fail("model должна быть непустой строкой без переводов строки");
+  if (!isLine(model)) throw fail("model must be a non-empty single-line string");
 
   return { ...prompt, model };
 }
@@ -265,11 +265,11 @@ function parsePrompt(raw: Record<string, unknown>, t: number, fail: Fail): Promp
 function parseMessage(raw: Record<string, unknown>, t: number, fail: Fail): MessageEvent {
   const { from, to, line, text } = raw;
 
-  if (!isSpeaker(from)) throw fail(`неизвестный говорящий ${String(from)}`);
-  if (!isSpeaker(to)) throw fail(`неизвестный адресат ${String(to)}`);
-  if (from === to) throw fail(`${from} не может говорить сам с собой`);
-  if (!isLine(line)) throw fail("line должна быть непустой строкой без переводов строки");
-  if (!isText(text)) throw fail("text должен быть непустой строкой");
+  if (!isSpeaker(from)) throw fail(`unknown speaker ${String(from)}`);
+  if (!isSpeaker(to)) throw fail(`unknown addressee ${String(to)}`);
+  if (from === to) throw fail(`${from} cannot talk to itself`);
+  if (!isLine(line)) throw fail("line must be a non-empty single-line string");
+  if (!isText(text)) throw fail("text must be a non-empty string");
 
   return { t, type: "message", from, to, line, text };
 }
@@ -277,34 +277,34 @@ function parseMessage(raw: Record<string, unknown>, t: number, fail: Fail): Mess
 function parseIntervention(raw: Record<string, unknown>, t: number, fail: Fail): InterventionEvent {
   const { reason, line, text } = raw;
 
-  if (!isInterventionReason(reason)) throw fail(`неизвестная причина ${String(reason)}`);
-  if (!isLine(line)) throw fail("line должна быть непустой строкой без переводов строки");
-  if (!isText(text)) throw fail("text должен быть непустой строкой");
+  if (!isInterventionReason(reason)) throw fail(`unknown reason ${String(reason)}`);
+  if (!isLine(line)) throw fail("line must be a non-empty single-line string");
+  if (!isText(text)) throw fail("text must be a non-empty string");
 
   return { t, type: "intervention", reason, line, text };
 }
 
 function parseStageEnter(raw: Record<string, unknown>, t: number, fail: Fail): SessionEvent {
-  if (!isStage(raw.stage)) throw fail(`неизвестный этап ${String(raw.stage)}`);
+  if (!isStage(raw.stage)) throw fail(`unknown stage ${String(raw.stage)}`);
 
   return { t, type: "stage_enter", stage: raw.stage };
 }
 
 function parseStageFail(raw: Record<string, unknown>, t: number, fail: Fail): SessionEvent {
-  if (!isStage(raw.stage)) throw fail(`неизвестный этап ${String(raw.stage)}`);
-  if (typeof raw.reason !== "string") throw fail("нет reason");
+  if (!isStage(raw.stage)) throw fail(`unknown stage ${String(raw.stage)}`);
+  if (typeof raw.reason !== "string") throw fail("missing reason");
 
   return { t, type: "stage_fail", stage: raw.stage, reason: raw.reason };
 }
 
 function parseUsage(raw: Record<string, unknown>, t: number, fail: Fail): SessionEvent {
-  if (typeof raw.tokens !== "number" || raw.tokens < 0) throw fail("некорректное tokens");
+  if (typeof raw.tokens !== "number" || raw.tokens < 0) throw fail("invalid tokens");
 
   return { t, type: "usage", tokens: raw.tokens };
 }
 
 function parseBuildEnd(raw: Record<string, unknown>, t: number, fail: Fail): SessionEvent {
-  if (typeof raw.ok !== "boolean") throw fail("нет ok");
+  if (typeof raw.ok !== "boolean") throw fail("missing ok");
 
   return { t, type: "build_end", ok: raw.ok };
 }
@@ -321,13 +321,13 @@ function isEventTime(value: unknown): value is number {
  * @throws {RecordError} Если событие не соответствует формату.
  */
 export function parseSessionEvent(raw: unknown, index: number): SessionEvent {
-  const fail: Fail = (why) => new RecordError(`событие #${index}: ${why}`);
+  const fail: Fail = (why) => new RecordError(`event #${index}: ${why}`);
 
-  if (!isObject(raw)) throw fail("не объект");
+  if (!isObject(raw)) throw fail("not an object");
 
   const { t, type } = raw;
 
-  if (!isEventTime(t)) throw fail("некорректное время t");
+  if (!isEventTime(t)) throw fail("invalid time t");
 
   switch (type) {
     case "build_start":
@@ -347,36 +347,38 @@ export function parseSessionEvent(raw: unknown, index: number): SessionEvent {
     case "build_end":
       return parseBuildEnd(raw, t, fail);
     default:
-      throw fail(`неизвестный тип ${String(type)}`);
+      throw fail(`unknown type ${String(type)}`);
   }
 }
 
 function parseSource(raw: unknown): RecordSource {
-  if (!isObject(raw)) throw new RecordError("source должен быть объектом");
+  if (!isObject(raw)) throw new RecordError("source must be an object");
 
   switch (raw.type) {
     case "manual":
       return { type: "manual" };
     case "agent":
-      if (!isLine(raw.provider)) throw new RecordError("у source нет provider");
-      if (!isLine(raw.agent)) throw new RecordError("у source нет agent");
+      if (!isLine(raw.provider)) throw new RecordError("source has no provider");
+      if (!isLine(raw.agent)) throw new RecordError("source has no agent");
 
       return { type: "agent", provider: raw.provider, agent: raw.agent };
     default:
-      throw new RecordError(`неизвестный источник ${String(raw.type)}`);
+      throw new RecordError(`unknown source ${String(raw.type)}`);
   }
 }
 
 function parseHeader(raw: Record<string, unknown>): RecordHeader {
   if (raw.version !== RECORD_VERSION) {
-    throw new RecordError(`неподдерживаемая версия ${String(raw.version)}`);
+    throw new RecordError(`unsupported version ${String(raw.version)}`);
   }
-  if (!isRecordId(raw.id)) throw new RecordError("id должен состоять из букв, цифр, «_» и «-»");
+  if (!isRecordId(raw.id)) {
+    throw new RecordError("id must contain only letters, digits, underscores and hyphens");
+  }
   if (!isRecordId(raw.projectId)) {
-    throw new RecordError("projectId должен состоять из букв, цифр, «_» и «-»");
+    throw new RecordError("projectId must contain only letters, digits, underscores and hyphens");
   }
   if (!isInstant(raw.timestamp)) {
-    throw new RecordError("timestamp должен быть временем ISO 8601 по UTC, как у toISOString");
+    throw new RecordError("timestamp must be an ISO 8601 UTC time, as from toISOString");
   }
 
   const header: RecordHeader = {
@@ -388,28 +390,28 @@ function parseHeader(raw: Record<string, unknown>): RecordHeader {
   };
 
   if (raw.sessionId === undefined) return header;
-  if (!isLine(raw.sessionId)) throw new RecordError("sessionId должен быть непустой строкой");
+  if (!isLine(raw.sessionId)) throw new RecordError("sessionId must be a non-empty string");
 
   return { ...header, sessionId: raw.sessionId };
 }
 
 function parseEvents(raw: unknown): SessionEvent[] {
-  if (!Array.isArray(raw)) throw new RecordError("нет events");
+  if (!Array.isArray(raw)) throw new RecordError("missing events");
 
   const events = raw.map(parseSessionEvent);
 
   if (events[0]?.type !== "build_start") {
-    throw new RecordError("сессия должна начинаться с build_start");
+    throw new RecordError("session must start with build_start");
   }
   if (events.at(-1)?.type !== "build_end") {
-    throw new RecordError("сессия должна заканчиваться build_end");
+    throw new RecordError("session must end with build_end");
   }
 
   events.forEach((event, index) => {
     const previous = events[index - 1];
 
     if (previous !== undefined && event.t < previous.t) {
-      throw new RecordError(`событие #${index}: время идёт назад`);
+      throw new RecordError(`event #${index}: time goes backwards`);
     }
   });
 
@@ -417,40 +419,40 @@ function parseEvents(raw: unknown): SessionEvent[] {
 }
 
 function parseSessionData(raw: unknown): SessionData {
-  if (!isObject(raw)) throw new RecordError("data должна быть объектом");
+  if (!isObject(raw)) throw new RecordError("data must be an object");
 
   const { title, workflow, harness, language = LEGACY_SESSION_LANGUAGE } = raw;
 
   if (!isLine(title)) {
-    throw new RecordError("title должен быть непустой строкой без переводов строки");
+    throw new RecordError("title must be a non-empty single-line string");
   }
   if (!isLanguageCode(language)) {
-    throw new RecordError("language должен быть кодом языка ISO 639: ru, en");
+    throw new RecordError("language must be an ISO 639 language code: ru, en");
   }
-  if (!isLine(workflow)) throw new RecordError("workflow должен быть непустой строкой");
+  if (!isLine(workflow)) throw new RecordError("workflow must be a non-empty string");
   if (!isHarnessVersion(harness)) {
-    throw new RecordError("harness должна быть непустой строкой без переводов строки");
+    throw new RecordError("harness must be a non-empty single-line string");
   }
 
   return { title, language, workflow, harness, events: parseEvents(raw.events) };
 }
 
 function parseDecisionData(raw: unknown): DecisionRecord["data"] {
-  if (!isObject(raw)) throw new RecordError("data должна быть объектом");
+  if (!isObject(raw)) throw new RecordError("data must be an object");
 
   const { title, description } = raw;
 
   if (!isLine(title)) {
-    throw new RecordError("title должен быть непустой строкой без переводов строки");
+    throw new RecordError("title must be a non-empty single-line string");
   }
-  if (typeof description !== "string") throw new RecordError("description должно быть строкой");
+  if (typeof description !== "string") throw new RecordError("description must be a string");
 
   return { title, description };
 }
 
 function parseNoteData(raw: unknown): NoteRecord["data"] {
-  if (!isObject(raw)) throw new RecordError("data должна быть объектом");
-  if (!isText(raw.text)) throw new RecordError("text должен быть непустой строкой");
+  if (!isObject(raw)) throw new RecordError("data must be an object");
+  if (!isText(raw.text)) throw new RecordError("text must be a non-empty string");
 
   return { text: raw.text };
 }
@@ -462,7 +464,7 @@ function parseNoteData(raw: unknown): NoteRecord["data"] {
  * @throws {RecordError} Если запись не соответствует формату.
  */
 export function parseRecord(raw: unknown): JournalRecord {
-  if (!isObject(raw)) throw new RecordError("запись должна быть объектом");
+  if (!isObject(raw)) throw new RecordError("record must be an object");
 
   const header = parseHeader(raw);
 
@@ -474,7 +476,7 @@ export function parseRecord(raw: unknown): JournalRecord {
     case "note":
       return { ...header, type: "note", data: parseNoteData(raw.data) };
     default:
-      throw new RecordError(`неизвестный тип записи ${String(raw.type)}`);
+      throw new RecordError(`unknown record type ${String(raw.type)}`);
   }
 }
 

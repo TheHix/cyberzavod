@@ -51,7 +51,7 @@ function parseLink(
 
   if (value === undefined) return {};
   if (!isSecureUrl(value)) {
-    throw new ProjectError(`${field} должен быть адресом с https`);
+    throw new ProjectError(`${field} must be an https URL`);
   }
 
   return { [field]: value };
@@ -67,7 +67,7 @@ function parseStack(raw: Record<string, unknown>): Pick<Project<string>, "stack"
 
   if (!isList || !stack.every(isLine)) {
     throw new ProjectError(
-      `stack должен быть списком из 1–${MAX_STACK_ITEMS} непустых строк без переводов строки`,
+      `stack must be a list of 1–${MAX_STACK_ITEMS} non-empty single-line strings`,
     );
   }
 
@@ -80,14 +80,14 @@ function parseText<Language extends string>(
   languages: readonly Language[],
 ): ProjectText<Language> {
   if (!isObject(raw)) {
-    throw new ProjectError(`${field} должно быть объектом с переводами: ${languages.join(", ")}`);
+    throw new ProjectError(`${field} must be an object with translations: ${languages.join(", ")}`);
   }
 
   const missing = languages.filter((language) => !isLine(raw[language]));
 
   if (missing.length > 0) {
     throw new ProjectError(
-      `${field} на ${missing.join(", ")} должно быть непустой строкой без переводов строки`,
+      `${field} in ${missing.join(", ")} must be a non-empty single-line string`,
     );
   }
 
@@ -107,11 +107,13 @@ export function parseProject<Language extends string>(
   raw: unknown,
   languages: readonly Language[],
 ): Project<Language> {
-  if (!isObject(raw)) throw new ProjectError("карточка проекта должна быть объектом");
+  if (!isObject(raw)) throw new ProjectError("project card must be an object");
 
   const { id } = raw;
 
-  if (!isRecordId(id)) throw new ProjectError("id должен состоять из букв, цифр, «_» и «-»");
+  if (!isRecordId(id)) {
+    throw new ProjectError("id must contain only letters, digits, underscores and hyphens");
+  }
 
   return {
     id,

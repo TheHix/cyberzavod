@@ -20,7 +20,7 @@ export interface Installation {
 function template(templates: Readonly<Record<string, string>>, name: string): string {
   const text = templates[name];
 
-  if (text === undefined) throw new Error(`в установке нет шаблона ${name}`);
+  if (text === undefined) throw new Error(`installation has no template ${name}`);
 
   return text;
 }

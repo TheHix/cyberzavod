@@ -343,7 +343,7 @@ export function parseRawLog(content: string): RawEvent[] {
       return;
     }
 
-    if (!isRawEvent(value)) throw new RawLogError(`строка ${index + 1}: не событие журнала`);
+    if (!isRawEvent(value)) throw new RawLogError(`line ${index + 1}: not a log event`);
 
     events.push(value);
   });

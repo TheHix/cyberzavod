@@ -57,7 +57,7 @@ export function workflowOf(harness: Harness, name: string): Workflow {
   if (workflow === undefined) {
     const known = harness.workflows.map((candidate) => candidate.name).join(", ");
 
-    throw new HarnessError(`процесса ${name} нет в harness; есть: ${known}`);
+    throw new HarnessError(`process ${name} is not in the harness; available: ${known}`);
   }
 
   return workflow;

@@ -21,8 +21,8 @@ describe("parseWorkflow", () => {
   it.each([
     ["без имени", { stages: ["planning"] }, /name/],
     ["без этапов", { name: "x", stages: [] }, /stages/],
-    ["с неизвестным этапом", { name: "x", stages: ["deploy"] }, /неизвестный этап deploy/],
-    ["с повтором этапа", { name: "x", stages: ["planning", "planning"] }, /повторяются/],
+    ["с неизвестным этапом", { name: "x", stages: ["deploy"] }, /unknown stage deploy/],
+    ["с повтором этапа", { name: "x", stages: ["planning", "planning"] }, /repeated/],
   ])("отклоняет процесс %s", (_name, raw, message) => {
     const act = () => parseWorkflow(raw);
 

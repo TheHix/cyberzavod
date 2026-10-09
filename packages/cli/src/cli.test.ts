@@ -449,8 +449,7 @@ describe("runCli", () => {
 
       expect({ code, error: printedError() }).toEqual({
         code: 1,
-        error:
-          "cyberzavod sync: .claude/settings.json cannot be parsed: hooks должен быть объектом",
+        error: "cyberzavod sync: .claude/settings.json cannot be parsed: hooks must be an object",
       });
     },
   );

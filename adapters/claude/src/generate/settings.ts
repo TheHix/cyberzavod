@@ -184,7 +184,7 @@ function isHookGroup(value: unknown): value is HookGroup {
 
 function groupsOf(event: string, value: unknown): HookGroup[] {
   if (!Array.isArray(value) || !value.every(isHookGroup)) {
-    throw new SettingsError(`hooks.${event} должен быть списком групп с обработчиками`);
+    throw new SettingsError(`hooks.${event} must be a list of groups with handlers`);
   }
 
   return value;
@@ -198,7 +198,7 @@ function withoutOwnHandlers(groups: HookGroup[]): HookGroup[] {
 
 function mergedHooks(existing: unknown, own: AdapterHooks): Record<string, HookGroup[]> {
   if (existing !== undefined && !isObject(existing)) {
-    throw new SettingsError("hooks должен быть объектом");
+    throw new SettingsError("hooks must be an object");
   }
 
   const merged: Record<string, HookGroup[]> = {};
@@ -218,13 +218,13 @@ function mergedHooks(existing: unknown, own: AdapterHooks): Record<string, HookG
 
 function mergedPermissions(existing: unknown): Record<string, unknown> {
   if (existing !== undefined && !isObject(existing)) {
-    throw new SettingsError("permissions должен быть объектом");
+    throw new SettingsError("permissions must be an object");
   }
 
   const { deny = [] } = existing ?? {};
 
   if (!Array.isArray(deny) || !deny.every((rule) => typeof rule === "string")) {
-    throw new SettingsError("permissions.deny должен быть списком строк");
+    throw new SettingsError("permissions.deny must be a list of strings");
   }
 
   const missing = ADAPTER_DENY.filter((rule) => !deny.includes(rule));
@@ -294,7 +294,7 @@ function isEventComplete(event: string, groups: HookGroup[], own: OwnHandler[]):
  */
 export function inspectHooks(settings: Settings, version: string): HooksInspection {
   if (settings.hooks !== undefined && !isObject(settings.hooks)) {
-    throw new SettingsError("hooks должен быть объектом");
+    throw new SettingsError("hooks must be an object");
   }
 
   const own = ownHandlersOf(settings.hooks ?? {});
@@ -315,13 +315,13 @@ export function inspectHooks(settings: Settings, version: string): HooksInspecti
 
 function denyOf(permissions: unknown): string[] {
   if (permissions !== undefined && !isObject(permissions)) {
-    throw new SettingsError("permissions должен быть объектом");
+    throw new SettingsError("permissions must be an object");
   }
 
   const { deny = [] } = permissions ?? {};
 
   if (!Array.isArray(deny) || !deny.every((rule) => typeof rule === "string")) {
-    throw new SettingsError("permissions.deny должен быть списком строк");
+    throw new SettingsError("permissions.deny must be a list of strings");
   }
 
   return deny;
@@ -341,7 +341,7 @@ export function missingAdapterDeny(settings: Settings): string[] {
 
 function withoutOwnHooks(hooks: unknown): Record<string, HookGroup[]> {
   if (hooks !== undefined && !isObject(hooks)) {
-    throw new SettingsError("hooks должен быть объектом");
+    throw new SettingsError("hooks must be an object");
   }
 
   const entries = Object.entries(hooks ?? {}).map(

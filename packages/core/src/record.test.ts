@@ -111,7 +111,7 @@ describe("parseRecord", () => {
 
     const act = () => parseRecord(raw);
 
-    expect(act).toThrow(new RegExp(`неподдерживаемая версия ${version}`));
+    expect(act).toThrow(new RegExp(`unsupported version ${version}`));
   });
 
   it("отклоняет неизвестный тип записи", () => {
@@ -119,12 +119,12 @@ describe("parseRecord", () => {
 
     const act = () => parseRecord(raw);
 
-    expect(act).toThrow(/тип записи milestone/);
+    expect(act).toThrow(/record type milestone/);
   });
 
   it.each([
     ["без источника", undefined, /source/],
-    ["неизвестный источник", { type: "robot" }, /источник robot/],
+    ["неизвестный источник", { type: "robot" }, /source robot/],
     ["агент без провайдера", { type: "agent", agent: "claude" }, /provider/],
     ["агент без имени", { type: "agent", provider: "anthropic" }, /agent/],
   ])("отклоняет источник: %s", (_name, source, message) => {
@@ -200,7 +200,7 @@ describe("parseRecord", () => {
 
     const act = () => parseRecord(raw);
 
-    expect(act).toThrow(/время идёт назад/);
+    expect(act).toThrow(/time goes backwards/);
   });
 
   it("отклоняет промпт без цели", () => {
@@ -348,18 +348,18 @@ describe("parseRecord: реплики", () => {
   });
 
   it.each([
-    ["дирижёр говорящий", { from: "conductor" }, /говорящий/],
-    ["человек говорящий", { from: "human" }, /говорящий/],
-    ["неизвестный говорящий", { from: "deploy" }, /говорящий/],
-    ["дирижёр адресат", { to: "conductor" }, /адресат/],
-    ["человек адресат", { to: "human" }, /адресат/],
-    ["неизвестный адресат", { to: "deploy" }, /адресат/],
+    ["дирижёр говорящий", { from: "conductor" }, /speaker/],
+    ["человек говорящий", { from: "human" }, /speaker/],
+    ["неизвестный говорящий", { from: "deploy" }, /speaker/],
+    ["дирижёр адресат", { to: "conductor" }, /addressee/],
+    ["человек адресат", { to: "human" }, /addressee/],
+    ["неизвестный адресат", { to: "deploy" }, /addressee/],
     [
       "рабочий говорит сам с собой",
       { from: "implementation", to: "implementation" },
-      /сам с собой/,
+      /talk to itself/,
     ],
-    ["мастер говорит сам с собой", { from: "foreman", to: "foreman" }, /сам с собой/],
+    ["мастер говорит сам с собой", { from: "foreman", to: "foreman" }, /talk to itself/],
     ["многострочная строка", { line: "раз\nдва" }, /line/],
     ["пустая строка", { line: "  " }, /line/],
     ["пустой текст", { text: " \n " }, /text/],
@@ -476,7 +476,7 @@ describe("parseRecord: вмешательства", () => {
 
     const act = () => parseRecord(raw);
 
-    expect(act).toThrow(/причина approval/);
+    expect(act).toThrow(/reason approval/);
   });
 
   it.each([

@@ -203,19 +203,19 @@ function parseDraftPrompt(raw: Record<string, unknown>, index: number): DraftPro
   const { t, said, goal, requirements, model, joined, build } = raw;
 
   if (typeof t !== "number" || typeof said !== "string" || typeof goal !== "string") {
-    throw new DraftError(`событие #${index}: у промпта должны быть t, said и goal`);
+    throw new DraftError(`event #${index}: a prompt must have t, said and goal`);
   }
   if (!isStrings(requirements)) {
-    throw new DraftError(`событие #${index}: requirements должны быть списком строк`);
+    throw new DraftError(`event #${index}: requirements must be a list of strings`);
   }
   if (model !== undefined && typeof model !== "string") {
-    throw new DraftError(`событие #${index}: model должна быть строкой`);
+    throw new DraftError(`event #${index}: model must be a string`);
   }
   if (joined !== undefined && typeof joined !== "boolean") {
-    throw new DraftError(`событие #${index}: joined должно быть true или false`);
+    throw new DraftError(`event #${index}: joined must be true or false`);
   }
   if (build !== undefined && typeof build !== "string") {
-    throw new DraftError(`событие #${index}: build должна быть строкой`);
+    throw new DraftError(`event #${index}: build must be a string`);
   }
 
   return {
@@ -234,22 +234,22 @@ function parseDraftMessage(raw: Record<string, unknown>, index: number): DraftMe
   const { t, from, to, source, said, line, text, run, build } = raw;
 
   if (typeof t !== "number" || typeof said !== "string") {
-    throw new DraftError(`событие #${index}: у реплики должны быть t и said`);
+    throw new DraftError(`event #${index}: a message must have t and said`);
   }
   if (!isSpeaker(from) || !isSpeaker(to)) {
-    throw new DraftError(`событие #${index}: у реплики должны быть from и to`);
+    throw new DraftError(`event #${index}: a message must have from and to`);
   }
   if (!isMessageSource(source)) {
-    throw new DraftError(`событие #${index}: неизвестный source ${String(source)}`);
+    throw new DraftError(`event #${index}: unknown source ${String(source)}`);
   }
   if (typeof line !== "string" || typeof text !== "string") {
-    throw new DraftError(`событие #${index}: line и text реплики должны быть строками`);
+    throw new DraftError(`event #${index}: message line and text must be strings`);
   }
   if (run !== undefined && typeof run !== "string") {
-    throw new DraftError(`событие #${index}: run должен быть строкой`);
+    throw new DraftError(`event #${index}: run must be a string`);
   }
   if (build !== undefined && typeof build !== "string") {
-    throw new DraftError(`событие #${index}: build должна быть строкой`);
+    throw new DraftError(`event #${index}: build must be a string`);
   }
 
   return {
@@ -270,16 +270,16 @@ function parseDraftIntervention(raw: Record<string, unknown>, index: number): Dr
   const { t, reason, said, line, text, build } = raw;
 
   if (typeof t !== "number" || typeof said !== "string") {
-    throw new DraftError(`событие #${index}: у вмешательства должны быть t и said`);
+    throw new DraftError(`event #${index}: an intervention must have t and said`);
   }
   if (!isInterventionReason(reason)) {
-    throw new DraftError(`событие #${index}: неизвестная причина ${String(reason)}`);
+    throw new DraftError(`event #${index}: unknown reason ${String(reason)}`);
   }
   if (typeof line !== "string" || typeof text !== "string") {
-    throw new DraftError(`событие #${index}: line и text вмешательства должны быть строками`);
+    throw new DraftError(`event #${index}: intervention line and text must be strings`);
   }
   if (build !== undefined && typeof build !== "string") {
-    throw new DraftError(`событие #${index}: build должна быть строкой`);
+    throw new DraftError(`event #${index}: build must be a string`);
   }
 
   return {
@@ -297,10 +297,10 @@ function parseDraftRun(raw: Record<string, unknown>, index: number): DraftRun {
   const { t, run, agent, until } = raw;
 
   if (typeof t !== "number" || typeof run !== "string" || typeof agent !== "string") {
-    throw new DraftError(`событие #${index}: у запуска должны быть t, run и agent`);
+    throw new DraftError(`event #${index}: a run must have t, run and agent`);
   }
   if (typeof until !== "number") {
-    throw new DraftError(`событие #${index}: until запуска должно быть числом`);
+    throw new DraftError(`event #${index}: run until must be a number`);
   }
 
   return { t, type: "draft_run", run, agent, until };
@@ -310,7 +310,7 @@ function parseDraftCheck(raw: Record<string, unknown>, index: number): DraftChec
   const { t, ok } = raw;
 
   if (typeof t !== "number" || typeof ok !== "boolean") {
-    throw new DraftError(`событие #${index}: у проверки должны быть t и ok`);
+    throw new DraftError(`event #${index}: a check must have t and ok`);
   }
 
   return { t, type: "draft_check", ok, ...parseEventMarks(raw, index) };
@@ -322,10 +322,10 @@ function parseEventMarks(raw: unknown, index: number): { run?: string; project?:
   const { run, project } = isObject(raw) ? raw : { run: undefined, project: undefined };
 
   if (run !== undefined && typeof run !== "string") {
-    throw new DraftError(`событие #${index}: run должен быть строкой`);
+    throw new DraftError(`event #${index}: run must be a string`);
   }
   if (project !== undefined && typeof project !== "string") {
-    throw new DraftError(`событие #${index}: project должен быть строкой`);
+    throw new DraftError(`event #${index}: project must be a string`);
   }
 
   return {
@@ -354,14 +354,16 @@ function parseDraftEvent(raw: unknown, index: number): DraftEvent {
 }
 
 function parseBuild(raw: unknown, index: number): DraftBuild {
-  if (!isObject(raw)) throw new DraftError(`сборка #${index}: должна быть объектом`);
+  if (!isObject(raw)) throw new DraftError(`build #${index}: must be an object`);
 
   // Черновики до поля language лежат в capture/ и переносят редактуру в пересобранный черновик:
   // у них язык ещё ждёт редактуры.
   const { id, project, harness, workflow, title, language = "", runs } = raw;
 
   if (!isRecordId(id)) {
-    throw new DraftError(`сборка #${index}: id должен состоять из букв, цифр, «_» и «-»`);
+    throw new DraftError(
+      `build #${index}: id must contain only letters, digits, underscores and hyphens`,
+    );
   }
   if (
     typeof project !== "string" ||
@@ -371,17 +373,17 @@ function parseBuild(raw: unknown, index: number): DraftBuild {
     typeof language !== "string"
   ) {
     throw new DraftError(
-      `сборка ${id}: project, harness, workflow, title и language должны быть строками`,
+      `build ${id}: project, harness, workflow, title and language must be strings`,
     );
   }
-  if (!isStrings(runs)) throw new DraftError(`сборка ${id}: runs должны быть списком строк`);
+  if (!isStrings(runs)) throw new DraftError(`build ${id}: runs must be a list of strings`);
 
   return { id, project, harness, workflow, title, language, runs: [...runs] };
 }
 
 function parseBuilds(raw: Record<string, unknown>): DraftBuild[] {
   if (!Array.isArray(raw.builds) || raw.builds.length === 0) {
-    throw new DraftError("у черновика должна быть хотя бы одна сборка в builds");
+    throw new DraftError("draft must have at least one build in builds");
   }
 
   return raw.builds.map(parseBuild);
@@ -391,7 +393,7 @@ function checkBuildIds(builds: readonly DraftBuild[]): void {
   const seen = new Set<string>();
 
   for (const { id } of builds) {
-    if (seen.has(id)) throw new DraftError(`сборка ${id} указана в builds дважды`);
+    if (seen.has(id)) throw new DraftError(`build ${id} is listed in builds twice`);
 
     seen.add(id);
   }
@@ -405,7 +407,7 @@ function checkRunsAreUnique(builds: readonly DraftBuild[]): void {
     const owner = owners.get(run);
 
     if (owner !== undefined && owner !== buildId) {
-      throw new DraftError(`запуск ${run} указан в двух сборках: ${owner} и ${buildId}`);
+      throw new DraftError(`run ${run} is listed in two builds: ${owner} and ${buildId}`);
     }
 
     owners.set(run, buildId);
@@ -426,7 +428,7 @@ function checkEventBuilds(builds: readonly DraftBuild[], events: readonly DraftE
   events.forEach((event, index) => {
     if (!isEditable(event)) return;
     if (event.build !== undefined && !known.has(event.build)) {
-      throw new DraftError(`событие #${index}: неизвестная сборка ${event.build}`);
+      throw new DraftError(`event #${index}: unknown build ${event.build}`);
     }
   });
 }
@@ -443,12 +445,12 @@ function checkEventBuilds(builds: readonly DraftBuild[], events: readonly DraftE
  * @throws {RecordError} Если событие цеха в черновике не соответствует формату ядра.
  */
 export function parseDraft(raw: unknown): Draft {
-  if (!isObject(raw)) throw new DraftError("черновик должен быть объектом");
+  if (!isObject(raw)) throw new DraftError("draft must be an object");
 
   const { id, startedAt, events } = raw;
 
   if (typeof id !== "string" || typeof startedAt !== "string") {
-    throw new DraftError("у черновика должны быть id и startedAt");
+    throw new DraftError("draft must have id and startedAt");
   }
 
   const builds = parseBuilds(raw);
@@ -456,7 +458,7 @@ export function parseDraft(raw: unknown): Draft {
   checkBuildIds(builds);
   checkRunsAreUnique(builds);
 
-  if (!Array.isArray(events)) throw new DraftError("у черновика нет events");
+  if (!Array.isArray(events)) throw new DraftError("draft has no events");
 
   const parsedEvents = events.map(parseDraftEvent);
 
@@ -696,7 +698,7 @@ function toPublishedEvents(
           hasPrompt = true;
           published.push(toPublishedPrompt(event, at(event.t)));
         } else if (!hasPrompt) {
-          throw new DraftError(`событие #${index}: склеенному промпту нет предыдущего промпта`);
+          throw new DraftError(`event #${index}: joined prompt has no previous prompt`);
         }
 
         return;
@@ -783,7 +785,7 @@ function totalTokens(events: readonly DraftEvent[]): number | undefined {
 function buildOf(draft: Draft, buildId: string): DraftBuild {
   const build = draft.builds.find(({ id }) => id === buildId);
 
-  if (build === undefined) throw new DraftError(`в черновике нет сборки ${buildId}`);
+  if (build === undefined) throw new DraftError(`draft has no build ${buildId}`);
 
   return build;
 }
@@ -854,7 +856,7 @@ export function publishBuild(draft: Draft, buildId: string): SessionRecord {
   });
 
   if (record.type !== "session") {
-    throw new DraftError(`сборка ${buildId} опубликовалась не сессией`);
+    throw new DraftError(`build ${buildId} was not published as a session`);
   }
 
   checkNoLeaks(record, buildId);
