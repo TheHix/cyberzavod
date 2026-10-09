@@ -1,5 +1,5 @@
-// Маркер проекта на диске: `.cyberzavod/project.json` в корне репозитория. По нему CLI,
-// адаптеры и хуки находят проект и его журнал.
+// The project marker on disk: `.cyberzavod/project.json` in the repository root. The CLI,
+// adapters and hooks use it to find the project and its journal.
 
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -9,23 +9,23 @@ import {
   type ProjectConfig,
 } from "@cyberzavod/core";
 
-/** Каталог маркера относительно корня проекта. */
+/** Marker directory relative to the project root. */
 export const MARKER_DIRECTORY = ".cyberzavod";
 
-/** Путь конфига проекта относительно его корня. */
+/** Project config path relative to its root. */
 export const PROJECT_CONFIG_FILE = path.join(MARKER_DIRECTORY, "project.json");
 
 /**
- * Собранный CLI внутри проекта до версии 0.8.0, от корня через `/`: туда клали файл, который
- * запускали хуки. Теперь хуки идут через npx, `sync` этот файл удаляет, а адаптер по нему
- * узнаёт хуки прежних версий.
+ * The built CLI inside the project before version 0.8.0, from the root with `/`: the file the hooks
+ * ran was put there. Now hooks go through npx, `sync` deletes this file, and the adapter uses it
+ * to recognize hooks of earlier versions.
  */
 export const LEGACY_TOOL_FILE = `${MARKER_DIRECTORY}/bin/cyberzavod.mjs`;
 
-/** Журнал проекта по умолчанию, от корня через `/`: рядом с конфигом, в репозитории проекта. */
+/** Default project journal, from the root with `/`: next to the config, in the project repo. */
 export const DEFAULT_JOURNAL = `${MARKER_DIRECTORY}/journal`;
 
-/** Ошибка чтения конфига проекта: файл есть, но не читается или не прошёл проверку. */
+/** Project config read error: the file exists but cannot be read or failed validation. */
 export class ProjectFileError extends Error {}
 
 const FILE_NOT_FOUND = "ENOENT";
@@ -36,24 +36,24 @@ function hasErrorCode(err: unknown, code: string): boolean {
 }
 
 /**
- * Отличает «файла нет» от остальных ошибок файловой системы.
- * @param {unknown} err Ошибка из node:fs.
- * @returns {boolean} true, если файла или каталога нет.
+ * Tells "no file" apart from other file system errors.
+ * @param {unknown} err An error from node:fs.
+ * @returns {boolean} true if the file or directory does not exist.
  */
 export function isNotFound(err: unknown): boolean {
   return hasErrorCode(err, FILE_NOT_FOUND);
 }
 
-// Путь может вести сквозь файл (ENOTDIR): для поиска маркера это тоже «нет».
+// The path may go through a file (ENOTDIR): when looking for the marker that is also "no file".
 function isMissing(err: unknown): boolean {
   return isNotFound(err) || hasErrorCode(err, NOT_A_DIRECTORY);
 }
 
 /**
- * Читает конфиг проекта из его корня.
- * @param {string} root Корень проекта.
- * @returns {Promise<ProjectConfig | undefined>} Конфиг или undefined, если маркера нет.
- * @throws {ProjectFileError} Если файл есть, но это не JSON или он не прошёл проверку.
+ * Reads the project config from its root.
+ * @param {string} root Project root.
+ * @returns {Promise<ProjectConfig | undefined>} The config, or undefined if there is no marker.
+ * @throws {ProjectFileError} If the file exists but is not JSON or failed validation.
  */
 export async function readProjectConfig(root: string): Promise<ProjectConfig | undefined> {
   const configPath = path.join(root, PROJECT_CONFIG_FILE);
@@ -75,11 +75,11 @@ export async function readProjectConfig(root: string): Promise<ProjectConfig | u
 }
 
 /**
- * Находит проект каталога: поднимается от него вверх до первого маркера.
- * @param {string} directory Каталог, с которого начинается поиск.
- * @returns {Promise<string | undefined>} Корень проекта или undefined, если маркера нет до корня
- *   диска.
- * @throws {Error} Если путь не читается по другой причине, чем «нет файла».
+ * Finds a directory's project: walks up from it to the first marker.
+ * @param {string} directory Directory the search starts from.
+ * @returns {Promise<string | undefined>} Project root, or undefined if there is no marker up to the
+ *   disk root.
+ * @throws {Error} If the path cannot be read for a reason other than "no file".
  */
 export async function findProjectRoot(directory: string): Promise<string | undefined> {
   for (let current = path.resolve(directory); ; current = path.dirname(current)) {
@@ -101,11 +101,11 @@ async function isFile(file: string): Promise<boolean> {
 }
 
 /**
- * Записывает конфиг проекта в его корень, создавая каталог маркера; первым полем идёт версия
- * формата файла.
- * @param {string} root Корень проекта.
- * @param {ProjectConfig} config Проверенный конфиг.
- * @returns {Promise<void>} Готово, когда файл записан.
+ * Writes the project config to its root, creating the marker directory; the file format version
+ * comes as the first field.
+ * @param {string} root Project root.
+ * @param {ProjectConfig} config The validated config.
+ * @returns {Promise<void>} Resolves when the file is written.
  */
 export async function writeProjectConfig(root: string, config: ProjectConfig): Promise<void> {
   await mkdir(path.join(root, MARKER_DIRECTORY), { recursive: true });

@@ -1,5 +1,5 @@
-// Ядро Cyberzavod: доменная модель (этапы, процесс, агенты, конфиг проекта, harness, записи
-// журнала). Чистый TypeScript без зависимостей от фреймворков, браузера и Node.
+// Cyberzavod core: the domain model (stages, workflow, agents, project config, harness, journal
+// records). Plain TypeScript with no dependencies on frameworks, the browser or Node.
 
 export {
   HarnessError,

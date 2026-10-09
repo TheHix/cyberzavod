@@ -1,4 +1,4 @@
-// Общие данные для тестов хранилища: временные каталоги и проверенные записи.
+// Shared data for storage tests: temporary directories and validated records.
 
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,8 +7,8 @@ import { onTestFinished } from "vitest";
 import type { DecisionRecord, ProjectConfig, SessionRecord } from "@cyberzavod/core";
 
 /**
- * Создаёт пустой временный каталог для теста и удаляет его, когда тест закончится.
- * @returns {Promise<string>} Абсолютный путь каталога.
+ * Creates an empty temporary directory for a test and deletes it when the test ends.
+ * @returns {Promise<string>} Absolute directory path.
  */
 export async function temporaryDirectory(): Promise<string> {
   const directory = await mkdtemp(path.join(tmpdir(), "cyberzavod-storage-"));
@@ -19,9 +19,9 @@ export async function temporaryDirectory(): Promise<string> {
 }
 
 /**
- * Конфиг проекта для тестов.
- * @param {Partial<ProjectConfig>} patch Поля, которые нужно заменить.
- * @returns {ProjectConfig} Конфиг с журналом в репозитории.
+ * Project config for tests.
+ * @param {Partial<ProjectConfig>} patch Fields to replace.
+ * @returns {ProjectConfig} Config with the journal in the repository.
  */
 export function validConfig(patch: Partial<ProjectConfig> = {}): ProjectConfig {
   return {
@@ -36,9 +36,9 @@ export function validConfig(patch: Partial<ProjectConfig> = {}): ProjectConfig {
 }
 
 /**
- * Сессия для тестов.
- * @param {string} id Идентификатор записи.
- * @returns {SessionRecord} Сессия из начала и конца.
+ * Session for tests.
+ * @param {string} id Record id.
+ * @returns {SessionRecord} A session of a start and an end.
  */
 export function validSession(id = "2026-10-07-demo"): SessionRecord {
   return {
@@ -62,8 +62,8 @@ export function validSession(id = "2026-10-07-demo"): SessionRecord {
 }
 
 /**
- * Решение для тестов.
- * @returns {DecisionRecord} Решение, записанное вручную.
+ * Decision for tests.
+ * @returns {DecisionRecord} A decision recorded by hand.
  */
 export function validDecision(): DecisionRecord {
   return {

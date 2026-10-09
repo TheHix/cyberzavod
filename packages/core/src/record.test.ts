@@ -10,7 +10,7 @@ import {
   type SessionRecord,
 } from "./record.ts";
 
-// Сессия как сырой JSON: тесты портят её как угодно, проверяет parseRecord.
+// The session as raw JSON: tests break it however they like, parseRecord validates it.
 interface RawSession {
   version: number;
   type: string;

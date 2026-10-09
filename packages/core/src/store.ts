@@ -1,19 +1,19 @@
-// Граница хранилища: домен знает, что записи можно перечислить и сохранить, но не знает,
-// где они лежат — в репозитории проекта, в каталоге рядом с ним или где-то ещё.
+// Storage boundary: the domain knows that records can be listed and saved, but not where
+// they live: in the project repository, in a directory next to it, or somewhere else.
 
 import type { JournalRecord } from "./record.ts";
 
-/** Хранилище записей журнала одного проекта. */
+/** Store of one project's journal records. */
 export interface RecordStore {
   /**
-   * Перечисляет все записи журнала.
-   * @returns {Promise<JournalRecord[]>} Проверенные записи в порядке, который выбирает хранилище.
+   * Lists all journal records.
+   * @returns {Promise<JournalRecord[]>} Validated records in the order the store chooses.
    */
   list(): Promise<JournalRecord[]>;
   /**
-   * Сохраняет запись; запись того же типа с тем же `id` заменяется.
-   * @param {JournalRecord} record Проверенная запись.
-   * @returns {Promise<void>} Готово, когда запись сохранена.
+   * Saves a record; a record of the same type with the same `id` is replaced.
+   * @param {JournalRecord} record The validated record.
+   * @returns {Promise<void>} Resolves when the record is saved.
    */
   write(record: JournalRecord): Promise<void>;
 }

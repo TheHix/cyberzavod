@@ -1,5 +1,5 @@
-// Конфиг проекта — `.cyberzavod/project.json` в его репозитории: маркер «проект подключён»
-// и всё, что процессу нужно знать о проекте. Истории в нём нет: записи лежат в журнале.
+// Project config is `.cyberzavod/project.json` in its repository: the "project is connected"
+// marker and all the workflow needs about the project. No history: records are in the journal.
 
 import { parseAgentConfig, type AgentConfig } from "./agent.ts";
 import { isLine, isObject } from "./guards.ts";
@@ -7,8 +7,8 @@ import { isHarnessVersion, isRecordId } from "./record.ts";
 import { isStage, type Stage } from "./stage.ts";
 
 /**
- * Что считается проверкой проекта: команды запускаются по порядку, все должны пройти.
- * `paths` — каталоги с кодом: правка в них требует проверки; пусто — весь репозиторий.
+ * What counts as the project's checks: commands run in order, all must pass.
+ * `paths` are code directories: an edit in them requires checks; empty means the whole repository.
  */
 export interface VerificationConfig {
   commands: string[];
@@ -16,42 +16,42 @@ export interface VerificationConfig {
 }
 
 /**
- * Что найдено в проекте при `init` и `sync`: справка, а не ограничение — стек может смениться,
- * и `sync` найдёт его заново.
+ * What `init` and `sync` found in the project: a reference, not a constraint. The stack may change,
+ * and `sync` will find it again.
  */
 export interface StackInfo {
   languages: string[];
   frameworks: string[];
-  /** Менеджер пакетов, например `pnpm`; нет, если не найден. */
+  /** Package manager, for example `pnpm`; absent if not found. */
   packageManager?: string;
 }
 
-/** Конфиг проекта, подключённого к Cyberzavod. */
+/** Config of a project connected to Cyberzavod. */
 export interface ProjectConfig {
-  /** Идентификатор проекта: буквы, цифры, «_» и «-». */
+  /** Project id: letters, digits, "_" and "-". */
   projectId: string;
-  /** Версия harness, по которой созданы файлы адаптеров. */
+  /** Harness version the adapter files were generated from. */
   harness: string;
-  /** Имя процесса из `harness/workflows/`. */
+  /** Workflow name from `harness/workflows/`. */
   workflow: string;
   /**
-   * Каталог журнала относительно корня проекта, через `/`: `journal` — в репозитории,
-   * `../<проект>.cyberzavod` — рядом с ним.
+   * Journal directory relative to the project root, with `/`: `journal` is inside the repository,
+   * `../<project>.cyberzavod` is next to it.
    */
   journal: string;
-  /** Агент каждого этапа; этап без агента ведёт адаптер по умолчанию. */
+  /** Agent for each stage; a stage without an agent is run by the adapter's default. */
   agents: Partial<Record<Stage, AgentConfig>>;
   verification: VerificationConfig;
   stack?: StackInfo;
 }
 
 /**
- * Версия формата `.cyberzavod/project.json`; не путать с версией CLI и harness. Конфиг без поля
- * записан версиями до 0.9.0 и читается как версия 1.
+ * Format version of `.cyberzavod/project.json`; not to be confused with the CLI or harness version.
+ * A config without the field was written by versions before 0.9.0 and is read as version 1.
  */
 export const PROJECT_CONFIG_SCHEMA_VERSION = 1;
 
-/** Ошибка конфига проекта: файл не прошёл проверку. */
+/** Project config error: the file failed validation. */
 export class ProjectConfigError extends Error {}
 
 function isLines(value: unknown): value is string[] {
@@ -112,10 +112,10 @@ function parseStack(raw: unknown): StackInfo | undefined {
 }
 
 /**
- * Проверяет конфиг проекта, прочитанный из файла.
- * @param {unknown} raw Разобранный JSON конфига.
- * @returns {ProjectConfig} Проверенный конфиг; неизвестные поля отброшены.
- * @throws {ProjectConfigError} Если конфиг не соответствует формату.
+ * Validates a project config read from a file.
+ * @param {unknown} raw Parsed JSON of the config.
+ * @returns {ProjectConfig} The validated config; unknown fields are dropped.
+ * @throws {ProjectConfigError} If the config does not match the format.
  */
 export function parseProjectConfig(raw: unknown): ProjectConfig {
   if (!isObject(raw)) throw new ProjectConfigError("project config must be an object");

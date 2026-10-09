@@ -1,19 +1,19 @@
-// Общие предикаты формата: записи и карточки проекта приходят извне и проверяются одинаково.
-// Из пакета не экспортируются.
+// Shared format predicates: records and project cards come from outside and are checked alike.
+// Not exported from the package.
 
 /**
- * Проверяет, что значение — объект (не `null`): разобранный JSON, который можно читать по полям.
- * @param {unknown} value Проверяемое значение.
- * @returns {value is Record<string, unknown>} true, если это объект.
+ * Checks that a value is an object (not `null`): parsed JSON that can be read field by field.
+ * @param {unknown} value The value to check.
+ * @returns {value is Record<string, unknown>} true if it is an object.
  */
 export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
 /**
- * Проверяет, что значение — строка для показа в одну строку: в заголовке, в карточке промпта.
- * @param {unknown} value Проверяемое значение.
- * @returns {value is string} true, если строка непустая и без переводов строки.
+ * Checks that a value is a string to show on one line: in a title, in a prompt card.
+ * @param {unknown} value The value to check.
+ * @returns {value is string} true if the string is non-empty and has no line breaks.
  */
 export function isLine(value: unknown): value is string {
   return typeof value === "string" && value.trim() !== "" && !/[\r\n]/.test(value);

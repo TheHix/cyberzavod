@@ -1,5 +1,5 @@
-// Хранение на диске: маркер проекта, журнал и harness. Формат данных задаёт ядро, здесь — только где
-// и как файлы лежат в файловой системе.
+// On-disk storage: the project marker, the journal and the harness. The core defines the data
+// format; here is only where and how the files lie in the file system.
 
 export {
   DEFAULT_JOURNAL,
