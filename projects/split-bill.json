@@ -9,6 +9,6 @@
     "ru": "Веб-приложение для тех, кто ездит компанией или ходит вместе в кафе: внесите траты, и приложение посчитает, кто кому сколько должен, и сведёт расчёты к минимальному числу переводов. На английском и русском, счёт — в долларах США или российских рублях."
   },
   "repo": "https://github.com/bysavelii/split-bill",
-  "website": "https://bysavelii.github.io/split-bill/",
+  "website": "https://split-bill.bysavelii.com/",
   "stack": ["TypeScript", "Astro", "Solid"]
 }
