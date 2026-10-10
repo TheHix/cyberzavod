@@ -241,6 +241,68 @@ describe("parseRecord", () => {
     expect(act).toThrow(/model/);
   });
 
+  it("сохраняет модель, прошедшую этап", () => {
+    const raw = validSession();
+
+    raw.data.events[2] = {
+      t: 20,
+      type: "stage_enter",
+      stage: "implementation",
+      model: "claude-sonnet-4-6",
+    };
+
+    const recording = parseSession(raw);
+
+    expect(recording.data.events[2]).toEqual({
+      t: 20,
+      type: "stage_enter",
+      stage: "implementation",
+      model: "claude-sonnet-4-6",
+    });
+  });
+
+  it("принимает вход в этап без модели", () => {
+    const raw = validSession();
+
+    const recording = parseSession(raw);
+
+    expect(recording.data.events[2]).not.toHaveProperty("model");
+  });
+
+  it.each(["", "  ", "claude\nopus", 7])("отклоняет модель этапа «%s»", (model) => {
+    const raw = validSession();
+
+    raw.data.events[2] = { t: 20, type: "stage_enter", stage: "implementation", model };
+
+    const act = () => parseRecord(raw);
+
+    expect(act).toThrow(/event #2: model/);
+  });
+
+  it("сохраняет метку задачи", () => {
+    const raw = withData({ task: "split-bill_1" });
+
+    const recording = parseSession(raw);
+
+    expect(recording.data.task).toBe("split-bill_1");
+  });
+
+  it("принимает запись без метки задачи", () => {
+    const raw = validSession();
+
+    const recording = parseSession(raw);
+
+    expect(recording.data).not.toHaveProperty("task");
+  });
+
+  it.each(["", "split bill", "split/bill", "../bill", 7])("отклоняет метку задачи «%s»", (task) => {
+    const raw = withData({ task });
+
+    const act = () => parseRecord(raw);
+
+    expect(act).toThrow(/task/);
+  });
+
   it("отклоняет требование в несколько строк", () => {
     const raw = validSession();
 
@@ -399,6 +461,23 @@ describe("briefOf", () => {
       { t: 25, type: "message", from: "foreman", to: "implementation", line: "Сделай счётчик" },
       ...recording.data.events.slice(4),
     ]);
+  });
+
+  it("сохраняет метку задачи и модель этапа", () => {
+    const raw = withData({ task: "split-bill" });
+
+    raw.data.events[2] = {
+      t: 20,
+      type: "stage_enter",
+      stage: "implementation",
+      model: "claude-sonnet-4-6",
+    };
+    const recording = parseSession(raw);
+
+    const brief = briefOf(recording);
+
+    expect(brief.data.task).toBe("split-bill");
+    expect(brief.data.events[2]).toEqual(recording.data.events[2]);
   });
 
   it("убирает полный текст у вмешательства", () => {
