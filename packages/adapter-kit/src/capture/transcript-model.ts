@@ -1,8 +1,9 @@
 // What a draft takes from an agent's transcript. The model is the same for every agent; each
 // adapter parses its own transcript format into these shapes.
 
-/** A model reply in the transcript: when it came and which model replied. */
+/** A model reply in the transcript: when it ended and which model replied. */
 export interface ModelReply {
+  /** When the reply ended: the calls and prompts before this moment belong to it. */
   ts: number;
   model: string;
 }

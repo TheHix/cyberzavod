@@ -61,6 +61,13 @@ function stagesOf(events: DraftEvent[]): string[] {
   });
 }
 
+// Stage and model of each stage entry in order: `stage:model`, the model empty if unknown.
+function modelsOfStages(events: DraftEvent[]): string[] {
+  return events.flatMap((event) =>
+    event.type === "stage_enter" ? [`${event.stage}:${event.model ?? ""}`] : [],
+  );
+}
+
 describe("toDraft", () => {
   it("проводит типичную сессию по этапам код → проверки → код → проверки → ревью → выпуск", () => {
     const raw = typicalSession();
@@ -565,6 +572,44 @@ describe("toDraft", () => {
     expect(
       draft.events.flatMap((event) => (event.type === "draft_prompt" ? [event.model] : [])),
     ).toEqual(["claude-opus-5-5", "claude-sonnet-5-5", undefined]);
+  });
+
+  it("отдаёт этапу, который начали инструменты, модель ответа, внутри которого вызов", () => {
+    const raw: RawEvent[] = [
+      { ts: START + 1_000, kind: "tool", tool: "Edit", ok: true },
+      { ts: START + 5_000, kind: "tool", tool: "Bash", ok: true, command: "make check" },
+    ];
+    const replies = [
+      { ts: START + 2_000, model: "claude-opus-5-5" },
+      { ts: START + 9_000, model: "claude-sonnet-5-5" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1", replies });
+
+    expect(modelsOfStages(draft.events)).toEqual([
+      "implementation:claude-opus-5-5",
+      "verification:claude-sonnet-5-5",
+    ]);
+  });
+
+  it("отдаёт этапу, который начали инструменты после последнего ответа, модель последнего ответа", () => {
+    const raw: RawEvent[] = [{ ts: START + 5_000, kind: "tool", tool: "Edit", ok: true }];
+    const replies = [
+      { ts: START + 1_000, model: "claude-opus-5-5" },
+      { ts: START + 2_000, model: "claude-sonnet-5-5" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1", replies });
+
+    expect(modelsOfStages(draft.events)).toEqual(["implementation:claude-sonnet-5-5"]);
+  });
+
+  it("не пишет модель этапа без транскрипта", () => {
+    const raw: RawEvent[] = [{ ts: START, kind: "tool", tool: "Edit", ok: true }];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(draft.events[0]).not.toHaveProperty("model");
   });
 
   it("не пропускает служебные сообщения в промпты", () => {
@@ -1108,6 +1153,27 @@ describe("toDraft: запуски станций", () => {
     expect(
       draft.events.flatMap((event) => (event.type === "stage_enter" ? [event.run] : [])),
     ).toEqual(["c1", "c2"]);
+  });
+
+  it("отдаёт входу на этап станции модель её запуска по agentId", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "subagent_start", agent: "coder", agentId: "c1" },
+      { ts: START + 1_000, kind: "subagent_start", agent: "reviewer", agentId: "r1" },
+      { ts: START + 2_000, kind: "subagent_start", agent: "tester" },
+      { ts: START + 3_000, kind: "subagent_start", agent: "Explore", agentId: "e1" },
+    ];
+    const runModels = new Map([
+      ["c1", "claude-sonnet-5-5"],
+      ["e1", "claude-haiku-4-5"],
+    ]);
+
+    const draft = toDraft(raw, { sessionId: "s1", runModels });
+
+    expect(modelsOfStages(draft.events)).toEqual([
+      "implementation:claude-sonnet-5-5",
+      "review:",
+      "verification:",
+    ]);
   });
 
   it("не повторяет этап правками, пока сборка стоит на нём", () => {

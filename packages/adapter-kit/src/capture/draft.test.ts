@@ -116,6 +116,45 @@ function publishOnly(draft: Draft) {
 }
 
 describe("parseDraft", () => {
+  it("читает метку задачи сборки", () => {
+    const raw = {
+      ...uneditedDraft(),
+      builds: [{ ...uneditedDraft().builds[0], task: "split-bill" }],
+    };
+
+    const draft = parseDraft(raw);
+
+    expect(buildOf(draft, 0).task).toBe("split-bill");
+  });
+
+  it("не придумывает метку задачи, если её нет в черновике", () => {
+    const raw: unknown = JSON.parse(JSON.stringify(uneditedDraft()));
+
+    const draft = parseDraft(raw);
+
+    expect(buildOf(draft, 0)).not.toHaveProperty("task");
+  });
+
+  it("отклоняет метку задачи не строкой", () => {
+    const raw = { ...uneditedDraft(), builds: [{ ...uneditedDraft().builds[0], task: 5 }] };
+
+    const act = () => parseDraft(raw);
+
+    expect(act).toThrow(new DraftError(`build ${BUILD_ID}: task must be a string`));
+  });
+
+  it("читает модель входа на этап", () => {
+    const raw: unknown = JSON.parse(
+      JSON.stringify(
+        draftWith({ t: 2_000, type: "stage_enter", stage: "review", model: "claude-opus-5-5" }),
+      ),
+    );
+
+    const draft = parseDraft(raw);
+
+    expect(draft.events[0]).toMatchObject({ type: "stage_enter", model: "claude-opus-5-5" });
+  });
+
   it("принимает черновик с ещё пустой редактурой", () => {
     const raw: unknown = JSON.parse(JSON.stringify(uneditedDraft()));
 
@@ -423,6 +462,17 @@ describe("carryOverEdits", () => {
     const draft = carryOverEdits(previous, next);
 
     expect(draft.builds).toEqual(interleavedDraft().builds);
+  });
+
+  it("переносит метку задачи, которую редактор поставил сборке", () => {
+    const previous = editedDraft();
+
+    previous.builds = [{ ...buildOf(previous, 0), task: "split-bill" }];
+    const next = uneditedDraft();
+
+    const draft = carryOverEdits(previous, next);
+
+    expect(buildOf(draft, 0).task).toBe("split-bill");
   });
 
   it("переносит заполненные редактором проект и версию harness первой сборки", () => {
@@ -759,6 +809,77 @@ describe("publishBuild", () => {
       requirements: ["Показывай его над цехом"],
       model: "claude-opus-5-5",
     });
+  });
+
+  it("кладёт метку задачи сборки в запись", () => {
+    const draft = editedDraft();
+
+    buildOf(draft, 0).task = "split-bill";
+
+    const recording = publishOnly(draft);
+
+    expect(recording.data.task).toBe("split-bill");
+  });
+
+  it.each([undefined, ""])("не пишет метку задачи, если она %j", (task) => {
+    const draft = editedDraft();
+
+    buildOf(draft, 0).task = task;
+
+    const recording = publishOnly(draft);
+
+    expect(recording.data).not.toHaveProperty("task");
+  });
+
+  it("отклоняет метку задачи с пробелом", () => {
+    const draft = editedDraft();
+
+    buildOf(draft, 0).task = "split bill";
+
+    const act = () => publishOnly(draft);
+
+    expect(act).toThrow(RecordError);
+    expect(act).toThrow(/task/);
+  });
+
+  it("проверяет на утечки метку задачи", () => {
+    const draft = editedDraft();
+
+    buildOf(draft, 0).task = "sk-abcdefgh12345678";
+
+    const act = () => publishOnly(draft);
+
+    expect(act).toThrow(KitError);
+  });
+
+  it("кладёт модель на вход на этап, а без неё поля не пишет", () => {
+    const draft = editedDraft();
+
+    draft.events = [
+      { t: 1_000, type: "stage_enter", stage: "planning", model: "claude-opus-5-5" },
+      { t: 2_000, type: "draft_prompt", said: "а", goal: "Добавь", requirements: [] },
+      { t: 3_000, type: "stage_enter", stage: "implementation" },
+    ];
+
+    const recording = publishOnly(draft);
+
+    expect(recording.data.events.filter((event) => event.type === "stage_enter")).toEqual([
+      { t: 0, type: "stage_enter", stage: "planning", model: "claude-opus-5-5" },
+      { t: 2_000, type: "stage_enter", stage: "implementation" },
+    ]);
+  });
+
+  it("проверяет на утечки модель на входе на этап", () => {
+    const draft = editedDraft();
+
+    draft.events = [
+      { t: 1_000, type: "draft_prompt", said: "а", goal: "Добавь", requirements: [] },
+      { t: 2_000, type: "stage_enter", stage: "planning", model: "arn:aws:bedrock:203.0.113.7" },
+    ];
+
+    const act = () => publishOnly(draft);
+
+    expect(act).toThrow(/IP address/);
   });
 
   it("публикует вмешательство без исходного текста", () => {
