@@ -71,6 +71,21 @@ export function formatNumber(value: number, locale: Locale): string {
   return NUMBER_FORMATTERS[locale].format(value);
 }
 
+const PERCENT_FORMATTERS = byLocale(
+  (locale) =>
+    new Intl.NumberFormat(LOCALE_TAGS[locale], { style: "percent", maximumFractionDigits: 0 }),
+);
+
+/**
+ * Formats a share as a whole percent.
+ * @param {number} share Share from 0 to 1.
+ * @param {Locale} locale Language whose rules write the number and the percent sign.
+ * @returns {string} A string like "57%"; in Russian «57 %» with a non-breaking space.
+ */
+export function formatPercent(share: number, locale: Locale): string {
+  return PERCENT_FORMATTERS[locale].format(share);
+}
+
 /**
  * Formats a token count with digit grouping.
  * @param {number} tokens Token count.

@@ -7,6 +7,7 @@ function validStats(): BuildStats {
     recordings: 1,
     authors: 1,
     tokens: 100,
+    withoutReworks: 1,
     returns: [],
     interventions: [],
     outcomes: { ok: 1, failed: 0 },

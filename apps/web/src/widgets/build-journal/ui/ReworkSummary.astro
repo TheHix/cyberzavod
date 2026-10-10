@@ -1,0 +1,55 @@
+---
+// What the process caught: the reworks of a recording, each with what the returning stage said.
+// Static markup without an island: the recording is known at site build time.
+import { reworksOf, type SessionRecord } from "@cyberzavod/core";
+import type { Locale } from "@/shared/i18n/locale.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
+import { Title } from "@/shared/ui";
+import ReworkCard from "./ReworkCard.astro";
+
+interface Props {
+  /** Full recording: the stage's full text comes from it. */
+  recording: SessionRecord;
+  /** Page language: headings and labels are in it. */
+  locale: Locale;
+}
+
+const TEXT = UI_TEXT.reworks;
+
+const { recording, locale } = Astro.props;
+const reworks = reworksOf(recording);
+---
+
+<section class="summary">
+  <Title as="h3">{TEXT.caughtHeading[locale]}</Title>
+  {reworks.length === 0 ? (
+    <p class="note">{TEXT.firstTry[locale]}</p>
+  ) : (
+    <ol class="reworks">
+      {reworks.map((rework) => (
+        <li>
+          <ReworkCard rework={rework} language={recording.data.language} locale={locale} />
+        </li>
+      ))}
+    </ol>
+  )}
+</section>
+
+<style>
+  .summary {
+    display: grid;
+    gap: var(--space-s);
+  }
+
+  .reworks {
+    display: grid;
+    gap: var(--space-m);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .note {
+    margin: 0;
+  }
+</style>

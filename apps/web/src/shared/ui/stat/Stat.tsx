@@ -6,7 +6,7 @@ import styles from "./Stat.module.css";
 export interface StatItem {
   readonly label: string;
   readonly value: string;
-  /** Note under the value: "no rework 4 of 7". Wraps when it does not fit. */
+  /** Note under the value: "4 of 7". Wraps when it does not fit. */
   readonly detail?: string | undefined;
 }
 

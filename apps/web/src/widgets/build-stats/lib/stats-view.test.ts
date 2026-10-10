@@ -7,6 +7,7 @@ function emptyStats(): BuildStats {
     recordings: 0,
     authors: 0,
     tokens: 0,
+    withoutReworks: 0,
     returns: [],
     interventions: [],
     outcomes: { ok: 0, failed: 0 },
@@ -18,6 +19,7 @@ function filledStats(): BuildStats {
     recordings: 12,
     authors: 3,
     tokens: 4_500_000,
+    withoutReworks: 5,
     returns: [
       { key: "verification", count: 2 },
       { key: "review", count: 7 },
@@ -42,6 +44,7 @@ describe("statsViewOf", () => {
       { label: "Builds", value: "12" },
       { label: "Authors", value: "3" },
       { label: "Tokens", value: "4,500,000" },
+      { label: "First try", value: "42%", detail: "5 of 12" },
       { label: "Reworks", value: "10" },
       { label: "Interventions", value: "9" },
     ]);

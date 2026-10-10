@@ -2,7 +2,7 @@
 // Project totals as counters: computed at site build time from the recordings of its builds,
 // without the API.
 import type { SessionRecord } from "@cyberzavod/core";
-import { totalsOf } from "@/entities/recording";
+import { reworksByStageOf, totalsOf } from "@/entities/recording";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { StatList } from "@/shared/ui";
 import { projectTotalsOf } from "../lib/totals-view.ts";
@@ -16,7 +16,8 @@ interface Props {
 
 const { recordings, locale } = Astro.props;
 const totals = totalsOf(recordings);
-const items = projectTotalsOf(totals, locale);
+const stageReworks = reworksByStageOf(recordings);
+const items = projectTotalsOf(totals, stageReworks, locale);
 ---
 
 <StatList items={items} />
