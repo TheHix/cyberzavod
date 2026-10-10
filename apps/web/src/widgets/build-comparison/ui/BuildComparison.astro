@@ -1,0 +1,143 @@
+---
+// Runs of one task side by side: for each recording the agent, the models by stage, the reworks,
+// tokens, time and outcome. Static markup without an island: the recordings are known at site
+// build time. The panel scrolls inside the field, like a guide article.
+import { projectLinkOf, projectOf, publishedProjects } from "@/entities/project";
+import { comparisonTitleOf, type TaskComparison } from "@/entities/recording";
+import type { Locale } from "@/shared/i18n/locale.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
+import { Card, Panel, StatList, Title } from "@/shared/ui";
+import { comparisonColumnOf } from "../lib/comparison-view.ts";
+
+interface Props {
+  comparison: TaskComparison;
+  /** Page language: captions, numbers and dates are in it; recording titles keep their own. */
+  locale: Locale;
+}
+
+const TEXT = UI_TEXT.comparison;
+
+const { comparison, locale } = Astro.props;
+const [firstRun] = comparison.recordings;
+const columns = comparison.recordings.map((recording) => ({
+  column: comparisonColumnOf(recording, locale),
+  project: projectLinkOf(projectOf(publishedProjects, recording.projectId), locale),
+}));
+---
+
+<Panel scrollable>
+  <div class="comparison">
+    <header class="header">
+      <Title as="h1" size="xl">
+        {TEXT.heading[locale]}
+      </Title>
+      <Title as="p" size="m" lang={firstRun?.data.language}>
+        {comparisonTitleOf(comparison)}
+      </Title>
+      <p class="intro">{TEXT.intro[locale]}</p>
+    </header>
+    <ol class="columns">
+      {columns.map(({ column, project }) => (
+        <li class="run">
+          <Card>
+            <div class="column">
+              <Title as="h2" lang={column.language}>
+                <a href={column.url}>{column.title}</a>
+              </Title>
+              <p class="note">
+                <a href={project.url}>{project.name}</a> · {column.day}
+              </p>
+              <dl class="facts">
+                <dt>{TEXT.agent[locale]}</dt>
+                <dd>{column.agent}</dd>
+              </dl>
+              <p class="note">{column.process}</p>
+              <section class="stages">
+                <Title as="h3" size="m">
+                  {TEXT.stagesHeading[locale]}
+                </Title>
+                <dl class="facts">
+                  {column.stages.map((stage) => (
+                    <>
+                      <dt>{stage.label}</dt>
+                      <dd>{stage.models}</dd>
+                    </>
+                  ))}
+                </dl>
+              </section>
+              <StatList items={column.counters} />
+            </div>
+          </Card>
+        </li>
+      ))}
+    </ol>
+  </div>
+</Panel>
+
+<style>
+  .comparison {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-l);
+  }
+
+  .header {
+    display: grid;
+    gap: var(--space-s);
+  }
+
+  .intro {
+    margin: 0;
+    color: var(--ink-soft);
+    font-weight: 700;
+  }
+
+  .columns {
+    --column-min-width: 18rem;
+
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--column-min-width)), 1fr));
+    gap: var(--space-m);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* The card stretches to the tallest column, so the counters line up across the row. */
+  .run {
+    display: grid;
+  }
+
+  .column {
+    display: grid;
+    gap: var(--space-m);
+    align-content: start;
+  }
+
+  .note {
+    margin: 0;
+    color: var(--ink-soft);
+    font-weight: 700;
+  }
+
+  .stages {
+    display: grid;
+    gap: var(--space-s);
+  }
+
+  .facts {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--space-xs) var(--space-m);
+    margin: 0;
+  }
+
+  .facts dt {
+    color: var(--ink-soft);
+    font-weight: 700;
+  }
+
+  .facts dd {
+    margin: 0;
+  }
+</style>

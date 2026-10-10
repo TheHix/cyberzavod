@@ -71,13 +71,22 @@ export interface InterventionEvent {
   text: string;
 }
 
+/** Entry of the session into a workflow stage: the station starts working. */
+export interface StageEnterEvent {
+  t: number;
+  type: "stage_enter";
+  stage: Stage;
+  /** Model that ran the stage, an id like `claude-sonnet-4-6`; absent if unknown. */
+  model?: string;
+}
+
 /** Session event; `t` is milliseconds from the session start (the record's `timestamp`). */
 export type SessionEvent =
   | { t: number; type: "build_start" }
   | PromptEvent
   | MessageEvent
   | InterventionEvent
-  | { t: number; type: "stage_enter"; stage: Stage }
+  | StageEnterEvent
   | { t: number; type: "stage_fail"; stage: Stage; reason: string }
   | { t: number; type: "usage"; tokens: number }
   | { t: number; type: "build_end"; ok: boolean };
@@ -111,6 +120,11 @@ export interface SessionData {
   workflow: string;
   /** Harness version on one line, for example `0.3.0`: shows which rules were in effect. */
   harness: string;
+  /**
+   * Task label: records with the same label are runs of one task, and the site compares them. It
+   * goes into the page address, so the rules are the same as for `id`; absent if not compared.
+   */
+  task?: string;
   events: SessionEvent[];
 }
 
@@ -285,10 +299,17 @@ function parseIntervention(raw: Record<string, unknown>, t: number, fail: Fail):
   return { t, type: "intervention", reason, line, text };
 }
 
-function parseStageEnter(raw: Record<string, unknown>, t: number, fail: Fail): SessionEvent {
-  if (!isStage(raw.stage)) throw fail(`unknown stage ${String(raw.stage)}`);
+function parseStageEnter(raw: Record<string, unknown>, t: number, fail: Fail): StageEnterEvent {
+  const { stage, model } = raw;
 
-  return { t, type: "stage_enter", stage: raw.stage };
+  if (!isStage(stage)) throw fail(`unknown stage ${String(stage)}`);
+
+  const entry: StageEnterEvent = { t, type: "stage_enter", stage };
+
+  if (model === undefined) return entry;
+  if (!isLine(model)) throw fail("model must be a non-empty single-line string");
+
+  return { ...entry, model };
 }
 
 function parseStageFail(raw: Record<string, unknown>, t: number, fail: Fail): SessionEvent {
@@ -422,7 +443,7 @@ function parseEvents(raw: unknown): SessionEvent[] {
 function parseSessionData(raw: unknown): SessionData {
   if (!isObject(raw)) throw new RecordError("data must be an object");
 
-  const { title, workflow, harness, language = LEGACY_SESSION_LANGUAGE } = raw;
+  const { title, workflow, harness, task, language = LEGACY_SESSION_LANGUAGE } = raw;
 
   if (!isLine(title)) {
     throw new RecordError("title must be a non-empty single-line string");
@@ -435,7 +456,14 @@ function parseSessionData(raw: unknown): SessionData {
     throw new RecordError("harness must be a non-empty single-line string");
   }
 
-  return { title, language, workflow, harness, events: parseEvents(raw.events) };
+  const data: SessionData = { title, language, workflow, harness, events: parseEvents(raw.events) };
+
+  if (task === undefined) return data;
+  if (!isRecordId(task)) {
+    throw new RecordError("task must contain only letters, digits, underscores and hyphens");
+  }
+
+  return { ...data, task };
 }
 
 function parseDecisionData(raw: unknown): DecisionRecord["data"] {

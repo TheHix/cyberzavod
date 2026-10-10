@@ -1,4 +1,9 @@
 import { reworksOf, STAGES, type SessionRecord, type Stage } from "@cyberzavod/core";
+import { STAGE_LABELS } from "@/shared/config/stages.ts";
+import type { Locale } from "@/shared/i18n/locale.ts";
+import { formatNumber } from "@/shared/lib/format.ts";
+
+const DETAIL_SEPARATOR = " · ";
 
 /** How many times one stage sent the work back across several builds. */
 export interface StageReworks {
@@ -22,4 +27,24 @@ export function reworksByStageOf(recordings: readonly SessionRecord[]): StageRew
     stage,
     count: stages.filter((reworked) => reworked === stage).length,
   })).filter(({ count }) => count > 0);
+}
+
+/**
+ * Writes the rework breakdown by stage as a note under a counter.
+ * @param {readonly StageReworks[]} stageReworks Rework counts by stage, as `reworksByStageOf` gives.
+ * @param {Locale} locale Page language: stage names and numbers are in it.
+ * @returns {string | undefined} A string like "Review 17 · Verify 1"; in Russian «Ревью 17 ·
+ * Проверки 1»; `undefined` if no stage sent the work back.
+ */
+export function stageReworksDetailOf(
+  stageReworks: readonly StageReworks[],
+  locale: Locale,
+): string | undefined {
+  if (stageReworks.length === 0) return undefined;
+
+  const byStage = stageReworks.map(
+    ({ stage, count }) => `${STAGE_LABELS[stage][locale]} ${formatNumber(count, locale)}`,
+  );
+
+  return byStage.join(DETAIL_SEPARATOR);
 }

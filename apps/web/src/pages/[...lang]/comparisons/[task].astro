@@ -1,0 +1,38 @@
+---
+import type { GetStaticPaths } from "astro";
+import GameLayout from "@/app/layouts/GameLayout.astro";
+import { BuildComparison } from "@/widgets/build-comparison";
+import {
+  comparisonTitleOf,
+  publishedRecordings,
+  taskComparisonsOf,
+  type TaskComparison,
+} from "@/entities/recording";
+import { LOCALES, type Locale } from "@/shared/i18n/locale.ts";
+import { localeParam } from "@/shared/i18n/path.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
+
+export const getStaticPaths = (() =>
+  LOCALES.flatMap((locale) =>
+    taskComparisonsOf(publishedRecordings).map((comparison) => ({
+      params: { lang: localeParam(locale), task: comparison.task },
+      props: { locale, comparison },
+    })),
+  )) satisfies GetStaticPaths;
+
+interface Props {
+  locale: Locale;
+  comparison: TaskComparison;
+}
+
+const { locale, comparison } = Astro.props;
+const taskTitle = comparisonTitleOf(comparison);
+---
+
+<GameLayout
+  locale={locale}
+  title={UI_TEXT.pages.comparisonTitle[locale](taskTitle)}
+  description={UI_TEXT.pages.comparisonDescription[locale](taskTitle)}
+>
+  <BuildComparison comparison={comparison} locale={locale} />
+</GameLayout>

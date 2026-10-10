@@ -143,6 +143,16 @@ export const UI_TEXT = {
       ru: (title: string) =>
         `Как ИИ-агенты собирали «${title}»: промпты человека, реплики мастера и станций, время и токены.`,
     },
+    comparisonTitle: {
+      en: (title: string) => `Comparison: “${title}”`,
+      ru: (title: string) => `Сравнение: «${title}»`,
+    },
+    comparisonDescription: {
+      en: (title: string) =>
+        `One task, one process, different models: “${title}” — models by stage, reworks, tokens, time and outcome side by side.`,
+      ru: (title: string) =>
+        `Одна задача, один процесс, разные модели: «${title}» — модели по этапам, возвраты, токены, время и итог рядом.`,
+    },
   },
   /** Duration units: "1 h 05 min", «1 ч 05 мин». */
   duration: {
@@ -376,6 +386,26 @@ export const UI_TEXT = {
       en: (clean: number, builds: number) => `${clean} of ${builds}`,
       ru: (clean: number, builds: number) => `${clean} из ${builds}`,
     },
+  },
+  /** Comparison of runs of one task: the page and the link to it from a recording. */
+  comparison: {
+    heading: { en: "One task, different models", ru: "Одна задача, разные модели" },
+    intro: {
+      en: "The same task went through the same process; only the agent and the models changed.",
+      ru: "Одна и та же задача прошла один и тот же процесс; менялись только агент и модели.",
+    },
+    process: {
+      en: (workflow: string, harness: string) => `process ${workflow} · harness ${harness}`,
+      ru: (workflow: string, harness: string) => `процесс ${workflow} · harness ${harness}`,
+    },
+    agent: { en: "Agent", ru: "Агент" },
+    manual: { en: "by hand", ru: "вручную" },
+    stagesHeading: { en: "Models by stage", ru: "Модели по этапам" },
+    unknownModel: { en: "model unknown", ru: "модель неизвестна" },
+    outcome: { en: "Outcome", ru: "Итог" },
+    passed: { en: "checks passed", ru: "проверки прошли" },
+    failed: { en: "checks failed", ru: "проверки не прошли" },
+    link: { en: "Compare runs of this task", ru: "Сравнить прогоны этой задачи" },
   },
   /** Galleries: examples (projects the factory built from scratch) above the user galleries. */
   examples: {
