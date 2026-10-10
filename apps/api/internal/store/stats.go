@@ -74,7 +74,8 @@ func readStats(ctx context.Context, tx pgx.Tx) (gallery.Stats, error) {
 	return stats, nil
 }
 
-// readTotals counts recordings, authors, tokens and build outcomes.
+// readTotals counts recordings, authors, tokens, recordings without a single return and build
+// outcomes.
 func readTotals(ctx context.Context, tx pgx.Tx) (gallery.Stats, error) {
 	var stats gallery.Stats
 	err := tx.QueryRow(ctx, publicEventsSQL+`
@@ -85,11 +86,17 @@ func readTotals(ctx context.Context, tx pgx.Tx) (gallery.Stats, error) {
 				CASE WHEN jsonb_typeof(event -> 'tokens') = 'number'
 					THEN (event ->> 'tokens')::numeric END
 			), 0)::bigint FROM events WHERE event ->> 'type' = 'usage'),
+			(SELECT count(*) FROM public_recordings r WHERE NOT EXISTS (
+				SELECT 1 FROM jsonb_array_elements(r.body -> 'data' -> 'events') AS event
+				WHERE event ->> 'type' = 'stage_fail')),
 			(SELECT count(*) FROM events
 				WHERE event ->> 'type' = 'build_end' AND event -> 'ok' = 'true'::jsonb),
 			(SELECT count(*) FROM events
 				WHERE event ->> 'type' = 'build_end' AND event -> 'ok' = 'false'::jsonb)`,
-	).Scan(&stats.Recordings, &stats.Authors, &stats.Tokens, &stats.Outcomes.OK, &stats.Outcomes.Failed)
+	).Scan(
+		&stats.Recordings, &stats.Authors, &stats.Tokens, &stats.WithoutReworks,
+		&stats.Outcomes.OK, &stats.Outcomes.Failed,
+	)
 	if err != nil {
 		return gallery.Stats{}, fmt.Errorf("итоги по записям: %w", err)
 	}

@@ -375,12 +375,13 @@ func TestStats(t *testing.T) {
 		}
 	}
 	want := gallery.Stats{
-		Recordings:    2,
-		Authors:       1,
-		Tokens:        1500,
-		Returns:       []gallery.StageReturns{{Stage: "review", Count: 2}, {Stage: "verification", Count: 1}},
-		Interventions: []gallery.ReasonInterventions{{Reason: "plan_review", Count: 1}},
-		Outcomes:      gallery.Outcomes{OK: 1, Failed: 1},
+		Recordings:     2,
+		Authors:        1,
+		Tokens:         1500,
+		WithoutReworks: 1,
+		Returns:        []gallery.StageReturns{{Stage: "review", Count: 2}, {Stage: "verification", Count: 1}},
+		Interventions:  []gallery.ReasonInterventions{{Reason: "plan_review", Count: 1}},
+		Outcomes:       gallery.Outcomes{OK: 1, Failed: 1},
 	}
 
 	stats, err := store.Stats(t.Context())
