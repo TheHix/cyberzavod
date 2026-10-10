@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "id": "2026-10-10-4093fdb0",
+  "timestamp": "2026-10-10T09:17:26.055Z",
+  "projectId": "cyberzavod",
+  "source": {
+    "type": "manual"
+  },
+  "type": "decision",
+  "data": {
+    "title": "Проект ведёт один агент: Claude Code или Codex, не оба сразу",
+    "description": "Так решил человек на старте второго адаптера: формат конфига (agents по этапам) не меняется; смешанный конфиг — ошибка, сменить агента — через disconnect и init --agent"
+  }
+}
