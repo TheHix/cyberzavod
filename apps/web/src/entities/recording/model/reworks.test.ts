@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SessionEvent, SessionRecord, Stage } from "@cyberzavod/core";
-import { reworksByStageOf } from "./reworks.ts";
+import { reworksByStageOf, stageReworksDetailOf } from "./reworks.ts";
 
 function recordingReturnedBy(stages: readonly Stage[]): SessionRecord {
   const events: SessionEvent[] = [
@@ -57,5 +57,30 @@ describe("reworksByStageOf", () => {
     const reworks = reworksByStageOf([recordingReturnedBy([])]);
 
     expect(reworks).toEqual([]);
+  });
+});
+
+describe("stageReworksDetailOf", () => {
+  it("пишет этапы через точку с числом возвратов у каждого", () => {
+    const stageReworks = [
+      { stage: "review", count: 17 },
+      { stage: "verification", count: 1 },
+    ] as const;
+
+    const detail = stageReworksDetailOf(stageReworks, "ru");
+
+    expect(detail).toBe("Ревью 17 · Проверки 1");
+  });
+
+  it("называет этапы на языке страницы", () => {
+    const detail = stageReworksDetailOf([{ stage: "review", count: 2 }], "en");
+
+    expect(detail).toBe("Review 2");
+  });
+
+  it("без возвратов пояснения нет", () => {
+    const detail = stageReworksDetailOf([], "ru");
+
+    expect(detail).toBeUndefined();
   });
 });

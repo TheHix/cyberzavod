@@ -36,6 +36,14 @@ function recordingWith(
   };
 }
 
+function failedRecording(): SessionRecord {
+  const recording = recordingWith();
+  const eventsBeforeEnd = recording.data.events.slice(0, -1);
+  const failedEnd: SessionEvent = { t: 125_000, type: "build_end", ok: false };
+
+  return { ...recording, data: { ...recording.data, events: [...eventsBeforeEnd, failedEnd] } };
+}
+
 describe("comparisonColumnOf", () => {
   it("называет агента Claude Code по источнику записи", () => {
     const recording = recordingWith();
@@ -116,14 +124,9 @@ describe("comparisonColumnOf", () => {
   });
 
   it("пишет, что проверки не прошли, если сборка закончилась неудачей", () => {
-    const failed: SessionRecord = recordingWith();
-    const events = failed.data.events.slice(0, -1);
-    const unsuccessful: SessionRecord = {
-      ...failed,
-      data: { ...failed.data, events: [...events, { t: 125_000, type: "build_end", ok: false }] },
-    };
+    const recording = failedRecording();
 
-    const column = comparisonColumnOf(unsuccessful, "ru");
+    const column = comparisonColumnOf(recording, "ru");
 
     expect(column.counters.at(-1)).toEqual({ label: "Итог", value: "проверки не прошли" });
   });

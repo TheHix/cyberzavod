@@ -2,13 +2,13 @@ export { publishedRecordings } from "./model/published.ts";
 export { comparisonUrl, recordingUrl } from "./model/url.ts";
 export {
   comparisonOfRecording,
-  MIN_COMPARED_RECORDINGS,
+  comparisonTitleOf,
   taskComparisonsOf,
   type TaskComparison,
 } from "./model/comparison.ts";
 export { recordingsOfProject } from "./model/project.ts";
 export { projectSeriesOf, type ProjectSeries } from "./model/series.ts";
-export { reworksByStageOf, type StageReworks } from "./model/reworks.ts";
+export { reworksByStageOf, stageReworksDetailOf, type StageReworks } from "./model/reworks.ts";
 export {
   averagePerBuild,
   humanInputOf,

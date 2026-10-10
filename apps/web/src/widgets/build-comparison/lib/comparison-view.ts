@@ -1,5 +1,5 @@
 import { stageModelsOf, summarize, type SessionRecord, type StageModels } from "@cyberzavod/core";
-import { recordingUrl, reworksByStageOf } from "@/entities/recording";
+import { recordingUrl, reworksByStageOf, stageReworksDetailOf } from "@/entities/recording";
 import { AGENT_NAMES } from "@/shared/config/agents.ts";
 import { STAGE_LABELS } from "@/shared/config/stages.ts";
 import type { Locale } from "@/shared/i18n/locale.ts";
@@ -15,7 +15,6 @@ import type { StatItem } from "@/shared/ui";
 
 const TEXT = UI_TEXT.comparison;
 const MODEL_SEPARATOR = " → ";
-const DETAIL_SEPARATOR = " · ";
 
 /** Models that ran one stage of the run, ready to show. */
 export interface StageModelsView {
@@ -55,17 +54,13 @@ function stageModelsViewOf({ stage, models }: StageModels, locale: Locale): Stag
 }
 
 function reworksItemOf(recording: SessionRecord, reworks: number, locale: Locale): StatItem {
-  const label = UI_TEXT.hud.reworks[locale];
-  const value = formatNumber(reworks, locale);
   const stageReworks = reworksByStageOf([recording]);
 
-  if (stageReworks.length === 0) return { label, value };
-
-  const byStage = stageReworks.map(
-    ({ stage, count }) => `${STAGE_LABELS[stage][locale]} ${formatNumber(count, locale)}`,
-  );
-
-  return { label, value, detail: byStage.join(DETAIL_SEPARATOR) };
+  return {
+    label: UI_TEXT.hud.reworks[locale],
+    value: formatNumber(reworks, locale),
+    detail: stageReworksDetailOf(stageReworks, locale),
+  };
 }
 
 function outcomeItemOf(ok: boolean, locale: Locale): StatItem {

@@ -1,10 +1,10 @@
 import {
   averagePerBuild,
   humanInputOf,
+  stageReworksDetailOf,
   type RecordingTotals,
   type StageReworks,
 } from "@/entities/recording";
-import { STAGE_LABELS } from "@/shared/config/stages.ts";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import {
@@ -38,13 +38,7 @@ function reworksItemOf(
   const label = TEXT.reworks[locale];
   const value = formatNumber(totals.reworks, locale);
 
-  if (stageReworks.length === 0) return { label, value };
-
-  const byStage = stageReworks.map(
-    ({ stage, count }) => `${STAGE_LABELS[stage][locale]} ${formatNumber(count, locale)}`,
-  );
-
-  return { label, value, detail: byStage.join(DETAIL_SEPARATOR) };
+  return { label, value, detail: stageReworksDetailOf(stageReworks, locale) };
 }
 
 function humanInputItemOf(totals: RecordingTotals, locale: Locale): StatItem {

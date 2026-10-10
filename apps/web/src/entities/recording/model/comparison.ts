@@ -55,3 +55,13 @@ export function comparisonOfRecording(
 
   return taskComparisonsOf(recordings).find((comparison) => comparison.task === task);
 }
+
+/**
+ * Names a comparison by its task: the title of the earliest run, since the label is only an
+ * address. The title keeps the language of its recording.
+ * @param {TaskComparison} comparison The comparison.
+ * @returns {string} Title of the first run; the label if the comparison has no runs.
+ */
+export function comparisonTitleOf(comparison: TaskComparison): string {
+  return comparison.recordings[0]?.data.title ?? comparison.task;
+}

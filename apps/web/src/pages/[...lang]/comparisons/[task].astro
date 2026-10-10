@@ -2,7 +2,12 @@
 import type { GetStaticPaths } from "astro";
 import GameLayout from "@/app/layouts/GameLayout.astro";
 import { BuildComparison } from "@/widgets/build-comparison";
-import { publishedRecordings, taskComparisonsOf, type TaskComparison } from "@/entities/recording";
+import {
+  comparisonTitleOf,
+  publishedRecordings,
+  taskComparisonsOf,
+  type TaskComparison,
+} from "@/entities/recording";
 import { LOCALES, type Locale } from "@/shared/i18n/locale.ts";
 import { localeParam } from "@/shared/i18n/path.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
@@ -21,8 +26,7 @@ interface Props {
 }
 
 const { locale, comparison } = Astro.props;
-const [firstRun] = comparison.recordings;
-const taskTitle = firstRun?.data.title ?? comparison.task;
+const taskTitle = comparisonTitleOf(comparison);
 ---
 
 <GameLayout

@@ -3,7 +3,7 @@
 // tokens, time and outcome. Static markup without an island: the recordings are known at site
 // build time. The panel scrolls inside the field, like a guide article.
 import { projectLinkOf, projectOf, publishedProjects } from "@/entities/project";
-import type { TaskComparison } from "@/entities/recording";
+import { comparisonTitleOf, type TaskComparison } from "@/entities/recording";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { Card, Panel, StatList, Title } from "@/shared/ui";
@@ -20,7 +20,6 @@ const TEXT = UI_TEXT.comparison;
 const { comparison, locale } = Astro.props;
 const [firstRun] = comparison.recordings;
 const columns = comparison.recordings.map((recording) => ({
-  recording,
   column: comparisonColumnOf(recording, locale),
   project: projectLinkOf(projectOf(publishedProjects, recording.projectId), locale),
 }));
@@ -32,11 +31,9 @@ const columns = comparison.recordings.map((recording) => ({
       <Title as="h1" size="xl">
         {TEXT.heading[locale]}
       </Title>
-      {firstRun !== undefined && (
-        <Title as="p" size="m" lang={firstRun.data.language}>
-          {firstRun.data.title}
-        </Title>
-      )}
+      <Title as="p" size="m" lang={firstRun?.data.language}>
+        {comparisonTitleOf(comparison)}
+      </Title>
       <p class="intro">{TEXT.intro[locale]}</p>
     </header>
     <ol class="columns">
@@ -44,11 +41,9 @@ const columns = comparison.recordings.map((recording) => ({
         <li class="run">
           <Card>
             <div class="column">
-              <a href={column.url}>
-                <Title as="h2" lang={column.language}>
-                  {column.title}
-                </Title>
-              </a>
+              <Title as="h2" lang={column.language}>
+                <a href={column.url}>{column.title}</a>
+              </Title>
               <p class="note">
                 <a href={project.url}>{project.name}</a> · {column.day}
               </p>

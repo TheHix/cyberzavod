@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SessionRecord } from "@cyberzavod/core";
-import { comparisonOfRecording, taskComparisonsOf } from "./comparison.ts";
+import { comparisonOfRecording, comparisonTitleOf, taskComparisonsOf } from "./comparison.ts";
 
 function recordingWith(id: string, timestamp: string, task?: string): SessionRecord {
   return {
@@ -105,5 +105,25 @@ describe("comparisonOfRecording", () => {
     const comparison = comparisonOfRecording([only], only);
 
     expect(comparison).toBeUndefined();
+  });
+});
+
+describe("comparisonTitleOf", () => {
+  it("берёт название самого раннего прогона", () => {
+    const early = recordingWith("early", "2026-10-07T21:00:00.000Z", "split-bill");
+    const late = recordingWith("late", "2026-10-07T23:00:00.000Z", "split-bill");
+    const comparison = { task: "split-bill", recordings: [early, late] };
+
+    const title = comparisonTitleOf(comparison);
+
+    expect(title).toBe(early.data.title);
+  });
+
+  it("без прогонов называет сравнение меткой задачи", () => {
+    const comparison = { task: "split-bill", recordings: [] };
+
+    const title = comparisonTitleOf(comparison);
+
+    expect(title).toBe("split-bill");
   });
 });
