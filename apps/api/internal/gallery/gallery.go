@@ -86,12 +86,14 @@ type SharedRecording struct {
 
 // Stats is a summary of the recordings in public galleries.
 type Stats struct {
-	Recordings    int                   `json:"recordings"`
-	Authors       int                   `json:"authors"`
-	Tokens        int64                 `json:"tokens"`
-	Returns       []StageReturns        `json:"returns"`
-	Interventions []ReasonInterventions `json:"interventions"`
-	Outcomes      Outcomes              `json:"outcomes"`
+	Recordings int   `json:"recordings"`
+	Authors    int   `json:"authors"`
+	Tokens     int64 `json:"tokens"`
+	// WithoutReworks is how many recordings passed without a single stage_fail.
+	WithoutReworks int                   `json:"withoutReworks"`
+	Returns        []StageReturns        `json:"returns"`
+	Interventions  []ReasonInterventions `json:"interventions"`
+	Outcomes       Outcomes              `json:"outcomes"`
 }
 
 // StageReturns is how many times work was sent back from stage Stage.

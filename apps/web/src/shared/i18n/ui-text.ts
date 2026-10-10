@@ -68,6 +68,7 @@ export const UI_TEXT = {
   },
   /** Build journal. */
   journal: {
+    timelineHeading: { en: "Build log", ru: "Ход сборки" },
     empty: {
       en: "This build has no prompts, interventions or messages.",
       ru: "В этой сборке нет промптов, вмешательств и реплик.",
@@ -350,14 +351,30 @@ export const UI_TEXT = {
     durationPerBuild: { en: "Per build on average", ru: "В среднем на сборку" },
     tokens: { en: "Total tokens", ru: "Токены всего" },
     reworks: { en: "Reworks", ru: "Возвраты" },
-    withoutReworks: {
-      en: (clean: number, builds: number) => `${clean} of ${builds} without reworks`,
-      ru: (clean: number, builds: number) => `без возвратов ${clean} из ${builds}`,
-    },
     human: { en: "Human input", ru: "Участие человека" },
     interventions: {
       en: { one: "intervention", other: "interventions" },
       ru: { one: "вмешательство", few: "вмешательства", many: "вмешательств" },
+    },
+  },
+  /**
+   * What the process caught: the reworks on the recording page, and the share of builds that passed
+   * on the first try in the project totals and on the analytics page.
+   */
+  reworks: {
+    caughtHeading: { en: "What the process caught", ru: "Что поймал процесс" },
+    firstTry: {
+      en: "No stage sent the work back: the task passed on the first try.",
+      ru: "Ни один этап не вернул работу: задача прошла с первого раза.",
+    },
+    label: {
+      en: (stage: string) => `rework · ${stage}`,
+      ru: (stage: string) => `возврат · ${stage}`,
+    },
+    firstPass: { en: "First try", ru: "С первого раза" },
+    firstPassOf: {
+      en: (clean: number, builds: number) => `${clean} of ${builds}`,
+      ru: (clean: number, builds: number) => `${clean} из ${builds}`,
     },
   },
   /** Galleries: examples (projects the factory built from scratch) above the user galleries. */

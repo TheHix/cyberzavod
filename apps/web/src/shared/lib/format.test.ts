@@ -7,6 +7,7 @@ import {
   formatLanguage,
   formatModel,
   formatNumber,
+  formatPercent,
   formatTokens,
   type PluralWords,
 } from "./format.ts";
@@ -75,6 +76,30 @@ describe("formatNumber", () => {
 
     // Intl inserts non-breaking spaces, so we compare against regular ones.
     expect(result.replace(/\s/g, " ")).toBe(expected);
+  });
+});
+
+describe("formatPercent", () => {
+  it.each([
+    ["en", "57%"],
+    ["ru", "57 %"],
+  ] as const)("пишет долю целым процентом по правилам языка (%s)", (locale, expected) => {
+    const result = formatPercent(4 / 7, locale);
+
+    // Intl inserts a non-breaking space in Russian, so we compare against a regular one.
+    expect(result.replace(/\s/g, " ")).toBe(expected);
+  });
+
+  it("округляет до целого процента", () => {
+    const result = formatPercent(0.666, "en");
+
+    expect(result).toBe("67%");
+  });
+
+  it("пишет 0% и 100% на краях", () => {
+    const results = [formatPercent(0, "en"), formatPercent(1, "en")];
+
+    expect(results).toEqual(["0%", "100%"]);
   });
 });
 

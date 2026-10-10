@@ -1,7 +1,6 @@
-import { For, type JSX } from "solid-js";
-import { paragraphsOf } from "@/entities/message";
+import type { JSX } from "solid-js";
 import { Title } from "@/shared/ui";
-import styles from "./SpokenText.module.css";
+import { Paragraphs } from "./Paragraphs.tsx";
 
 interface Props {
   /** The line the speaker says above the machine. */
@@ -25,9 +24,7 @@ export function SpokenText(props: Props): JSX.Element {
   return (
     <>
       <Title lang={props.language}>{props.line}</Title>
-      <div class={styles.text} lang={props.language}>
-        <For each={paragraphsOf(props.text)}>{(paragraph) => <p>{paragraph}</p>}</For>
-      </div>
+      <Paragraphs text={props.text} language={props.language} />
     </>
   );
 }

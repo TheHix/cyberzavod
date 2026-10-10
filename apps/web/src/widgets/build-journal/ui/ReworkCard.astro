@@ -1,0 +1,63 @@
+---
+// One rework as a card: when and which stage sent the work back, then what the stage said. The
+// stage's line is the collapsed header, the full text opens without JS. A stage that said nothing
+// shows the generic reason from the recording.
+import type { Rework } from "@cyberzavod/core";
+import { STAGE_LABELS } from "@/shared/config/stages.ts";
+import type { Locale } from "@/shared/i18n/locale.ts";
+import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
+import { formatClock } from "@/shared/lib/format.ts";
+import { Card, Disclosure, Title } from "@/shared/ui";
+import { Paragraphs } from "./Paragraphs.tsx";
+
+interface Props {
+  rework: Rework;
+  /** Recording language: the stage's words are not translated and carry their own `lang`. */
+  language: string;
+  /** Page language: the label is in it. */
+  locale: Locale;
+}
+
+const { rework, language, locale } = Astro.props;
+const { message } = rework;
+const stageLabel = STAGE_LABELS[rework.stage][locale];
+---
+
+<Card>
+  <div class="rework">
+    <p class="meta">
+      {formatClock(rework.t)} · {UI_TEXT.reworks.label[locale](stageLabel)}
+    </p>
+    {message === undefined ? (
+      <p class="reason" lang={language}>
+        {rework.reason}
+      </p>
+    ) : (
+      <Disclosure>
+        <span slot="summary">
+          <Title as="span" lang={language}>
+            {message.line}
+          </Title>
+        </span>
+        <Paragraphs text={message.text} language={language} />
+      </Disclosure>
+    )}
+  </div>
+</Card>
+
+<style>
+  .rework {
+    display: grid;
+    gap: var(--space-s);
+  }
+
+  .meta,
+  .reason {
+    margin: 0;
+  }
+
+  .meta {
+    color: var(--ink-soft);
+    font-weight: 700;
+  }
+</style>

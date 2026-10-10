@@ -182,7 +182,7 @@ func TestStats(t *testing.T) {
 	if cacheControl := recorder.Header().Get("Cache-Control"); cacheControl != publicCacheControl {
 		t.Fatalf("Cache-Control %q, ожидался %q", cacheControl, publicCacheControl)
 	}
-	want := `{"recordings":0,"authors":0,"tokens":0,"returns":[],"interventions":[],"outcomes":{"ok":0,"failed":0}}`
+	want := `{"recordings":0,"authors":0,"tokens":0,"withoutReworks":0,"returns":[],"interventions":[],"outcomes":{"ok":0,"failed":0}}`
 	if got := strings.TrimSpace(recorder.Body.String()); got != want {
 		t.Fatalf("ответ %s, ожидался %s", got, want)
 	}

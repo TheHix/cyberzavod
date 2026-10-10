@@ -70,6 +70,7 @@ export {
   type RecordType,
   type BuildStats,
 } from "./record.ts";
+export { reworksOf, type Rework } from "./rework.ts";
 export type { RecordStore } from "./store.ts";
 export { RULES_TODO_MARK } from "./project-rules.ts";
 export { ProjectError, parseProject, type Project } from "./project.ts";

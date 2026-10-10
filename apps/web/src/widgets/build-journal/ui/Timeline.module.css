@@ -21,3 +21,8 @@
   color: var(--ink-soft);
   font-weight: 700;
 }
+
+/* Separates the "what the process caught" block from the list of entries below it. */
+.heading {
+  margin: var(--space-l) 0 var(--space-m);
+}

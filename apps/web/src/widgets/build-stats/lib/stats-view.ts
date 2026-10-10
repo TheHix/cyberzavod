@@ -4,7 +4,7 @@ import { INTERVENTION_LABELS } from "@/shared/config/interventions.ts";
 import { STAGE_LABELS } from "@/shared/config/stages.ts";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
-import { formatNumber, formatTokens } from "@/shared/lib/format.ts";
+import { formatNumber, formatPercent, formatTokens } from "@/shared/lib/format.ts";
 import type { BarItem, StatItem } from "@/shared/ui";
 import { barOf } from "./bars.ts";
 
@@ -51,11 +51,21 @@ function totalOf(rows: readonly TallyRow[]): number {
   return rows.reduce((sum, row) => sum + row.count, 0);
 }
 
+// Called only for stats with recordings, so the share does not divide by zero.
+function firstPassItemOf(stats: BuildStats, locale: Locale): StatItem {
+  return {
+    label: UI_TEXT.reworks.firstPass[locale],
+    value: formatPercent(stats.withoutReworks / stats.recordings, locale),
+    detail: UI_TEXT.reworks.firstPassOf[locale](stats.withoutReworks, stats.recordings),
+  };
+}
+
 function totalsOf(stats: BuildStats, locale: Locale): StatItem[] {
   return [
     { label: UI_TEXT.stats.builds[locale], value: formatNumber(stats.recordings, locale) },
     { label: UI_TEXT.stats.authors[locale], value: formatNumber(stats.authors, locale) },
     { label: UI_TEXT.hud.tokens[locale], value: formatTokens(stats.tokens, locale) },
+    firstPassItemOf(stats, locale),
     { label: UI_TEXT.hud.reworks[locale], value: formatNumber(totalOf(stats.returns), locale) },
     {
       label: UI_TEXT.hud.interventions[locale],

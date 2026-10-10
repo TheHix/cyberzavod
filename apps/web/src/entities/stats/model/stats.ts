@@ -12,6 +12,8 @@ export interface BuildStats {
   readonly recordings: number;
   readonly authors: number;
   readonly tokens: number;
+  /** How many recordings passed every stage on the first try, without a single rework. */
+  readonly withoutReworks: number;
   /** Reworks (`stage_fail`) by stage. */
   readonly returns: readonly TallyRow[];
   /** Human interventions by reason. */
@@ -46,6 +48,7 @@ export function parseStats(raw: unknown): BuildStats {
     recordings: countAt(stats, "recordings", place),
     authors: countAt(stats, "authors", place),
     tokens: countAt(stats, "tokens", place),
+    withoutReworks: countAt(stats, "withoutReworks", place),
     returns: tallyRowsAt(stats, "returns", "stage"),
     interventions: tallyRowsAt(stats, "interventions", "reason"),
     outcomes: {

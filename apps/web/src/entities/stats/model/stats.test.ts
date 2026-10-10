@@ -7,6 +7,7 @@ function validResponse(): Record<string, unknown> {
     recordings: 12,
     authors: 3,
     tokens: 4500000,
+    withoutReworks: 5,
     returns: [{ stage: "review", count: 7 }],
     interventions: [{ reason: "plan_review", count: 9 }],
     outcomes: { ok: 10, failed: 2 },
@@ -27,6 +28,7 @@ describe("parseStats", () => {
       recordings: 12,
       authors: 3,
       tokens: 4500000,
+      withoutReworks: 5,
       returns: [{ key: "review", count: 7 }],
       interventions: [{ key: "plan_review", count: 9 }],
       outcomes: { ok: 10, failed: 2 },
@@ -45,6 +47,14 @@ describe("parseStats", () => {
     const withoutOutcomes = withoutField(validResponse(), "outcomes");
 
     const act = () => parseStats(withoutOutcomes);
+
+    expect(act).toThrow(ApiResponseError);
+  });
+
+  it("отклоняет ответ без числа сборок с первого раза", () => {
+    const withoutShare = withoutField(validResponse(), "withoutReworks");
+
+    const act = () => parseStats(withoutShare);
 
     expect(act).toThrow(ApiResponseError);
   });
