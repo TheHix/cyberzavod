@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { RULES_TODO_MARK, type Harness, type StageGuide } from "@cyberzavod/core";
 import { GENERATED_MARK } from "@cyberzavod/adapter-kit";
 import { claudeFiles, renderTemplate, type ClaudeProject } from "./files.ts";
+import { realTemplates } from "./templates.fixtures.ts";
 
 function guide(stage: StageGuide["stage"], title: string, role?: string): StageGuide {
   const base = { stage, title, description: `${title}.`, body: `Stage text ${title}.` };
@@ -43,6 +44,7 @@ function claudeProject(): ClaudeProject {
       publishRecording: "{{generated}}\n{{cli}} draft",
       recordingEditor: "{{drafts}}",
       setup: "{{generated}}\n{{todo}}",
+      recordingFragments: { rules: "", editor: "" },
     },
   };
 }
@@ -119,6 +121,39 @@ describe("claudeFiles", () => {
     const content = fileOf(project, ".claude/skills/setup/SKILL.md");
 
     expect(content).toContain(GENERATED_MARK);
+  });
+});
+
+describe("claudeFiles: запись сессии", () => {
+  it("зовёт скилл процесса как /feature и ответ через AskUserQuestion в правилах записи", async () => {
+    const project = { ...claudeProject(), templates: await realTemplates() };
+
+    const skill = fileOf(project, ".claude/skills/publish-recording/SKILL.md");
+
+    expect(skill).toContain("several `/feature` runs");
+    expect(skill).toContain(
+      "an answer to a question through `AskUserQuestion` and the human's word after the automation stops remain interventions",
+    );
+  });
+
+  it("отсылает редактора к скиллу записи Claude Code и к черновикам журнала", async () => {
+    const project = { ...claudeProject(), templates: await realTemplates() };
+
+    const editor = fileOf(project, ".claude/agents/recording-editor.md");
+
+    expect(editor).toContain("`journal/capture/claude/drafts/<id>.json`");
+    expect(editor).toContain("`.claude/skills/publish-recording/SKILL.md`");
+  });
+
+  it("не оставляет в скилле и у редактора неподставленных мест", async () => {
+    const project = { ...claudeProject(), templates: await realTemplates() };
+
+    const texts = [
+      fileOf(project, ".claude/skills/publish-recording/SKILL.md"),
+      fileOf(project, ".claude/agents/recording-editor.md"),
+    ];
+
+    expect(texts.filter((text) => text.includes("{{"))).toEqual([]);
   });
 });
 

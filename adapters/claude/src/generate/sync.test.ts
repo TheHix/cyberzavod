@@ -12,9 +12,9 @@ import {
 import { parseProjectConfig } from "@cyberzavod/core";
 import { loadHarness, PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
 import { previewClaude, syncClaude, type ClaudeInstallation, type SyncOptions } from "./sync.ts";
+import { realTemplates } from "./templates.fixtures.ts";
 
 const REPOSITORY = path.resolve(import.meta.dirname, "../../../..");
-const TEMPLATES = path.join(REPOSITORY, "adapters/claude/templates");
 
 let root: string;
 
@@ -51,11 +51,7 @@ async function newProject(): Promise<void> {
 async function installation(): Promise<ClaudeInstallation> {
   return {
     harness: await loadHarness(path.join(REPOSITORY, "harness")),
-    templates: {
-      publishRecording: await readFile(path.join(TEMPLATES, "publish-recording.md"), "utf8"),
-      recordingEditor: await readFile(path.join(TEMPLATES, "recording-editor.md"), "utf8"),
-      setup: await readFile(path.join(TEMPLATES, "setup.md"), "utf8"),
-    },
+    templates: await realTemplates(),
   };
 }
 

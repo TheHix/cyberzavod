@@ -328,8 +328,6 @@ export interface ErrorMessages {
   unknownAgent(params: { agent: string; supported: string }): string;
   /** `init --agent` asks for another agent than the connected project has. */
   agentDiffers(params: { configured: string; requested: string }): string;
-  /** The command is not available for the agent yet. */
-  agentCommandUnavailable(params: { agent: string; command: string }): string;
   /** The stages of the config name several agents; `agents` lists them. */
   mixedAgents(params: { agents: string; file: string }): string;
   unknownCommand(name: string): string;

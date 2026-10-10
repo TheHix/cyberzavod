@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { RecordError } from "@cyberzavod/core";
-import { ClaudeError } from "../errors.ts";
-import { CLAUDE_MESSAGES } from "../messages/catalog.ts";
+import { RecordError, type RecordSource } from "@cyberzavod/core";
+import { KitError } from "../errors.ts";
+import { KIT_MESSAGES } from "../messages/catalog.ts";
 import {
   carryOverEdits,
   DraftError,
@@ -109,8 +109,10 @@ function buildOf(draft: Draft, index: number): DraftBuild {
   return build;
 }
 
+const SOURCE: RecordSource = { type: "agent", provider: "openai", agent: "codex" };
+
 function publishOnly(draft: Draft) {
-  return publishBuild(draft, BUILD_ID);
+  return publishBuild(draft, BUILD_ID, SOURCE);
 }
 
 describe("parseDraft", () => {
@@ -794,10 +796,10 @@ describe("publishBuild", () => {
     draft.events.push(intervention({ t: 2_500, text: "Зайди на 203.0.113.7" }));
 
     const act = () => publishOnly(draft);
-    const error = thrownBy(act) as ClaudeError;
+    const error = thrownBy(act) as KitError;
 
-    expect(error).toBeInstanceOf(ClaudeError);
-    expect([error.describe(CLAUDE_MESSAGES.en), error.describe(CLAUDE_MESSAGES.ru)]).toEqual([
+    expect(error).toBeInstanceOf(KitError);
+    expect([error.describe(KIT_MESSAGES.en), error.describe(KIT_MESSAGES.ru)]).toEqual([
       expect.stringContaining("IP address in “Зайди на 203.0.113.7”") as string,
       expect.stringContaining("IP-адрес в «Зайди на 203.0.113.7»") as string,
     ]);
@@ -823,7 +825,7 @@ describe("publishBuild", () => {
     expect(act).toThrow(/goal/);
   });
 
-  it("собирает запись сессии с проектом, версией harness, процессом и источником Claude", () => {
+  it("собирает запись сессии с проектом, версией harness, процессом и переданным источником", () => {
     const draft = editedDraft();
 
     const recording = publishOnly(draft);
@@ -832,7 +834,7 @@ describe("publishBuild", () => {
       version: 1,
       type: "session",
       projectId: "cyberzavod",
-      source: { type: "agent", provider: "anthropic", agent: "claude" },
+      source: SOURCE,
       data: { harness: "0.1.0", workflow: "default", language: "ru" },
     });
   });
@@ -858,7 +860,7 @@ describe("publishBuild", () => {
 
     const act = () => publishOnly(draft);
 
-    expect(act).toThrow(ClaudeError);
+    expect(act).toThrow(KitError);
   });
 
   it("не публикует сборку без заголовка", () => {
@@ -998,7 +1000,7 @@ describe("publishBuild", () => {
         : event,
     );
 
-    const act = () => publishBuild(draft, SECOND_BUILD_ID);
+    const act = () => publishBuild(draft, SECOND_BUILD_ID, SOURCE);
 
     expect(act).toThrow(DraftError);
   });
@@ -1084,7 +1086,7 @@ describe("publishBuild", () => {
   it("не оставляет в записи служебных событий и пометок черновика", () => {
     const draft = interleavedDraft();
 
-    const recording = publishBuild(draft, FIRST_BUILD_ID);
+    const recording = publishBuild(draft, FIRST_BUILD_ID, SOURCE);
 
     const marks = ["draft_", "run", "said", "source", 'build":'];
 
@@ -1106,8 +1108,8 @@ describe("publishBuild", () => {
       runs: [],
     });
 
-    const unknown = () => publishBuild(draft, "no-such-build");
-    const empty = () => publishBuild(draft, "empty");
+    const unknown = () => publishBuild(draft, "no-such-build", SOURCE);
+    const empty = () => publishBuild(draft, "empty", SOURCE);
 
     expect(unknown).toThrow(/no build no-such-build/);
     expect(empty).toThrow(/build empty has no events/);
@@ -1118,7 +1120,7 @@ describe("publishDraft: несколько сборок", () => {
   it("публикует две записи со своими id, проектом, версией, заголовком и временем начала", () => {
     const draft = interleavedDraft();
 
-    const recordings = publishDraft(draft);
+    const recordings = publishDraft(draft, SOURCE);
 
     expect(
       recordings.map(({ id, projectId, timestamp, data }) => ({
@@ -1149,7 +1151,7 @@ describe("publishDraft: несколько сборок", () => {
   it("кладёт в каждую запись только события своих запусков и участков основной сессии", () => {
     const draft = interleavedDraft();
 
-    const recordings = publishDraft(draft);
+    const recordings = publishDraft(draft, SOURCE);
 
     const summary = recordings.map((recording) =>
       recording.data.events.flatMap((event) => {
@@ -1170,7 +1172,7 @@ describe("publishDraft: несколько сборок", () => {
   it("сжимает паузу ожидания первой задачи и не трогает вторую", () => {
     const draft = interleavedDraft();
 
-    const recordings = publishDraft(draft);
+    const recordings = publishDraft(draft, SOURCE);
 
     const lastEventBeforeWaiting = 31_000;
     const waiting = 200_000 - lastEventBeforeWaiting;
@@ -1182,7 +1184,7 @@ describe("publishDraft: несколько сборок", () => {
   it("считает токены записи по её станциям и участкам основной сессии", () => {
     const draft = interleavedDraft();
 
-    const recordings = publishDraft(draft);
+    const recordings = publishDraft(draft, SOURCE);
 
     const tokens = recordings.map((recording) =>
       recording.data.events.flatMap((event) => (event.type === "usage" ? [event.tokens] : [])),
@@ -1195,7 +1197,7 @@ describe("publishDraft: несколько сборок", () => {
     const draft = interleavedDraft();
     const inDraft = draft.events.reduce((sum, e) => sum + (e.type === "usage" ? e.tokens : 0), 0);
 
-    const recordings = publishDraft(draft);
+    const recordings = publishDraft(draft, SOURCE);
 
     const inRecordings = recordings
       .flatMap((recording) => recording.data.events)
@@ -1207,7 +1209,7 @@ describe("publishDraft: несколько сборок", () => {
   it("ставит usage перед build_end и один раз", () => {
     const draft = interleavedDraft();
 
-    const [recording] = publishDraft(draft);
+    const [recording] = publishDraft(draft, SOURCE);
 
     expect(recording?.data.events.slice(-2).map((event) => event.type)).toEqual([
       "usage",
@@ -1218,7 +1220,7 @@ describe("publishDraft: несколько сборок", () => {
   it("берёт итог сборки из её последней проверки: провал соседней сборки не мешает", () => {
     const draft = interleavedDraft();
 
-    const recordings = publishDraft(draft);
+    const recordings = publishDraft(draft, SOURCE);
 
     const outcomes = recordings.map((recording) => recording.data.events.at(-1));
 
@@ -1233,7 +1235,7 @@ describe("publishDraft: несколько сборок", () => {
 
     buildOf(draft, 0).title = "";
 
-    const recording = publishBuild(draft, SECOND_BUILD_ID);
+    const recording = publishBuild(draft, SECOND_BUILD_ID, SOURCE);
 
     expect(recording.id).toBe(SECOND_BUILD_ID);
   });
@@ -1243,7 +1245,7 @@ describe("publishDraft: несколько сборок", () => {
 
     buildOf(draft, 0).title = "";
 
-    const act = () => publishDraft(draft);
+    const act = () => publishDraft(draft, SOURCE);
 
     expect(act).toThrow(/title/);
   });
@@ -1257,8 +1259,8 @@ describe("publishDraft: несколько сборок", () => {
         : event,
     );
 
-    const first = () => publishBuild(draft, FIRST_BUILD_ID);
-    const second = () => publishBuild(draft, SECOND_BUILD_ID);
+    const first = () => publishBuild(draft, FIRST_BUILD_ID, SOURCE);
+    const second = () => publishBuild(draft, SECOND_BUILD_ID, SOURCE);
 
     expect(first).not.toThrow();
     expect(second).toThrow(/IP address/);
@@ -1267,7 +1269,7 @@ describe("publishDraft: несколько сборок", () => {
   it("публикует черновик с одной сборкой одной записью с id черновика", () => {
     const draft = editedDraft();
 
-    const recordings = publishDraft(draft);
+    const recordings = publishDraft(draft, SOURCE);
 
     expect(recordings.map((recording) => recording.id)).toEqual([draft.id]);
   });

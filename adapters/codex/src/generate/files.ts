@@ -7,20 +7,33 @@ import {
   HASH_GENERATED_COMMENT,
   MARKDOWN_GENERATED_COMMENT,
   ownStageSections,
+  recordingTemplateValues,
   renderTemplate,
   stageGuidesOf,
   stageTable,
   templateValues,
   workingRulesParagraphs,
   type GeneratedFile,
+  type RecordingFragments,
+  type RecordingTerms,
 } from "@cyberzavod/adapter-kit";
 import type { Harness, ProjectConfig, StageGuide, StageRole, Workflow } from "@cyberzavod/core";
-import { codexEffortOf, codexModelOf, ESCALATION_MODEL, type CodexGenerateError } from "./codex.ts";
+import {
+  codexEffortOf,
+  codexModelOf,
+  ESCALATION_MODEL,
+  RECORDING_EDITOR_EFFORT,
+  RECORDING_EDITOR_MODEL,
+  type CodexGenerateError,
+} from "./codex.ts";
 import { tomlMultilineString, tomlString } from "./toml.ts";
 
 /** Adapter templates: texts that are not derived from the harness. */
 export interface CodexTemplates {
+  publishRecording: string;
   setup: string;
+  /** The recording texts every agent shares. */
+  recordingFragments: RecordingFragments;
 }
 
 /** Everything the project's Codex files are built from. */
@@ -45,6 +58,19 @@ const FEATURE_CALL = "$feature <task>";
 // Codex reads at most 32 KiB of AGENTS.md files by default and silently cuts the rest, which is
 // less than a large project's root rules file. 256 KiB leaves room for nested files too.
 const PROJECT_DOC_MAX_BYTES = 262144;
+
+const RECORDING_SKILL = "publish-recording";
+const RECORDING_EDITOR = "recording-editor";
+const RECORDING_EDITOR_DESCRIPTION =
+  "Fills in, for the messages and human interventions in a recording draft, the line above the speaker and the full text. Editing for $publish-recording; the human's prompts and the title are edited by the session itself.";
+
+// What the shared recording texts say differently in Codex: the skill call, where the skill lives,
+// and the human's words that become interventions.
+const RECORDING_TERMS: RecordingTerms = {
+  feature: "$feature",
+  publishSkill: `${SKILLS_DIRECTORY}/${RECORDING_SKILL}/SKILL.md`,
+  interventionWords: "the human's words after the automation stops",
+};
 
 const SKILL_POLICY = "policy:\n  allow_implicit_invocation: false";
 
@@ -154,6 +180,38 @@ function skillPolicy(skill: string): GeneratedFile {
   };
 }
 
+function recordingValues(project: CodexProject): Record<string, string> {
+  return recordingTemplateValues({
+    cli: project.cli,
+    capture: project.capture,
+    fragments: project.templates.recordingFragments,
+    terms: RECORDING_TERMS,
+  });
+}
+
+function recordingSkill(project: CodexProject): GeneratedFile {
+  return {
+    path: `${SKILLS_DIRECTORY}/${RECORDING_SKILL}/SKILL.md`,
+    content: renderTemplate(project.templates.publishRecording, recordingValues(project)),
+  };
+}
+
+// The editor's instructions are the shared fragment: Codex roles are TOML files, so the role is
+// composed here and not from a template.
+function recordingEditorRole(project: CodexProject): GeneratedFile {
+  const instructions = renderTemplate("{{recordingEditor}}", recordingValues(project));
+  const content = [
+    HASH_GENERATED_COMMENT,
+    `name = ${tomlString(RECORDING_EDITOR)}`,
+    `description = ${tomlString(RECORDING_EDITOR_DESCRIPTION)}`,
+    `model = ${tomlString(RECORDING_EDITOR_MODEL)}`,
+    `model_reasoning_effort = ${tomlString(RECORDING_EDITOR_EFFORT)}`,
+    `developer_instructions = ${tomlMultilineString(instructions)}`,
+  ].join("\n");
+
+  return { path: `${AGENTS_DIRECTORY}${RECORDING_EDITOR}.toml`, content: `${content}\n` };
+}
+
 /**
  * Builds all of the project's Codex files except the hooks file.
  * @param {CodexProject} project Config, harness, workflow and templates.
@@ -168,5 +226,8 @@ export function codexFiles(project: CodexProject): GeneratedFile[] {
     skillPolicy("feature"),
     setupSkill(project),
     skillPolicy("setup"),
+    recordingSkill(project),
+    skillPolicy(RECORDING_SKILL),
+    recordingEditorRole(project),
   ];
 }

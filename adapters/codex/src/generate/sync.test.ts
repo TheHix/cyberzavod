@@ -8,9 +8,9 @@ import { parseProjectConfig } from "@cyberzavod/core";
 import { loadHarness, PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
 import { HOOKS_FILE } from "./hooks-config.ts";
 import { previewCodex, syncCodex, type CodexInstallation, type SyncOptions } from "./sync.ts";
+import { realTemplates } from "./templates.fixtures.ts";
 
 const REPOSITORY = path.resolve(import.meta.dirname, "../../../..");
-const TEMPLATES = path.join(REPOSITORY, "adapters/codex/templates");
 const HUMAN_HOOK = { type: "command", command: "echo mine" };
 
 let root: string;
@@ -46,7 +46,7 @@ function newConfig() {
 async function installation(): Promise<CodexInstallation> {
   return {
     harness: await loadHarness(path.join(REPOSITORY, "harness")),
-    templates: { setup: await readFile(path.join(TEMPLATES, "setup.md"), "utf8") },
+    templates: await realTemplates(),
   };
 }
 
@@ -81,6 +81,8 @@ describe("syncCodex", () => {
         ".codex/agents/coder.toml",
         ".agents/skills/feature/SKILL.md",
         ".agents/skills/setup/SKILL.md",
+        ".agents/skills/publish-recording/SKILL.md",
+        ".codex/agents/recording-editor.toml",
         HOOKS_FILE,
         MANIFEST_FILE,
       ]),

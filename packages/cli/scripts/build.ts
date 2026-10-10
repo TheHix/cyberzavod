@@ -19,6 +19,7 @@ const HARNESS_DIRECTORY = path.join(REPOSITORY, "harness");
 // Keys must match src/installation/assets.ts: templates are keyed `<source>/<name>`.
 const TEMPLATE_DIRECTORIES: Readonly<Record<string, string>> = {
   cli: path.join(PACKAGE, "templates"),
+  kit: path.join(REPOSITORY, "packages/adapter-kit/templates"),
   claude: path.join(REPOSITORY, "adapters/claude/templates"),
   codex: path.join(REPOSITORY, "adapters/codex/templates"),
 };

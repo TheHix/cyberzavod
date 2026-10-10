@@ -2,6 +2,7 @@
 
 import type { ClaudeTemplates } from "@cyberzavod/adapter-claude";
 import type { CodexTemplates } from "@cyberzavod/adapter-codex";
+import type { RecordingFragments } from "@cyberzavod/adapter-kit";
 import { parseHarness, type Harness, type HarnessError } from "@cyberzavod/core";
 import { readAssets } from "./assets.ts";
 
@@ -19,6 +20,13 @@ export interface Installation {
   rulesTemplate: string;
   claudeTemplates: ClaudeTemplates;
   codexTemplates: CodexTemplates;
+}
+
+function recordingFragments(templates: Readonly<Record<string, string>>): RecordingFragments {
+  return {
+    rules: template(templates, "kit/recording-rules.md"),
+    editor: template(templates, "kit/recording-editor.md"),
+  };
 }
 
 function template(templates: Readonly<Record<string, string>>, name: string): string {
@@ -44,7 +52,12 @@ export async function readInstallation(): Promise<Installation> {
       publishRecording: template(templates, "claude/publish-recording.md"),
       recordingEditor: template(templates, "claude/recording-editor.md"),
       setup: template(templates, "claude/setup.md"),
+      recordingFragments: recordingFragments(templates),
     },
-    codexTemplates: { setup: template(templates, "codex/setup.md") },
+    codexTemplates: {
+      publishRecording: template(templates, "codex/publish-recording.md"),
+      setup: template(templates, "codex/setup.md"),
+      recordingFragments: recordingFragments(templates),
+    },
   };
 }

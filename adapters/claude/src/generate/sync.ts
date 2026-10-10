@@ -4,6 +4,7 @@
 
 import {
   applySyncPlan,
+  captureDirectories,
   directoriesWith,
   fileAt,
   generatedCandidates,
@@ -31,8 +32,7 @@ import {
 } from "@cyberzavod/adapter-kit";
 import type { Harness } from "@cyberzavod/core";
 import { workflowOf } from "@cyberzavod/storage";
-import { captureDirectories } from "../paths.ts";
-import type { GenerateError } from "./claude.ts";
+import { CLAUDE_AGENT, type GenerateError } from "./claude.ts";
 import { claudeFiles, type ClaudeProject, type ClaudeTemplates } from "./files.ts";
 import {
   adapterHooks,
@@ -75,7 +75,7 @@ async function claudeProjectOf(
   installation: ClaudeInstallation,
 ): Promise<ClaudeProject> {
   const { harness, templates } = installation;
-  const capture = captureDirectories(project.journal);
+  const capture = captureDirectories(project.journal, CLAUDE_AGENT);
 
   return {
     config: project.config,

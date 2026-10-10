@@ -384,13 +384,46 @@ describe("runCli", () => {
   });
 
   describe("draft и publish", () => {
-    it("пока недоступны для Codex и говорят об этом", async () => {
+    it("draft без журналов сессии ищет их в каталоге Codex", async () => {
       await initCodex();
 
       const code = await runCli(["draft"], root, env);
 
       expect(code).toBe(1);
-      expect(printedError()).toContain("draft is not available for codex yet");
+      expect(printedError()).toContain("capture/codex/raw");
+    });
+
+    it("draft собирает черновик из сырого журнала Codex", async () => {
+      await initCodex();
+      const raw = path.join(root, ".cyberzavod/journal/capture/codex/raw");
+      const events = [
+        { ts: Date.UTC(2026, 9, 4, 10), kind: "session_start" },
+        { ts: Date.UTC(2026, 9, 4, 10, 0, 1), kind: "prompt", text: "Add a counter" },
+      ];
+
+      await mkdir(raw, { recursive: true });
+      await writeFile(
+        path.join(raw, "0123456789abcdef.jsonl"),
+        events.map((event) => JSON.stringify(event)).join("\n"),
+      );
+
+      const code = await runCli(["draft"], root, env);
+
+      expect(code).toBe(0);
+      expect(
+        await exists(
+          path.join(root, ".cyberzavod/journal/capture/codex/drafts/2026-10-04-01234567.json"),
+        ),
+      ).toBe(true);
+    });
+
+    it("publish без черновиков просит сначала собрать черновик", async () => {
+      await initCodex();
+
+      const code = await runCli(["publish"], root, env);
+
+      expect(code).toBe(1);
+      expect(printedError()).toContain("no drafts yet");
     });
   });
 });

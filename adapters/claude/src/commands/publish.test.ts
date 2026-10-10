@@ -1,16 +1,20 @@
-import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { KIT_MESSAGES } from "@cyberzavod/adapter-kit";
+import { parseRecord } from "@cyberzavod/core";
 import { PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
-import { FIRST_BUILD_ID, interleavedDraft } from "../capture/draft.fixtures.ts";
-import type { Draft } from "../capture/draft.ts";
-import { ClaudeError } from "../errors.ts";
-import { CLAUDE_MESSAGES } from "../messages/catalog.ts";
-import { publishSessions } from "./publish.ts";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { draftSession } from "./draft.ts";
+import { CLAUDE_SOURCE, publishSessions } from "./publish.ts";
 
 const JOURNAL = ".cyberzavod/journal";
-const DRAFTS = path.join(JOURNAL, "capture/claude/drafts");
+const START = Date.UTC(2026, 9, 4, 10, 0, 0);
+
+interface EditedDraft {
+  builds: { title: string; language: string }[];
+  events: { type: string; goal?: string; requirements?: string[] }[];
+}
 
 let root: string;
 
@@ -21,19 +25,49 @@ async function connectProject(): Promise<void> {
   await writeFile(path.join(root, PROJECT_CONFIG_FILE), JSON.stringify(config));
 }
 
-async function saveDraft(draft: Draft): Promise<void> {
-  await mkdir(path.join(root, DRAFTS), { recursive: true });
-  await writeFile(path.join(root, DRAFTS, `${draft.id}.json`), JSON.stringify(draft));
+// A draft of a one-prompt session with every field the editor fills in already filled.
+async function editedDraft(): Promise<string> {
+  const rawDirectory = path.join(root, JOURNAL, "capture", "claude", "raw");
+  const events = [
+    { ts: START, kind: "session_start", project: "lab", harness: "0.4.0", workflow: "default" },
+    { ts: START + 1_000, kind: "prompt", text: "Add a counter" },
+  ];
+
+  await mkdir(rawDirectory, { recursive: true });
+  await writeFile(
+    path.join(rawDirectory, "0123456789abcdef.jsonl"),
+    events.map((event) => JSON.stringify(event)).join("\n"),
+  );
+
+  const draftPath = await draftSession({ projectDirectory: root, messages: KIT_MESSAGES.en });
+  const draft = JSON.parse(await readFile(draftPath, "utf8")) as EditedDraft;
+
+  draft.builds[0] = { ...draft.builds[0], title: "Counter", language: "en" };
+
+  for (const event of draft.events) {
+    if (event.type === "draft_prompt") {
+      Object.assign(event, { goal: "Add a counter", requirements: [] });
+    }
+  }
+
+  await writeFile(draftPath, JSON.stringify(draft));
+
+  return draftPath;
 }
 
-function printed(spy: ReturnType<typeof vi.spyOn>): string {
-  return spy.mock.calls.join("\n");
+// The recording the publication wrote for the draft.
+async function publishedRecord(draftPath: string) {
+  const recordPath = path.join(root, JOURNAL, "sessions", path.basename(draftPath));
+
+  return parseRecord(JSON.parse(await readFile(recordPath, "utf8")));
 }
 
 describe("publishSessions", () => {
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), "cyberzavod-publish-"));
+    root = await mkdtemp(path.join(tmpdir(), "cyberzavod-claude-publish-"));
     await connectProject();
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
   });
 
   afterEach(async () => {
@@ -41,81 +75,17 @@ describe("publishSessions", () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  it("публикует выбранную сборку записью в журнал и сообщает об этом", async () => {
-    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-
-    await saveDraft(interleavedDraft());
+  it("пишет запись сессии, которую принимает parseRecord, с источником Claude Code", async () => {
+    const draftPath = await editedDraft();
 
     const isPublished = await publishSessions({
       projectDirectory: root,
-      buildId: FIRST_BUILD_ID,
-      messages: CLAUDE_MESSAGES.en,
+      draftPath,
+      messages: KIT_MESSAGES.en,
     });
 
-    expect({
-      isPublished,
-      files: await readdir(path.join(root, JOURNAL, "sessions")),
-      output: printed(log),
-    }).toEqual({
-      isPublished: true,
-      files: [`${FIRST_BUILD_ID}.json`],
-      output: expect.stringContaining("published: ") as string,
-    });
-  });
-
-  it("не публикует сборку с утечкой и называет её на языке сообщений", async () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const draft = interleavedDraft();
-
-    draft.builds = draft.builds.map((build) =>
-      build.id === FIRST_BUILD_ID ? { ...build, title: "Сервер 203.0.113.7" } : build,
-    );
-    await saveDraft(draft);
-
-    const isPublished = await publishSessions({
-      projectDirectory: root,
-      buildId: FIRST_BUILD_ID,
-      messages: CLAUDE_MESSAGES.ru,
-    });
-
-    expect({ isPublished, output: printed(error) }).toEqual({
-      isPublished: false,
-      output: expect.stringMatching(
-        /не готов к публикации[\s\S]*IP-адрес в «Сервер 203\.0\.113\.7»/,
-      ) as string,
-    });
-  });
-
-  it("неизвестная сборка — черновик не готов, а не исключение", async () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
-
-    await saveDraft(interleavedDraft());
-
-    const isPublished = await publishSessions({
-      projectDirectory: root,
-      buildId: "no-such-build",
-      messages: CLAUDE_MESSAGES.en,
-    });
-
-    expect({ isPublished, output: printed(error) }).toEqual({
-      isPublished: false,
-      output: expect.stringContaining("the draft has no build no-such-build") as string,
-    });
-  });
-
-  it("без черновиков — ошибка адаптера с подсказкой", async () => {
-    const act = () => publishSessions({ projectDirectory: root, messages: CLAUDE_MESSAGES.en });
-
-    await expect(act()).rejects.toThrow(ClaudeError);
-    await expect(act()).rejects.toThrow("no drafts yet: run npx cyberzavod draft first");
-  });
-
-  it("вне проекта — ошибка адаптера", async () => {
-    const outside = await mkdtemp(path.join(tmpdir(), "cyberzavod-outside-"));
-
-    const act = () => publishSessions({ projectDirectory: outside, messages: CLAUDE_MESSAGES.en });
-
-    await expect(act()).rejects.toThrow(/is not in a Cyberzavod project/);
-    await rm(outside, { recursive: true, force: true });
+    expect(isPublished).toBe(true);
+    expect((await publishedRecord(draftPath)).source).toEqual(CLAUDE_SOURCE);
+    expect(CLAUDE_SOURCE).toEqual({ type: "agent", provider: "anthropic", agent: "claude" });
   });
 });

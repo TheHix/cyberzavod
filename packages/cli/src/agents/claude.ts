@@ -27,11 +27,10 @@ import type { AgentTerms } from "../messages/cli-messages.ts";
 import type {
   AgentAdapter,
   AgentHooksReading,
-  DraftRequest,
   FilesRequest,
   HookRequest,
-  PublishRequest,
 } from "./agent-adapter.ts";
+import { draftOptionsOf, publishOptionsOf } from "./session-requests.ts";
 
 const CLAUDE_PROJECT_DIRECTORY = "CLAUDE_PROJECT_DIR";
 
@@ -74,25 +73,6 @@ function runClaudeHook(name: string, request: HookRequest) {
   });
 }
 
-function draftClaudeSession({ projectDirectory, rawPath, language }: DraftRequest) {
-  return draftSession({
-    projectDirectory,
-    messages: CLAUDE_MESSAGES[language],
-    ...(rawPath === undefined ? {} : { rawPath }),
-  });
-}
-
-function publishClaudeSessions(request: PublishRequest) {
-  const { projectDirectory, draftPath, buildId, language } = request;
-
-  return publishSessions({
-    projectDirectory,
-    messages: CLAUDE_MESSAGES[language],
-    ...(draftPath === undefined ? {} : { draftPath }),
-    ...(buildId === undefined ? {} : { buildId }),
-  });
-}
-
 function describeClaudeError(err: unknown, language: InterfaceLanguage): string | undefined {
   if (err instanceof ClaudeError) return err.describe(CLAUDE_MESSAGES[language]);
 
@@ -128,7 +108,7 @@ export const claudeAdapter: AgentAdapter = {
   disconnect: (projectDirectory) => disconnectClaude({ projectDirectory }),
 
   runHook: runClaudeHook,
-  draftSession: draftClaudeSession,
-  publishSessions: publishClaudeSessions,
+  draftSession: (request) => draftSession(draftOptionsOf(request)),
+  publishSessions: (request) => publishSessions(publishOptionsOf(request)),
   describeError: describeClaudeError,
 };

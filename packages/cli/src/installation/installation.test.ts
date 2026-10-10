@@ -34,4 +34,20 @@ describe("readInstallation", () => {
 
     expect(installation.codexTemplates.setup.length).toBeGreaterThan(0);
   });
+
+  it("читает шаблон скилла записи для Codex и общие тексты записи", async () => {
+    const installation = await readInstallation();
+
+    expect(installation.codexTemplates.publishRecording).toContain("$publish-recording");
+    expect(installation.codexTemplates.recordingFragments.rules.length).toBeGreaterThan(0);
+    expect(installation.codexTemplates.recordingFragments.editor.length).toBeGreaterThan(0);
+  });
+
+  it("отдаёт обоим агентам одни и те же общие тексты записи", async () => {
+    const installation = await readInstallation();
+
+    expect(installation.claudeTemplates.recordingFragments).toEqual(
+      installation.codexTemplates.recordingFragments,
+    );
+  });
 });

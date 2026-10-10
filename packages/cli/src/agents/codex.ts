@@ -10,6 +10,7 @@ import {
   CODEX_PROVIDER,
   CodexError,
   disconnectCodex,
+  draftSession,
   HOOKS_FILE,
   inspectCodexHooks,
   inspectTrust,
@@ -17,6 +18,7 @@ import {
   planConnectTrust,
   planDisconnectTrust,
   previewCodex,
+  publishSessions,
   runCodexHook,
   syncCodex,
   type CodexHomeSource,
@@ -37,6 +39,7 @@ import type {
   UserConfigAccess,
   UserConfigReading,
 } from "./agent-adapter.ts";
+import { draftOptionsOf, publishOptionsOf } from "./session-requests.ts";
 
 const terms: AgentTerms = {
   product: "Codex",
@@ -112,11 +115,6 @@ function runCodexHookByName(name: string, request: HookRequest) {
   });
 }
 
-// Drafting and publishing a Codex session is not built yet.
-function unavailable(command: string): never {
-  throw new CommandError((m) => m.errors.agentCommandUnavailable({ agent: CODEX_AGENT, command }));
-}
-
 function describeCodexError(err: unknown, language: InterfaceLanguage): string | undefined {
   if (err instanceof CodexError) return err.describe(CODEX_MESSAGES[language]);
 
@@ -161,8 +159,8 @@ export function createCodexAdapter(source: CodexHomeSource): AgentAdapter {
     disconnect: (projectDirectory) => disconnectCodex({ projectDirectory }),
 
     runHook: runCodexHookByName,
-    draftSession: () => unavailable("draft"),
-    publishSessions: () => unavailable("publish"),
+    draftSession: (request) => draftSession(draftOptionsOf(request)),
+    publishSessions: (request) => publishSessions(publishOptionsOf(request)),
     describeError: describeCodexError,
   };
 }
