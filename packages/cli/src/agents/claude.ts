@@ -70,7 +70,7 @@ function runClaudeHook(name: string, request: HookRequest) {
     payload: request.payload,
     projectDirectory: hookProjectDirectory(request),
     tmpDir: request.tmpDir,
-    messages: CLAUDE_MESSAGES[request.language],
+    messages: KIT_MESSAGES[request.language],
   });
 }
 

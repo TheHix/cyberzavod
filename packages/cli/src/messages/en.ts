@@ -1,10 +1,10 @@
 // English CLI texts.
 
-import { HOOK_NAMES } from "@cyberzavod/adapter-claude";
 import { CLI_COMMAND } from "@cyberzavod/adapter-kit";
 import { AGENT_NAMES, DEFAULT_AGENT_NAME } from "../agents/agent-adapter.ts";
 import { API_URL_VARIABLE, DEFAULT_API_URL } from "../sharing/services.ts";
 import type { CliMessages } from "./cli-messages.ts";
+import { ALL_HOOK_NAMES } from "./hook-names.ts";
 
 /** CLI texts in English. */
 export const en: CliMessages = {
@@ -138,9 +138,15 @@ export const en: CliMessages = {
       ],
     },
     hook: {
-      usage: `hook <${HOOK_NAMES.join("|")}>`,
-      summary: "Claude Code hook: project settings call it, not a person",
-      parameters: [{ name: "<hook name>", description: "the event arrives on stdin" }],
+      usage: `hook <${ALL_HOOK_NAMES.join("|")}> [--agent <agent>]`,
+      summary: "agent hook: the agent's hook file calls it, not a person",
+      parameters: [
+        { name: "<hook name>", description: "the event arrives on stdin" },
+        {
+          name: "--agent <agent>",
+          description: `agent whose hook it is: ${AGENT_NAMES.join(", ")}; default: ${DEFAULT_AGENT_NAME}`,
+        },
+      ],
     },
   },
   init: {

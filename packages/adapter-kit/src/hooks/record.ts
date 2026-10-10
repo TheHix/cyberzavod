@@ -1,25 +1,37 @@
-// Capture hook: appends a Claude Code event as a line to the session's raw log
-// `capture/claude/raw/<session_id>.jsonl` in the project journal. It runs asynchronously and does
+// Capture hook: appends an agent event as a line to the session's raw log
+// `capture/<agent>/raw/<session_id>.jsonl` in the project journal. It runs asynchronously and does
 // not slow the agent down. A project without the Cyberzavod marker is not captured.
 
 import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { ProjectFileError } from "@cyberzavod/storage";
-import { isHumanPrompt } from "../capture/to-draft.ts";
 import {
-  fromHookPayload,
   isSafeSessionId,
   markAfterStopGate,
   stampProject,
   type RawEvent,
 } from "../capture/raw-event.ts";
-import { locateProject, type LocatedProject } from "@cyberzavod/adapter-kit";
-import { captureDirectories } from "../paths.ts";
+import { isHumanPrompt } from "../capture/service-messages.ts";
+import { isObject } from "../object.ts";
+import { captureDirectories, locateProject, type LocatedProject } from "../paths.ts";
 import { SILENT_EXIT, type HookContext, type HookOutcome } from "./hook.ts";
 import { claimHumanCallMarker } from "./state.ts";
 
 /** Capture error: the hook payload is not fit for a log file name. */
 export class RecordHookError extends Error {}
+
+/** What the capture hook needs to know about an agent: where its log lives and its payloads. */
+export interface RawEventSource {
+  /** Agent name: the log goes to `capture/<agent>/raw/`. */
+  agent: string;
+  /**
+   * Turns a hook payload into a log event.
+   * @param {unknown} payload JSON the hook received on stdin.
+   * @param {number} ts Event time in milliseconds.
+   * @returns {RawEvent | null} Log event, or null if the payload is not needed for the recording.
+   */
+  eventOf(payload: unknown, ts: number): RawEvent | null;
+}
 
 function withProject(event: RawEvent, project: LocatedProject): RawEvent {
   return event.kind === "session_start" ? stampProject(event, project.config) : event;
@@ -43,12 +55,16 @@ async function withStopGateMark(
  * Writes a session event to the project's raw log. A broken config does not crash the hook: the
  * session is not captured, and the hook warns.
  * @param {HookContext} context Hook call.
+ * @param {RawEventSource} source The agent whose event it is.
  * @returns {Promise<HookOutcome>} A silent exit or a warning on stderr.
  * @throws {RecordHookError} If `session_id` is not fit for a file name.
  */
-export async function recordEvent(context: HookContext): Promise<HookOutcome> {
+export async function recordEvent(
+  context: HookContext,
+  source: RawEventSource,
+): Promise<HookOutcome> {
   const payload: unknown = JSON.parse(context.payload);
-  const hookEvent = fromHookPayload(payload, Date.now());
+  const hookEvent = source.eventOf(payload, Date.now());
 
   if (hookEvent === null) return SILENT_EXIT;
 
@@ -66,7 +82,7 @@ export async function recordEvent(context: HookContext): Promise<HookOutcome> {
 
   if (project === undefined) return SILENT_EXIT;
 
-  const sessionId = (payload as { session_id?: unknown }).session_id;
+  const sessionId = isObject(payload) ? payload.session_id : undefined;
 
   if (!isSafeSessionId(sessionId)) {
     throw new RecordHookError(`invalid session_id: ${String(sessionId)}`);
@@ -74,7 +90,7 @@ export async function recordEvent(context: HookContext): Promise<HookOutcome> {
 
   const stampedEvent = withProject(hookEvent, project);
   const event = await withStopGateMark(stampedEvent, sessionId, context);
-  const { raw } = captureDirectories(project.journal);
+  const { raw } = captureDirectories(project.journal, source.agent);
 
   await mkdir(raw, { recursive: true });
   await appendFile(path.join(raw, `${sessionId}.jsonl`), `${JSON.stringify(event)}\n`);

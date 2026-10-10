@@ -5,7 +5,7 @@
 import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { isNotFound } from "@cyberzavod/storage";
-import type { ClaudeMessages } from "../messages/claude-messages.ts";
+import type { KitMessages } from "../messages/kit-messages.ts";
 
 /** Kind of hook state. */
 export type HookStateName = "turn-start" | "stop-blocks" | "checks-output" | "human-call";
@@ -34,13 +34,13 @@ export function hookStatePath(tmpDir: string, sessionId: string, name: HookState
  * written as an ordinary one.
  * @param {string} sessionId Session id from the hook payload.
  * @param {string} tmpDir Temporary files directory.
- * @param {ClaudeMessages} messages Messages in the chosen language.
+ * @param {KitMessages} messages Messages in the chosen language.
  * @returns {Promise<boolean>} true if the marker existed and was deleted.
  */
 export async function claimHumanCallMarker(
   sessionId: string,
   tmpDir: string,
-  messages: ClaudeMessages,
+  messages: KitMessages,
 ): Promise<boolean> {
   const markerPath = hookStatePath(tmpDir, sessionId, "human-call");
 

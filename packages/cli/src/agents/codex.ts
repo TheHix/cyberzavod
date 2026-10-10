@@ -1,10 +1,11 @@
 // The Codex adapter as the CLI uses it: the adapter package's functions behind the CLI's
 // `AgentAdapter` interface. This is the only file in the CLI that calls them.
 
-import { KIT_MESSAGES, KitError, requireWritable } from "@cyberzavod/adapter-kit";
+import { isObject, KIT_MESSAGES, KitError, requireWritable } from "@cyberzavod/adapter-kit";
 import {
   carryOverTrust,
   CODEX_AGENT,
+  CODEX_HOOK_NAMES,
   CODEX_MESSAGES,
   CODEX_PROVIDER,
   CodexError,
@@ -12,9 +13,11 @@ import {
   HOOKS_FILE,
   inspectCodexHooks,
   inspectTrust,
+  isCodexHookName,
   planConnectTrust,
   planDisconnectTrust,
   previewCodex,
+  runCodexHook,
   syncCodex,
   type CodexHomeSource,
   type CodexInstallation,
@@ -30,6 +33,7 @@ import type {
   AgentAdapter,
   AgentHooksReading,
   FilesRequest,
+  HookRequest,
   UserConfigAccess,
   UserConfigReading,
 } from "./agent-adapter.ts";
@@ -87,8 +91,28 @@ function userConfigOf(source: CodexHomeSource): UserConfigAccess {
   };
 }
 
-// Recording a Codex session is not built yet: the hooks Codex runs are generated, but the commands
-// that answer them come later.
+// Codex starts a hook in the session directory and gives it no variable with the project root, so
+// the payload's `cwd` is the place to look from; the adapter walks up from there to the project.
+function hookProjectDirectory({ payload, directory }: HookRequest): string {
+  const parsed: unknown = JSON.parse(payload);
+  const cwd = isObject(parsed) ? parsed.cwd : undefined;
+
+  return typeof cwd === "string" && cwd !== "" ? cwd : directory;
+}
+
+function runCodexHookByName(name: string, request: HookRequest) {
+  if (!isCodexHookName(name)) throw new CommandError((m) => m.errors.unknownHook(name));
+
+  return runCodexHook(name, {
+    payload: request.payload,
+    projectDirectory: hookProjectDirectory(request),
+    tmpDir: request.tmpDir,
+    messages: KIT_MESSAGES[request.language],
+    guardMessages: CODEX_MESSAGES[request.language].guard,
+  });
+}
+
+// Drafting and publishing a Codex session is not built yet.
 function unavailable(command: string): never {
   throw new CommandError((m) => m.errors.agentCommandUnavailable({ agent: CODEX_AGENT, command }));
 }
@@ -118,7 +142,7 @@ export function createCodexAdapter(source: CodexHomeSource): AgentAdapter {
     legacyRulesFile: undefined,
     programCheck: codexCheck,
     extraProjectChecks: [trustCheckFor(userConfig, terms)],
-    hookNames: [],
+    hookNames: CODEX_HOOK_NAMES,
     userConfig,
 
     previewFiles: (planned, installation) =>
@@ -136,7 +160,7 @@ export function createCodexAdapter(source: CodexHomeSource): AgentAdapter {
     planDisconnect: (projectDirectory) => disconnectCodex({ projectDirectory, check: true }),
     disconnect: (projectDirectory) => disconnectCodex({ projectDirectory }),
 
-    runHook: (name) => unavailable(`hook ${name}`),
+    runHook: runCodexHookByName,
     draftSession: () => unavailable("draft"),
     publishSessions: () => unavailable("publish"),
     describeError: describeCodexError,

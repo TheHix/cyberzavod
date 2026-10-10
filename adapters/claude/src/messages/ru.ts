@@ -5,23 +5,6 @@ import type { ClaudeMessages } from "./claude-messages.ts";
 
 /** Adapter texts in Russian. */
 export const ru: ClaudeMessages = {
-  stop: {
-    configUnreadable: ({ file, reason }) =>
-      `Конфиг ${file} не читается — проверки пропущены, агент отпущен. ${reason}`,
-    gitUnavailable: (reason) =>
-      `Хук остановки не запустил git — проверки пропущены, агент отпущен. ${reason}`,
-    counterNotSaved: (file) =>
-      `Хук остановки не смог записать счётчик попыток (${file}) — проверки красные, агент отпущен без повторов.`,
-    checksFailing: ({ command, attempt, maxAttempts, output }) =>
-      `${command} не проходит — закончить работу нельзя (попытка ${attempt} из ${maxAttempts}). Исправь:\n${output}\n`,
-    humanCalled: (maxAttempts) =>
-      `Проверки красные после ${maxAttempts} попыток исправить — агент остановлен, нужен человек.`,
-    markerNotSaved: "Отметка для записи не сохранена.",
-  },
-  record: {
-    sessionNotRecorded: (reason) => `сессия не записана: ${reason}`,
-    markerNotClaimed: ({ file, reason }) => `отметка ${file} не забрана: ${reason}`,
-  },
   draft: {
     configNotRead: (reason) => `конфиг проекта не прочитан: ${reason}`,
     transcriptNotRead: ({ file, reason }) => `транскрипт ${file} не прочитан: ${reason}`,

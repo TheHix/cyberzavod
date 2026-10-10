@@ -18,6 +18,7 @@ import {
   type SettingsError,
   type Settings,
 } from "@cyberzavod/adapter-kit";
+import { PATCH_TOOL, SHELL_TOOL } from "./codex.ts";
 
 /** Path of the Codex hooks file relative to the project root. */
 export const HOOKS_FILE = ".codex/hooks.json";
@@ -26,7 +27,7 @@ export const HOOKS_FILE = ".codex/hooks.json";
 export const HOOK_AGENT_FLAG = "--agent codex";
 
 /** Tools the `.env` guard looks at: the shell and file edits. */
-export const GUARDED_TOOLS = "Bash|apply_patch";
+export const GUARDED_TOOLS = `${SHELL_TOOL}|${PATCH_TOOL}`;
 
 const GUARD_TIMEOUT_SECONDS = 30;
 

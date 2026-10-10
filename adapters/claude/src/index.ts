@@ -17,11 +17,4 @@ export { disconnectClaude } from "./generate/disconnect.ts";
 export type { ClaudeTemplates } from "./generate/files.ts";
 export { inspectClaudeHooks, type HooksReading } from "./generate/inspect.ts";
 export { SETTINGS_FILE } from "./generate/settings.ts";
-export {
-  HOOK_NAMES,
-  isHookName,
-  runHook,
-  type HookContext,
-  type HookName,
-  type HookOutcome,
-} from "./hooks/index.ts";
+export { HOOK_NAMES, isHookName, runHook, type HookName } from "./hooks/index.ts";

@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
+import type { RawEvent } from "@cyberzavod/adapter-kit";
 import type { Draft, DraftEvent, DraftMessage } from "./draft.ts";
-import type { RawEvent } from "./raw-event.ts";
 import {
   directoriesOutsideProjects,
-  isHumanPrompt,
   routeMessages,
   runTranscriptPaths,
   sessionTranscriptPath,
@@ -564,16 +563,6 @@ describe("toDraft", () => {
     expect(
       draft.events.flatMap((event) => (event.type === "draft_prompt" ? [event.said] : [])),
     ).toEqual(["Сделай проигрыватель"]);
-  });
-});
-
-describe("isHumanPrompt", () => {
-  it("отличает сообщение человека от служебного", () => {
-    const texts = ["Сделай цех", "[SYSTEM NOTIFICATION - NOT USER INPUT]", "<system-reminder>…"];
-
-    const results = texts.map(isHumanPrompt);
-
-    expect(results).toEqual([true, false, false]);
   });
 });
 

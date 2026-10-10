@@ -4,6 +4,12 @@ import type { CodexMessages } from "./codex-messages.ts";
 
 /** Adapter texts in Russian. */
 export const ru: CodexMessages = {
+  guard: {
+    secretFile: (file) =>
+      `Cyberzavod заблокировал вызов: ${file} может хранить секреты и закрыт для агента. Попроси человека сделать это или работай без этого файла.`,
+    rawLog: (file) =>
+      `Cyberzavod заблокировал вызов: ${file} — сырой журнал сессии, его пишет только хук записи. Не правь его.`,
+  },
   errors: {
     unsupportedAgent: ({ stage, requested, supported }) =>
       `этап ${stage}: ${requested} не поддерживается адаптером Codex, он ведёт только ${supported}`,

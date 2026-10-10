@@ -1,32 +1,11 @@
-// Claude Code adapter texts for the human and the agent: the stop hook (the agent reads its stderr
-// as a task), the capture hook, drafting and publishing recordings, errors. A value is a string or
-// a function; with two or more parameters, one object with named fields. The sets live in `en.ts`
-// and `ru.ts`; the CLI picks the language.
+// Claude Code adapter texts for the human and the agent: drafting and publishing recordings, errors.
+// The stop and capture hook texts are shared with the other agents (see the adapter kit). A value is
+// a string or a function; with two or more parameters, one object with named fields. The sets live
+// in `en.ts` and `ru.ts`; the CLI picks the language.
 
 import type { InterventionReason } from "@cyberzavod/core";
 import type { HeaderField } from "../capture/draft.ts";
 import type { LeakKind } from "../capture/leaks.ts";
-
-/** Stop hook texts: the agent receives them as the hook's message. */
-export interface StopMessages {
-  configUnreadable(params: { file: string; reason: string }): string;
-  gitUnavailable(reason: string): string;
-  counterNotSaved(file: string): string;
-  checksFailing(params: {
-    command: string;
-    attempt: number;
-    maxAttempts: number;
-    output: string;
-  }): string;
-  humanCalled(maxAttempts: number): string;
-  markerNotSaved: string;
-}
-
-/** Session capture hook texts. */
-export interface RecordMessages {
-  sessionNotRecorded(reason: string): string;
-  markerNotClaimed(params: { file: string; reason: string }): string;
-}
 
 /** Texts of the `draft` command. */
 export interface DraftMessages {
@@ -80,8 +59,6 @@ export interface ClaudeErrorMessages {
 
 /** All texts of the Claude Code adapter. */
 export interface ClaudeMessages {
-  stop: StopMessages;
-  record: RecordMessages;
   draft: DraftMessages;
   publish: PublishMessages;
   errors: ClaudeErrorMessages;
