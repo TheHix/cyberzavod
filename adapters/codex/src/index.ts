@@ -15,6 +15,13 @@ export { disconnectCodex } from "./generate/disconnect.ts";
 export type { CodexTemplates } from "./generate/files.ts";
 export { inspectCodexHooks, type HooksReading } from "./generate/inspect.ts";
 export { HOOKS_FILE } from "./generate/hooks-config.ts";
+export {
+  CODEX_HOOK_NAMES,
+  isCodexHookName,
+  runCodexHook,
+  type CodexHookName,
+} from "./hooks/index.ts";
+export type { CodexHookContext } from "./hooks/context.ts";
 export type { CodexHomeSource } from "./trust/codex-home.ts";
 export type { HookEvent } from "./trust/hook-trust.ts";
 export {

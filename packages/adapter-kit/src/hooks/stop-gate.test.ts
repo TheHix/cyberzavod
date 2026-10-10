@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
-import { CLAUDE_MESSAGES } from "../messages/catalog.ts";
-import type { ClaudeMessages } from "../messages/claude-messages.ts";
+import { KIT_MESSAGES } from "../messages/catalog.ts";
+import type { KitMessages } from "../messages/kit-messages.ts";
 import type { HookContext, HookOutcome } from "./hook.ts";
 import { gateStop } from "./stop-gate.ts";
 import { startTurn } from "./turn-start.ts";
@@ -52,7 +52,7 @@ async function makeRepo(
   git("commit", "-qm", "init");
 }
 
-function context(messages: ClaudeMessages = CLAUDE_MESSAGES.en): HookContext {
+function context(messages: KitMessages = KIT_MESSAGES.en): HookContext {
   return {
     payload: JSON.stringify({ session_id: SESSION }),
     projectDirectory: repo,
@@ -143,7 +143,7 @@ describe("gateStop", () => {
     await startTurn(context());
     await breakCode();
 
-    const outcome = await gateStop(context(CLAUDE_MESSAGES.ru));
+    const outcome = await gateStop(context(KIT_MESSAGES.ru));
 
     expect(blockReason(outcome)).toContain(
       "не проходит — закончить работу нельзя (попытка 1 из 3)",

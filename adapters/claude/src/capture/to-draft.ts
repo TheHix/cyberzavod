@@ -3,6 +3,7 @@
 // in a table.
 
 import path from "node:path";
+import { isHumanPrompt, type RawEvent } from "@cyberzavod/adapter-kit";
 import {
   FOREMAN,
   STAGES,
@@ -20,7 +21,6 @@ import type {
   DraftRun,
   MessageSource,
 } from "./draft.ts";
-import type { RawEvent } from "./raw-event.ts";
 import type {
   AgentAssignment,
   AgentReport,
@@ -143,16 +143,6 @@ const AGENT_HUMAN_CALLS: Readonly<Record<string, InterventionReason>> = {
 const REWORK_CALL: InterventionReason = "rework_limit";
 const ANSWER_CALL: InterventionReason = "question";
 const STOP_GATE_CALL: InterventionReason = "stop_gate";
-
-// The Claude Code environment delivers subagent reports and notifications with the same event as
-// human messages. These openings tell them apart: the recording has only human prompts.
-const SERVICE_MESSAGE_PREFIXES: readonly string[] = [
-  "[Subagent hand-back]",
-  "[SYSTEM NOTIFICATION",
-  "<task-notification>",
-  "<agent-message",
-  "<system-reminder>",
-];
 
 const SHORT_SESSION_LENGTH = 8;
 // Length of the day `2026-10-04` at the start of a toISOString string, in UTC wherever the draft is
@@ -352,17 +342,6 @@ function stagesReachedByTool(event: ToolEvent): PlacedStage[] {
   const stages = stagesOfCommand(event.command, start);
 
   return event.ok ? stages : stages.slice(0, 1);
-}
-
-/**
- * Tells a human message from a Claude Code environment service message.
- * @param {string} text UserPromptSubmit event text.
- * @returns {boolean} true if the message was written by a human.
- */
-export function isHumanPrompt(text: string): boolean {
-  const start = text.trimStart();
-
-  return !SERVICE_MESSAGE_PREFIXES.some((prefix) => start.startsWith(prefix));
 }
 
 // Reason for calling the human after a station stops; Object.hasOwn as in stageOfAgent.

@@ -20,6 +20,20 @@ import type { Adapters } from "./registry.ts";
 const LIST_SEPARATOR = ", ";
 
 /**
+ * The agent a person or a hook file named with `--agent`.
+ * @param {string} name Agent name as typed.
+ * @returns {AgentName} The agent.
+ * @throws {CommandError} If the CLI cannot drive such an agent.
+ */
+export function agentNamed(name: string): AgentName {
+  if (isAgentName(name)) return name;
+
+  const supported = AGENT_NAMES.join(LIST_SEPARATOR);
+
+  throw new CommandError((m) => m.errors.unknownAgent({ agent: name, supported }));
+}
+
+/**
  * Agents the stages of the config name, in order of appearance without repeats.
  * @param {ProjectConfig} config Project config.
  * @returns {string[]} Agent names; empty if no stage names an agent.

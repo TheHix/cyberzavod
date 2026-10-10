@@ -5,11 +5,11 @@
 import type { InterfaceLanguage } from "@cyberzavod/core";
 import type {
   DisconnectPlan,
+  HookOutcome,
   HooksInspection,
   PlannedProject,
   SyncReport,
 } from "@cyberzavod/adapter-kit";
-import type { HookOutcome } from "@cyberzavod/adapter-claude";
 import type { MachineCheck, ProjectCheck } from "../doctor/check.ts";
 import type { Installation } from "../installation/installation.ts";
 import type { AgentTerms } from "../messages/cli-messages.ts";

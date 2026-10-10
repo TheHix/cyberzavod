@@ -4,6 +4,7 @@ import { KitError } from "../errors.ts";
 import { KIT_MESSAGES } from "../messages/catalog.ts";
 import {
   hookCommand,
+  hookNameOf,
   inspectHooks,
   isOwnHandler,
   mergedHooks,
@@ -83,6 +84,31 @@ describe("isOwnHandler", () => {
 
   it("не принимает чужой обработчик", () => {
     expect(isOwnHandler(HUMAN)).toBe(false);
+  });
+});
+
+describe("hookNameOf", () => {
+  it("читает имя хука из команды, которую собрал hookCommand", () => {
+    const command = hookCommand({
+      runner: "npx -y --prefix .",
+      version: "1.2.3",
+      hook: "turn-start",
+      agentFlag: "--agent codex",
+      onFailure: "true",
+    });
+
+    const name = hookNameOf({ type: "command", command });
+
+    expect(name).toBe("turn-start");
+  });
+
+  it("не даёт имени чужому обработчику и прежнему вшитому CLI", () => {
+    const names = [
+      hookNameOf(HUMAN),
+      hookNameOf({ type: "command", command: `node ${LEGACY_TOOL_FILE} record` }),
+    ];
+
+    expect(names).toEqual([undefined, undefined]);
   });
 });
 

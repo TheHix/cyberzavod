@@ -1,8 +1,8 @@
 // Stop hook: if the agent changed code in this turn, it cannot finish while the project checks are
 // red. No config or no check commands: the agent is let go without checks; a broken config: it is
 // let go with a message. The JSON `block` decision with exit code 0 sends the agent back to work:
-// the adapter's hooks read a non-zero code as "npx did not start" and let the agent go (see
-// generate/settings.ts), so code 2 does not fit here. Infinite loop guard: after MAX_BLOCKS
+// the adapters' hooks read a non-zero code as "npx did not start" and let the agent go (see
+// generate/hook-config.ts), so code 2 does not fit here. Infinite loop guard: after MAX_BLOCKS
 // refusals per turn the agent is let go, calls the human and leaves the `human-call` marker for the
 // session recording; if the counter cannot be written, the agent is let go too. The start of a
 // turn resets the counter, so here it only grows.
@@ -14,7 +14,7 @@ import {
   ProjectFileError,
   readProjectConfig,
 } from "@cyberzavod/storage";
-import type { ClaudeMessages } from "../messages/claude-messages.ts";
+import type { KitMessages } from "../messages/kit-messages.ts";
 import type { ProjectConfig } from "@cyberzavod/core";
 import { checksOf, runChecks, type ProjectChecks } from "./checks.ts";
 import { codeFingerprint, GitError, hasUncommittedChanges } from "./fingerprint.ts";
@@ -37,7 +37,7 @@ const RELEASE: StopVerdict = { kind: "release" };
 interface StopSession {
   root: string;
   statePath(name: HookStateName): string;
-  messages: ClaudeMessages;
+  messages: KitMessages;
 }
 
 type ConfigReading = { config: ProjectConfig | undefined } | { broken: ProjectFileError };

@@ -8,15 +8,13 @@ import type { PlannedProject } from "@cyberzavod/adapter-kit";
 import { RULES_TODO_MARK, type ProjectConfig } from "@cyberzavod/core";
 import { PROJECT_CONFIG_FILE, readProjectConfig, writeProjectConfig } from "@cyberzavod/storage";
 import {
-  AGENT_NAMES,
   DEFAULT_AGENT_NAME,
-  isAgentName,
   type AgentAdapter,
   type AgentName,
   type UserConfigChange,
   type UserConfigPlan,
 } from "../agents/agent-adapter.ts";
-import { adapterFor } from "../agents/host-agent.ts";
+import { adapterFor, agentNamed } from "../agents/host-agent.ts";
 import type { Adapters } from "../agents/registry.ts";
 import type { Confirmation } from "../confirmation.ts";
 import { detectProject } from "../detect.ts";
@@ -226,15 +224,7 @@ export interface InitOptions {
 }
 
 function requestedAgentOf(agent: string | undefined): AgentName | undefined {
-  if (agent === undefined) return undefined;
-
-  if (!isAgentName(agent)) {
-    const supported = AGENT_NAMES.join(LIST_SEPARATOR);
-
-    throw new CommandError((m) => m.errors.unknownAgent({ agent, supported }));
-  }
-
-  return agent;
+  return agent === undefined ? undefined : agentNamed(agent);
 }
 
 // `init` does not change an already connected project; it says whether it is fine and what to do

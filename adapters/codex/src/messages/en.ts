@@ -4,6 +4,12 @@ import type { CodexMessages } from "./codex-messages.ts";
 
 /** Adapter texts in English. */
 export const en: CodexMessages = {
+  guard: {
+    secretFile: (file) =>
+      `Cyberzavod blocked this call: ${file} may hold secrets and is closed to the agent. Ask the human to do it, or work without that file.`,
+    rawLog: (file) =>
+      `Cyberzavod blocked this call: ${file} is a raw session log written only by the capture hook. Do not edit it.`,
+  },
   errors: {
     unsupportedAgent: ({ stage, requested, supported }) =>
       `stage ${stage}: ${requested} is not supported by the Codex adapter, it runs only ${supported}`,

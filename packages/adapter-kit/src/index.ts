@@ -3,7 +3,23 @@
 
 export { CLI_COMMAND, PACKAGE_NAME, pinnedCliCommand } from "./cli-command.ts";
 export { KitError } from "./errors.ts";
-export { isObject } from "./object.ts";
+export {
+  MAX_COMMAND_LENGTH,
+  parseRawLog,
+  RawLogError,
+  subagentNameOf,
+  UNKNOWN_NAME,
+  verdictOf,
+  withOptional,
+  type RawEvent,
+} from "./capture/raw-event.ts";
+export { isHumanPrompt } from "./capture/service-messages.ts";
+export { SILENT_EXIT, type HookContext, type HookOutcome } from "./hooks/hook.ts";
+export { recordEvent, RecordHookError, type RawEventSource } from "./hooks/record.ts";
+export { hookStatePath } from "./hooks/state.ts";
+export { gateStop } from "./hooks/stop-gate.ts";
+export { startTurn } from "./hooks/turn-start.ts";
+export { isObject, stringField } from "./object.ts";
 export {
   applyDisconnect,
   isEmptySettings,
@@ -39,6 +55,7 @@ export {
 } from "./generate/file-plan.ts";
 export {
   hookCommand,
+  hookNameOf,
   groupsOf,
   inspectHooks,
   isOwnHandler,
@@ -85,7 +102,12 @@ export {
   type WorkingRulesSource,
 } from "./generate/workflow-text.ts";
 export { KIT_MESSAGES } from "./messages/catalog.ts";
-export type { KitErrorMessages, KitMessages } from "./messages/kit-messages.ts";
+export type {
+  KitErrorMessages,
+  KitMessages,
+  RecordMessages,
+  StopMessages,
+} from "./messages/kit-messages.ts";
 export {
   captureDirectories,
   locatedFromPlanned,

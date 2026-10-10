@@ -246,6 +246,113 @@ describe("runCli", () => {
     expect(systemMessage.startsWith(start)).toBe(true);
   });
 
+  describe("hook --agent", () => {
+    const CODEX_SESSION = "cli-test-codex-hook";
+
+    function codexStdin(extra: object): void {
+      const payload = { session_id: CODEX_SESSION, cwd: root, ...extra };
+
+      vi.spyOn(process, "stdin", "get").mockReturnValue(stdinWith(payload));
+    }
+
+    it("запускает хук Codex: stop при битом конфиге отпускает с сообщением, проект ищется по cwd из нагрузки", async () => {
+      await mkdir(path.join(root, ".cyberzavod"));
+      await writeFile(path.join(root, PROJECT_CONFIG_FILE), "{ broken");
+      codexStdin({ hook_event_name: "Stop" });
+      const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+      const code = await runCli(["hook", "stop", "--agent", "codex"], workspace, NO_LOCALE);
+
+      const [written] = stdout.mock.calls[0] ?? [];
+
+      expect(code).toBe(0);
+      expect(String(written)).toContain("The config");
+    });
+
+    it("запускает защиту Codex: отказывает на чтении .env", async () => {
+      codexStdin({
+        hook_event_name: "PreToolUse",
+        tool_name: "Bash",
+        tool_input: { command: "cat .env" },
+      });
+      const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+      await runCli(["hook", "guard", "--agent", "codex"], root, NO_LOCALE);
+
+      const [written] = stdout.mock.calls[0] ?? [];
+
+      expect(String(written)).toContain('"permissionDecision":"deny"');
+    });
+
+    it("пишет событие Codex в capture/codex/raw", async () => {
+      await initialized();
+      codexStdin({ hook_event_name: "UserPromptSubmit", prompt: "Сделай цех" });
+
+      await runCli(["hook", "record", "--agent", "codex"], root, NO_LOCALE);
+
+      const raw = path.join(
+        root,
+        ".cyberzavod/journal/capture/codex/raw",
+        `${CODEX_SESSION}.jsonl`,
+      );
+
+      expect(await readFile(raw, "utf8")).toContain("Сделай цех");
+    });
+
+    it("без флага пишет событие Claude в capture/claude/raw по CLAUDE_PROJECT_DIR", async () => {
+      const CLAUDE_SESSION = "cli-test-claude-hook";
+
+      await initialized();
+      vi.spyOn(process, "stdin", "get").mockReturnValue(
+        stdinWith({
+          session_id: CLAUDE_SESSION,
+          hook_event_name: "UserPromptSubmit",
+          prompt: "Привет",
+        }),
+      );
+
+      await runCli(["hook", "record"], workspace, { CLAUDE_PROJECT_DIR: root });
+
+      const raw = path.join(
+        root,
+        ".cyberzavod/journal/capture/claude/raw",
+        `${CLAUDE_SESSION}.jsonl`,
+      );
+
+      expect(await readFile(raw, "utf8")).toContain("Привет");
+    });
+
+    it("без флага хук идёт к Claude, и хука Codex среди его хуков нет", async () => {
+      codexStdin({ hook_event_name: "PreToolUse" });
+
+      const code = await runCli(["hook", "guard"], root, NO_LOCALE);
+
+      expect({ code, error: printedError() }).toEqual({
+        code: 1,
+        error: "cyberzavod hook: no hook named guard",
+      });
+    });
+
+    it("неизвестный агент — ошибка с перечнем поддерживаемых", async () => {
+      const code = await runCli(["hook", "stop", "--agent", "gemini"], root, NO_LOCALE);
+
+      expect({ code, error: printedError() }).toEqual({
+        code: 1,
+        error:
+          "cyberzavod hook: unknown agent gemini in --agent: supported agents are claude, codex",
+      });
+    });
+
+    it("справка хука называет флаг --agent и хуки обоих агентов", async () => {
+      await runCli(["hook", "--help"], root, NO_LOCALE);
+
+      const help = printedLog();
+
+      expect(help).toContain("hook <record|turn-start|stop|guard> [--agent <agent>]");
+      expect(help).toContain("--agent <agent>");
+    });
+  });
+
   it("справка называет видимые команды по разделам и не называет служебные", async () => {
     await runCli(["--help"], root, NO_LOCALE);
 

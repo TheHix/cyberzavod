@@ -103,17 +103,29 @@ export function stopFailureCommand(): string {
 }
 
 // The npx flags between `npx` and the package may change in later versions: hooks of earlier
-// versions are recognized by the package and hook name, not by the full command prefix.
-const NPX_HANDLER_PATTERN = new RegExp(`^npx\\s.*\\s${PACKAGE_NAME}@(\\S+) hook `);
+// versions are recognized by the package and hook name, not by the full command prefix. This is the
+// one place that knows the shape `npx … cyberzavod@<version> hook <name> …` that `hookCommand`
+// writes.
+const NPX_HANDLER_PATTERN = new RegExp(`^npx\\s.*\\s${PACKAGE_NAME}@(\\S+) hook ([\\w-]*)`);
 
-// Version referenced by an own handler; the former in-project CLI has no version and is recognized
-// by file name. Someone else's handler gives undefined.
-function ownVersionOf(handler: HookHandler): string | undefined {
-  const [, npxVersion] = NPX_HANDLER_PATTERN.exec(handler.command) ?? [];
+/** What an own handler's command says: the package version it runs and the hook it calls. */
+interface OwnCommand {
+  /** The version of the package; the former in-project CLI is named as `LEGACY_TOOL_FILE`. */
+  version: string;
+  /** Hook name for `cyberzavod hook`; undefined for the former in-project CLI. */
+  hook: string | undefined;
+}
 
-  if (npxVersion !== undefined) return npxVersion;
+// The former in-project CLI has no version and no `hook <name>` shape, and is recognized by file
+// name. Someone else's handler gives undefined.
+function ownCommandOf(handler: HookHandler): OwnCommand | undefined {
+  const [, version, hook] = NPX_HANDLER_PATTERN.exec(handler.command) ?? [];
 
-  return handler.command.includes(LEGACY_TOOL_FILE) ? LEGACY_TOOL_FILE : undefined;
+  if (version !== undefined) return { version, hook };
+
+  return handler.command.includes(LEGACY_TOOL_FILE)
+    ? { version: LEGACY_TOOL_FILE, hook: undefined }
+    : undefined;
 }
 
 /**
@@ -123,7 +135,19 @@ function ownVersionOf(handler: HookHandler): string | undefined {
  * @returns {boolean} true for an adapter handler.
  */
 export function isOwnHandler(handler: HookHandler): boolean {
-  return ownVersionOf(handler) !== undefined;
+  return ownCommandOf(handler) !== undefined;
+}
+
+/**
+ * The hook an adapter handler calls: `record`, `stop` and so on.
+ * @param {HookHandler} handler Handler from the project's hooks file.
+ * @returns {string | undefined} Hook name; undefined for someone else's handler and for the former
+ *   in-project CLI, which has no such name.
+ */
+export function hookNameOf(handler: HookHandler): string | undefined {
+  const name = ownCommandOf(handler)?.hook;
+
+  return name === "" ? undefined : name;
 }
 
 /** What a hook command needs: how npx is run, which version, which hook, what if it fails. */
@@ -251,9 +275,9 @@ function ownHandlersOf(hooks: Record<string, unknown>): OwnHandler[] {
     const handlers = groupsOf(event, value).flatMap((group) => group.hooks);
 
     return handlers.flatMap((handler) => {
-      const version = ownVersionOf(handler);
+      const own = ownCommandOf(handler);
 
-      return version === undefined ? [] : [{ event, command: handler.command, version }];
+      return own === undefined ? [] : [{ event, command: handler.command, version: own.version }];
     });
   });
 }

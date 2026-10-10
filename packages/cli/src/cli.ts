@@ -6,7 +6,7 @@ import { parseArgs } from "node:util";
 import { RecordError, type InterfaceLanguage, type LocalizedText } from "@cyberzavod/core";
 import { JournalError, ProjectFileError } from "@cyberzavod/storage";
 import { DEFAULT_AGENT_NAME, type AgentAdapter } from "./agents/agent-adapter.ts";
-import { adapterAt, adapterFor } from "./agents/host-agent.ts";
+import { adapterAt, adapterFor, agentNamed } from "./agents/host-agent.ts";
 import { createAdapters, type Adapters } from "./agents/registry.ts";
 import { projectChecksWith, runDoctor, type DoctorOptions } from "./commands/doctor.ts";
 import { galleryAccessOf, showGallery } from "./commands/gallery.ts";
@@ -385,9 +385,13 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
   hook: {
     section: "service",
     run: async ({ args, directory, env, language, adapters }) => {
-      const { positionals } = parseArgs({ args, allowPositionals: true });
+      const { positionals, values } = parseArgs({
+        args,
+        allowPositionals: true,
+        options: { agent: { type: "string" } },
+      });
       const [name = ""] = positionals;
-      const adapter = adapters[DEFAULT_AGENT_NAME];
+      const adapter = adapters[agentNamed(values.agent ?? DEFAULT_AGENT_NAME)];
 
       if (!adapter.hookNames.includes(name)) {
         throw new CommandError((m) => m.errors.unknownHook(name));

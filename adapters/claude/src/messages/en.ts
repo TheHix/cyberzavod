@@ -5,23 +5,6 @@ import type { ClaudeMessages } from "./claude-messages.ts";
 
 /** Adapter texts in English. */
 export const en: ClaudeMessages = {
-  stop: {
-    configUnreadable: ({ file, reason }) =>
-      `The config ${file} cannot be read — checks were skipped, the agent is released. ${reason}`,
-    gitUnavailable: (reason) =>
-      `The stop hook could not run git — checks were skipped, the agent is released. ${reason}`,
-    counterNotSaved: (file) =>
-      `The stop hook could not write the attempt counter (${file}) — checks are red, the agent is released without retries.`,
-    checksFailing: ({ command, attempt, maxAttempts, output }) =>
-      `${command} fails — you cannot finish yet (attempt ${attempt} of ${maxAttempts}). Fix:\n${output}\n`,
-    humanCalled: (maxAttempts) =>
-      `Checks are still red after ${maxAttempts} attempts to fix them — the agent is stopped, a human is needed.`,
-    markerNotSaved: "The marker for the recording was not saved.",
-  },
-  record: {
-    sessionNotRecorded: (reason) => `session not recorded: ${reason}`,
-    markerNotClaimed: ({ file, reason }) => `marker ${file} was not claimed: ${reason}`,
-  },
   draft: {
     configNotRead: (reason) => `project config not read: ${reason}`,
     transcriptNotRead: ({ file, reason }) => `transcript ${file} not read: ${reason}`,

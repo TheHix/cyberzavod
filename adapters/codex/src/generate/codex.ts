@@ -10,6 +10,12 @@ export const CODEX_PROVIDER = "openai";
 /** Agent this adapter runs. */
 export const CODEX_AGENT = "codex";
 
+/** Name of the shell tool in Codex hook payloads (the `exec_command` tool). */
+export const SHELL_TOOL = "Bash";
+
+/** Name of the file-editing tool in Codex hook payloads. */
+export const PATCH_TOOL = "apply_patch";
+
 // Mistakes cost most in plan and review, so the frontier model there; code and checks get the
 // workhorse model.
 const DEFAULT_MODELS: Readonly<Record<Stage, string>> = {

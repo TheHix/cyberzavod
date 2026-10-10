@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import {
   groupsOf,
+  hookNameOf,
   isObject,
   isOwnHandler,
   parseSettings,
@@ -149,14 +150,6 @@ export function hookTrustKey(
   return `${hooksFilePath}:${EVENT_KEY_LABELS[event]}:${position.group}:${position.handler}`;
 }
 
-const HOOK_NAME = /\bhook\s+([\w-]+)/;
-
-// The command is `… hook <name> --agent codex || …`; the former in-project CLI has no such shape,
-// and its command stands for itself.
-function hookNameOf(handler: HookHandler): string {
-  return HOOK_NAME.exec(handler.command)?.[1] ?? handler.command;
-}
-
 function hooksOf(hooks: unknown): Record<string, unknown> {
   if (hooks === undefined) return {};
 
@@ -191,7 +184,10 @@ export function ownHookTrust(root: string, hooksText: string): HookTrust[] {
         });
         const hash = hookTrustHash(event, group.matcher, handler);
 
-        return [{ key, hash, event, name: hookNameOf(handler) }];
+        // The former in-project CLI has no hook name: its command stands for itself.
+        const name = hookNameOf(handler) ?? handler.command;
+
+        return [{ key, hash, event, name }];
       }),
     ),
   );

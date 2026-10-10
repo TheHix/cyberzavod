@@ -1,10 +1,17 @@
 // Adapter hooks by name: `cyberzavod hook <name>` calls them, and the Claude Code settings use the
-// same names.
+// same names. The hooks themselves are shared with the other agents (see the adapter kit); here
+// they are tied to Claude Code's payloads.
 
-import type { HookContext, HookOutcome } from "./hook.ts";
-import { recordEvent } from "./record.ts";
-import { gateStop } from "./stop-gate.ts";
-import { startTurn } from "./turn-start.ts";
+import {
+  gateStop,
+  recordEvent,
+  startTurn,
+  type HookContext,
+  type HookOutcome,
+  type RawEventSource,
+} from "@cyberzavod/adapter-kit";
+import { fromHookPayload } from "../capture/hook-payload.ts";
+import { CLAUDE_AGENT } from "../generate/claude.ts";
 
 /** Adapter hook names. */
 export const HOOK_NAMES = ["record", "turn-start", "stop"] as const;
@@ -12,8 +19,10 @@ export const HOOK_NAMES = ["record", "turn-start", "stop"] as const;
 /** Adapter hook name. */
 export type HookName = (typeof HOOK_NAMES)[number];
 
+const CLAUDE_EVENTS: RawEventSource = { agent: CLAUDE_AGENT, eventOf: fromHookPayload };
+
 const HOOKS: Readonly<Record<HookName, (context: HookContext) => Promise<HookOutcome>>> = {
-  record: recordEvent,
+  record: (context) => recordEvent(context, CLAUDE_EVENTS),
   "turn-start": startTurn,
   stop: gateStop,
 };
@@ -36,5 +45,3 @@ export function isHookName(name: string): name is HookName {
 export async function runHook(name: HookName, context: HookContext): Promise<HookOutcome> {
   return HOOKS[name](context);
 }
-
-export type { HookContext, HookOutcome } from "./hook.ts";

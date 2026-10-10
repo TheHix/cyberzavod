@@ -1,10 +1,10 @@
 // Russian CLI texts.
 
-import { HOOK_NAMES } from "@cyberzavod/adapter-claude";
 import { CLI_COMMAND } from "@cyberzavod/adapter-kit";
 import { AGENT_NAMES, DEFAULT_AGENT_NAME } from "../agents/agent-adapter.ts";
 import { API_URL_VARIABLE, DEFAULT_API_URL } from "../sharing/services.ts";
 import type { CliMessages } from "./cli-messages.ts";
+import { ALL_HOOK_NAMES } from "./hook-names.ts";
 
 /** CLI texts in Russian. */
 export const ru: CliMessages = {
@@ -138,9 +138,15 @@ export const ru: CliMessages = {
       ],
     },
     hook: {
-      usage: `hook <${HOOK_NAMES.join("|")}>`,
-      summary: "хук Claude Code: его вызывают настройки проекта, а не человек",
-      parameters: [{ name: "<имя хука>", description: "событие приходит на stdin" }],
+      usage: `hook <${ALL_HOOK_NAMES.join("|")}> [--agent <agent>]`,
+      summary: "хук агента: его вызывает файл хуков агента, а не человек",
+      parameters: [
+        { name: "<имя хука>", description: "событие приходит на stdin" },
+        {
+          name: "--agent <agent>",
+          description: `агент, чей это хук: ${AGENT_NAMES.join(", ")}; по умолчанию ${DEFAULT_AGENT_NAME}`,
+        },
+      ],
     },
   },
   init: {

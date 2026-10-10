@@ -5,6 +5,7 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { parseRawLog, type RawEvent } from "@cyberzavod/adapter-kit";
 import { eventBuilds, projectsWithoutBuild, unassignedRuns } from "../capture/builds.ts";
 import {
   carryOverEdits,
@@ -18,7 +19,6 @@ import {
   type DraftRun,
   type EditableDraftEvent,
 } from "../capture/draft.ts";
-import { parseRawLog, type RawEvent } from "../capture/raw-event.ts";
 import {
   directoriesOutsideProjects,
   routeMessages,

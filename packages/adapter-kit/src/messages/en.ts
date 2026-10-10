@@ -5,6 +5,23 @@ import type { KitMessages } from "./kit-messages.ts";
 
 /** Shared adapter texts in English. */
 export const en: KitMessages = {
+  stop: {
+    configUnreadable: ({ file, reason }) =>
+      `The config ${file} cannot be read — checks were skipped, the agent is released. ${reason}`,
+    gitUnavailable: (reason) =>
+      `The stop hook could not run git — checks were skipped, the agent is released. ${reason}`,
+    counterNotSaved: (file) =>
+      `The stop hook could not write the attempt counter (${file}) — checks are red, the agent is released without retries.`,
+    checksFailing: ({ command, attempt, maxAttempts, output }) =>
+      `${command} fails — you cannot finish yet (attempt ${attempt} of ${maxAttempts}). Fix:\n${output}\n`,
+    humanCalled: (maxAttempts) =>
+      `Checks are still red after ${maxAttempts} attempts to fix them — the agent is stopped, a human is needed.`,
+    markerNotSaved: "The marker for the recording was not saved.",
+  },
+  record: {
+    sessionNotRecorded: (reason) => `session not recorded: ${reason}`,
+    markerNotClaimed: ({ file, reason }) => `marker ${file} was not claimed: ${reason}`,
+  },
   errors: {
     fileConflicts: (files) =>
       `nothing was changed: these files are yours (not generated, or generated and then edited by hand): ${files}. Move your edits to AGENTS.md and delete the files, or overwrite them with ${CLI_COMMAND} sync --force`,
