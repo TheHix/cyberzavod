@@ -115,6 +115,7 @@ describe("transcriptsOf", () => {
 
     expect(meta).toEqual({
       runTokens: new Map([["a1", "станция".length]]),
+      runModels: new Map([["a1", "gpt-x"]]),
       sessionUsages: [{ ts: 10, tokens: "сессия".length }],
       replies: [{ ts: 5, model: "gpt-x" }],
       answers: [{ ts: 6, text: "готово" }],
@@ -142,6 +143,34 @@ describe("transcriptsOf", () => {
     expect(meta.reports).toEqual([{ ts: 7, agentId: "a1", text: "станция" }]);
   });
 
+  it("берёт модель запуска из первого ответа его транскрипта", async () => {
+    const station = await transcriptFile("station.jsonl", "станция");
+    const modelReplies = () => [
+      { ts: 1, model: "gpt-first" },
+      { ts: 2, model: "gpt-second" },
+    ];
+    const transcripts = transcriptsOf(lineFormat({ modelReplies }));
+    const events: RawEvent[] = [
+      { ts: 1, kind: "subagent_stop", agent: "coder", agentId: "a1", transcriptPath: station },
+    ];
+
+    const { meta } = await transcripts.inputsOf(events, KIT_MESSAGES.en);
+
+    expect(meta.runModels).toEqual(new Map([["a1", "gpt-first"]]));
+  });
+
+  it("не даёт модели запуску без ответов в транскрипте", async () => {
+    const station = await transcriptFile("station.jsonl", "станция");
+    const transcripts = transcriptsOf(lineFormat({ modelReplies: () => [] }));
+    const events: RawEvent[] = [
+      { ts: 1, kind: "subagent_stop", agent: "coder", agentId: "a1", transcriptPath: station },
+    ];
+
+    const { meta } = await transcripts.inputsOf(events, KIT_MESSAGES.en);
+
+    expect(meta.runModels).toEqual(new Map());
+  });
+
   it("исправляет исход вызовов по транскрипту сессии", async () => {
     const session = await transcriptFile("session.jsonl", "сессия");
     const station = await transcriptFile("station.jsonl", "станция");
@@ -166,6 +195,7 @@ describe("transcriptsOf", () => {
     expect({ meta, warnings: warn.mock.calls.map(([text]) => text) }).toEqual({
       meta: {
         runTokens: new Map(),
+        runModels: new Map(),
         sessionUsages: [],
         replies: [],
         answers: [],

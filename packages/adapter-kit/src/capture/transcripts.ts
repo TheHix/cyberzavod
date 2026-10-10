@@ -24,7 +24,10 @@ import type {
 
 /** Draft data that comes from transcripts rather than from the raw log. */
 export type TranscriptMeta = Required<
-  Pick<DraftMeta, "runTokens" | "sessionUsages" | "replies" | "answers" | "assignments" | "reports">
+  Pick<
+    DraftMeta,
+    "runTokens" | "runModels" | "sessionUsages" | "replies" | "answers" | "assignments" | "reports"
+  >
 >;
 
 /** What the draft is built from: the log events and the data from the transcripts. */
@@ -217,6 +220,25 @@ function tokensOfRuns(
   return tokens;
 }
 
+// Model of each subagent run: the one that replied first in the run's transcript. A run whose
+// transcript is unread, or has no replies, has no model.
+function modelsOfRuns(
+  paths: ReadonlyMap<string, string>,
+  readings: Readings,
+  format: TranscriptFormat,
+): Map<string, string> {
+  const models = new Map<string, string>();
+
+  for (const [agentId, transcriptPath] of paths) {
+    const transcript = textAt(readings, transcriptPath);
+    const model = transcript === undefined ? undefined : format.modelReplies(transcript)[0]?.model;
+
+    if (model !== undefined) models.set(agentId, model);
+  }
+
+  return models;
+}
+
 // Main session tokens per message, so they can be split across builds.
 function usagesOfSession(
   paths: readonly string[],
@@ -310,6 +332,7 @@ export function transcriptsOf(
         events: withToolOutcomes(rawEvents, session.outcomes),
         meta: {
           runTokens: tokensOfRuns(runPaths, readings, format),
+          runModels: modelsOfRuns(runPaths, readings, format),
           sessionUsages: usagesOfSession(sessionPaths, readings, format),
           replies,
           answers,

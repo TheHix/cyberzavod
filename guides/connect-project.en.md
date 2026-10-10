@@ -173,7 +173,7 @@ Every record has the same envelope: version, type, time, project, session, sourc
 5. Commit. If the journal is in the project repository, the skill runs the project checks and commits the recording by the rules in `AGENTS.md`.
 6. Gallery. With your consent, the skill sends the recording to your gallery.
 
-If one session handled several tasks, each one is published as a separate recording: the skill marks them up in the draft itself. You never type the gallery commands: the skill runs them. For the manual path you need `login`, `share <id>` and `gallery --public`.
+If one session handled several tasks, each one is published as a separate recording: the skill marks them up in the draft itself. To compare runs of one task on different models or agents, name a task label when you ask for the recording: the skill puts it into the recording, and the site shows recordings with the same label side by side. You never type the gallery commands: the skill runs them. For the manual path you need `login`, `share <id>` and `gallery --public`.
 
 ### The gallery
 

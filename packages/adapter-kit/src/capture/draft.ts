@@ -13,6 +13,7 @@ import {
   type SessionEvent,
   type InterventionEvent,
   type InterventionReason,
+  type StageEnterEvent,
   type SessionRecord,
   type RecordError,
   type Speaker,
@@ -21,6 +22,7 @@ import {
 import { KitError } from "../errors.ts";
 import { buildTimeline, eventBuilds } from "./builds.ts";
 import { findLeaks } from "./leaks.ts";
+import { withOptional } from "./raw-event.ts";
 
 /** A prompt in the draft: the human's original text and the clean version for publishing. */
 export interface DraftPrompt {
@@ -156,6 +158,11 @@ export interface DraftBuild {
   language: string;
   /** Station runs (`agentId`) that belong to the build. */
   runs: string[];
+  /**
+   * Task label for comparing runs of one task across recordings. The editor sets it only when the
+   * human named the label; without it the recording has no `task`.
+   */
+  task?: string;
 }
 
 /** Session recordings draft: built from the log, edited and published. */
@@ -357,7 +364,7 @@ function parseBuild(raw: unknown, index: number): DraftBuild {
 
   // Drafts from before the language field live in capture/ and carry editing into the rebuilt
   // draft: their language still awaits editing.
-  const { id, project, harness, workflow, title, language = "", runs } = raw;
+  const { id, project, harness, workflow, title, language = "", runs, task } = raw;
 
   if (!isRecordId(id)) {
     throw new DraftError(
@@ -376,8 +383,20 @@ function parseBuild(raw: unknown, index: number): DraftBuild {
     );
   }
   if (!isStrings(runs)) throw new DraftError(`build ${id}: runs must be a list of strings`);
+  if (task !== undefined && typeof task !== "string") {
+    throw new DraftError(`build ${id}: task must be a string`);
+  }
 
-  return { id, project, harness, workflow, title, language, runs: [...runs] };
+  return {
+    id,
+    project,
+    harness,
+    workflow,
+    title,
+    language,
+    runs: [...runs],
+    ...(task === undefined ? {} : { task }),
+  };
 }
 
 function parseBuilds(raw: Record<string, unknown>): DraftBuild[] {
@@ -573,10 +592,10 @@ function carryOverBuilds(previous: Draft, next: Draft): DraftBuild[] {
 
 /**
  * Carries editing from the previous draft of the same session into the rebuilt one: builds with
- * their titles, projects, factory versions and runs, clean prompts, "merged" marks, messages,
- * interventions and builds of prompts, messages and interventions. An empty project and harness
- * version of the build with the `id` of the rebuilt draft's first build come from the log. New
- * prompts and messages stay empty.
+ * their titles, projects, factory versions, task labels and runs, clean prompts, "merged" marks,
+ * messages, interventions and builds of prompts, messages and interventions. An empty project
+ * and harness version of the build with the `id` of the rebuilt draft's first build come from
+ * the log. New prompts and messages stay empty.
  * @param {Draft} previous Previous draft with editing already done.
  * @param {Draft} next Draft just built from the log.
  * @returns {Draft} Rebuilt draft with the editing carried over.
@@ -721,7 +740,12 @@ function toPublishedEvents(
         if (event.stage === currentStage) return;
 
         currentStage = event.stage;
-        published.push({ t: at(event.t), type: "stage_enter", stage: event.stage });
+        published.push(
+          withOptional<StageEnterEvent>(
+            { t: at(event.t), type: "stage_enter", stage: event.stage },
+            { model: event.model },
+          ),
+        );
 
         return;
       case "stage_fail":
@@ -760,8 +784,9 @@ function textsOf(event: SessionEvent): string[] {
     case "message":
     case "intervention":
       return [event.line, event.text];
-    case "build_start":
     case "stage_enter":
+      return event.model === undefined ? [] : [event.model];
+    case "build_start":
     case "usage":
     case "build_end":
       return [];
@@ -792,8 +817,19 @@ function buildOf(draft: Draft, buildId: string): DraftBuild {
   return build;
 }
 
+// An empty label is the same as none: the editor may leave the field blank.
+function taskMark({ task }: DraftBuild): { task?: string } {
+  return task === undefined || task === "" ? {} : { task };
+}
+
 function checkNoLeaks({ data }: SessionRecord, buildId: string): void {
-  const texts = [data.title, data.harness, data.workflow, ...data.events.flatMap(textsOf)];
+  const header = [
+    data.title,
+    data.harness,
+    data.workflow,
+    ...(data.task === undefined ? [] : [data.task]),
+  ];
+  const texts = [...header, ...data.events.flatMap(textsOf)];
   const leaks = texts.flatMap((text) => findLeaks(text).map((kind) => ({ kind, text })));
 
   if (leaks.length === 0) return;
@@ -854,6 +890,7 @@ export function publishBuild(draft: Draft, buildId: string, source: RecordSource
       language: build.language,
       workflow: build.workflow,
       harness: build.harness,
+      ...taskMark(build),
       events: published,
     },
   });

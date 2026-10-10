@@ -58,6 +58,7 @@ function fakeTranscripts(): SessionTranscripts {
         ),
         meta: {
           runTokens: new Map(),
+          runModels: new Map(),
           sessionUsages: [],
           replies: [{ ts: START + 2_000, model: "gpt-x" }],
           answers: [],

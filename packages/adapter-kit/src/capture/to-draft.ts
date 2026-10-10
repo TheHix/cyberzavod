@@ -161,7 +161,12 @@ export interface DraftMeta {
   runTokens?: ReadonlyMap<string, number>;
   /** Main session message tokens: they are split between builds by these. */
   sessionUsages?: readonly TokenUsage[];
-  /** Model replies from the session transcript: a prompt finds its model by them. */
+  /** Model of each subagent run by `agentId`: the first reply of the run's transcript. */
+  runModels?: ReadonlyMap<string, string>;
+  /**
+   * Model replies from the session transcript: a prompt, and a stage entered by a tool, find their
+   * model by them.
+   */
   replies?: readonly ModelReply[];
   /** Model replies from the session transcript: final replies to the human come from them. */
   answers?: readonly TranscriptText[];
@@ -183,6 +188,17 @@ function stageOfAgent(agent: string | undefined): Stage | undefined {
 // A prompt was received by the model that replied first after it.
 function modelAnswering(replies: readonly ModelReply[], promptTs: number): string | undefined {
   return replies.find((reply) => reply.ts >= promptTs)?.model;
+}
+
+// A stage entered by a tool was run by the model whose reply the call belongs to: a reply is dated
+// by its end, so the call is inside the first reply that ends after it. A call after the last
+// reply (the log outlived the transcript) belongs to the last one.
+function modelRunning(replies: readonly ModelReply[], toolTs: number): string | undefined {
+  return modelAnswering(replies, toolTs) ?? replies.at(-1)?.model;
+}
+
+function modelMark(model: string | undefined): { model?: string } {
+  return model === undefined ? {} : { model };
 }
 
 // Where a tool ran: it decides which project the call belongs to. `session` is an old log without
@@ -909,7 +925,7 @@ class DraftEventCollector {
       said: text,
       goal: "",
       requirements: [],
-      ...(model === undefined ? {} : { model }),
+      ...modelMark(model),
     });
   }
 
@@ -928,7 +944,16 @@ class DraftEventCollector {
     this.awaitingHuman = undefined;
     this.windows.observe(event);
     this.stagesByProject.clear();
-    this.draftEvents.push({ t: this.at(event.ts), type: "stage_enter", stage, run });
+
+    const model = event.agentId === undefined ? undefined : this.meta.runModels?.get(event.agentId);
+
+    this.draftEvents.push({
+      t: this.at(event.ts),
+      type: "stage_enter",
+      stage,
+      run,
+      ...modelMark(model),
+    });
 
     const window: DraftRun = {
       t: this.at(event.ts),
@@ -999,6 +1024,7 @@ class DraftEventCollector {
       t: this.at(ts),
       type: "stage_enter",
       stage,
+      ...modelMark(modelRunning(this.meta.replies ?? [], ts)),
       ...projectMark(project),
     });
   }

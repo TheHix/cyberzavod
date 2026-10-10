@@ -14,6 +14,10 @@ Order (do the layout before editing the messages: message routes are computed in
 6. Fill in the titles, prompts, messages, and interventions (steps 2 and 3 above) and show the human the table of builds.
 7. Publish all builds at once or one through `--build`: tasks that are not finished yet can be published later from the same draft.
 
+## Task label
+
+Recordings of one task that went through the same process on different models or agents are compared on the site by a task label. If the human named such a label, set `"task": "<label>"` on the build (every build it applies to, also in a session with one task); the label holds only letters, digits, underscores, and hyphens. Without the human's word the field is absent: do not invent a label.
+
 ## Rules for the clean version
 
 - **It is a prompt to an agent.** The human addresses the model as "you" and in the imperative, as in a live message: "Define the code style", "Do not write separator comments". Do not turn the prompt into a task name ("Defining the code style") and do not retell it in the third person ("The human asks…").
