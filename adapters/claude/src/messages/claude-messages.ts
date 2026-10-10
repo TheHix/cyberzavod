@@ -69,12 +69,6 @@ export interface PublishMessages {
 /** Adapter error texts: what the human fixes themselves. */
 export interface ClaudeErrorMessages {
   unsupportedAgent(params: { stage: string; requested: string; supported: string }): string;
-  fileConflicts(files: string): string;
-  settingsNotObject(file: string): string;
-  settingsNotParsed(params: { file: string; reason: string }): string;
-  manifestNotParsed(params: { file: string; reason: string }): string;
-  unknownPlaceholder(placeholder: string): string;
-  projectNotFound(directory: string): string;
   noDrafts: string;
   noRawLogs(directory: string): string;
   earlierDraftNotParsed(file: string): string;

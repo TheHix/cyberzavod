@@ -35,7 +35,7 @@ export const commandsFoundCheck: ProjectCheck = {
     const { commands } = context.messages.doctor;
     const configured = context.project.config.verification.commands;
 
-    if (configured.length === 0) return noCommandsResult(context.messages);
+    if (configured.length === 0) return noCommandsResult(context.messages, context.adapter.terms);
 
     const programs = uniqueProgramsOf(configured);
     const missing = await missingPrograms(programs, context);

@@ -38,6 +38,8 @@
   },
   "devDependencies": {
     "@cyberzavod/adapter-claude": "workspace:*",
+    "@cyberzavod/adapter-codex": "workspace:*",
+    "@cyberzavod/adapter-kit": "workspace:*",
     "@cyberzavod/core": "workspace:*",
     "@cyberzavod/storage": "workspace:*",
     "esbuild": "0.28.2"

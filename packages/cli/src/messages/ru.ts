@@ -1,6 +1,8 @@
 // Russian CLI texts.
 
-import { CLI_COMMAND, HOOK_NAMES } from "@cyberzavod/adapter-claude";
+import { HOOK_NAMES } from "@cyberzavod/adapter-claude";
+import { CLI_COMMAND } from "@cyberzavod/adapter-kit";
+import { AGENT_NAMES, DEFAULT_AGENT_NAME } from "../agents/agent-adapter.ts";
 import { API_URL_VARIABLE, DEFAULT_API_URL } from "../sharing/services.ts";
 import type { CliMessages } from "./cli-messages.ts";
 
@@ -8,7 +10,7 @@ import type { CliMessages } from "./cli-messages.ts";
 export const ru: CliMessages = {
   help: {
     title: "Cyberzavod — локальный harness разработки с ИИ-агентами.",
-    quickStart: `Старт: ${CLI_COMMAND} init, затем в Claude Code /setup и /feature <задача>.`,
+    quickStart: `Старт: ${CLI_COMMAND} init [--agent codex], /setup, /feature (Codex: $имя).`,
     sections: {
       start: "Начало",
       journal: "Журнал",
@@ -21,10 +23,14 @@ export const ru: CliMessages = {
   },
   commands: {
     init: {
-      usage: "init [--yes] [--id <id>] [--check <command>] [--journal <path>]",
+      usage: "init [options]",
       summary: "подключить проект: конфиг, AGENTS.md, файлы агента",
       parameters: [
         { name: "--yes, -y", description: "не спрашивать подтверждение" },
+        {
+          name: "--agent <agent>",
+          description: `агент: ${AGENT_NAMES.join(", ")}; по умолчанию ${DEFAULT_AGENT_NAME}`,
+        },
         { name: "--id <id>", description: "id проекта; по умолчанию — имя пакета или каталога" },
         {
           name: "--check <command>",
@@ -141,18 +147,22 @@ export const ru: CliMessages = {
     summaryTitle: "Cyberzavod подключит этот проект:",
     projectId: (id) => `Id проекта: ${id}`,
     checks: (commands) => `Проверки: ${commands}`,
-    checksMissing: (file) => `Проверки: не найдены — /setup или правка ${file}`,
+    checksMissing: ({ file, terms }) =>
+      `Проверки: не найдены — ${terms.skill("setup")} или правка ${file}`,
     rulesStarter: (file) => `Правила для агентов: ${file} — заготовка, допишите её`,
     rulesMoved: ({ from, to }) => `Правила для агентов: ваш ${from} станет ${to}`,
     rulesKept: (file) => `Правила для агентов: ${file} уже есть, не изменится`,
     journal: (path) => `Журнал сессий: ${path}`,
     files: (paths) => `Появятся: ${paths}`,
+    trustProject: (file) => `Доверие: проект будет помечен доверенным в ${file}`,
+    trustHooks: (file) => `Доверие: хуки проекта будут одобрены в ${file}`,
     overrideHint: `Поменять: --id, --check, --journal — подробнее: ${CLI_COMMAND} init --help`,
     confirm: "Продолжить? [Y/n]",
     cancelled: "Отменено: ничего не записано",
     done: "Готово: проект подключён.",
     commit: (paths) => `Закоммитьте: ${paths}`,
-    nextSteps: "Дальше: откройте Claude Code и запустите /setup, затем /feature <задача>.",
+    nextSteps: (terms) =>
+      `Дальше: откройте ${terms.product} и запустите ${terms.skill("setup")}, затем ${terms.skill("feature")} <задача>.`,
     alreadyConnected: "Cyberzavod уже подключён к этому проекту.",
     configValid: "✓ Конфиг в порядке",
     filesCurrent: "✓ Сгенерированные файлы актуальны",
@@ -169,8 +179,9 @@ export const ru: CliMessages = {
     willRemove: "Удалятся",
     yours: "НЕ тронет (ваши файлы на месте сгенерированных)",
     edited: "НЕ тронет (сгенерированные файлы, исправленные руками)",
-    neverTouched:
-      "Не трогает никогда: AGENTS.md, ваши настройки и хуки Claude Code, журнал, ваш код.",
+    neverTouched: (terms) =>
+      `Не трогает никогда: AGENTS.md, ваши настройки и хуки ${terms.product}, журнал, ваш код.`,
+    trustRefreshed: (file) => `Одобрение хуков в ${file} перенесено на новые хуки.`,
     upToDate: "Всё актуально: менять нечего.",
     harnessMismatch: ({ file, configVersion, cliVersion }) =>
       `${file}: harness ${configVersion}, а CLI — ${cliVersion}`,
@@ -199,6 +210,12 @@ export const ru: CliMessages = {
         "Claude Code (claude) не найден в PATH: это нормально, если вы работаете в приложении или расширении IDE",
       install: "установите Claude Code: https://claude.com/claude-code",
     },
+    codex: {
+      passed: "Codex установлен",
+      missing:
+        "Codex (codex) не найден в PATH: это нормально, если вы работаете в приложении или расширении IDE",
+      install: "установите Codex: https://developers.openai.com/codex/cli",
+    },
     gallery: {
       signedIn: "галерея: вход выполнен",
       notSignedIn: "галерея: вход не выполнен (нужен только для публикации записей)",
@@ -225,6 +242,17 @@ export const ru: CliMessages = {
       sync: `выполните ${CLI_COMMAND} sync`,
       repairSettings: (file) => `исправьте JSON в ${file}, затем выполните ${CLI_COMMAND} sync`,
     },
+    trust: {
+      passed: (file) => `проект и его хуки доверены в ${file}`,
+      projectUntrusted: ({ file, terms }) =>
+        `проект не доверен в ${file}: ${terms.product} не запускает его хуки`,
+      trustProject: ({ file, projectKey, terms }) =>
+        `откройте ${terms.product} в проекте и доверьте его или допишите в ${file} [projects.${JSON.stringify(projectKey)}] trust_level = "trusted"`,
+      hooksUntrusted: ({ events, terms }) => `${terms.product} не одобрил хуки проекта: ${events}`,
+      approveHooks: (terms) => `откройте ${terms.product} и одобрите хуки командой /hooks`,
+      unreadable: (reason) => `доверие не проверить: ${reason}`,
+      repairConfig: `исправьте файл из сообщения выше и запустите ${CLI_COMMAND} doctor`,
+    },
     files: {
       upToDate: "файлы агента актуальны",
       versionsDiffer: ({ file, configVersion, cliVersion }) =>
@@ -242,13 +270,14 @@ export const ru: CliMessages = {
     rules: {
       passed: (file) => `${file} заполнен`,
       missing: (file) => `${file} не найден`,
-      create: "создайте его или запустите /setup в Claude Code",
+      create: (terms) => `создайте его или запустите ${terms.skill("setup")} в ${terms.product}`,
       unfilled: (file) => `в ${file} остались заглушки заготовки`,
-      fill: "запустите /setup в Claude Code",
+      fill: (terms) => `запустите ${terms.skill("setup")} в ${terms.product}`,
     },
     commands: {
       noneSet: (file) => `команды проверок не заданы в ${file}`,
-      setUp: (file) => `запустите /setup в Claude Code или впишите команды в ${file}`,
+      setUp: ({ file, terms }) =>
+        `запустите ${terms.skill("setup")} в ${terms.product} или впишите команды в ${file}`,
       programsFound: (programs) =>
         `программы ${programs} найдены; команды не запускались — ${CLI_COMMAND} doctor --run-checks`,
       programsMissing: (programs) => `программы проверок не найдены: ${programs}`,
@@ -278,13 +307,21 @@ export const ru: CliMessages = {
     keepJournal: (path) => `журнал: ${path} (сессии, решения, заметки)`,
     keepIgnoreEntry: (entry) =>
       `строка ${entry} в .gitignore (сырые журналы сессий не попадут в git)`,
-    keepSettings: "ваши настройки, хуки и запреты Claude Code",
+    keepSettings: (terms) => `ваши настройки, хуки и запреты ${terms.product}`,
+    untrustProject: (file) => `доверие проекту, которое выдал Cyberzavod, в ${file}`,
+    untrustHooks: (file) => `одобрение хуков проекта в ${file}`,
+    keepProjectTrust: (file) => `доверие проекту, которое вы выдали сами, в ${file}`,
     editedFile: (file) => `${file} (сгенерирован, но вы исправили его руками)`,
     confirm: "Продолжить? [Y/n]",
     cancelled: "Отменено: ничего не изменено.",
     needsConfirmation: `Ничего не изменено: спросить негде, терминала нет. Чтобы удалить без вопроса, запустите:\n  ${CLI_COMMAND} disconnect --yes`,
-    done: (rulesFile) =>
-      `Готово: Cyberzavod убран из проекта. Просмотрите и закоммитьте изменения.\nClaude Code читает CLAUDE.md: чтобы правила ${rulesFile} остались в Claude Code, создайте CLAUDE.md с одной строкой @${rulesFile}.`,
+    done: ({ rulesFile, terms, agentRulesFile }) => {
+      const removed = "Готово: Cyberzavod убран из проекта. Просмотрите и закоммитьте изменения.";
+
+      if (agentRulesFile === undefined) return removed;
+
+      return `${removed}\n${terms.product} читает ${agentRulesFile}: чтобы правила ${rulesFile} остались в ${terms.product}, создайте ${agentRulesFile} с одной строкой @${rulesFile}.`;
+    },
   },
   status: {
     recordTypes: { session: "сессии", decision: "решения", note: "заметки" },
@@ -333,6 +370,12 @@ export const ru: CliMessages = {
     missingNoteText: "нужен текст заметки",
     missingRecordId: "нужен id записи",
     unknownHook: (name) => `нет хука ${name}`,
+    unknownAgent: ({ agent, supported }) =>
+      `неизвестный агент «${agent}» в --agent: доступны ${supported}`,
+    agentDiffers: ({ configured, requested }) =>
+      `проект уже подключён к агенту ${configured}, а не ${requested}: сначала выполните ${CLI_COMMAND} disconnect, затем init --agent ${requested}`,
+    agentCommandUnavailable: ({ agent, command }) =>
+      `команда ${command} для агента ${agent} пока недоступна`,
     unsupportedAgent: ({ agent, supported }) =>
       `агент «${agent}» не поддерживается: доступны ${supported}`,
     mixedAgents: ({ agents, file }) =>

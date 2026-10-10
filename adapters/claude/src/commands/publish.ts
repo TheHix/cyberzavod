@@ -10,7 +10,8 @@ import { DirectoryRecordStore } from "@cyberzavod/storage";
 import { DraftError, parseDraft, publishBuild, type Draft } from "../capture/draft.ts";
 import { ClaudeError } from "../errors.ts";
 import type { ClaudeMessages } from "../messages/claude-messages.ts";
-import { captureDirectories, newestFile, requireProject } from "../paths.ts";
+import { requireProject } from "@cyberzavod/adapter-kit";
+import { captureDirectories, newestFile } from "../paths.ts";
 
 /** What to publish: the project and, if needed, a specific draft and build. */
 export interface PublishSessionsOptions {

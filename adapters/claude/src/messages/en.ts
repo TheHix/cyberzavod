@@ -1,6 +1,6 @@
 // English texts of the Claude Code adapter.
 
-import { CLI_COMMAND } from "../cli-command.ts";
+import { CLI_COMMAND } from "@cyberzavod/adapter-kit";
 import type { ClaudeMessages } from "./claude-messages.ts";
 
 /** Adapter texts in English. */
@@ -58,16 +58,7 @@ export const en: ClaudeMessages = {
   },
   errors: {
     unsupportedAgent: ({ stage, requested, supported }) =>
-      `stage ${stage}: ${requested} is not supported, only the ${supported} adapter exists so far`,
-    fileConflicts: (files) =>
-      `nothing was changed: these files are yours (not generated, or generated and then edited by hand): ${files}. Move your edits to AGENTS.md and delete the files, or overwrite them with ${CLI_COMMAND} sync --force`,
-    settingsNotObject: (file) => `${file} cannot be parsed: the settings must be an object`,
-    settingsNotParsed: ({ file, reason }) => `${file} cannot be parsed: ${reason}`,
-    manifestNotParsed: ({ file, reason }) =>
-      `${file} cannot be parsed: ${reason}. Restore it from git, or delete it and run ${CLI_COMMAND} sync`,
-    unknownPlaceholder: (placeholder) => `the template has an unknown placeholder ${placeholder}`,
-    projectNotFound: (directory) =>
-      `${directory} is not in a Cyberzavod project: run ${CLI_COMMAND} init first`,
+      `stage ${stage}: ${requested} is not supported by the Claude Code adapter, it runs only ${supported}`,
     noDrafts: `no drafts yet: run ${CLI_COMMAND} draft first`,
     noRawLogs: (directory) => `no session logs yet: the hooks write them to ${directory}`,
     earlierDraftNotParsed: (file) =>

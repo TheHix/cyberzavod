@@ -5,17 +5,18 @@
 import type { InterfaceLanguage } from "@cyberzavod/core";
 import type {
   DisconnectPlan,
-  HookOutcome,
   HooksInspection,
   PlannedProject,
   SyncReport,
-} from "@cyberzavod/adapter-claude";
+} from "@cyberzavod/adapter-kit";
+import type { HookOutcome } from "@cyberzavod/adapter-claude";
 import type { MachineCheck, ProjectCheck } from "../doctor/check.ts";
 import type { Installation } from "../installation/installation.ts";
+import type { AgentTerms } from "../messages/cli-messages.ts";
 import type { Environment } from "../messages/language.ts";
 
 /** Agents the CLI can drive; a new agent is a new member here and an object in the registry. */
-export const AGENT_NAMES = ["claude"] as const;
+export const AGENT_NAMES = ["claude", "codex"] as const;
 
 /** Name of an agent the CLI can drive. */
 export type AgentName = (typeof AGENT_NAMES)[number];
@@ -36,14 +37,6 @@ export function isAgentName(name: string): name is AgentName {
 export interface AgentIdentity {
   provider: string;
   agent: string;
-}
-
-/** How the agent's product and skill calls are written in texts for the human. */
-export interface AgentTerms {
-  /** Product name, for example `Claude Code`. */
-  product: string;
-  /** How the human calls a skill by name, for example `/setup`. */
-  skill(name: string): string;
 }
 
 /** One hook call: the event payload and where it came from. */
@@ -94,6 +87,67 @@ export interface PublishRequest {
 export type AgentHooksReading =
   HooksInspection | { kind: "unreadable"; describe(language: InterfaceLanguage): string };
 
+/**
+ * A change in the human's own agent config, outside the project: the project is trusted
+ * (`project`) or the agent's hooks are approved (`hooks`). `file` is the config as shown to the
+ * human.
+ */
+export interface UserConfigChange {
+  kind: "project" | "hooks";
+  file: string;
+}
+
+/** A change in the human's config, planned and checked but not yet written. */
+export interface UserConfigPlan {
+  /** What the change adds or takes away. */
+  changes: readonly UserConfigChange[];
+  /** Config in which the project's trust stays because the human, not Cyberzavod, gave it. */
+  keptProjectTrustFile: string | undefined;
+  /** Writes the change; does nothing if `changes` is empty. */
+  apply(): Promise<void>;
+}
+
+/** An action that rewrote the project's agent files, and the config change it brought along. */
+export interface CarriedOver<T> {
+  value: T;
+  /** The approval that moved to the new hooks; undefined if there was nothing to move. */
+  change: UserConfigChange | undefined;
+}
+
+/**
+ * What the human's config says: all is in place (`ready`, in `file`), the project is not trusted
+ * (`projectUntrusted`, with the key the config uses for it), the hooks are not approved
+ * (`hooksUntrusted`, with their events), or the config cannot be read (`unreadable`, with the
+ * reason in the language of the reader).
+ */
+export type UserConfigReading =
+  | { kind: "ready"; file: string }
+  | { kind: "projectUntrusted"; file: string; projectKey: string }
+  | { kind: "hooksUntrusted"; file: string; events: readonly string[] }
+  | { kind: "unreadable"; describe(language: InterfaceLanguage): string };
+
+/** Where a project is and which Cyberzavod version's hooks it has. */
+export interface UserConfigTarget {
+  root: string;
+  version: string;
+}
+
+/**
+ * What an agent needs from the human's own config outside the project, for example the trust
+ * Codex asks for before it runs a project's hooks. Cyberzavod writes only what it adds itself and
+ * takes back only that.
+ */
+export interface UserConfigAccess {
+  /** What connecting adds to the config, planned before anything is written. */
+  planConnect(target: UserConfigTarget): Promise<UserConfigPlan>;
+  /** Runs the action that rewrites the agent files and carries the approval over to the result. */
+  carryOver<T>(root: string, action: () => Promise<T>): Promise<CarriedOver<T>>;
+  /** What the config says about the project; writes nothing. */
+  inspect(root: string): Promise<UserConfigReading>;
+  /** What disconnecting takes back from the config, planned before anything is removed. */
+  planDisconnect(root: string): Promise<UserConfigPlan>;
+}
+
 /** Everything the CLI commands need from an agent. */
 export interface AgentAdapter {
   readonly name: AgentName;
@@ -112,6 +166,8 @@ export interface AgentAdapter {
   readonly extraProjectChecks: readonly ProjectCheck[];
   /** Names the `hook` command accepts for this agent. */
   readonly hookNames: readonly string[];
+  /** The agent's needs in the human's own config, or undefined if it has none. */
+  readonly userConfig: UserConfigAccess | undefined;
 
   /** What generation would do in a project that is not on disk yet, writing nothing. */
   previewFiles(planned: PlannedProject, installation: Installation): Promise<SyncReport>;

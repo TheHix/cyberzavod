@@ -1,0 +1,29 @@
+# Адаптер Codex CLI (adapters/codex)
+
+Второй адаптер агента. Собирает из harness и конфига проекта файлы, которые понимает Codex CLI, и держит доверие к проекту и его хукам в конфиге человека. Общая часть (владение файлами, манифест, формат файла хуков, шаблоны) — в `packages/adapter-kit`. Захват сессии, хук остановки и защита `.env` (этап 3) и черновик с публикацией (этап 4) пока не сделаны: хуки в `.codex/hooks.json` уже зовут `cyberzavod hook … --agent codex`, пока такой команды нет, запасной путь (`|| …`) отпускает агента. CLI о Codex знает только через `AgentAdapter` в `packages/cli/src/agents/codex.ts`.
+
+## Генератор (`src/generate/`)
+
+- `codex.ts` — что адаптер знает о Codex: ведёт только `openai`/`codex` (другой агент этапа — `CodexGenerateError`, наследник `CodexError`), модель по умолчанию по этапу (постановка и ревью — старшая, код и проверки — рабочая), `effort` этапа, модель второй доработки (`ESCALATION_MODEL`), модель редактора записи. Идентификаторы моделей — константы с комментарием «почему».
+- `files.ts` — чистые тексты проектных файлов Codex: `.codex/config.toml` (`project_doc_max_bytes` — Codex иначе молча режет AGENTS.md на 32 КиБ — и `developer_instructions` с рабочими правилами), роль `.codex/agents/<роль>.toml` на каждый этап с ролью (Codex подменяет `developer_instructions` родителя ролевыми, поэтому в каждой роли рабочие правила и затем текст этапа), скиллы `.agents/skills/feature/` (таблица этапов, правила ведущего, как звать этап через `spawn_agent`) и `.agents/skills/setup/` (из `templates/setup.md`) и `agents/openai.yaml` рядом с каждым — `allow_implicit_invocation: false`: скиллы вызывает человек (`$feature`, `$setup`). `AGENTS.md` Codex читает сам, поэтому вложенных файлов рядом с ним нет.
+- `toml.ts` — запись строк TOML (`tomlString`, `tomlMultilineString`) для генерируемых файлов.
+- `hooks-config.ts` — хуки адаптера в `.codex/hooks.json`: запись на каждом событии (`record`, асинхронная; на `Stop` синхронная, потому что `codex exec` обрывает асинхронные хуки при выходе), `turn-start`, `guard` на `PreToolUse` для `Bash|apply_patch` (защита `.env`) и `stop`. Команда: `npx -y --prefer-offline --fetch-retries=0 --prefix . cyberzavod@<версия> hook <имя> --agent codex || <запасной путь>`; `--prefix .`, потому что Codex запускает хук в каталоге сессии и не даёт переменной с каталогом проекта. События `PostToolUseFailure` у Codex нет.
+- `sync.ts`, `inspect.ts`, `disconnect.ts` — как у Claude, поверх кита: `syncCodex`, `previewCodex` (`init` до записи), `inspectCodexHooks` (читает `.codex/hooks.json`, ничего не пишет), `disconnectCodex`. Файл хуков делят адаптер и человек: свои обработчики заменяются, чужие остаются. Файлов, которых больше нет в плане, не удаляет без отметки или записи в манифесте.
+
+## Доверие (`src/trust/`)
+
+Codex запускает хуки проекта, только если конфиг **человека** (`$CODEX_HOME/config.toml` или `~/.codex/config.toml`, `codex-home.ts`) доверяет проекту (`[projects."<realpath>"] trust_level = "trusted"`) и хранит хеш каждого хука (`[hooks.state."<hooks.json>:<событие>:<группа>:<обработчик>"] trusted_hash = "sha256:…"`). Хеш — sha256 компактного JSON с отсортированными ключами из `event_name`, `matcher` (кроме `UserPromptSubmit`, `Stop`, `Interrupt`) и обработчика с нормализованным таймаутом (`hook-trust.ts`; эталонные хеши в тесте посчитаны независимо). Без доверия Codex молча не видит роли и не запускает хуки.
+
+- Файл человека правится **построчно** (`toml-lines.ts`, `config-toml.ts`): комментарии, порядок и перевод строк сохраняются, дописывается и убирается только своё. Строка доверия проекту несёт `TRUST_MARK` (`# added by cyberzavod`): по ней `disconnect` отличает своё от доверия, которое дал человек. Если строка заменила другое значение (например `untrusted`), отметка его хранит (`# added by cyberzavod, was "untrusted"`), и `disconnect` возвращает его. Каждая правка проверяется разбором `smol-toml` (результат обязан отличаться от исходного ровно на запланированное — иначе `configEditRejected`); раскладка, которую построчно не поправить (инлайн-таблицы и подобное), и не-TOML — `CodexError` до записи.
+- `trust.ts` — план, потом запись: `planConnectTrust`, `planDisconnectTrust` возвращают `TrustPlan` (`changes`, `keptProjectTrustFile`, `apply`) — ошибки конфига падают до первой записи. `carryOverTrust(источник, корень, действие)` для `sync` переносит одобрение по паре (событие, имя хука; имя — из команды `hook <имя>`, `HookTrust.name`): новый свой обработчик одобряется, только если прежний с тем же событием и именем был одобрен; одобрение, которое человек снял или не давал, не выдумывается, записи заменённых обработчиков снимаются. Нет прежних своих хуков — `config.toml` даже не читается. `sync` доверия не создаёт. `inspectTrust` ничего не пишет и отвечает `trusted`, `projectUntrusted`, `hooksUntrusted` или `unreadable` (не TOML в `config.toml`, не JSON или неверная форма `.codex/hooks.json` — группы разбирает проверяющий `groupsOf` кита). Запись атомарная (временный файл + `rename`, права сохраняются, символическая ссылка разыменовывается).
+- Доверие пишет только `init` после своего единственного подтверждения; `sync --check` состояние машины не смотрит, его проверяет `doctor` (проверка `trust`). Тесты работают с временным `CODEX_HOME`, настоящий домашний каталог не трогается.
+
+## Сообщения (`src/messages/`)
+
+`CodexMessages` в `codex-messages.ts`, каталоги `en.ts` и `ru.ts`, `CODEX_MESSAGES`. Ошибка — `CodexError` (`errors.ts`), как `ClaudeError`: хранит `LocalizedText<CodexMessages>`, `message` английский. Тексты генерируемых файлов и шаблонов — всегда английские.
+
+## Правила
+
+- Привязка к агенту — в `codex.ts` и в названиях каталогов/событий; всё, что общее с Claude, — в ките.
+- `terms` адаптера (`Codex`, `$имя`) используются в текстах CLI, а не зашиты в них.
+- Тесты — на временном каталоге; `smol-toml` нужен только этому пакету (CLI получает его в бандле, `dist/THIRD_PARTY_LICENSES`).

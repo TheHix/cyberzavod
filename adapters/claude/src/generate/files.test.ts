@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { RULES_TODO_MARK, type Harness, type StageGuide } from "@cyberzavod/core";
-import { claudeFiles, GENERATED_MARK, renderTemplate, type ClaudeProject } from "./files.ts";
+import { GENERATED_MARK } from "@cyberzavod/adapter-kit";
+import { claudeFiles, renderTemplate, type ClaudeProject } from "./files.ts";
 
 function guide(stage: StageGuide["stage"], title: string, role?: string): StageGuide {
   const base = { stage, title, description: `${title}.`, body: `Stage text ${title}.` };

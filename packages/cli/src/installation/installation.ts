@@ -1,6 +1,7 @@
 // The running Cyberzavod version: version, harness and templates.
 
 import type { ClaudeTemplates } from "@cyberzavod/adapter-claude";
+import type { CodexTemplates } from "@cyberzavod/adapter-codex";
 import { parseHarness, type Harness, type HarnessError } from "@cyberzavod/core";
 import { readAssets } from "./assets.ts";
 
@@ -9,7 +10,7 @@ import { readAssets } from "./assets.ts";
  */
 export const HARNESS_VERSION = "0.9.1";
 
-const RULES_TEMPLATE = "rules.md";
+const RULES_TEMPLATE = "cli/rules.md";
 
 /** The running Cyberzavod version. */
 export interface Installation {
@@ -17,6 +18,7 @@ export interface Installation {
   /** AGENTS.md starter for a new project. */
   rulesTemplate: string;
   claudeTemplates: ClaudeTemplates;
+  codexTemplates: CodexTemplates;
 }
 
 function template(templates: Readonly<Record<string, string>>, name: string): string {
@@ -39,9 +41,10 @@ export async function readInstallation(): Promise<Installation> {
     harness: parseHarness(harness),
     rulesTemplate: template(templates, RULES_TEMPLATE),
     claudeTemplates: {
-      publishRecording: template(templates, "publish-recording.md"),
-      recordingEditor: template(templates, "recording-editor.md"),
-      setup: template(templates, "setup.md"),
+      publishRecording: template(templates, "claude/publish-recording.md"),
+      recordingEditor: template(templates, "claude/recording-editor.md"),
+      setup: template(templates, "claude/setup.md"),
     },
+    codexTemplates: { setup: template(templates, "codex/setup.md") },
   };
 }

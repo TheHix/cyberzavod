@@ -2,10 +2,9 @@ import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promise
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { GENERATED_MARK, MANIFEST_FILE } from "@cyberzavod/adapter-kit";
 import { loadHarness, PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
 import { disconnectClaude } from "./disconnect.ts";
-import { GENERATED_MARK } from "./files.ts";
-import { MANIFEST_FILE } from "./manifest.ts";
 import { syncClaude, type ClaudeInstallation } from "./sync.ts";
 
 const REPOSITORY = path.resolve(import.meta.dirname, "../../../..");

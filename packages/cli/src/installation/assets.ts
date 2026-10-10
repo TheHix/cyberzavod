@@ -9,17 +9,19 @@ import type { Assets } from "./types.ts";
 
 const REPOSITORY = path.resolve(import.meta.dirname, "../../../..");
 const HARNESS_DIRECTORY = path.join(REPOSITORY, "harness");
-const TEMPLATE_DIRECTORIES = [
-  path.join(REPOSITORY, "packages/cli/templates"),
-  path.join(REPOSITORY, "adapters/claude/templates"),
-];
+// Templates are keyed `<source>/<name>`: two adapters may have a template of the same name.
+const TEMPLATE_DIRECTORIES: Readonly<Record<string, string>> = {
+  cli: path.join(REPOSITORY, "packages/cli/templates"),
+  claude: path.join(REPOSITORY, "adapters/claude/templates"),
+  codex: path.join(REPOSITORY, "adapters/codex/templates"),
+};
 
 async function readTemplates(): Promise<Record<string, string>> {
   const templates: Record<string, string> = {};
 
-  for (const directory of TEMPLATE_DIRECTORIES) {
+  for (const [source, directory] of Object.entries(TEMPLATE_DIRECTORIES)) {
     for (const name of await readdir(directory)) {
-      templates[name] = await readFile(path.join(directory, name), "utf8");
+      templates[`${source}/${name}`] = await readFile(path.join(directory, name), "utf8");
     }
   }
 

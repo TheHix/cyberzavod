@@ -157,6 +157,7 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
         args,
         options: {
           yes: { type: "boolean", short: "y" },
+          agent: { type: "string" },
           id: { type: "string" },
           check: { type: "string", multiple: true },
           journal: { type: "string" },
@@ -173,6 +174,7 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
         installation: await readInstallation(),
         messages,
         adapters,
+        agent: values.agent,
       });
 
       return isReady ? SUCCESS : FAILURE;
@@ -533,7 +535,7 @@ export async function runCli(argv: string[], directory: string, env: Environment
 
   const messages = CLI_MESSAGES[choice.language];
   const { language } = choice;
-  const adapters = createAdapters();
+  const adapters = createAdapters({ env, homeDirectory: homedir() });
   const [name, ...args] = choice.rest;
 
   if (name === undefined || GENERAL_HELP_REQUESTS.includes(name)) {

@@ -1,31 +1,22 @@
 // Claude Code adapter: agent files from the harness, session capture into the project journal, and
-// publishing recordings from a draft.
+// publishing recordings from a draft. What the agents share lives in `@cyberzavod/adapter-kit`.
 
-export { CLI_COMMAND, PACKAGE_NAME, pinnedCliCommand } from "./cli-command.ts";
 export { draftSession, type DraftSessionOptions } from "./commands/draft.ts";
 export { publishSessions, type PublishSessionsOptions } from "./commands/publish.ts";
 export { ClaudeError } from "./errors.ts";
 export { CLAUDE_MESSAGES } from "./messages/catalog.ts";
 export type { ClaudeMessages } from "./messages/claude-messages.ts";
+export { CLAUDE_AGENT, CLAUDE_PROVIDER } from "./generate/claude.ts";
 export {
   previewClaude,
-  requireWritable,
   syncClaude,
   type ClaudeInstallation,
-  type PlannedProject,
   type SyncOptions,
-  type SyncReport,
 } from "./generate/sync.ts";
-export {
-  disconnectClaude,
-  type DisconnectOptions,
-  type DisconnectPlan,
-  type SettingsOutcome,
-} from "./generate/disconnect.ts";
-export { MANIFEST_FILE } from "./generate/manifest.ts";
+export { disconnectClaude } from "./generate/disconnect.ts";
 export type { ClaudeTemplates } from "./generate/files.ts";
 export { inspectClaudeHooks, type HooksReading } from "./generate/inspect.ts";
-export { SETTINGS_FILE, type HooksInspection } from "./generate/settings.ts";
+export { SETTINGS_FILE } from "./generate/settings.ts";
 export {
   HOOK_NAMES,
   isHookName,

@@ -28,4 +28,10 @@ describe("readInstallation", () => {
 
     expect(installation.claudeTemplates.setup.length).toBeGreaterThan(0);
   });
+
+  it("читает шаблон скилла $setup для Codex", async () => {
+    const installation = await readInstallation();
+
+    expect(installation.codexTemplates.setup.length).toBeGreaterThan(0);
+  });
 });

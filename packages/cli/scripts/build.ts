@@ -1,7 +1,7 @@
 // Builds the npm package: the CLI with all monorepo packages, the harness and templates, into one
 // file without dependencies. npm publishes the file, and npx runs it.
 
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { build, type Plugin } from "esbuild";
 import { readHarnessFiles } from "@cyberzavod/storage";
@@ -10,12 +10,18 @@ const PACKAGE = path.resolve(import.meta.dirname, "..");
 const REPOSITORY = path.resolve(PACKAGE, "../..");
 const ENTRY = path.join(PACKAGE, "src/bin/cyberzavod.ts");
 const OUTPUT = path.join(PACKAGE, "dist/cyberzavod.mjs");
+const LICENSES_OUTPUT = path.join(PACKAGE, "dist/THIRD_PARTY_LICENSES");
+// Packages whose code the bundle contains; the bundle drops their license comments, so the notices
+// go beside it.
+const BUNDLED_PACKAGES = [path.join(REPOSITORY, "adapters/codex/node_modules/smol-toml")];
 const ASSETS_MODULE = path.join(PACKAGE, "src/installation/assets.ts");
 const HARNESS_DIRECTORY = path.join(REPOSITORY, "harness");
-const TEMPLATE_DIRECTORIES = [
-  path.join(PACKAGE, "templates"),
-  path.join(REPOSITORY, "adapters/claude/templates"),
-];
+// Keys must match src/installation/assets.ts: templates are keyed `<source>/<name>`.
+const TEMPLATE_DIRECTORIES: Readonly<Record<string, string>> = {
+  cli: path.join(PACKAGE, "templates"),
+  claude: path.join(REPOSITORY, "adapters/claude/templates"),
+  codex: path.join(REPOSITORY, "adapters/codex/templates"),
+};
 const ASSETS_NAMESPACE = "cyberzavod-assets";
 // The oldest Node that still gets security updates.
 const NODE_TARGET = "node22";
@@ -29,9 +35,9 @@ function sortedByName(texts: Readonly<Record<string, string>>): Record<string, s
 async function readTemplates(): Promise<Record<string, string>> {
   const templates: Record<string, string> = {};
 
-  for (const directory of TEMPLATE_DIRECTORIES) {
+  for (const [source, directory] of Object.entries(TEMPLATE_DIRECTORIES)) {
     for (const name of await readdir(directory)) {
-      templates[name] = await readFile(path.join(directory, name), "utf8");
+      templates[`${source}/${name}`] = await readFile(path.join(directory, name), "utf8");
     }
   }
 
@@ -82,3 +88,20 @@ await build({
   plugins: [embeddedAssets],
   logLevel: "warning",
 });
+
+async function noticeOf(packageDirectory: string): Promise<string> {
+  const manifest = JSON.parse(
+    await readFile(path.join(packageDirectory, "package.json"), "utf8"),
+  ) as {
+    name: string;
+    version: string;
+    license: string;
+  };
+  const license = await readFile(path.join(packageDirectory, "LICENSE"), "utf8");
+
+  return `${manifest.name} ${manifest.version} (${manifest.license})\n\n${license.trim()}\n`;
+}
+
+const notices = await Promise.all(BUNDLED_PACKAGES.map(noticeOf));
+
+await writeFile(LICENSES_OUTPUT, notices.join("\n"));

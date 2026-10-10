@@ -1,4 +1,4 @@
-// How the adapter calls the CLI: the npm package via npx.
+// How the adapters call the CLI: the npm package via npx.
 
 /** Name of the Cyberzavod npm package. */
 export const PACKAGE_NAME = "cyberzavod";

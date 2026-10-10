@@ -1,10 +1,12 @@
 // Manifest of generated output: which files the generator wrote and with what contents, and which
 // deny rules it added to the settings itself. With it sync and disconnect tell their own untouched
 // file from their own hand-edited one, and their own deny rule from the same rule by the human.
+// The manifest is shared by the agents: a project has one agent, so one set of files in it.
 
 import { createHash } from "node:crypto";
 import { MARKER_DIRECTORY } from "@cyberzavod/storage";
-import { GenerateError } from "./claude.ts";
+import { KitError } from "../errors.ts";
+import { isObject } from "../object.ts";
 
 /** Manifest path from the project root with `/`. */
 export const MANIFEST_FILE = `${MARKER_DIRECTORY}/generated.json`;
@@ -41,10 +43,6 @@ export function contentHash(text: string): string {
   return `${HASH_ALGORITHM}:${digest}`;
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function isStringRecord(value: unknown): value is Record<string, string> {
   return isObject(value) && Object.values(value).every((hash) => typeof hash === "string");
 }
@@ -53,8 +51,8 @@ function isStringList(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((rule) => typeof rule === "string");
 }
 
-function unreadable(reason: string): GenerateError {
-  return new GenerateError((messages) =>
+function unreadable(reason: string): KitError {
+  return new KitError((messages) =>
     messages.errors.manifestNotParsed({ file: MANIFEST_FILE, reason }),
   );
 }
@@ -71,7 +69,7 @@ function parseJson(text: string): unknown {
  * Parses the manifest text.
  * @param {string | undefined} text File contents; undefined if there is no file.
  * @returns {Manifest} The manifest; empty if there is no file.
- * @throws {GenerateError} If the text is not JSON, the format version is unknown, or fields have
+ * @throws {KitError} If the text is not JSON, the format version is unknown, or fields have
  *   the wrong shape.
  */
 export function parseManifest(text: string | undefined): Manifest {

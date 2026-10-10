@@ -112,7 +112,12 @@ describe("initProject", () => {
 
     await initProject(root, { confirm, overrides: {}, installation, messages, adapters });
 
-    expect(seen[0]).toContain(messages.init.checksMissing(".cyberzavod/project.json"));
+    expect(seen[0]).toContain(
+      messages.init.checksMissing({
+        file: ".cyberzavod/project.json",
+        terms: adapters.claude.terms,
+      }),
+    );
     expect(seen[0]).toContain("/setup");
   });
 

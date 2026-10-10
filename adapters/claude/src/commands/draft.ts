@@ -45,7 +45,8 @@ import {
 import { isNotFound } from "@cyberzavod/storage";
 import { ClaudeError } from "../errors.ts";
 import type { ClaudeMessages } from "../messages/claude-messages.ts";
-import { captureDirectories, findProjectId, newestFile, requireProject } from "../paths.ts";
+import { requireProject } from "@cyberzavod/adapter-kit";
+import { captureDirectories, findProjectId, newestFile } from "../paths.ts";
 
 type TranscriptRead =
   { status: "read"; text: string } | { status: "missing" } | { status: "failed" };

@@ -3,19 +3,17 @@
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { isNotFound } from "@cyberzavod/storage";
-import { ClaudeError } from "../errors.ts";
 import {
-  inspectHooks,
+  KitError,
   parseSettings,
-  SETTINGS_FILE,
   SettingsError,
-  unparsedSettings,
   type HooksInspection,
-} from "./settings.ts";
+} from "@cyberzavod/adapter-kit";
+import { isNotFound } from "@cyberzavod/storage";
+import { inspectHooks, SETTINGS_FILE, unparsedSettings } from "./settings.ts";
 
 /** Hooks were read (`HooksInspection`) or `settings.json` is unparsable (`unreadable`, `error`). */
-export type HooksReading = HooksInspection | { kind: "unreadable"; error: ClaudeError };
+export type HooksReading = HooksInspection | { kind: "unreadable"; error: KitError };
 
 async function readSettingsText(projectRoot: string): Promise<string | undefined> {
   try {
@@ -46,7 +44,7 @@ export async function inspectClaudeHooks(
   try {
     return inspectHooks(parseSettings(text, SETTINGS_FILE), version);
   } catch (err) {
-    if (err instanceof ClaudeError) return { kind: "unreadable", error: err };
+    if (err instanceof KitError) return { kind: "unreadable", error: err };
 
     if (err instanceof SettingsError) return { kind: "unreadable", error: unparsedSettings(err) };
 
