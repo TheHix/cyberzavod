@@ -1,6 +1,7 @@
 // Shared `doctor` check types: the result, a machine check and a project check.
 
-import type { ClaudeMessages } from "@cyberzavod/adapter-claude";
+import type { InterfaceLanguage } from "@cyberzavod/core";
+import type { AgentAdapter } from "../agents/agent-adapter.ts";
 import type { ProjectAt } from "../commands/project.ts";
 import type { Installation } from "../installation/installation.ts";
 import type { CliMessages } from "../messages/cli-messages.ts";
@@ -66,12 +67,17 @@ export type CommandRun = { kind: "exited"; code: number } | { kind: "notStarted"
 /** Runs a command with the system shell in the project root. */
 export type CommandRunner = (command: string, root: string) => CommandRun;
 
-/** Everything project checks need: the project itself, CLI version, texts and program access. */
+/**
+ * Everything project checks need: the project itself, its agent's adapter, CLI version, texts and
+ * program access.
+ */
 export interface ProjectContext {
   project: ProjectAt;
   installation: Installation;
   messages: CliMessages;
-  claudeMessages: ClaudeMessages;
+  adapter: AgentAdapter;
+  /** Language of the texts that come from the adapter. */
+  language: InterfaceLanguage;
   /**
    * Whether the program exists: a word with `/` or `\` is a file from `root`, otherwise a `PATH`
    * lookup.

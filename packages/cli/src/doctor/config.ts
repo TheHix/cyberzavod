@@ -8,7 +8,10 @@ import {
   PROJECT_CONFIG_FILE,
   readProjectConfig,
 } from "@cyberzavod/storage";
+import { hostAgentOf } from "../agents/host-agent.ts";
+import type { ProjectConfig } from "@cyberzavod/core";
 import type { ProjectAt } from "../commands/project.ts";
+import { CommandError } from "../errors.ts";
 import type { CliMessages } from "../messages/cli-messages.ts";
 import { failed, passed, type CheckResult } from "./check.ts";
 
@@ -36,6 +39,37 @@ function invalid(err: ProjectFileError, messages: CliMessages): ConfigCheckOutco
   return { result, project: undefined };
 }
 
+// A project whose agent the CLI cannot drive is not usable: no further check would make sense.
+function agentsProblem(
+  config: ProjectConfig,
+  messages: CliMessages,
+): ConfigCheckOutcome | undefined {
+  try {
+    hostAgentOf(config);
+
+    return undefined;
+  } catch (err) {
+    if (!(err instanceof CommandError)) throw err;
+
+    const result = failed({
+      problem: messages.doctor.config.agents(err.describe(messages)),
+      fix: messages.doctor.config.fixAgents(PROJECT_CONFIG_FILE),
+    });
+
+    return { result, project: undefined };
+  }
+}
+
+async function readConfig(root: string): Promise<ProjectConfig | ProjectFileError | undefined> {
+  try {
+    return await readProjectConfig(root);
+  } catch (err) {
+    if (err instanceof ProjectFileError) return err;
+
+    throw err;
+  }
+}
+
 /**
  * Looks for the project from the directory and reads its config.
  * @param {string} directory Directory the command was run from.
@@ -51,24 +85,23 @@ export async function configCheck(
 
   if (root === undefined) return notFound(directory, messages);
 
-  try {
-    const config = await readProjectConfig(root);
+  const config = await readConfig(root);
 
-    if (config === undefined) return notFound(directory, messages);
+  if (config === undefined) return notFound(directory, messages);
+  if (config instanceof ProjectFileError) return invalid(config, messages);
 
-    const summary = messages.doctor.config.passed({
-      file: PROJECT_CONFIG_FILE,
-      projectId: config.projectId,
-      harness: config.harness,
-    });
+  const unusable = agentsProblem(config, messages);
 
-    return {
-      result: passed(summary),
-      project: { root, config, journal: journalDirectory(root, config) },
-    };
-  } catch (err) {
-    if (err instanceof ProjectFileError) return invalid(err, messages);
+  if (unusable !== undefined) return unusable;
 
-    throw err;
-  }
+  const summary = messages.doctor.config.passed({
+    file: PROJECT_CONFIG_FILE,
+    projectId: config.projectId,
+    harness: config.harness,
+  });
+
+  return {
+    result: passed(summary),
+    project: { root, config, journal: journalDirectory(root, config) },
+  };
 }

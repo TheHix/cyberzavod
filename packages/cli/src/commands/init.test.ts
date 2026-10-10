@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RULES_TODO_MARK } from "@cyberzavod/core";
 import { PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
+import { adapters } from "../agents/fixtures.ts";
 import type { Confirmation } from "../confirmation.ts";
 import { readInstallation, type Installation } from "../installation/installation.ts";
 import { CLI_MESSAGES } from "../messages/catalog.ts";
@@ -64,7 +65,7 @@ describe("initProject", () => {
     await writeFile(path.join(root, "CLAUDE.md"), "# Мои правила\n");
     const { confirm } = answering(false);
 
-    await initProject(root, { confirm, overrides: {}, installation, messages });
+    await initProject(root, { confirm, overrides: {}, installation, messages, adapters });
 
     expect({
       cancelled: printed().includes(messages.init.cancelled),
@@ -84,7 +85,7 @@ describe("initProject", () => {
   it("спрашивает один раз «Продолжить?» и после согласия подключает проект", async () => {
     const { confirm, asked } = answering(true);
 
-    await initProject(root, { confirm, overrides: {}, installation, messages });
+    await initProject(root, { confirm, overrides: {}, installation, messages, adapters });
 
     expect({ asked, connected: await exists(PROJECT_CONFIG_FILE) }).toEqual({
       asked: [messages.init.confirm],
@@ -96,7 +97,7 @@ describe("initProject", () => {
     await writeFile(path.join(root, "package.json"), JSON.stringify({ scripts: { test: "x" } }));
     const { confirm, seen } = answering(true);
 
-    await initProject(root, { confirm, overrides: {}, installation, messages });
+    await initProject(root, { confirm, overrides: {}, installation, messages, adapters });
 
     const [summary = ""] = seen;
 
@@ -109,7 +110,7 @@ describe("initProject", () => {
   it("без проверок сводка отправляет к /setup", async () => {
     const { confirm, seen } = answering(true);
 
-    await initProject(root, { confirm, overrides: {}, installation, messages });
+    await initProject(root, { confirm, overrides: {}, installation, messages, adapters });
 
     expect(seen[0]).toContain(messages.init.checksMissing(".cyberzavod/project.json"));
     expect(seen[0]).toContain("/setup");
@@ -128,6 +129,7 @@ describe("initProject", () => {
         overrides: { checks: commands },
         installation,
         messages,
+        adapters,
       });
 
       const rules = await readFile(path.join(root, "AGENTS.md"), "utf8");
@@ -151,6 +153,7 @@ describe("initProject", () => {
       overrides: {},
       installation,
       messages: CLI_MESSAGES[language],
+      adapters,
     });
 
     const [summary = ""] = seen;
@@ -162,7 +165,7 @@ describe("initProject", () => {
   it("итог называет верхние каталоги и файлы для коммита без повторов", async () => {
     const { confirm } = answering(true);
 
-    await initProject(root, { confirm, overrides: {}, installation, messages });
+    await initProject(root, { confirm, overrides: {}, installation, messages, adapters });
 
     expect(printed()).toContain(
       "Закоммитьте: .cyberzavod/, AGENTS.md, CLAUDE.md, .claude/, .gitignore",
@@ -178,6 +181,7 @@ describe("initProject", () => {
       overrides: { journal: "../shop.cyberzavod" },
       installation,
       messages,
+      adapters,
     });
 
     expect(printed()).toContain("Закоммитьте: .cyberzavod/, CLAUDE.md, .claude/\n");
@@ -187,7 +191,7 @@ describe("initProject", () => {
     await writeFile(path.join(root, "CLAUDE.md"), "# Мои правила\n");
     const { confirm, seen } = answering(true);
 
-    await initProject(root, { confirm, overrides: {}, installation, messages });
+    await initProject(root, { confirm, overrides: {}, installation, messages, adapters });
 
     expect(seen[0]).toContain(messages.init.rulesMoved({ from: "CLAUDE.md", to: "AGENTS.md" }));
   });
@@ -196,7 +200,13 @@ describe("initProject", () => {
     const { confirm, asked } = answering(true);
 
     const act = () =>
-      initProject(root, { confirm, overrides: { projectId: "" }, installation, messages });
+      initProject(root, {
+        confirm,
+        overrides: { projectId: "" },
+        installation,
+        messages,
+        adapters,
+      });
 
     await expect(act).rejects.toThrow(/--id is empty/);
     expect({ asked, connected: await exists(PROJECT_CONFIG_FILE) }).toEqual({

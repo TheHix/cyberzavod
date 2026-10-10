@@ -65,6 +65,13 @@ async function journalFiles(collection: string): Promise<string[]> {
   return readdir(path.join(root, ".cyberzavod/journal", collection));
 }
 
+async function rewriteAgents(agents: Record<string, object>): Promise<void> {
+  const file = path.join(root, PROJECT_CONFIG_FILE);
+  const config = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
+
+  await writeFile(file, JSON.stringify({ ...config, agents }));
+}
+
 describe("runCli", () => {
   beforeEach(async () => {
     workspace = await mkdtemp(path.join(tmpdir(), "cyberzavod-cli-"));
@@ -454,6 +461,34 @@ describe("runCli", () => {
       });
     },
   );
+
+  it("sync с неизвестным агентом в конфиге выходит с 1 и называет поддерживаемых", async () => {
+    await initialized();
+    await rewriteAgents({ implementation: { provider: "google", agent: "gemini" } });
+
+    const code = await runCli(["sync"], root, NO_LOCALE);
+
+    expect({ code, error: printedError() }).toEqual({
+      code: 1,
+      error: "cyberzavod sync: the agent “gemini” is not supported: available are claude",
+    });
+  });
+
+  it("sync со смешанными агентами в конфиге выходит с 1 и называет агентов", async () => {
+    await initialized();
+    await rewriteAgents({
+      implementation: { provider: "anthropic", agent: "claude" },
+      review: { provider: "google", agent: "gemini" },
+    });
+
+    const code = await runCli(["sync"], root, NO_LOCALE);
+
+    expect({ code, error: printedError() }).toEqual({
+      code: 1,
+      error:
+        "cyberzavod sync: .cyberzavod/project.json names several agents (claude, gemini): a project is driven by one agent",
+    });
+  });
 
   it("--help после -- — аргумент команды, а не запрос справки", async () => {
     const code = await runCli(["note", "--", "--help"], root, NO_LOCALE);

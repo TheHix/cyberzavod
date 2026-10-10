@@ -3,15 +3,12 @@
 // change: the first exits with code 1 if anything is outdated (so project checks catch outdated
 // files), the second with code 0.
 
-import {
-  previewClaude,
-  requireWritable,
-  syncClaude,
-  type ClaudeInstallation,
-  type SyncReport,
-} from "@cyberzavod/adapter-claude";
+import type { SyncReport } from "@cyberzavod/adapter-claude";
 import type { ProjectConfig } from "@cyberzavod/core";
 import { LEGACY_TOOL_FILE, PROJECT_CONFIG_FILE, writeProjectConfig } from "@cyberzavod/storage";
+import type { AgentAdapter } from "../agents/agent-adapter.ts";
+import { adapterFor } from "../agents/host-agent.ts";
+import type { Adapters } from "../agents/registry.ts";
 import { detectProject, stackOf } from "../detect.ts";
 import { HARNESS_VERSION, type Installation } from "../installation/installation.ts";
 import { printJson } from "../json-output.ts";
@@ -27,12 +24,15 @@ export interface SyncCommandOptions {
   installation: Installation;
   /** Messages in the chosen language. */
   messages: CliMessages;
+  /** Adapters of the agents the CLI can drive. */
+  adapters: Adapters;
 }
 
 /** How to show what sync will change: as text for the human or as JSON for scripts. */
 export interface PreviewOptions {
   installation: Installation;
   messages: CliMessages;
+  adapters: Adapters;
   isJson: boolean;
 }
 
@@ -77,10 +77,6 @@ function printPreview(report: SyncReport, messages: CliMessages): void {
   console.log(sync.neverTouched);
 }
 
-function claudeInstallationOf(installation: Installation): ClaudeInstallation {
-  return { harness: installation.harness, templates: installation.claudeTemplates };
-}
-
 function withLegacyTool(report: SyncReport, isLegacyToolRemoved: boolean): SyncReport {
   return isLegacyToolRemoved
     ? { ...report, removed: [LEGACY_TOOL_FILE, ...report.removed] }
@@ -118,22 +114,20 @@ export interface ProjectFilesInspection {
  * Compares the project's agent files with what the running version would build, writing nothing.
  * @param {ProjectAt} project Connected project.
  * @param {Installation} installation The running Cyberzavod version.
+ * @param {AgentAdapter} adapter Adapter of the agent that drives the project.
  * @returns {Promise<ProjectFilesInspection>} File and version differences.
  * @throws {Error} If the agent files cannot be built.
  */
 export async function inspectProjectFiles(
   project: ProjectAt,
   installation: Installation,
+  adapter: AgentAdapter,
 ): Promise<ProjectFilesInspection> {
-  const claudeReport = await syncClaude({
-    projectDirectory: project.root,
-    installation: claudeInstallationOf(installation),
-    check: true,
-  });
+  const adapterReport = await adapter.inspectFiles(project.root, installation);
   const isLegacyToolPresent = await hasLegacyTool(project.root);
 
   return {
-    report: withLegacyTool(claudeReport, isLegacyToolPresent),
+    report: withLegacyTool(adapterReport, isLegacyToolPresent),
     configVersion: project.config.harness,
     isHarnessOutdated: project.config.harness !== HARNESS_VERSION,
   };
@@ -185,14 +179,15 @@ function printPreviewJson(inspection: ProjectFilesInspection): void {
 /**
  * Shows what sync will change, writing nothing.
  * @param {string} directory Directory inside the project.
- * @param {PreviewOptions} options Version, messages and output format.
+ * @param {PreviewOptions} options Version, messages, adapters and output format.
  * @returns {Promise<boolean>} true if there is nothing to sync.
  * @throws {Error} If there is no project or the agent files cannot be built.
  */
 export async function previewProject(directory: string, options: PreviewOptions): Promise<boolean> {
-  const { installation, messages, isJson } = options;
+  const { installation, messages, adapters, isJson } = options;
   const project = await requireProjectAt(directory);
-  const inspection = await inspectProjectFiles(project, installation);
+  const adapter = adapterFor(project.config, adapters);
+  const inspection = await inspectProjectFiles(project, installation, adapter);
 
   if (isJson) printPreviewJson(inspection);
   else printPreviewText(inspection, messages);
@@ -205,20 +200,23 @@ export async function previewProject(directory: string, options: PreviewOptions)
  * earlier versions. If the generator runs into the human's files, nothing changes, the config
  * included.
  * @param {string} directory Directory inside the project.
- * @param {SyncCommandOptions} options Whether to overwrite the human's files, version, messages.
+ * @param {SyncCommandOptions} options Whether to overwrite the human's files, version, messages,
+ *   adapters.
  * @returns {Promise<void>} Done when everything is written.
  * @throws {Error} If there is no project or the agent files cannot be built.
  */
 export async function syncProject(directory: string, options: SyncCommandOptions): Promise<void> {
-  const { force, installation, messages } = options;
+  const { force, installation, messages, adapters } = options;
   const project = await requireProjectAt(directory);
+  const adapter = adapterFor(project.config, adapters);
   const config = await refreshedConfig(project.root, project.config);
-  const claudeInstallation = claudeInstallationOf(installation);
 
   // The human's files are looked for before the first write: on a conflict the config stays as it
   // was.
   if (!force) {
-    requireWritable(await previewClaude({ root: project.root, config }, claudeInstallation));
+    adapter.requireWritable(
+      await adapter.previewFiles({ root: project.root, config }, installation),
+    );
   }
 
   await writeProjectConfig(project.root, config);
@@ -227,9 +225,9 @@ export async function syncProject(directory: string, options: SyncCommandOptions
 
   if (isLegacyToolPresent) await removeLegacyTool(project.root);
 
-  const report = await syncClaude({
+  const report = await adapter.syncFiles({
     projectDirectory: project.root,
-    installation: claudeInstallation,
+    installation,
     force,
   });
 

@@ -3,22 +3,17 @@
 
 import { homedir, tmpdir } from "node:os";
 import { parseArgs } from "node:util";
-import {
-  CLAUDE_MESSAGES,
-  ClaudeError,
-  draftSession,
-  isHookName,
-  publishSessions,
-  runHook,
-  type ClaudeMessages,
-} from "@cyberzavod/adapter-claude";
 import { RecordError, type InterfaceLanguage, type LocalizedText } from "@cyberzavod/core";
 import { JournalError, ProjectFileError } from "@cyberzavod/storage";
+import { DEFAULT_AGENT_NAME, type AgentAdapter } from "./agents/agent-adapter.ts";
+import { adapterAt, adapterFor } from "./agents/host-agent.ts";
+import { createAdapters, type Adapters } from "./agents/registry.ts";
 import { projectChecksWith, runDoctor, type DoctorOptions } from "./commands/doctor.ts";
 import { galleryAccessOf, showGallery } from "./commands/gallery.ts";
 import { initProject } from "./commands/init.ts";
 import { recordDecision, recordNote } from "./commands/journal.ts";
 import { login, logout } from "./commands/login.ts";
+import { requireProjectAt } from "./commands/project.ts";
 import { shareRecording, unshareRecording } from "./commands/share.ts";
 import { printStatus } from "./commands/status.ts";
 import { previewProject, syncProject } from "./commands/sync.ts";
@@ -62,7 +57,8 @@ interface Invocation {
   directory: string;
   env: Environment;
   messages: CliMessages;
-  claudeMessages: ClaudeMessages;
+  language: InterfaceLanguage;
+  adapters: Adapters;
 }
 
 // A command's help lives in the message catalog: a command without help does not compile. The
@@ -90,13 +86,20 @@ function defaultSharing(env: Environment): Sharing {
   return createSharing({ env, platform: process.platform, homeDirectory: homedir() });
 }
 
+/** What `doctor` is run with: the project's adapter and the chosen commands check. */
+interface DoctorPlan {
+  adapter: AgentAdapter;
+  commandsCheck: ProjectCheck;
+}
+
 // The machine and program lookup use the calling environment: PATH comes from it, not process.env.
 function doctorOptionsOf(
-  invocation: Pick<Invocation, "directory" | "env" | "messages" | "claudeMessages">,
+  invocation: Pick<Invocation, "directory" | "env" | "messages" | "language">,
   installation: Installation,
-  commandsCheck: ProjectCheck,
+  doctorPlan: DoctorPlan,
 ): Omit<DoctorOptions, "isJson"> {
-  const { directory, env, messages, claudeMessages } = invocation;
+  const { directory, env, messages, language } = invocation;
+  const { adapter, commandsCheck } = doctorPlan;
   const platform = process.platform;
   const credentials = new FileCredentialsStore(
     credentialsFile({ env, platform, homeDirectory: homedir() }),
@@ -108,14 +111,15 @@ function doctorOptionsOf(
       credentials,
       isProgramAvailable: (name) => isProgramAvailable({ name, root: directory, env, platform }),
     },
-    projectChecks: projectChecksWith(commandsCheck),
+    projectChecks: projectChecksWith(commandsCheck, adapter),
     projectTools: {
       isProgramAvailable: (name, root) => isProgramAvailable({ name, root, env, platform }),
       runCommand: runCommandInShell,
     },
     installation,
     messages,
-    claudeMessages,
+    adapter,
+    language,
   };
 }
 
@@ -148,7 +152,7 @@ function initOverridesOf(flags: InitFlags): InitOverrides {
 const COMMANDS: Readonly<Record<CommandName, Command>> = {
   init: {
     section: "start",
-    run: async ({ args, directory, messages }) => {
+    run: async ({ args, directory, messages, adapters }) => {
       const { values } = parseArgs({
         args,
         options: {
@@ -168,6 +172,7 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
         overrides: initOverridesOf(values),
         installation: await readInstallation(),
         messages,
+        adapters,
       });
 
       return isReady ? SUCCESS : FAILURE;
@@ -175,7 +180,7 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
   },
   sync: {
     section: "maintenance",
-    run: async ({ args, directory, messages }) => {
+    run: async ({ args, directory, messages, adapters }) => {
       const { values } = parseArgs({
         args,
         options: {
@@ -190,7 +195,12 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
 
       if (isPreview) {
         const isJson = values.json === true;
-        const isUpToDate = await previewProject(directory, { installation, messages, isJson });
+        const isUpToDate = await previewProject(directory, {
+          installation,
+          messages,
+          adapters,
+          isJson,
+        });
         const isCheckFailed = values.check === true && !isUpToDate;
 
         return isCheckFailed ? FAILURE : SUCCESS;
@@ -198,7 +208,12 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
 
       if (values.json === true) throw new CommandError((m) => m.errors.jsonNeedsPreview);
 
-      await syncProject(directory, { force: values.force === true, installation, messages });
+      await syncProject(directory, {
+        force: values.force === true,
+        installation,
+        messages,
+        adapters,
+      });
 
       return SUCCESS;
     },
@@ -211,8 +226,9 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
         options: { "run-checks": { type: "boolean" }, json: { type: "boolean" } },
       });
       const commandsCheck = values["run-checks"] === true ? commandsPassCheck : commandsFoundCheck;
+      const adapter = await adapterAt(invocation.directory, invocation.adapters);
       const options = {
-        ...doctorOptionsOf(invocation, await readInstallation(), commandsCheck),
+        ...doctorOptionsOf(invocation, await readInstallation(), { adapter, commandsCheck }),
         isJson: values.json === true,
       };
       const isHealthy = await runDoctor(invocation.directory, options);
@@ -222,14 +238,14 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
   },
   disconnect: {
     section: "maintenance",
-    run: async ({ args, directory, messages }) => {
+    run: async ({ args, directory, messages, adapters }) => {
       const { values } = parseArgs({ args, options: { yes: { type: "boolean", short: "y" } } });
       const isTerminal = process.stdin.isTTY === true;
       const canAsk = values.yes !== true && isTerminal;
       const confirm = canAsk
         ? terminalConfirmation({ input: process.stdin, output: process.stdout })
         : refuseWithoutTerminal(values.yes === true, messages);
-      const outcome = await disconnectProject(directory, { confirm, messages });
+      const outcome = await disconnectProject(directory, { confirm, messages, adapters });
       const isRefused = outcome === "cancelled" && !canAsk;
 
       return isRefused ? FAILURE : SUCCESS;
@@ -276,13 +292,14 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
   },
   draft: {
     section: "service",
-    run: async ({ args, directory, claudeMessages }) => {
+    run: async ({ args, directory, language, adapters }) => {
       const { positionals } = parseArgs({ args, allowPositionals: true });
       const [rawPath] = positionals;
+      const { config } = await requireProjectAt(directory);
 
-      await draftSession({
+      await adapterFor(config, adapters).draftSession({
         projectDirectory: directory,
-        messages: claudeMessages,
+        language,
         ...(rawPath === undefined ? {} : { rawPath }),
       });
 
@@ -291,14 +308,15 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
   },
   publish: {
     section: "service",
-    run: async ({ args, directory, claudeMessages }) => {
+    run: async ({ args, directory, language, adapters }) => {
       const { values } = parseArgs({
         args,
         options: { draft: { type: "string" }, build: { type: "string" } },
       });
-      const published = await publishSessions({
+      const { config } = await requireProjectAt(directory);
+      const published = await adapterFor(config, adapters).publishSessions({
         projectDirectory: directory,
-        messages: claudeMessages,
+        language,
         ...(values.draft === undefined ? {} : { draftPath: values.draft }),
         ...(values.build === undefined ? {} : { buildId: values.build }),
       });
@@ -364,18 +382,22 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
   },
   hook: {
     section: "service",
-    run: async ({ args, directory, env, claudeMessages }) => {
+    run: async ({ args, directory, env, language, adapters }) => {
       const { positionals } = parseArgs({ args, allowPositionals: true });
       const [name = ""] = positionals;
+      const adapter = adapters[DEFAULT_AGENT_NAME];
 
-      if (!isHookName(name)) throw new CommandError((m) => m.errors.unknownHook(name));
+      if (!adapter.hookNames.includes(name)) {
+        throw new CommandError((m) => m.errors.unknownHook(name));
+      }
 
       const payload = await readStdin();
-      const outcome = await runHook(name, {
+      const outcome = await adapter.runHook(name, {
         payload,
-        projectDirectory: env.CLAUDE_PROJECT_DIR || directory,
+        directory,
+        env,
         tmpDir: tmpdir(),
-        messages: claudeMessages,
+        language,
       });
 
       process.stdout.write(outcome.stdout);
@@ -386,18 +408,12 @@ const COMMANDS: Readonly<Record<CommandName, Command>> = {
   },
 };
 
-const EXPECTED_ERRORS = [
-  CommandError,
-  ApiError,
-  ClaudeError,
-  ProjectFileError,
-  JournalError,
-  RecordError,
-];
+const EXPECTED_ERRORS = [CommandError, ApiError, ProjectFileError, JournalError, RecordError];
 const ARGUMENT_ERROR_PREFIX = "ERR_PARSE_ARGS";
 
 // Errors the human fixes themselves: the message is enough. parseArgs reports invalid arguments
-// with an ERR_PARSE_ARGS_* error code.
+// with an ERR_PARSE_ARGS_* error code. Adapter errors are expected too, but they are recognized by
+// the adapters themselves (`describeError`).
 function isExpected(err: unknown): err is Error {
   if (EXPECTED_ERRORS.some((kind) => err instanceof kind)) return true;
 
@@ -408,15 +424,25 @@ function isExpected(err: unknown): err is Error {
 
 // Errors with catalog text are printed in the chosen language; the rest as is: server texts and
 // file format diagnostics are not translated.
-function expectedErrorText(
-  err: Error,
-  messages: CliMessages,
-  claudeMessages: ClaudeMessages,
-): string {
+function expectedErrorText(err: Error, messages: CliMessages): string {
   if (err instanceof CommandError) return err.describe(messages);
-  if (err instanceof ClaudeError) return err.describe(claudeMessages);
 
   return err.message;
+}
+
+// The text of an error that belongs to one of the adapters, in the chosen language.
+function adapterErrorText(
+  err: unknown,
+  adapters: Adapters,
+  language: InterfaceLanguage,
+): string | undefined {
+  for (const adapter of Object.values(adapters)) {
+    const text = adapter.describeError(err, language);
+
+    if (text !== undefined) return text;
+  }
+
+  return undefined;
 }
 
 interface UnexpectedError {
@@ -506,7 +532,8 @@ export async function runCli(argv: string[], directory: string, env: Environment
   if (choice instanceof CommandError) return printLanguageError(choice, env);
 
   const messages = CLI_MESSAGES[choice.language];
-  const claudeMessages = CLAUDE_MESSAGES[choice.language];
+  const { language } = choice;
+  const adapters = createAdapters();
   const [name, ...args] = choice.rest;
 
   if (name === undefined || GENERAL_HELP_REQUESTS.includes(name)) {
@@ -531,11 +558,19 @@ export async function runCli(argv: string[], directory: string, env: Environment
   }
 
   try {
-    return await COMMANDS[name].run({ args, directory, env, messages, claudeMessages });
+    return await COMMANDS[name].run({ args, directory, env, messages, language, adapters });
   } catch (err) {
+    const adapterText = adapterErrorText(err, adapters, language);
+
+    if (adapterText !== undefined) {
+      console.error(`cyberzavod ${name}: ${adapterText}`);
+
+      return FAILURE;
+    }
+
     if (!isExpected(err)) return printUnexpectedError({ name, err, env, messages });
 
-    console.error(`cyberzavod ${name}: ${expectedErrorText(err, messages, claudeMessages)}`);
+    console.error(`cyberzavod ${name}: ${expectedErrorText(err, messages)}`);
 
     return FAILURE;
   }

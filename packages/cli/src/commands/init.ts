@@ -4,9 +4,12 @@
 
 import { rename, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { previewClaude, syncClaude } from "@cyberzavod/adapter-claude";
+import type { PlannedProject } from "@cyberzavod/adapter-claude";
 import { RULES_TODO_MARK, type ProjectConfig } from "@cyberzavod/core";
 import { PROJECT_CONFIG_FILE, readProjectConfig, writeProjectConfig } from "@cyberzavod/storage";
+import { DEFAULT_AGENT_NAME, type AgentAdapter } from "../agents/agent-adapter.ts";
+import { adapterFor } from "../agents/host-agent.ts";
+import type { Adapters } from "../agents/registry.ts";
 import type { Confirmation } from "../confirmation.ts";
 import { detectProject } from "../detect.ts";
 import { CommandError } from "../errors.ts";
@@ -20,8 +23,6 @@ import { filesStatusOf, inspectProjectFiles } from "./sync.ts";
 
 /** The project's rules file for agents, in its root. */
 export const RULES_FILE = "AGENTS.md";
-const LEGACY_ENTRYPOINT = "CLAUDE.md";
-const AGENT_DIRECTORY = ".claude/";
 const SUMMARY_INDENT = "  ";
 const LIST_SEPARATOR = ", ";
 const PATH_SEPARATORS = /[\\/]/;
@@ -39,28 +40,32 @@ function starterRules(template: string, name: string, commands: string[]): strin
     .replaceAll(TODO_PLACEHOLDER, RULES_TODO_MARK);
 }
 
-// What happens to the project rules: AGENTS.md already exists and is not changed; a CLAUDE.md
-// written by the human is the rules, so it moves to AGENTS.md, and a thin generated CLAUDE.md
-// takes its place; otherwise AGENTS.md is written from the starter.
-type RulesPlan = "kept" | "moved" | "starter";
+// What happens to the project rules: AGENTS.md already exists and is not changed; a rules file
+// written by the human for the agent (for Claude Code, CLAUDE.md) is the rules, so it moves to
+// AGENTS.md, and a thin generated file takes its place; otherwise AGENTS.md is written from the
+// starter.
+type RulesPlan = { kind: "kept" } | { kind: "moved"; from: string } | { kind: "starter" };
 
-async function planRules(root: string): Promise<RulesPlan> {
+async function planRules(root: string, adapter: AgentAdapter): Promise<RulesPlan> {
   const hasRules = (await readOptionalText(path.join(root, RULES_FILE))) !== undefined;
 
-  if (hasRules) return "kept";
+  if (hasRules) return { kind: "kept" };
 
-  const hasLegacyEntrypoint =
-    (await readOptionalText(path.join(root, LEGACY_ENTRYPOINT))) !== undefined;
+  const { legacyRulesFile } = adapter;
 
-  return hasLegacyEntrypoint ? "moved" : "starter";
+  if (legacyRulesFile === undefined) return { kind: "starter" };
+
+  const hasLegacyRules = (await readOptionalText(path.join(root, legacyRulesFile))) !== undefined;
+
+  return hasLegacyRules ? { kind: "moved", from: legacyRulesFile } : { kind: "starter" };
 }
 
 function rulesSummary(plan: RulesPlan, messages: CliMessages): string {
-  switch (plan) {
+  switch (plan.kind) {
     case "kept":
       return messages.init.rulesKept(RULES_FILE);
     case "moved":
-      return messages.init.rulesMoved({ from: LEGACY_ENTRYPOINT, to: RULES_FILE });
+      return messages.init.rulesMoved({ from: plan.from, to: RULES_FILE });
     case "starter":
       return messages.init.rulesStarter(RULES_FILE);
     default:
@@ -85,11 +90,11 @@ async function applyRules({
 }: RulesApplication): Promise<void> {
   const rules = path.join(root, RULES_FILE);
 
-  switch (plan) {
+  switch (plan.kind) {
     case "kept":
       return;
     case "moved":
-      await rename(path.join(root, LEGACY_ENTRYPOINT), rules);
+      await rename(path.join(root, plan.from), rules);
 
       return;
     case "starter":
@@ -107,20 +112,21 @@ function slashed(file: string): string {
 
 // Files that will appear are named the way the human will see them: the project and the agent,
 // without listing their contents.
-function createdFiles(ignoreEntry: string | undefined): string[] {
-  const files = [slashed(PROJECT_CONFIG_FILE), LEGACY_ENTRYPOINT, AGENT_DIRECTORY];
+function createdFiles(adapter: AgentAdapter, ignoreEntry: string | undefined): string[] {
+  const files = [slashed(PROJECT_CONFIG_FILE), ...adapter.initFiles];
 
   return ignoreEntry === undefined ? files : [...files, GITIGNORE_FILE];
 }
 
 interface Summary {
   config: ProjectConfig;
+  adapter: AgentAdapter;
   rulesPlan: RulesPlan;
   ignoreEntry: string | undefined;
   messages: CliMessages;
 }
 
-function printSummary({ config, rulesPlan, ignoreEntry, messages }: Summary): void {
+function printSummary({ config, adapter, rulesPlan, ignoreEntry, messages }: Summary): void {
   const { init } = messages;
   const checks =
     config.verification.commands.length === 0
@@ -131,7 +137,7 @@ function printSummary({ config, rulesPlan, ignoreEntry, messages }: Summary): vo
     checks,
     rulesSummary(rulesPlan, messages),
     init.journal(config.journal),
-    init.files(createdFiles(ignoreEntry).join(LIST_SEPARATOR)),
+    init.files(createdFiles(adapter, ignoreEntry).join(LIST_SEPARATOR)),
   ];
 
   console.log(init.summaryTitle);
@@ -185,14 +191,17 @@ export interface InitOptions {
   installation: Installation;
   /** Messages in the chosen language. */
   messages: CliMessages;
+  /** Adapters of the agents the CLI can drive. */
+  adapters: Adapters;
 }
 
 // `init` does not change an already connected project; it says whether it is fine and what to do
 // next.
 async function reportConnected(root: string, options: InitOptions): Promise<boolean> {
-  const { installation, messages } = options;
+  const { installation, messages, adapters } = options;
   const project = await requireProjectAt(root);
-  const { report, isHarnessOutdated } = await inspectProjectFiles(project, installation);
+  const adapter = adapterFor(project.config, adapters);
+  const { report, isHarnessOutdated } = await inspectProjectFiles(project, installation, adapter);
   const status = filesStatusOf(report);
   const isCurrent = status === "current" && !isHarnessOutdated;
 
@@ -205,21 +214,20 @@ async function reportConnected(root: string, options: InitOptions): Promise<bool
 }
 
 // Files the generator would write over are looked for before the first write: so a refusal leaves
-// the project untouched. A handwritten CLAUDE.md that will become AGENTS.md is not in the way.
+// the project untouched. A handwritten rules file of the agent that will become AGENTS.md is not in
+// the way.
 async function blockingFiles(
-  root: string,
-  config: ProjectConfig,
+  planned: PlannedProject,
+  adapter: AgentAdapter,
   rulesPlan: RulesPlan,
   installation: Installation,
 ): Promise<string[]> {
-  const claudeInstallation = {
-    harness: installation.harness,
-    templates: installation.claudeTemplates,
-  };
-  const report = await previewClaude({ root, config }, claudeInstallation);
+  const report = await adapter.previewFiles(planned, installation);
   const blocked = [...report.conflicts, ...report.edited];
 
-  return rulesPlan === "moved" ? blocked.filter((file) => file !== LEGACY_ENTRYPOINT) : blocked;
+  if (rulesPlan.kind !== "moved") return blocked;
+
+  return blocked.filter((file) => file !== rulesPlan.from);
 }
 
 /**
@@ -233,16 +241,22 @@ async function blockingFiles(
  *   nothing is written.
  */
 export async function initProject(root: string, options: InitOptions): Promise<boolean> {
-  const { confirm, overrides, installation, messages } = options;
+  const { confirm, overrides, installation, messages, adapters } = options;
   const isConnected = (await readProjectConfig(root)) !== undefined;
 
   if (isConnected) return reportConnected(root, options);
 
   const detected = await detectProject(root);
-  const config = initialConfigOf({ detected, harness: installation.harness, overrides });
-  const rulesPlan = await planRules(root);
+  const adapter = adapters[DEFAULT_AGENT_NAME];
+  const config = initialConfigOf({
+    detected,
+    harness: installation.harness,
+    overrides,
+    identity: adapter.identity,
+  });
+  const rulesPlan = await planRules(root, adapter);
   const ignoreEntry = captureIgnoreEntry(config.journal);
-  const blocked = await blockingFiles(root, config, rulesPlan, installation);
+  const blocked = await blockingFiles({ root, config }, adapter, rulesPlan, installation);
 
   if (blocked.length > 0) {
     const files = blocked.join(LIST_SEPARATOR);
@@ -250,7 +264,7 @@ export async function initProject(root: string, options: InitOptions): Promise<b
     throw new CommandError((m) => m.errors.initBlocked({ files, rulesFile: RULES_FILE }));
   }
 
-  printSummary({ config, rulesPlan, ignoreEntry, messages });
+  printSummary({ config, adapter, rulesPlan, ignoreEntry, messages });
 
   const isConfirmed = await confirm(messages.init.confirm);
 
@@ -271,14 +285,15 @@ export async function initProject(root: string, options: InitOptions): Promise<b
 
   const isIgnoreEntryAdded =
     ignoreEntry !== undefined && (await appendIgnoreEntry(root, ignoreEntry));
-  const report = await syncClaude({
+  const report = await adapter.syncFiles({
     projectDirectory: root,
-    installation: { harness: installation.harness, templates: installation.claudeTemplates },
+    installation,
+    force: false,
   });
 
   printDone({
     changed: [...report.added, ...report.updated],
-    isRulesFileWritten: rulesPlan !== "kept",
+    isRulesFileWritten: rulesPlan.kind !== "kept",
     isIgnoreEntryAdded,
     messages,
   });

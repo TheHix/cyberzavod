@@ -212,6 +212,8 @@ export const en: CliMessages = {
       init: `run ${CLI_COMMAND} init in the project root`,
       invalid: (reason) => `the project config cannot be used: ${reason}`,
       repair: (file) => `correct ${file} following the message above`,
+      agents: (reason) => `the agents in the project config cannot be used: ${reason}`,
+      fixAgents: (file) => `edit agents in ${file}`,
     },
     hooks: {
       passed: (version) => `agent hooks are installed for ${version}`,
@@ -330,6 +332,10 @@ export const en: CliMessages = {
     missingNoteText: "the note text is required",
     missingRecordId: "the recording id is required",
     unknownHook: (name) => `no hook named ${name}`,
+    unsupportedAgent: ({ agent, supported }) =>
+      `the agent “${agent}” is not supported: available are ${supported}`,
+    mixedAgents: ({ agents, file }) =>
+      `${file} names several agents (${agents}): a project is driven by one agent`,
     unknownCommand: (name) => `unknown command “${name}”: all commands — ${CLI_COMMAND} --help`,
     unknownCommandWithSuggestion: ({ name, suggestion }) =>
       `unknown command “${name}”: did you mean ${CLI_COMMAND} ${suggestion}? All commands: ${CLI_COMMAND} --help`,

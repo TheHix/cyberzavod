@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { claudeAdapter } from "./agents/claude.ts";
 import type { DetectedProject } from "./detect.ts";
 import { initialConfigOf, type InitOverrides } from "./initial-config.ts";
 import { CommandError } from "./errors.ts";
@@ -20,7 +21,12 @@ function detected(): DetectedProject {
 async function configWith(overrides: InitOverrides) {
   const { harness } = await readInstallation();
 
-  return initialConfigOf({ detected: detected(), harness, overrides });
+  return initialConfigOf({
+    detected: detected(),
+    harness,
+    overrides,
+    identity: claudeAdapter.identity,
+  });
 }
 
 describe("initialConfigOf", () => {
