@@ -5,7 +5,7 @@ import GameLayout from "@/app/layouts/GameLayout.astro";
 import { Factory } from "@/widgets/factory";
 import { BuildJournal } from "@/widgets/build-journal";
 import { projectLinkOf, projectOf, publishedProjects, type ProjectLink } from "@/entities/project";
-import { publishedRecordings } from "@/entities/recording";
+import { comparisonOfRecording, comparisonUrl, publishedRecordings } from "@/entities/recording";
 import { languageNoteOf } from "@/shared/lib/language-note.ts";
 import { PANELS } from "@/shared/config/panels.ts";
 import { LOCALES, type Locale } from "@/shared/i18n/locale.ts";
@@ -15,23 +15,30 @@ import { Drawer } from "@/shared/ui";
 
 export const getStaticPaths = (() =>
   LOCALES.flatMap((locale) =>
-    publishedRecordings.map((recording) => ({
-      params: { lang: localeParam(locale), id: recording.id },
-      props: {
-        locale,
-        recording,
-        project: projectLinkOf(projectOf(publishedProjects, recording.projectId), locale),
-      },
-    })),
+    publishedRecordings.map((recording) => {
+      const comparison = comparisonOfRecording(publishedRecordings, recording);
+
+      return {
+        params: { lang: localeParam(locale), id: recording.id },
+        props: {
+          locale,
+          recording,
+          project: projectLinkOf(projectOf(publishedProjects, recording.projectId), locale),
+          comparisonHref: comparison && comparisonUrl(comparison.task, locale),
+        },
+      };
+    }),
   )) satisfies GetStaticPaths;
 
 interface Props {
   locale: Locale;
   recording: SessionRecord;
   project: ProjectLink;
+  /** Page of the comparison of this task's runs; absent if the recording has none. */
+  comparisonHref: string | undefined;
 }
 
-const { locale, recording, project } = Astro.props;
+const { locale, recording, project, comparisonHref } = Astro.props;
 const description = UI_TEXT.pages.recordingDescription[locale](recording.data.title);
 ---
 
@@ -49,6 +56,6 @@ const description = UI_TEXT.pages.recordingDescription[locale](recording.data.ti
     title={UI_TEXT.panels.journal[locale]}
     closeLabel={UI_TEXT.panels.close[locale]}
   >
-    <BuildJournal recording={recording} locale={locale} />
+    <BuildJournal recording={recording} locale={locale} comparisonUrl={comparisonHref} />
   </Drawer>
 </GameLayout>

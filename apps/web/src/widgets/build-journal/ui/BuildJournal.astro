@@ -6,12 +6,13 @@
 // only with JS, when the entry is on screen; without it the same markup remains. Only Astro
 // creates islands, so the list is assembled here, while the entry body, header and styles are
 // shared with `JournalTimeline`, the journal of a recording from the API. Above the list stands
-// what the process caught: the reworks of the recording.
+// what the process caught: the reworks of the recording, and, if the task has other runs, a link to
+// their comparison.
 import type { SessionRecord } from "@cyberzavod/core";
 import type { Locale } from "@/shared/i18n/locale.ts";
 import { UI_TEXT } from "@/shared/i18n/ui-text.ts";
 import { languageNoteOf } from "@/shared/lib/language-note.ts";
-import { Title } from "@/shared/ui";
+import { ButtonLink, Title } from "@/shared/ui";
 import { headerOf, timelineOf } from "../lib/timeline.ts";
 import { EntryBody } from "./EntryBody.tsx";
 import { JournalEntry } from "./JournalEntry.tsx";
@@ -23,15 +24,25 @@ interface Props {
   recording: SessionRecord;
   /** Page language: journal labels and captions are in it. */
   locale: Locale;
+  /** Page comparing the runs of this recording's task; absent if there is nothing to compare. */
+  comparisonUrl?: string | undefined;
 }
 
-const { recording, locale } = Astro.props;
+const { recording, locale, comparisonUrl } = Astro.props;
 const entries = timelineOf(recording.data.events);
 const { language } = recording.data;
 const languageNote = languageNoteOf(language, locale);
 ---
 
 {languageNote !== undefined && <p class={styles.language}>{languageNote}</p>}
+
+{comparisonUrl !== undefined && (
+  <p class={styles.comparison}>
+    <ButtonLink variant="secondary" href={comparisonUrl}>
+      {UI_TEXT.comparison.link[locale]}
+    </ButtonLink>
+  </p>
+)}
 
 <ReworkSummary recording={recording} locale={locale} />
 

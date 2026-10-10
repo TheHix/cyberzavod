@@ -22,6 +22,11 @@
   font-weight: 700;
 }
 
+/* The link to the comparison of the task's runs stands above the "what the process caught" block. */
+.comparison {
+  margin: 0 0 var(--space-m);
+}
+
 /* Separates the "what the process caught" block from the list of entries below it. */
 .heading {
   margin: var(--space-l) 0 var(--space-m);

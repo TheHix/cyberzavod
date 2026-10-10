@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { recordingUrl } from "./url.ts";
+import { comparisonUrl, recordingUrl } from "./url.ts";
 
 describe("recordingUrl", () => {
   it("оставляет адрес в корне для английского", () => {
@@ -12,5 +12,19 @@ describe("recordingUrl", () => {
     const url = recordingUrl("a-1", "ru");
 
     expect(url).toBe("/ru/recordings/a-1/");
+  });
+});
+
+describe("comparisonUrl", () => {
+  it("оставляет адрес в корне для английского", () => {
+    const url = comparisonUrl("split-bill", "en");
+
+    expect(url).toBe("/comparisons/split-bill/");
+  });
+
+  it("добавляет префикс /ru для русского", () => {
+    const url = comparisonUrl("split-bill", "ru");
+
+    expect(url).toBe("/ru/comparisons/split-bill/");
   });
 });
