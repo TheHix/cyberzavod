@@ -2,12 +2,15 @@ import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promise
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  GENERATED_MARK,
+  KIT_MESSAGES,
+  KitError,
+  LEGACY_GENERATED_MARK,
+  MANIFEST_FILE,
+} from "@cyberzavod/adapter-kit";
 import { parseProjectConfig } from "@cyberzavod/core";
 import { loadHarness, PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
-import { ClaudeError } from "../errors.ts";
-import { CLAUDE_MESSAGES } from "../messages/catalog.ts";
-import { GENERATED_MARK, LEGACY_GENERATED_MARK } from "./files.ts";
-import { MANIFEST_FILE } from "./manifest.ts";
 import { previewClaude, syncClaude, type ClaudeInstallation, type SyncOptions } from "./sync.ts";
 
 const REPOSITORY = path.resolve(import.meta.dirname, "../../../..");
@@ -141,8 +144,8 @@ describe("syncClaude", () => {
       (err: unknown) => err,
     );
 
-    expect(error).toBeInstanceOf(ClaudeError);
-    expect((error as ClaudeError).describe(CLAUDE_MESSAGES.en)).toMatch(/CLAUDE\.md/);
+    expect(error).toBeInstanceOf(KitError);
+    expect((error as KitError).describe(KIT_MESSAGES.en)).toMatch(/CLAUDE\.md/);
     expect(await exists(".claude/settings.json")).toBe(false);
   });
 
@@ -155,8 +158,8 @@ describe("syncClaude", () => {
       (err: unknown) => err,
     );
 
-    expect(error).toBeInstanceOf(ClaudeError);
-    expect((error as ClaudeError).describe(CLAUDE_MESSAGES.en)).toBe(
+    expect(error).toBeInstanceOf(KitError);
+    expect((error as KitError).describe(KIT_MESSAGES.en)).toBe(
       ".claude/settings.json cannot be parsed: hooks must be an object",
     );
   });
@@ -230,7 +233,7 @@ describe("syncClaude", () => {
       (err: unknown) => err,
     );
 
-    expect(error).toBeInstanceOf(ClaudeError);
+    expect(error).toBeInstanceOf(KitError);
     expect(await readFile(coder, "utf8")).toContain("Моя правка");
   });
 

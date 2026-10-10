@@ -4,10 +4,18 @@
 
 import { rename, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { PlannedProject } from "@cyberzavod/adapter-claude";
+import type { PlannedProject } from "@cyberzavod/adapter-kit";
 import { RULES_TODO_MARK, type ProjectConfig } from "@cyberzavod/core";
 import { PROJECT_CONFIG_FILE, readProjectConfig, writeProjectConfig } from "@cyberzavod/storage";
-import { DEFAULT_AGENT_NAME, type AgentAdapter } from "../agents/agent-adapter.ts";
+import {
+  AGENT_NAMES,
+  DEFAULT_AGENT_NAME,
+  isAgentName,
+  type AgentAdapter,
+  type AgentName,
+  type UserConfigChange,
+  type UserConfigPlan,
+} from "../agents/agent-adapter.ts";
 import { adapterFor } from "../agents/host-agent.ts";
 import type { Adapters } from "../agents/registry.ts";
 import type { Confirmation } from "../confirmation.ts";
@@ -118,26 +126,39 @@ function createdFiles(adapter: AgentAdapter, ignoreEntry: string | undefined): s
   return ignoreEntry === undefined ? files : [...files, GITIGNORE_FILE];
 }
 
+function trustLine(change: UserConfigChange, messages: CliMessages): string {
+  switch (change.kind) {
+    case "project":
+      return messages.init.trustProject(change.file);
+    case "hooks":
+      return messages.init.trustHooks(change.file);
+  }
+}
+
 interface Summary {
   config: ProjectConfig;
   adapter: AgentAdapter;
   rulesPlan: RulesPlan;
   ignoreEntry: string | undefined;
+  userConfigPlan: UserConfigPlan | undefined;
   messages: CliMessages;
 }
 
-function printSummary({ config, adapter, rulesPlan, ignoreEntry, messages }: Summary): void {
+function printSummary(summary: Summary): void {
+  const { config, adapter, rulesPlan, ignoreEntry, userConfigPlan, messages } = summary;
   const { init } = messages;
   const checks =
     config.verification.commands.length === 0
-      ? init.checksMissing(slashed(PROJECT_CONFIG_FILE))
+      ? init.checksMissing({ file: slashed(PROJECT_CONFIG_FILE), terms: adapter.terms })
       : init.checks(config.verification.commands.join(LIST_SEPARATOR));
+  const trust = (userConfigPlan?.changes ?? []).map((change) => trustLine(change, messages));
   const details = [
     init.projectId(config.projectId),
     checks,
     rulesSummary(rulesPlan, messages),
     init.journal(config.journal),
     init.files(createdFiles(adapter, ignoreEntry).join(LIST_SEPARATOR)),
+    ...trust,
   ];
 
   console.log(init.summaryTitle);
@@ -164,10 +185,17 @@ interface Done {
   changed: readonly string[];
   isRulesFileWritten: boolean;
   isIgnoreEntryAdded: boolean;
+  adapter: AgentAdapter;
   messages: CliMessages;
 }
 
-function printDone({ changed, isRulesFileWritten, isIgnoreEntryAdded, messages }: Done): void {
+function printDone({
+  changed,
+  isRulesFileWritten,
+  isIgnoreEntryAdded,
+  adapter,
+  messages,
+}: Done): void {
   const files = [
     PROJECT_CONFIG_FILE,
     ...(isRulesFileWritten ? [RULES_FILE] : []),
@@ -177,7 +205,7 @@ function printDone({ changed, isRulesFileWritten, isIgnoreEntryAdded, messages }
   const paths = commitPaths(files).join(LIST_SEPARATOR);
 
   console.log(
-    `\n${messages.init.done}\n${messages.init.commit(paths)}\n${messages.init.nextSteps}`,
+    `\n${messages.init.done}\n${messages.init.commit(paths)}\n${messages.init.nextSteps(adapter.terms)}`,
   );
 }
 
@@ -193,14 +221,37 @@ export interface InitOptions {
   messages: CliMessages;
   /** Adapters of the agents the CLI can drive. */
   adapters: Adapters;
+  /** `--agent`: the agent that will drive the project; without it, the default one. */
+  agent?: string | undefined;
+}
+
+function requestedAgentOf(agent: string | undefined): AgentName | undefined {
+  if (agent === undefined) return undefined;
+
+  if (!isAgentName(agent)) {
+    const supported = AGENT_NAMES.join(LIST_SEPARATOR);
+
+    throw new CommandError((m) => m.errors.unknownAgent({ agent, supported }));
+  }
+
+  return agent;
 }
 
 // `init` does not change an already connected project; it says whether it is fine and what to do
 // next.
-async function reportConnected(root: string, options: InitOptions): Promise<boolean> {
+async function reportConnected(
+  root: string,
+  options: InitOptions,
+  requested: AgentName | undefined,
+): Promise<boolean> {
   const { installation, messages, adapters } = options;
   const project = await requireProjectAt(root);
   const adapter = adapterFor(project.config, adapters);
+
+  if (requested !== undefined && requested !== adapter.name) {
+    throw new CommandError((m) => m.errors.agentDiffers({ configured: adapter.name, requested }));
+  }
+
   const { report, isHarnessOutdated } = await inspectProjectFiles(project, installation, adapter);
   const status = filesStatusOf(report);
   const isCurrent = status === "current" && !isHarnessOutdated;
@@ -239,15 +290,17 @@ async function blockingFiles(
  *   human refused; false if the connected project needs sync.
  * @throws {CommandError} If a flag is invalid or the human's files block connecting: then
  *   nothing is written.
+ * @throws {Error} If the agent's own config cannot be edited: then nothing is written.
  */
 export async function initProject(root: string, options: InitOptions): Promise<boolean> {
   const { confirm, overrides, installation, messages, adapters } = options;
+  const requested = requestedAgentOf(options.agent);
   const isConnected = (await readProjectConfig(root)) !== undefined;
 
-  if (isConnected) return reportConnected(root, options);
+  if (isConnected) return reportConnected(root, options, requested);
 
   const detected = await detectProject(root);
-  const adapter = adapters[DEFAULT_AGENT_NAME];
+  const adapter = adapters[requested ?? DEFAULT_AGENT_NAME];
   const config = initialConfigOf({
     detected,
     harness: installation.harness,
@@ -264,7 +317,11 @@ export async function initProject(root: string, options: InitOptions): Promise<b
     throw new CommandError((m) => m.errors.initBlocked({ files, rulesFile: RULES_FILE }));
   }
 
-  printSummary({ config, adapter, rulesPlan, ignoreEntry, messages });
+  // The human's own agent config is checked before the summary: if it cannot be edited, nothing
+  // has been written yet.
+  const userConfigPlan = await adapter.userConfig?.planConnect({ root, version: config.harness });
+
+  printSummary({ config, adapter, rulesPlan, ignoreEntry, userConfigPlan, messages });
 
   const isConfirmed = await confirm(messages.init.confirm);
 
@@ -291,10 +348,13 @@ export async function initProject(root: string, options: InitOptions): Promise<b
     force: false,
   });
 
+  await userConfigPlan?.apply();
+
   printDone({
     changed: [...report.added, ...report.updated],
     isRulesFileWritten: rulesPlan.kind !== "kept",
     isIgnoreEntryAdded,
+    adapter,
     messages,
   });
 

@@ -1,8 +1,11 @@
 // The Claude Code adapter as the CLI uses it: the adapter package's functions behind the CLI's
 // `AgentAdapter` interface. This is the only file in the CLI that calls them.
 
+import { KIT_MESSAGES, KitError, requireWritable } from "@cyberzavod/adapter-kit";
 import {
+  CLAUDE_AGENT,
   CLAUDE_MESSAGES,
+  CLAUDE_PROVIDER,
   ClaudeError,
   disconnectClaude,
   draftSession,
@@ -11,7 +14,6 @@ import {
   isHookName,
   previewClaude,
   publishSessions,
-  requireWritable,
   runHook,
   SETTINGS_FILE,
   syncClaude,
@@ -21,10 +23,10 @@ import type { InterfaceLanguage } from "@cyberzavod/core";
 import { claudeCodeCheck } from "../doctor/claude-code.ts";
 import { CommandError } from "../errors.ts";
 import type { Installation } from "../installation/installation.ts";
+import type { AgentTerms } from "../messages/cli-messages.ts";
 import type {
   AgentAdapter,
   AgentHooksReading,
-  AgentTerms,
   DraftRequest,
   FilesRequest,
   HookRequest,
@@ -51,7 +53,7 @@ async function inspectHooks(root: string, version: string): Promise<AgentHooksRe
 
   return {
     kind: "unreadable",
-    describe: (language) => error.describe(CLAUDE_MESSAGES[language]),
+    describe: (language) => error.describe(KIT_MESSAGES[language]),
   };
 }
 
@@ -92,13 +94,15 @@ function publishClaudeSessions(request: PublishRequest) {
 }
 
 function describeClaudeError(err: unknown, language: InterfaceLanguage): string | undefined {
-  return err instanceof ClaudeError ? err.describe(CLAUDE_MESSAGES[language]) : undefined;
+  if (err instanceof ClaudeError) return err.describe(CLAUDE_MESSAGES[language]);
+
+  return err instanceof KitError ? err.describe(KIT_MESSAGES[language]) : undefined;
 }
 
 /** Claude Code: `anthropic`/`claude`, files in `CLAUDE.md` and `.claude/`, hooks in the settings. */
 export const claudeAdapter: AgentAdapter = {
   name: "claude",
-  identity: { provider: "anthropic", agent: "claude" },
+  identity: { provider: CLAUDE_PROVIDER, agent: CLAUDE_AGENT },
   terms,
   hooksFile: SETTINGS_FILE,
   initFiles: ["CLAUDE.md", ".claude/"],
@@ -106,6 +110,7 @@ export const claudeAdapter: AgentAdapter = {
   programCheck: claudeCodeCheck,
   extraProjectChecks: [],
   hookNames: HOOK_NAMES,
+  userConfig: undefined,
 
   previewFiles: (planned, installation) =>
     previewClaude(planned, claudeInstallationOf(installation)),

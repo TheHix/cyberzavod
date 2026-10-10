@@ -1,0 +1,17 @@
+{
+  "name": "@cyberzavod/adapter-codex",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "tsc -p . && vitest run"
+  },
+  "dependencies": {
+    "@cyberzavod/adapter-kit": "workspace:*",
+    "@cyberzavod/core": "workspace:*",
+    "@cyberzavod/storage": "workspace:*",
+    "smol-toml": "1.9.0"
+  }
+}

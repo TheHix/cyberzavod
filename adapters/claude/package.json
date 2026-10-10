@@ -9,6 +9,7 @@
     "check": "tsc -p . && vitest run"
   },
   "dependencies": {
+    "@cyberzavod/adapter-kit": "workspace:*",
     "@cyberzavod/core": "workspace:*",
     "@cyberzavod/storage": "workspace:*"
   }

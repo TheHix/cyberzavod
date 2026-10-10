@@ -1,5 +1,7 @@
 import { INTERFACE_LANGUAGES } from "@cyberzavod/core";
 import { CLAUDE_MESSAGES } from "@cyberzavod/adapter-claude";
+import { CODEX_MESSAGES } from "@cyberzavod/adapter-codex";
+import { KIT_MESSAGES } from "@cyberzavod/adapter-kit";
 import { describe, expect, it } from "vitest";
 import { CLI_MESSAGES } from "./catalog.ts";
 
@@ -24,6 +26,8 @@ function stringsOf(messages: unknown): string[] {
 describe.each<[string, Catalog]>([
   ["CLI_MESSAGES", CLI_MESSAGES],
   ["CLAUDE_MESSAGES", CLAUDE_MESSAGES],
+  ["CODEX_MESSAGES", CODEX_MESSAGES],
+  ["KIT_MESSAGES", KIT_MESSAGES],
 ])("%s", (_name, catalog) => {
   it("содержит набор сообщений на каждом языке интерфейса", () => {
     const languages = Object.keys(catalog);

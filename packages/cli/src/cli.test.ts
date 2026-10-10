@@ -470,7 +470,7 @@ describe("runCli", () => {
 
     expect({ code, error: printedError() }).toEqual({
       code: 1,
-      error: "cyberzavod sync: the agent “gemini” is not supported: available are claude",
+      error: "cyberzavod sync: the agent “gemini” is not supported: available are claude, codex",
     });
   });
 

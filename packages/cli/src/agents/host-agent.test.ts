@@ -40,12 +40,21 @@ describe("hostAgentOf", () => {
     expect(hostAgentOf(config)).toBe("claude");
   });
 
+  it("берёт codex, если его назвали все этапы", () => {
+    const config = configWith({
+      implementation: { agent: "codex" },
+      review: { agent: "codex" },
+    });
+
+    expect(hostAgentOf(config)).toBe("codex");
+  });
+
   it("отклоняет неизвестного агента и перечисляет поддерживаемых", () => {
     const config = configWith({ implementation: { agent: "gemini" } });
 
     const act = () => hostAgentOf(config);
 
-    expect(act).toThrow("the agent “gemini” is not supported: available are claude");
+    expect(act).toThrow("the agent “gemini” is not supported: available are claude, codex");
   });
 
   it("отклоняет смешанных агентов и называет их", () => {
@@ -63,6 +72,12 @@ describe("hostAgentOf", () => {
 });
 
 describe("adapterFor", () => {
+  it("возвращает адаптер codex для проекта с codex", () => {
+    const config = configWith({ implementation: { agent: "codex" } });
+
+    expect(adapterFor(config, adapters).name).toBe("codex");
+  });
+
   it("возвращает адаптер агента проекта", () => {
     const config = configWith({ implementation: { agent: "claude" } });
 

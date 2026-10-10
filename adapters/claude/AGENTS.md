@@ -2,6 +2,8 @@
 
 Первый адаптер агента. Две работы: собрать из harness и конфига проекта файлы, которые понимает Claude Code (`src/generate/`), и записать сессию Claude Code в журнал проекта (`src/capture/`, `src/hooks/`, `src/commands/`). Ядро и CLI о Claude не знают; всё, что знает о нём, — здесь.
 
+Общая часть с другими адаптерами вынесена в `packages/adapter-kit`: отметки и владение файлами, план синхронизации и отключения (`planSyncFiles`, `applySyncPlan`, `plannedDisconnectFiles`, `applyDisconnect`), манифест `.cyberzavod/generated.json` (`manifest.ts`), сборка и слияние обработчиков хуков (`hookCommand`, `mergedHooks`, `inspectHooks`), подстановки шаблонов, таблица этапов и абзацы рабочих правил, поиск проекта и `CLI_COMMAND`/`pinnedCliCommand` (`cli-command.ts`), `KitError` и каталог `KIT_MESSAGES`. Ниже они описаны там, где Claude на них опирается; в самом адаптере остаётся то, что знает только Claude: модели и инструменты ролей, формат `.claude/settings.json` и его запреты, хуки и запись сессии.
+
 ## Генератор (`src/generate/`)
 
 - `claude.ts` — что адаптер знает о Claude: ведёт только `anthropic`/`claude` (другой агент этапа — `GenerateError`, наследник `ClaudeError`), модели по умолчанию по этапу (постановка и ревью — `opus`, код и проверки — `sonnet`), `effort` по этапу, модель второй доработки, инструменты роли по её доступу (`read` — без правки).

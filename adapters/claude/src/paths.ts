@@ -1,26 +1,16 @@
 // Where the adapter keeps its files: raw session logs and drafts live in the project journal's
-// `capture/`. The project config sets the journal directory, so the journal can live inside the
-// repository or next to it.
+// `capture/claude/`. The shared part (finding the project) lives in the adapter kit.
 
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import {
-  CAPTURE_DIRECTORY,
-  findProjectRoot,
-  isNotFound,
-  journalDirectory,
-  ProjectFileError,
-  readProjectConfig,
-} from "@cyberzavod/storage";
-import type { ProjectConfig } from "@cyberzavod/core";
-import { ClaudeError } from "./errors.ts";
+  captureDirectories as kitCaptureDirectories,
+  locateProject,
+  type CaptureDirectories,
+} from "@cyberzavod/adapter-kit";
+import { isNotFound, ProjectFileError } from "@cyberzavod/storage";
 import type { ClaudeMessages } from "./messages/claude-messages.ts";
-
-/** Adapter directories in the project journal: raw session logs and recording drafts. */
-export interface CaptureDirectories {
-  raw: string;
-  drafts: string;
-}
+import { CLAUDE_AGENT } from "./generate/claude.ts";
 
 /**
  * Adapter directories in the project journal.
@@ -28,51 +18,7 @@ export interface CaptureDirectories {
  * @returns {CaptureDirectories} Directories of raw logs and drafts.
  */
 export function captureDirectories(journal: string): CaptureDirectories {
-  const capture = path.join(journal, CAPTURE_DIRECTORY, "claude");
-
-  return { raw: path.join(capture, "raw"), drafts: path.join(capture, "drafts") };
-}
-
-/** Project found on disk: root, config and journal. */
-export interface LocatedProject {
-  root: string;
-  config: ProjectConfig;
-  journal: string;
-}
-
-/**
- * Finds the directory's project and its journal.
- * @param {string} directory Directory inside the project.
- * @returns {Promise<LocatedProject | undefined>} The project, or undefined if there is no marker.
- * @throws {ProjectFileError} If the project config is broken.
- */
-export async function locateProject(directory: string): Promise<LocatedProject | undefined> {
-  const root = await findProjectRoot(directory);
-
-  if (root === undefined) return undefined;
-
-  const config = await readProjectConfig(root);
-
-  if (config === undefined) return undefined;
-
-  return { root, config, journal: journalDirectory(root, config) };
-}
-
-/**
- * Finds the directory's project for a command that has nothing to do without one.
- * @param {string} directory Directory inside the project.
- * @returns {Promise<LocatedProject>} The project.
- * @throws {ClaudeError} If there is no marker anywhere up the path.
- * @throws {ProjectFileError} If the project config is broken.
- */
-export async function requireProject(directory: string): Promise<LocatedProject> {
-  const project = await locateProject(directory);
-
-  if (project === undefined) {
-    throw new ClaudeError((messages) => messages.errors.projectNotFound(directory));
-  }
-
-  return project;
+  return kitCaptureDirectories(journal, CLAUDE_AGENT);
 }
 
 /**

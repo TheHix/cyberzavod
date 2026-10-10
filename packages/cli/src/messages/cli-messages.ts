@@ -51,6 +51,14 @@ export interface CommandHelp {
   parameters: readonly CommandParameter[];
 }
 
+/** How the agent's product and skill calls are written in texts for the human. */
+export interface AgentTerms {
+  /** Product name, for example `Claude Code`. */
+  product: string;
+  /** How the human calls a skill by name, for example `/setup`. */
+  skill(name: string): string;
+}
+
 /** Help texts. */
 export interface HelpMessages {
   title: string;
@@ -78,20 +86,24 @@ export interface InitMessages {
   /** Checks found or set by a flag; `commands` are comma-separated. */
   checks(commands: string): string;
   /** No checks; `file` is the project config where they can be added. */
-  checksMissing(file: string): string;
+  checksMissing(params: { file: string; terms: AgentTerms }): string;
   rulesStarter(file: string): string;
   rulesMoved(params: { from: string; to: string }): string;
   rulesKept(file: string): string;
   journal(path: string): string;
   /** Files that will appear; `paths` are comma-separated. */
   files(paths: string): string;
+  /** The project will be marked trusted in the human's agent config `file`. */
+  trustProject(file: string): string;
+  /** The project's hooks will be approved in the human's agent config `file`. */
+  trustHooks(file: string): string;
   overrideHint: string;
   confirm: string;
   cancelled: string;
   done: string;
   /** What to commit; `paths` are comma-separated. */
   commit(paths: string): string;
-  nextSteps: string;
+  nextSteps(terms: AgentTerms): string;
   /** Repeated `init` in a connected project. */
   alreadyConnected: string;
   configValid: string;
@@ -116,7 +128,9 @@ export interface SyncMessages {
   /** Generated files edited by hand. */
   edited: string;
   /** What sync never touches. */
-  neverTouched: string;
+  neverTouched(terms: AgentTerms): string;
+  /** The approval of the hooks in the human's agent config `file` moved to the new hooks. */
+  trustRefreshed(file: string): string;
   upToDate: string;
   harnessMismatch(params: { file: string; configVersion: string; cliVersion: string }): string;
   filesOutdated: string;
@@ -142,6 +156,7 @@ export interface DoctorMessages {
   };
   git: { passed: string; missing: string; install: string };
   claudeCode: { passed: string; missing: string; install: string };
+  codex: { passed: string; missing: string; install: string };
   gallery: {
     signedIn: string;
     notSignedIn: string;
@@ -168,6 +183,17 @@ export interface DoctorMessages {
     sync: string;
     repairSettings(file: string): string;
   };
+  /** Trust in the human's own agent config: the project and its hooks. */
+  trust: {
+    passed(file: string): string;
+    projectUntrusted(params: { file: string; terms: AgentTerms }): string;
+    /** How to trust the project: in the agent, or by hand in `file`. */
+    trustProject(params: { file: string; projectKey: string; terms: AgentTerms }): string;
+    hooksUntrusted(params: { events: string; terms: AgentTerms }): string;
+    approveHooks(terms: AgentTerms): string;
+    unreadable(reason: string): string;
+    repairConfig: string;
+  };
   files: {
     upToDate: string;
     versionsDiffer(params: { file: string; configVersion: string; cliVersion: string }): string;
@@ -182,13 +208,13 @@ export interface DoctorMessages {
   rules: {
     passed(file: string): string;
     missing(file: string): string;
-    create: string;
+    create(terms: AgentTerms): string;
     unfilled(file: string): string;
-    fill: string;
+    fill(terms: AgentTerms): string;
   };
   commands: {
     noneSet(file: string): string;
-    setUp(file: string): string;
+    setUp(params: { file: string; terms: AgentTerms }): string;
     programsFound(programs: string): string;
     programsMissing(programs: string): string;
     fixPrograms(file: string): string;
@@ -217,13 +243,26 @@ export interface DisconnectMessages {
   keepSource: string;
   keepJournal(path: string): string;
   keepIgnoreEntry(entry: string): string;
-  keepSettings: string;
+  keepSettings(terms: AgentTerms): string;
+  /** Trust Cyberzavod added to the agent config `file` goes away. */
+  untrustProject(file: string): string;
+  untrustHooks(file: string): string;
+  /** Trust the human gave the project themselves stays in `file`. */
+  keepProjectTrust(file: string): string;
   editedFile(file: string): string;
   confirm: string;
   cancelled: string;
   /** Run without a terminal and without `--yes`: there is nowhere to ask. */
   needsConfirmation: string;
-  done(rulesFile: string): string;
+  /**
+   * The result. `agentRulesFile` is the agent's own rules file that the agent reads instead of
+   * AGENTS.md, or undefined if it reads AGENTS.md itself.
+   */
+  done(params: {
+    rulesFile: string;
+    terms: AgentTerms;
+    agentRulesFile: string | undefined;
+  }): string;
 }
 
 /** `status` command texts. */
@@ -285,6 +324,12 @@ export interface ErrorMessages {
   unknownHook(name: string): string;
   /** The config names an agent the CLI cannot drive; `supported` lists the ones it can. */
   unsupportedAgent(params: { agent: string; supported: string }): string;
+  /** `init --agent` names an agent the CLI cannot drive. */
+  unknownAgent(params: { agent: string; supported: string }): string;
+  /** `init --agent` asks for another agent than the connected project has. */
+  agentDiffers(params: { configured: string; requested: string }): string;
+  /** The command is not available for the agent yet. */
+  agentCommandUnavailable(params: { agent: string; command: string }): string;
   /** The stages of the config name several agents; `agents` lists them. */
   mixedAgents(params: { agents: string; file: string }): string;
   unknownCommand(name: string): string;

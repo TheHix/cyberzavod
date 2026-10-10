@@ -1,6 +1,8 @@
 // English CLI texts.
 
-import { CLI_COMMAND, HOOK_NAMES } from "@cyberzavod/adapter-claude";
+import { HOOK_NAMES } from "@cyberzavod/adapter-claude";
+import { CLI_COMMAND } from "@cyberzavod/adapter-kit";
+import { AGENT_NAMES, DEFAULT_AGENT_NAME } from "../agents/agent-adapter.ts";
 import { API_URL_VARIABLE, DEFAULT_API_URL } from "../sharing/services.ts";
 import type { CliMessages } from "./cli-messages.ts";
 
@@ -8,7 +10,7 @@ import type { CliMessages } from "./cli-messages.ts";
 export const en: CliMessages = {
   help: {
     title: "Cyberzavod — a local-first development harness for AI coding agents.",
-    quickStart: `Start here: ${CLI_COMMAND} init, then /setup and /feature <task> in Claude Code.`,
+    quickStart: `Start: ${CLI_COMMAND} init [--agent codex], /setup, /feature (Codex: $name).`,
     sections: {
       start: "Getting started",
       journal: "Journal",
@@ -21,10 +23,14 @@ export const en: CliMessages = {
   },
   commands: {
     init: {
-      usage: "init [--yes] [--id <id>] [--check <command>] [--journal <path>]",
+      usage: "init [options]",
       summary: "set up the project: config, AGENTS.md, agent files",
       parameters: [
         { name: "--yes, -y", description: "do not ask for confirmation" },
+        {
+          name: "--agent <agent>",
+          description: `agent: ${AGENT_NAMES.join(", ")}; default: ${DEFAULT_AGENT_NAME}`,
+        },
         { name: "--id <id>", description: "project id; default: package or directory name" },
         {
           name: "--check <command>",
@@ -141,18 +147,22 @@ export const en: CliMessages = {
     summaryTitle: "Cyberzavod will set up this project:",
     projectId: (id) => `Project id: ${id}`,
     checks: (commands) => `Checks: ${commands}`,
-    checksMissing: (file) => `Checks: none found — /setup or edit ${file}`,
+    checksMissing: ({ file, terms }) =>
+      `Checks: none found — ${terms.skill("setup")} or edit ${file}`,
     rulesStarter: (file) => `Agent rules: ${file} — a starter set, fill it in`,
     rulesMoved: ({ from, to }) => `Agent rules: your ${from} becomes ${to}`,
     rulesKept: (file) => `Agent rules: ${file} already exists, it stays as is`,
     journal: (path) => `Session journal: ${path}`,
     files: (paths) => `Will appear: ${paths}`,
+    trustProject: (file) => `Trust: the project will be marked trusted in ${file}`,
+    trustHooks: (file) => `Trust: the project hooks will be approved in ${file}`,
     overrideHint: `Change: --id, --check, --journal — details: ${CLI_COMMAND} init --help`,
     confirm: "Continue? [Y/n]",
     cancelled: "Cancelled: nothing was written",
     done: "Done: the project is set up.",
     commit: (paths) => `Commit: ${paths}`,
-    nextSteps: "Next: open Claude Code and run /setup, then /feature <task>.",
+    nextSteps: (terms) =>
+      `Next: open ${terms.product} and run ${terms.skill("setup")}, then ${terms.skill("feature")} <task>.`,
     alreadyConnected: "Cyberzavod is already initialized in this project.",
     configValid: "✓ Configuration valid",
     filesCurrent: "✓ Generated files current",
@@ -169,8 +179,9 @@ export const en: CliMessages = {
     willRemove: "Will remove",
     yours: "Will NOT touch (your files where generated ones go)",
     edited: "Will NOT touch (generated files you edited by hand)",
-    neverTouched:
-      "Never touched: AGENTS.md, your own Claude Code settings and hooks, the journal, your code.",
+    neverTouched: (terms) =>
+      `Never touched: AGENTS.md, your own ${terms.product} settings and hooks, the journal, your code.`,
+    trustRefreshed: (file) => `Hook approval in ${file} moved to the new hooks.`,
     upToDate: "Up to date: nothing to change.",
     harnessMismatch: ({ file, configVersion, cliVersion }) =>
       `${file}: harness ${configVersion}, but the CLI is ${cliVersion}`,
@@ -199,6 +210,12 @@ export const en: CliMessages = {
         "Claude Code (claude) was not found in PATH: fine if you use the desktop app or an IDE extension",
       install: "install Claude Code: https://claude.com/claude-code",
     },
+    codex: {
+      passed: "Codex is installed",
+      missing:
+        "Codex (codex) was not found in PATH: fine if you use the desktop app or an IDE extension",
+      install: "install Codex: https://developers.openai.com/codex/cli",
+    },
     gallery: {
       signedIn: "gallery: signed in",
       notSignedIn: "gallery: not signed in (needed only to publish recordings)",
@@ -225,6 +242,18 @@ export const en: CliMessages = {
       sync: `run ${CLI_COMMAND} sync`,
       repairSettings: (file) => `fix the JSON in ${file}, then run ${CLI_COMMAND} sync`,
     },
+    trust: {
+      passed: (file) => `the project and its hooks are trusted in ${file}`,
+      projectUntrusted: ({ file, terms }) =>
+        `the project is not trusted in ${file}: ${terms.product} ignores its hooks`,
+      trustProject: ({ file, projectKey, terms }) =>
+        `open ${terms.product} in the project and trust it, or add [projects.${JSON.stringify(projectKey)}] trust_level = "trusted" to ${file}`,
+      hooksUntrusted: ({ events, terms }) =>
+        `${terms.product} has not approved the project hooks: ${events}`,
+      approveHooks: (terms) => `open ${terms.product} and approve the hooks with /hooks`,
+      unreadable: (reason) => `trust cannot be checked: ${reason}`,
+      repairConfig: `fix the file named above, then run ${CLI_COMMAND} doctor`,
+    },
     files: {
       upToDate: "agent files are up to date",
       versionsDiffer: ({ file, configVersion, cliVersion }) =>
@@ -242,13 +271,14 @@ export const en: CliMessages = {
     rules: {
       passed: (file) => `${file} is filled in`,
       missing: (file) => `${file} does not exist`,
-      create: "create it or run /setup in Claude Code",
+      create: (terms) => `create it or run ${terms.skill("setup")} in ${terms.product}`,
       unfilled: (file) => `${file} still has starter placeholders`,
-      fill: "run /setup in Claude Code",
+      fill: (terms) => `run ${terms.skill("setup")} in ${terms.product}`,
     },
     commands: {
       noneSet: (file) => `no check commands are set in ${file}`,
-      setUp: (file) => `run /setup in Claude Code or add the commands to ${file}`,
+      setUp: ({ file, terms }) =>
+        `run ${terms.skill("setup")} in ${terms.product} or add the commands to ${file}`,
       programsFound: (programs) =>
         `programs ${programs} found; the commands were not run — ${CLI_COMMAND} doctor --run-checks`,
       programsMissing: (programs) => `check programs not found: ${programs}`,
@@ -277,13 +307,22 @@ export const en: CliMessages = {
     keepSource: "your project source",
     keepJournal: (path) => `the journal: ${path} (sessions, decisions, notes)`,
     keepIgnoreEntry: (entry) => `the .gitignore line ${entry} (keeps raw session logs out of git)`,
-    keepSettings: "your own Claude Code settings, hooks and permission rules",
+    keepSettings: (terms) => `your own ${terms.product} settings, hooks and permission rules`,
+    untrustProject: (file) => `the trust Cyberzavod gave the project in ${file}`,
+    untrustHooks: (file) => `the approval of the project hooks in ${file}`,
+    keepProjectTrust: (file) => `the trust you gave the project in ${file}`,
     editedFile: (file) => `${file} (generated, but you edited it by hand)`,
     confirm: "Continue? [Y/n]",
     cancelled: "Cancelled: nothing was changed.",
     needsConfirmation: `Nothing was changed: there is no terminal to ask in. To remove without asking, run:\n  ${CLI_COMMAND} disconnect --yes`,
-    done: (rulesFile) =>
-      `Done: Cyberzavod was removed from this project. Review and commit the changes.\nClaude Code reads CLAUDE.md: to keep your ${rulesFile} rules in Claude Code, create CLAUDE.md with the single line @${rulesFile}.`,
+    done: ({ rulesFile, terms, agentRulesFile }) => {
+      const removed =
+        "Done: Cyberzavod was removed from this project. Review and commit the changes.";
+
+      if (agentRulesFile === undefined) return removed;
+
+      return `${removed}\n${terms.product} reads ${agentRulesFile}: to keep your ${rulesFile} rules in ${terms.product}, create ${agentRulesFile} with the single line @${rulesFile}.`;
+    },
   },
   status: {
     recordTypes: { session: "sessions", decision: "decisions", note: "notes" },
@@ -332,6 +371,11 @@ export const en: CliMessages = {
     missingNoteText: "the note text is required",
     missingRecordId: "the recording id is required",
     unknownHook: (name) => `no hook named ${name}`,
+    unknownAgent: ({ agent, supported }) =>
+      `unknown agent ${agent} in --agent: supported agents are ${supported}`,
+    agentDiffers: ({ configured, requested }) =>
+      `this project is already set up for ${configured}, not ${requested}: run ${CLI_COMMAND} disconnect first, then init --agent ${requested}`,
+    agentCommandUnavailable: ({ agent, command }) => `${command} is not available for ${agent} yet`,
     unsupportedAgent: ({ agent, supported }) =>
       `the agent “${agent}” is not supported: available are ${supported}`,
     mixedAgents: ({ agents, file }) =>

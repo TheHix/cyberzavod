@@ -59,12 +59,30 @@ importers:
 
   adapters/claude:
     dependencies:
+      '@cyberzavod/adapter-kit':
+        specifier: workspace:*
+        version: link:../../packages/adapter-kit
       '@cyberzavod/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@cyberzavod/storage':
         specifier: workspace:*
         version: link:../../packages/storage
+
+  adapters/codex:
+    dependencies:
+      '@cyberzavod/adapter-kit':
+        specifier: workspace:*
+        version: link:../../packages/adapter-kit
+      '@cyberzavod/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@cyberzavod/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
+      smol-toml:
+        specifier: 1.9.0
+        version: 1.9.0
 
   apps/web:
     dependencies:
@@ -118,11 +136,26 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
+  packages/adapter-kit:
+    dependencies:
+      '@cyberzavod/core':
+        specifier: workspace:*
+        version: link:../core
+      '@cyberzavod/storage':
+        specifier: workspace:*
+        version: link:../storage
+
   packages/cli:
     devDependencies:
       '@cyberzavod/adapter-claude':
         specifier: workspace:*
         version: link:../../adapters/claude
+      '@cyberzavod/adapter-codex':
+        specifier: workspace:*
+        version: link:../../adapters/codex
+      '@cyberzavod/adapter-kit':
+        specifier: workspace:*
+        version: link:../adapter-kit
       '@cyberzavod/core':
         specifier: workspace:*
         version: link:../core

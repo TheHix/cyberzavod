@@ -3,16 +3,9 @@ import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { SettingsError, type HookGroup, type Settings } from "@cyberzavod/adapter-kit";
 import { LEGACY_TOOL_FILE } from "@cyberzavod/storage";
-import {
-  ADAPTER_DENY,
-  adapterHooks,
-  inspectHooks,
-  mergeSettings,
-  SettingsError,
-  type HookGroup,
-  type Settings,
-} from "./settings.ts";
+import { ADAPTER_DENY, adapterHooks, inspectHooks, mergeSettings } from "./settings.ts";
 
 const VERSION = "1.2.3";
 const NPX_PREFIX =

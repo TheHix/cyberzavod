@@ -4,9 +4,9 @@
 
 import { rm } from "node:fs/promises";
 import path from "node:path";
-import type { DisconnectPlan } from "@cyberzavod/adapter-claude";
+import type { DisconnectPlan } from "@cyberzavod/adapter-kit";
 import { LEGACY_TOOL_FILE, MARKER_DIRECTORY, PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
-import type { AgentAdapter } from "../agents/agent-adapter.ts";
+import type { AgentAdapter, UserConfigChange, UserConfigPlan } from "../agents/agent-adapter.ts";
 import { adapterFor } from "../agents/host-agent.ts";
 import type { Adapters } from "../agents/registry.ts";
 import type { Confirmation } from "../confirmation.ts";
@@ -52,24 +52,54 @@ function settingsLine(
   }
 }
 
+function takenBackLine(change: UserConfigChange, messages: CliMessages): string {
+  switch (change.kind) {
+    case "project":
+      return messages.disconnect.untrustProject(change.file);
+    case "hooks":
+      return messages.disconnect.untrustHooks(change.file);
+  }
+}
+
 interface RemovedLines {
   plan: DisconnectPlan;
+  userConfigPlan: UserConfigPlan | undefined;
   adapter: AgentAdapter;
   hasLegacy: boolean;
   messages: CliMessages;
 }
 
-function removedLines({ plan, adapter, hasLegacy, messages }: RemovedLines): string[] {
+function removedLines({
+  plan,
+  userConfigPlan,
+  adapter,
+  hasLegacy,
+  messages,
+}: RemovedLines): string[] {
+  const takenBack = (userConfigPlan?.changes ?? []).map((change) =>
+    takenBackLine(change, messages),
+  );
+
   return [
     ...plan.removed,
     ...settingsLine(plan, adapter, messages),
+    ...takenBack,
     ...(hasLegacy ? [LEGACY_TOOL_FILE] : []),
     slashed(PROJECT_CONFIG_FILE),
   ];
 }
 
-function keptLines(project: ProjectAt, plan: DisconnectPlan, messages: CliMessages): string[] {
+interface KeptLines {
+  project: ProjectAt;
+  plan: DisconnectPlan;
+  userConfigPlan: UserConfigPlan | undefined;
+  adapter: AgentAdapter;
+  messages: CliMessages;
+}
+
+function keptLines({ project, plan, userConfigPlan, adapter, messages }: KeptLines): string[] {
   const { disconnect } = messages;
+  const keptTrustFile = userConfigPlan?.keptProjectTrustFile;
   const journal = slashed(path.relative(project.root, project.journal));
   const ignoreEntry = captureIgnoreEntry(project.config.journal);
   const edited = plan.edited.map((file) => disconnect.editedFile(file));
@@ -79,7 +109,8 @@ function keptLines(project: ProjectAt, plan: DisconnectPlan, messages: CliMessag
     RULES_FILE,
     disconnect.keepJournal(journal),
     ...(ignoreEntry === undefined ? [] : [disconnect.keepIgnoreEntry(ignoreEntry)]),
-    disconnect.keepSettings,
+    disconnect.keepSettings(adapter.terms),
+    ...(keptTrustFile === undefined ? [] : [disconnect.keepProjectTrust(keptTrustFile)]),
     ...edited,
   ];
 }
@@ -100,7 +131,7 @@ function printList(title: string, lines: readonly string[]): void {
  * @param {DisconnectCommandOptions} options Confirmation, texts and adapters.
  * @returns {Promise<DisconnectOutcome>} Removed or cancelled.
  * @throws {Error} If the directory is not in a project.
- * @throws {Error} If the settings do not parse: then nothing is changed.
+ * @throws {Error} If the settings or the agent's own config do not parse: then nothing is changed.
  */
 export async function disconnectProject(
   directory: string,
@@ -110,10 +141,15 @@ export async function disconnectProject(
   const project = await requireProjectAt(directory);
   const adapter = adapterFor(project.config, adapters);
   const plan = await adapter.planDisconnect(project.root);
+  const userConfigPlan = await adapter.userConfig?.planDisconnect(project.root);
   const hasLegacy = await hasLegacyTool(project.root);
+  const removed = removedLines({ plan, userConfigPlan, adapter, hasLegacy, messages });
 
-  printList(messages.disconnect.willRemove, removedLines({ plan, adapter, hasLegacy, messages }));
-  printList(messages.disconnect.willKeep, keptLines(project, plan, messages));
+  printList(messages.disconnect.willRemove, removed);
+  printList(
+    messages.disconnect.willKeep,
+    keptLines({ project, plan, userConfigPlan, adapter, messages }),
+  );
 
   const isConfirmed = await confirm(messages.disconnect.confirm);
 
@@ -123,13 +159,20 @@ export async function disconnectProject(
     return "cancelled";
   }
 
+  await userConfigPlan?.apply();
   await adapter.disconnect(project.root);
 
   if (hasLegacy) await removeLegacyTool(project.root);
 
   await rm(path.join(project.root, PROJECT_CONFIG_FILE), { force: true });
   await removeDirectoryIfEmpty(path.join(project.root, MARKER_DIRECTORY));
-  console.log(messages.disconnect.done(RULES_FILE));
+  console.log(
+    messages.disconnect.done({
+      rulesFile: RULES_FILE,
+      terms: adapter.terms,
+      agentRulesFile: adapter.legacyRulesFile,
+    }),
+  );
 
   return "removed";
 }

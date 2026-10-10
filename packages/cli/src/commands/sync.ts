@@ -3,10 +3,10 @@
 // change: the first exits with code 1 if anything is outdated (so project checks catch outdated
 // files), the second with code 0.
 
-import type { SyncReport } from "@cyberzavod/adapter-claude";
+import type { SyncReport } from "@cyberzavod/adapter-kit";
 import type { ProjectConfig } from "@cyberzavod/core";
 import { LEGACY_TOOL_FILE, PROJECT_CONFIG_FILE, writeProjectConfig } from "@cyberzavod/storage";
-import type { AgentAdapter } from "../agents/agent-adapter.ts";
+import type { AgentAdapter, CarriedOver, FilesRequest } from "../agents/agent-adapter.ts";
 import { adapterFor } from "../agents/host-agent.ts";
 import type { Adapters } from "../agents/registry.ts";
 import { detectProject, stackOf } from "../detect.ts";
@@ -66,7 +66,7 @@ function printWrittenReport(report: SyncReport, messages: CliMessages): void {
   if (isClean(report)) console.log(sync.upToDate);
 }
 
-function printPreview(report: SyncReport, messages: CliMessages): void {
+function printPreview(report: SyncReport, adapter: AgentAdapter, messages: CliMessages): void {
   const { sync } = messages;
 
   printFiles(sync.willAdd, report.added);
@@ -74,7 +74,7 @@ function printPreview(report: SyncReport, messages: CliMessages): void {
   printFiles(sync.willRemove, report.removed);
   printFiles(sync.yours, report.conflicts);
   printFiles(sync.edited, report.edited);
-  console.log(sync.neverTouched);
+  console.log(sync.neverTouched(adapter.terms));
 }
 
 function withLegacyTool(report: SyncReport, isLegacyToolRemoved: boolean): SyncReport {
@@ -133,7 +133,11 @@ export async function inspectProjectFiles(
   };
 }
 
-function printPreviewText(inspection: ProjectFilesInspection, messages: CliMessages): void {
+function printPreviewText(
+  inspection: ProjectFilesInspection,
+  adapter: AgentAdapter,
+  messages: CliMessages,
+): void {
   const { report, configVersion, isHarnessOutdated } = inspection;
   const status = filesStatusOf(report);
 
@@ -147,7 +151,7 @@ function printPreviewText(inspection: ProjectFilesInspection, messages: CliMessa
     );
   }
 
-  printPreview(report, messages);
+  printPreview(report, adapter, messages);
   console.log(conclusionOf(status, isHarnessOutdated, messages));
 }
 
@@ -190,9 +194,21 @@ export async function previewProject(directory: string, options: PreviewOptions)
   const inspection = await inspectProjectFiles(project, installation, adapter);
 
   if (isJson) printPreviewJson(inspection);
-  else printPreviewText(inspection, messages);
+  else printPreviewText(inspection, adapter, messages);
 
   return isClean(inspection.report) && !inspection.isHarnessOutdated;
+}
+
+// An agent that asks the human to approve its hooks keeps the approval for the new hooks.
+async function syncFilesCarryingTrust(
+  adapter: AgentAdapter,
+  request: FilesRequest,
+): Promise<CarriedOver<SyncReport>> {
+  const writeFiles = () => adapter.syncFiles(request);
+
+  if (adapter.userConfig === undefined) return { value: await writeFiles(), change: undefined };
+
+  return adapter.userConfig.carryOver(request.projectDirectory, writeFiles);
 }
 
 /**
@@ -225,11 +241,13 @@ export async function syncProject(directory: string, options: SyncCommandOptions
 
   if (isLegacyToolPresent) await removeLegacyTool(project.root);
 
-  const report = await adapter.syncFiles({
+  const { value: report, change } = await syncFilesCarryingTrust(adapter, {
     projectDirectory: project.root,
     installation,
     force,
   });
 
   printWrittenReport(withLegacyTool(report, isLegacyToolPresent), messages);
+
+  if (change !== undefined) console.log(messages.sync.trustRefreshed(change.file));
 }

@@ -15,7 +15,13 @@ const PACKAGE = path.resolve(import.meta.dirname, "..");
 const IS_WINDOWS = process.platform === "win32";
 // A space in the project path catches commands that join a path into a string without quotes.
 const PROJECT_NAME = "smoke project";
-const PUBLISHED_FILES = ["LICENSE", "README.md", "dist/cyberzavod.mjs", "package.json"];
+const PUBLISHED_FILES = [
+  "LICENSE",
+  "README.md",
+  "dist/THIRD_PARTY_LICENSES",
+  "dist/cyberzavod.mjs",
+  "package.json",
+];
 const SESSION_ID = "smoke-session";
 // Colors and other terminal control sequences start with this character.
 const ESCAPE = "\u001b";

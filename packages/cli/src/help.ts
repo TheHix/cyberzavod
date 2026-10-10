@@ -1,6 +1,6 @@
 // CLI help: the general list of commands by section and the help of a single command.
 
-import { CLI_COMMAND } from "@cyberzavod/adapter-claude";
+import { CLI_COMMAND } from "@cyberzavod/adapter-kit";
 import { INTERFACE_LANGUAGES } from "@cyberzavod/core";
 import {
   COMMAND_NAMES,

@@ -1,6 +1,6 @@
 // Russian texts of the Claude Code adapter.
 
-import { CLI_COMMAND } from "../cli-command.ts";
+import { CLI_COMMAND } from "@cyberzavod/adapter-kit";
 import type { ClaudeMessages } from "./claude-messages.ts";
 
 /** Adapter texts in Russian. */
@@ -58,16 +58,7 @@ export const ru: ClaudeMessages = {
   },
   errors: {
     unsupportedAgent: ({ stage, requested, supported }) =>
-      `этап ${stage}: ${requested} не поддерживается, пока есть только адаптер ${supported}`,
-    fileConflicts: (files) =>
-      `ничего не изменено: эти файлы ваши (написаны не генератором или исправлены руками после генерации): ${files}. Перенесите правки в AGENTS.md и удалите файлы или перезапишите их командой ${CLI_COMMAND} sync --force`,
-    settingsNotObject: (file) => `${file} не разобран: настройки должны быть объектом`,
-    settingsNotParsed: ({ file, reason }) => `${file} не разобран: ${reason}`,
-    manifestNotParsed: ({ file, reason }) =>
-      `${file} не разобран: ${reason}. Верните его из git или удалите и запустите ${CLI_COMMAND} sync`,
-    unknownPlaceholder: (placeholder) => `в шаблоне неизвестная подстановка ${placeholder}`,
-    projectNotFound: (directory) =>
-      `${directory} не в проекте Cyberzavod: сначала ${CLI_COMMAND} init`,
+      `этап ${stage}: ${requested} не поддерживается адаптером Claude Code, он ведёт только ${supported}`,
     noDrafts: `черновиков ещё нет: сначала ${CLI_COMMAND} draft`,
     noRawLogs: (directory) => `журналов сессий ещё нет: хуки пишут их в ${directory}`,
     earlierDraftNotParsed: (file) =>

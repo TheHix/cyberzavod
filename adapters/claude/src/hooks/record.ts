@@ -13,7 +13,8 @@ import {
   stampProject,
   type RawEvent,
 } from "../capture/raw-event.ts";
-import { captureDirectories, locateProject, type LocatedProject } from "../paths.ts";
+import { locateProject, type LocatedProject } from "@cyberzavod/adapter-kit";
+import { captureDirectories } from "../paths.ts";
 import { SILENT_EXIT, type HookContext, type HookOutcome } from "./hook.ts";
 import { claimHumanCallMarker } from "./state.ts";
 
