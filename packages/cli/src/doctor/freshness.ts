@@ -1,7 +1,6 @@
 // Agent files check: what is generated in the project matches what the running CLI would build,
 // the same way as `sync --check`.
 
-import { ClaudeError } from "@cyberzavod/adapter-claude";
 import { PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
 import { inspectProjectFiles, type ProjectFilesInspection } from "../commands/sync.ts";
 import { RULES_FILE } from "../commands/init.ts";
@@ -43,22 +42,19 @@ function resultOf(inspection: ProjectFilesInspection, doctor: DoctorMessages): C
 /** Agent files are current for the running version; the config and CLI versions agree. */
 export const freshnessCheck: ProjectCheck = {
   id: "files",
-  run: async ({ project, installation, messages, claudeMessages }) => {
+  run: async ({ project, installation, messages, adapter, language }) => {
     const { files } = messages.doctor;
 
     try {
-      const inspection = await inspectProjectFiles(project, installation);
+      const inspection = await inspectProjectFiles(project, installation, adapter);
 
       return resultOf(inspection, messages.doctor);
     } catch (err) {
-      if (err instanceof ClaudeError) {
-        return failed({
-          problem: files.cannotCheck(err.describe(claudeMessages)),
-          fix: files.fixCause,
-        });
-      }
+      const reason = adapter.describeError(err, language);
 
-      throw err;
+      if (reason === undefined) throw err;
+
+      return failed({ problem: files.cannotCheck(reason), fix: files.fixCause });
     }
   },
 };

@@ -155,6 +155,9 @@ export interface DoctorMessages {
     init: string;
     invalid(reason: string): string;
     repair(file: string): string;
+    /** The config names agents the CLI cannot drive together; `reason` says which. */
+    agents(reason: string): string;
+    fixAgents(file: string): string;
   };
   hooks: {
     passed(version: string): string;
@@ -280,6 +283,10 @@ export interface ErrorMessages {
   missingNoteText: string;
   missingRecordId: string;
   unknownHook(name: string): string;
+  /** The config names an agent the CLI cannot drive; `supported` lists the ones it can. */
+  unsupportedAgent(params: { agent: string; supported: string }): string;
+  /** The stages of the config name several agents; `agents` lists them. */
+  mixedAgents(params: { agents: string; file: string }): string;
   unknownCommand(name: string): string;
   unknownCommandWithSuggestion(params: { name: string; suggestion: string }): string;
   languageFlagWithoutValue: string;

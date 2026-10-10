@@ -1,33 +1,30 @@
-// Agent hooks check: `.claude/settings.json` has the handlers of the version in the config.
+// Agent hooks check: the agent's hooks file has the handlers of the version in the config.
 
-import {
-  inspectClaudeHooks,
-  SETTINGS_FILE,
-  type ClaudeMessages,
-  type HooksReading,
-} from "@cyberzavod/adapter-claude";
+import type { InterfaceLanguage } from "@cyberzavod/core";
+import type { AgentHooksReading } from "../agents/agent-adapter.ts";
 import type { DoctorMessages } from "../messages/cli-messages.ts";
 import { failed, LIST_SEPARATOR, passed, type CheckResult, type ProjectCheck } from "./check.ts";
 
 interface HooksOutcome {
-  reading: HooksReading;
+  reading: AgentHooksReading;
+  file: string;
   version: string;
   doctor: DoctorMessages;
-  claudeMessages: ClaudeMessages;
+  language: InterfaceLanguage;
 }
 
-function resultOf({ reading, version, doctor, claudeMessages }: HooksOutcome): CheckResult {
+function resultOf({ reading, file, version, doctor, language }: HooksOutcome): CheckResult {
   const { hooks } = doctor;
 
   switch (reading.kind) {
     case "installed":
       return passed(hooks.passed(version));
     case "missing":
-      return failed({ problem: hooks.missing(SETTINGS_FILE), fix: hooks.sync });
+      return failed({ problem: hooks.missing(file), fix: hooks.sync });
     case "otherVersion":
       return failed({
         problem: hooks.otherVersion({
-          file: SETTINGS_FILE,
+          file,
           found: reading.found.join(LIST_SEPARATOR),
           configVersion: version,
         }),
@@ -40,8 +37,8 @@ function resultOf({ reading, version, doctor, claudeMessages }: HooksOutcome): C
       });
     case "unreadable":
       return failed({
-        problem: hooks.unreadable(reading.error.describe(claudeMessages)),
-        fix: hooks.repairSettings(SETTINGS_FILE),
+        problem: hooks.unreadable(reading.describe(language)),
+        fix: hooks.repairSettings(file),
       });
   }
 }
@@ -49,10 +46,16 @@ function resultOf({ reading, version, doctor, claudeMessages }: HooksOutcome): C
 /** The adapter hooks in the project settings match the version from the config. */
 export const hooksCheck: ProjectCheck = {
   id: "hooks",
-  run: async ({ project, messages, claudeMessages }) => {
+  run: async ({ project, messages, adapter, language }) => {
     const version = project.config.harness;
-    const reading = await inspectClaudeHooks(project.root, version);
+    const reading = await adapter.inspectHooks(project.root, version);
 
-    return resultOf({ reading, version, doctor: messages.doctor, claudeMessages });
+    return resultOf({
+      reading,
+      file: adapter.hooksFile,
+      version,
+      doctor: messages.doctor,
+      language,
+    });
   },
 };

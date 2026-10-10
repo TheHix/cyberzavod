@@ -5,8 +5,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { onTestFinished, vi } from "vitest";
-import { CLAUDE_MESSAGES } from "@cyberzavod/adapter-claude";
 import { journalDirectory, readProjectConfig } from "@cyberzavod/storage";
+import { adapters } from "../agents/fixtures.ts";
 import { confirmWithoutAsking } from "../confirmation.ts";
 import { initProject } from "../commands/init.ts";
 import type { ProjectAt } from "../commands/project.ts";
@@ -56,6 +56,7 @@ export async function connectedProject(checks = [PROJECT_CHECK_COMMAND]): Promis
     overrides: { checks, projectId: "shop" },
     installation: await readInstallation(),
     messages,
+    adapters,
   });
   log.mockClear();
   await writeFile(path.join(root, "AGENTS.md"), FILLED_RULES);
@@ -92,7 +93,8 @@ export async function projectContext(
     project,
     installation: await readInstallation(),
     messages,
-    claudeMessages: CLAUDE_MESSAGES.en,
+    adapter: adapters.claude,
+    language: "en",
     isProgramAvailable: async () => true,
     runCommand,
     ...patch,

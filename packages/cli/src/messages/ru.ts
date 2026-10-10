@@ -212,6 +212,8 @@ export const ru: CliMessages = {
       init: `выполните ${CLI_COMMAND} init в корне проекта`,
       invalid: (reason) => `конфиг проекта не годится: ${reason}`,
       repair: (file) => `исправьте ${file} по сообщению выше`,
+      agents: (reason) => `агенты в конфиге проекта не годятся: ${reason}`,
+      fixAgents: (file) => `исправьте agents в ${file}`,
     },
     hooks: {
       passed: (version) => `хуки агента установлены для ${version}`,
@@ -331,6 +333,10 @@ export const ru: CliMessages = {
     missingNoteText: "нужен текст заметки",
     missingRecordId: "нужен id записи",
     unknownHook: (name) => `нет хука ${name}`,
+    unsupportedAgent: ({ agent, supported }) =>
+      `агент «${agent}» не поддерживается: доступны ${supported}`,
+    mixedAgents: ({ agents, file }) =>
+      `в ${file} указано несколько агентов (${agents}): проект ведёт один агент`,
     unknownCommand: (name) => `неизвестная команда «${name}»: все команды — ${CLI_COMMAND} --help`,
     unknownCommandWithSuggestion: ({ name, suggestion }) =>
       `неизвестная команда «${name}»: может быть, ${CLI_COMMAND} ${suggestion}? Все команды: ${CLI_COMMAND} --help`,

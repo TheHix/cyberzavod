@@ -6,32 +6,36 @@ import {
   type AgentConfig,
   type Harness,
   type JournalRecord,
+  type ProjectConfig,
   type RecordType,
+  type Stage,
   type StageGuide,
 } from "@cyberzavod/core";
 import { DirectoryRecordStore, RECORD_COLLECTIONS, workflowOf } from "@cyberzavod/storage";
+import { firstAgentNameOf } from "../agents/host-agent.ts";
 import type { CommandError } from "../errors.ts";
 import { HARNESS_VERSION, type Installation } from "../installation/installation.ts";
 import { printJson } from "../json-output.ts";
 import type { CliMessages } from "../messages/cli-messages.ts";
-import { DEFAULT_AGENT } from "../initial-config.ts";
 import { requireProjectAt, type ProjectAt } from "./project.ts";
 
-function performerOf(
-  guide: StageGuide,
-  agent: AgentConfig | undefined,
-  messages: CliMessages,
-): string {
+// A stage with no agent in the config is run by the agent that drives the project. Status is
+// printed even for a config that names unusable agents: `doctor` reports those.
+function stageAgentOf(config: ProjectConfig, stage: Stage): AgentConfig {
+  return { agent: firstAgentNameOf(config), ...config.agents[stage] };
+}
+
+function performerOf(guide: StageGuide, agent: AgentConfig, messages: CliMessages): string {
   if (guide.role === undefined) return messages.status.foreman;
 
-  return `${agent?.agent ?? DEFAULT_AGENT.agent} · ${agent?.model ?? DEFAULT_MODEL}`;
+  return `${agent.agent} · ${agent.model ?? DEFAULT_MODEL}`;
 }
 
 function processLines(project: ProjectAt, harness: Harness, messages: CliMessages): string[] {
   const workflow = workflowOf(harness, project.config.workflow);
   const stages = workflow.stages.map((stage) => {
     const guide = harness.stages[stage];
-    const performer = performerOf(guide, project.config.agents[stage], messages);
+    const performer = performerOf(guide, stageAgentOf(project.config, stage), messages);
 
     return `  ${guide.title}: ${performer}`;
   });
@@ -77,14 +81,14 @@ function stagesOf(project: ProjectAt, harness: Harness) {
   const workflow = workflowOf(harness, project.config.workflow);
   const stages = workflow.stages.map((stage) => {
     const guide = harness.stages[stage];
-    const agent = project.config.agents[stage];
+    const agent = stageAgentOf(project.config, stage);
     const isLead = guide.role === undefined;
 
     return {
       stage,
       title: guide.title,
-      agent: isLead ? null : (agent?.agent ?? DEFAULT_AGENT.agent),
-      model: isLead ? null : (agent?.model ?? DEFAULT_MODEL),
+      agent: isLead ? null : agent.agent,
+      model: isLead ? null : (agent.model ?? DEFAULT_MODEL),
     };
   });
 

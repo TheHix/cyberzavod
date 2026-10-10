@@ -10,15 +10,10 @@ import {
   type Stage,
 } from "@cyberzavod/core";
 import { DEFAULT_JOURNAL, workflowOf } from "@cyberzavod/storage";
+import type { AgentIdentity } from "./agents/agent-adapter.ts";
 import { projectIdOf, stackOf, type DetectedProject } from "./detect.ts";
 import { HARNESS_VERSION } from "./installation/installation.ts";
 import { CommandError } from "./errors.ts";
-
-/** The agent Cyberzavod can currently drive. */
-export const DEFAULT_AGENT: Required<Omit<AgentConfig, "model">> = {
-  provider: "anthropic",
-  agent: "claude",
-};
 
 /** The workflow `init` sets for the project. */
 export const DEFAULT_WORKFLOW = "default";
@@ -49,6 +44,8 @@ export interface InitialConfigSource {
   harness: Harness;
   /** The human's flags. */
   overrides: InitOverrides;
+  /** The provider and agent every stage with a role gets. */
+  identity: AgentIdentity;
 }
 
 function requiredValue(option: string, value: string): string {
@@ -91,13 +88,17 @@ function journalOption(value: string): string {
 }
 
 // Every workflow stage that has a role in the harness gets an agent.
-function agentsOf(harness: Harness, stages: readonly Stage[]): Partial<Record<Stage, AgentConfig>> {
+function agentsOf(
+  harness: Harness,
+  stages: readonly Stage[],
+  identity: AgentIdentity,
+): Partial<Record<Stage, AgentConfig>> {
   const agents: Partial<Record<Stage, AgentConfig>> = {};
 
   for (const stage of stages) {
     if (harness.stages[stage].role === undefined) continue;
 
-    agents[stage] = { ...DEFAULT_AGENT, model: DEFAULT_MODEL };
+    agents[stage] = { ...identity, model: DEFAULT_MODEL };
   }
 
   return agents;
@@ -105,13 +106,13 @@ function agentsOf(harness: Harness, stages: readonly Stage[]): Partial<Record<St
 
 /**
  * Builds the project config from the findings: id, checks and stack from the project, the
- * `default` workflow and an agent for each stage with a role. The human's flags override findings.
- * @param {InitialConfigSource} source Project findings, harness and flags.
+ * `default` workflow and the agent for each stage with a role. The human's flags override findings.
+ * @param {InitialConfigSource} source Project findings, harness, flags and the agent.
  * @returns {ProjectConfig} Project config with this CLI's harness version.
  * @throws {CommandError} If a flag is empty or `--journal` is an absolute path.
  */
 export function initialConfigOf(source: InitialConfigSource): ProjectConfig {
-  const { detected, harness, overrides } = source;
+  const { detected, harness, overrides, identity } = source;
   const projectId =
     overrides.projectId === undefined
       ? projectIdOf(detected.name)
@@ -127,7 +128,7 @@ export function initialConfigOf(source: InitialConfigSource): ProjectConfig {
     harness: HARNESS_VERSION,
     workflow: workflow.name,
     journal,
-    agents: agentsOf(harness, workflow.stages),
+    agents: agentsOf(harness, workflow.stages, identity),
     verification: { commands, paths: [] },
     stack: stackOf(detected),
   };

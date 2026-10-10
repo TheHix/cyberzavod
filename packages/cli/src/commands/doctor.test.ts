@@ -2,7 +2,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
-import { CLAUDE_MESSAGES } from "@cyberzavod/adapter-claude";
+import { PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
+import { adapters } from "../agents/fixtures.ts";
 import { commandsFoundCheck } from "../doctor/commands-found.ts";
 import { commandsPassCheck } from "../doctor/commands-pass.ts";
 import type { CommandRunner, Machine, ProjectCheck } from "../doctor/check.ts";
@@ -23,11 +24,12 @@ async function optionsWith(
 
   return {
     machine: patch.machine ?? machine(),
-    projectChecks: projectChecksWith(patch.commandsCheck ?? commandsFoundCheck),
+    projectChecks: projectChecksWith(patch.commandsCheck ?? commandsFoundCheck, adapters.claude),
     projectTools: { isProgramAvailable: async () => true, runCommand },
     installation: await readInstallation(),
     messages,
-    claudeMessages: CLAUDE_MESSAGES.en,
+    adapter: adapters.claude,
+    language: "en",
     isJson: patch.isJson ?? false,
   };
 }
@@ -123,6 +125,32 @@ describe("runDoctor", () => {
         "✓ gallery: signed in",
         `✗ no Cyberzavod project found from ${directory}`,
         "    How to fix: run npx cyberzavod init in the project root",
+        "Problems: 1.",
+      ],
+    });
+  });
+
+  it("со смешанными агентами в конфиге печатает ✗ конфига и пропускает проверки проекта", async () => {
+    const project = await connectedProject();
+    const agents = {
+      implementation: { provider: "anthropic", agent: "claude" },
+      review: { provider: "google", agent: "gemini" },
+    };
+
+    await writeFile(
+      path.join(project.root, PROJECT_CONFIG_FILE),
+      JSON.stringify({ ...project.config, agents }),
+    );
+    vi.mocked(console.log).mockClear();
+
+    const isHealthy = await runDoctor(project.root, await optionsWith());
+
+    expect({ isHealthy, lines: printedLines().slice(-4) }).toEqual({
+      isHealthy: false,
+      lines: [
+        "✓ gallery: signed in",
+        "✗ the agents in the project config cannot be used: .cyberzavod/project.json names several agents (claude, gemini): a project is driven by one agent",
+        "    How to fix: edit agents in .cyberzavod/project.json",
         "Problems: 1.",
       ],
     });

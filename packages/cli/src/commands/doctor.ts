@@ -1,7 +1,8 @@
 // `cyberzavod doctor`: checks the machine, the project connection and the agent files item by item
 // and says under each error how to fix it. Fixes nothing and does not go to the network.
 
-import type { ClaudeMessages } from "@cyberzavod/adapter-claude";
+import type { InterfaceLanguage } from "@cyberzavod/core";
+import type { AgentAdapter } from "../agents/agent-adapter.ts";
 import type {
   CheckResult,
   Machine,
@@ -9,7 +10,6 @@ import type {
   ProjectCheck,
   ProjectContext,
 } from "../doctor/check.ts";
-import { claudeCodeCheck } from "../doctor/claude-code.ts";
 import { configCheck } from "../doctor/config.ts";
 import { freshnessCheck } from "../doctor/freshness.ts";
 import { galleryCheck } from "../doctor/gallery.ts";
@@ -27,13 +27,6 @@ const FAILED_SIGN = "✗";
 const NOTICE_SIGN = "–";
 const HINT_INDENT = "    ";
 
-/** Machine checks in display order: they run before project checks and do not depend on them. */
-const MACHINE_CHECKS: readonly MachineCheck[] = [
-  nodeCheck,
-  gitCheck,
-  claudeCodeCheck,
-  galleryCheck,
-];
 const CONFIG_CHECK_ID = "config";
 
 /** What project checks need from the outside world: program lookup and running commands. */
@@ -48,7 +41,10 @@ export interface DoctorOptions {
   projectTools: ProjectTools;
   installation: Installation;
   messages: CliMessages;
-  claudeMessages: ClaudeMessages;
+  /** Adapter of the agent that drives the project, or the default one without a project. */
+  adapter: AgentAdapter;
+  /** Language of the texts that come from the adapter. */
+  language: InterfaceLanguage;
   /** Print the result as one JSON document rather than lines for the human. */
   isJson: boolean;
 }
@@ -60,13 +56,34 @@ interface IdentifiedResult {
 }
 
 /**
+ * Machine checks in display order: they run before project checks and do not depend on them.
+ * @param {AgentAdapter} adapter Adapter of the agent whose program is checked.
+ * @returns {MachineCheck[]} Node, git, the agent's program and the gallery.
+ */
+export function machineChecksFor(adapter: AgentAdapter): MachineCheck[] {
+  return [nodeCheck, gitCheck, adapter.programCheck, galleryCheck];
+}
+
+/**
  * Project checks in display order; the commands check is the one the caller chose: find the
  * programs or run the commands.
  * @param {ProjectCheck} commandsCheck Check of the project's check commands.
- * @returns {ProjectCheck[]} Hooks, agent files, rules, commands and `.gitignore`.
+ * @param {AgentAdapter} adapter Adapter of the agent that drives the project.
+ * @returns {ProjectCheck[]} Hooks, the agent's own checks, agent files, rules, commands and
+ *   `.gitignore`.
  */
-export function projectChecksWith(commandsCheck: ProjectCheck): ProjectCheck[] {
-  return [hooksCheck, freshnessCheck, rulesCheck, commandsCheck, gitignoreCheck];
+export function projectChecksWith(
+  commandsCheck: ProjectCheck,
+  adapter: AgentAdapter,
+): ProjectCheck[] {
+  return [
+    hooksCheck,
+    ...adapter.extraProjectChecks,
+    freshnessCheck,
+    rulesCheck,
+    commandsCheck,
+    gitignoreCheck,
+  ];
 }
 
 function linesOf(result: CheckResult, messages: CliMessages): string[] {
@@ -101,9 +118,9 @@ async function* resultsOf(
   directory: string,
   options: DoctorOptions,
 ): AsyncGenerator<IdentifiedResult> {
-  const { machine, messages, installation, claudeMessages, projectTools } = options;
+  const { machine, messages, installation, adapter, language, projectTools } = options;
 
-  for (const check of MACHINE_CHECKS) {
+  for (const check of machineChecksFor(adapter)) {
     yield { id: check.id, result: await check.run(machine, messages) };
   }
 
@@ -117,7 +134,8 @@ async function* resultsOf(
     project,
     installation,
     messages,
-    claudeMessages,
+    adapter,
+    language,
     ...projectTools,
   };
 

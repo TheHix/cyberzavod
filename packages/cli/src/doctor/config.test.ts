@@ -50,4 +50,29 @@ describe("configCheck", () => {
     });
     expect(outcome.result).toHaveProperty("problem", expect.stringContaining("the project config"));
   });
+
+  it("при нескольких агентах в конфиге не находит проект и зовёт исправить agents", async () => {
+    const project = await connectedProject();
+    const agents = {
+      implementation: { provider: "anthropic", agent: "claude" },
+      review: { provider: "google", agent: "gemini" },
+    };
+
+    await writeFile(
+      path.join(project.root, PROJECT_CONFIG_FILE),
+      JSON.stringify({ ...project.config, agents }),
+    );
+
+    const outcome = await configCheck(project.root, messages);
+
+    expect(outcome).toEqual({
+      result: {
+        status: "failed",
+        problem:
+          "the agents in the project config cannot be used: .cyberzavod/project.json names several agents (claude, gemini): a project is driven by one agent",
+        fix: `edit agents in ${PROJECT_CONFIG_FILE}`,
+      },
+      project: undefined,
+    });
+  });
 });
