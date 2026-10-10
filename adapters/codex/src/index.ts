@@ -13,6 +13,8 @@ export {
 } from "./generate/sync.ts";
 export { disconnectCodex } from "./generate/disconnect.ts";
 export type { CodexTemplates } from "./generate/files.ts";
+export { draftSession, type DraftSessionOptions } from "./commands/draft.ts";
+export { CODEX_SOURCE, publishSessions, type PublishSessionsOptions } from "./commands/publish.ts";
 export { inspectCodexHooks, type HooksReading } from "./generate/inspect.ts";
 export { HOOKS_FILE } from "./generate/hooks-config.ts";
 export {

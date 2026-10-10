@@ -7,9 +7,9 @@ import { loadHarness, PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
 import { disconnectCodex } from "./disconnect.ts";
 import { HOOKS_FILE } from "./hooks-config.ts";
 import { syncCodex, type CodexInstallation } from "./sync.ts";
+import { realTemplates } from "./templates.fixtures.ts";
 
 const REPOSITORY = path.resolve(import.meta.dirname, "../../../..");
-const TEMPLATES = path.join(REPOSITORY, "adapters/codex/templates");
 const HUMAN_HOOK = { type: "command", command: "echo mine" };
 
 let root: string;
@@ -31,7 +31,7 @@ async function exists(relative: string): Promise<boolean> {
 async function installation(): Promise<CodexInstallation> {
   return {
     harness: await loadHarness(path.join(REPOSITORY, "harness")),
-    templates: { setup: await readFile(path.join(TEMPLATES, "setup.md"), "utf8") },
+    templates: await realTemplates(),
   };
 }
 

@@ -40,6 +40,9 @@ export const ESCALATION_MODEL = "gpt-6-astra";
 /** Model of the agent that edits recording drafts. */
 export const RECORDING_EDITOR_MODEL = "gpt-6.1-sol";
 
+/** Reasoning effort of the agent that edits recording drafts: rewording, not deep work. */
+export const RECORDING_EDITOR_EFFORT = "medium";
+
 /** Codex file generation error: the config asks for something the adapter cannot do. */
 export class CodexGenerateError extends CodexError {}
 

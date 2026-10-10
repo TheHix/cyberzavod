@@ -6,9 +6,9 @@ import { GENERATED_MARK, MANIFEST_FILE } from "@cyberzavod/adapter-kit";
 import { loadHarness, PROJECT_CONFIG_FILE } from "@cyberzavod/storage";
 import { disconnectClaude } from "./disconnect.ts";
 import { syncClaude, type ClaudeInstallation } from "./sync.ts";
+import { realTemplates } from "./templates.fixtures.ts";
 
 const REPOSITORY = path.resolve(import.meta.dirname, "../../../..");
-const TEMPLATES = path.join(REPOSITORY, "adapters/claude/templates");
 const USER_HOOK = { type: "command", command: "echo mine" };
 
 let root: string;
@@ -30,11 +30,7 @@ async function exists(relative: string): Promise<boolean> {
 async function installation(): Promise<ClaudeInstallation> {
   return {
     harness: await loadHarness(path.join(REPOSITORY, "harness")),
-    templates: {
-      publishRecording: await readFile(path.join(TEMPLATES, "publish-recording.md"), "utf8"),
-      recordingEditor: await readFile(path.join(TEMPLATES, "recording-editor.md"), "utf8"),
-      setup: await readFile(path.join(TEMPLATES, "setup.md"), "utf8"),
-    },
+    templates: await realTemplates(),
   };
 }
 

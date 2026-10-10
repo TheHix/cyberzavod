@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RawEvent } from "@cyberzavod/adapter-kit";
+import type { RawEvent } from "./raw-event.ts";
 import type { Draft, DraftEvent, DraftMessage } from "./draft.ts";
 import {
   directoriesOutsideProjects,
@@ -11,7 +11,7 @@ import {
   toDraft,
   toolDirectories,
 } from "./to-draft.ts";
-import type { AgentAssignment, AgentReport, TranscriptText } from "./transcript.ts";
+import type { AgentAssignment, AgentReport, TranscriptText } from "./transcript-model.ts";
 
 const START = 1_000_000;
 
@@ -76,6 +76,30 @@ describe("toDraft", () => {
       "review",
       "record",
     ]);
+  });
+
+  it("считает правку патчем apply_patch этапом кода", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "tool", tool: "apply_patch", ok: true, file: "/project/a.ts" },
+      { ts: START + 1_000, kind: "tool", tool: "Bash", ok: true, command: "make check" },
+    ];
+
+    const draft = toDraft(raw, { sessionId: "s1" });
+
+    expect(stagesOf(draft.events)).toEqual(["implementation", "verification"]);
+  });
+
+  it("относит правку патчем к проекту по каталогу изменённого файла", () => {
+    const raw: RawEvent[] = [
+      { ts: START, kind: "tool", tool: "apply_patch", ok: true, file: "/other/src/a.ts" },
+    ];
+
+    const draft = toDraft(raw, {
+      sessionId: "s1",
+      projectsByDirectory: new Map([["/other/src", "other"]]),
+    });
+
+    expect(draft.events[0]).toMatchObject({ type: "stage_enter", project: "other" });
   });
 
   it("отсчитывает время событий от начала сессии", () => {

@@ -88,7 +88,7 @@ export const ru: CliMessages = {
     },
     draft: {
       usage: "draft [<сырой журнал сессии>]",
-      summary: "собрать черновик записи из журнала сессии Claude Code",
+      summary: "собрать черновик записи из журнала сессии агента",
       parameters: [
         {
           name: "<сырой журнал сессии>",
@@ -380,8 +380,6 @@ export const ru: CliMessages = {
       `неизвестный агент «${agent}» в --agent: доступны ${supported}`,
     agentDiffers: ({ configured, requested }) =>
       `проект уже подключён к агенту ${configured}, а не ${requested}: сначала выполните ${CLI_COMMAND} disconnect, затем init --agent ${requested}`,
-    agentCommandUnavailable: ({ agent, command }) =>
-      `команда ${command} для агента ${agent} пока недоступна`,
     unsupportedAgent: ({ agent, supported }) =>
       `агент «${agent}» не поддерживается: доступны ${supported}`,
     mixedAgents: ({ agents, file }) =>

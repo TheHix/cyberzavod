@@ -14,6 +14,77 @@ export {
   type RawEvent,
 } from "./capture/raw-event.ts";
 export { isHumanPrompt } from "./capture/service-messages.ts";
+export {
+  carryOverEdits,
+  DraftError,
+  orphanedEdits,
+  orphanedRuns,
+  parseDraft,
+  publishBuild,
+  publishDraft,
+  reroutedMessages,
+  unfilledHeader,
+  type Draft,
+  type DraftBuild,
+  type DraftCheck,
+  type DraftEvent,
+  type DraftIntervention,
+  type DraftMessage,
+  type DraftPrompt,
+  type DraftRun,
+  type EditableDraftEvent,
+  type HeaderField,
+  type MessageSource,
+  type UnfilledBuild,
+} from "./capture/draft.ts";
+export {
+  buildTimeline,
+  eventBuilds,
+  IDLE_GAP_MS,
+  projectsWithoutBuild,
+  unassignedRuns,
+} from "./capture/builds.ts";
+export { findLeaks, type LeakKind } from "./capture/leaks.ts";
+export {
+  directoriesOutsideProjects,
+  routeMessages,
+  runTranscriptPaths,
+  sessionTranscriptPath,
+  sessionTranscriptPaths,
+  stationTranscriptPaths,
+  toDraft,
+  toolDirectories,
+  type DraftMeta,
+} from "./capture/to-draft.ts";
+export type {
+  AgentAssignment,
+  AgentReport,
+  ModelReply,
+  TokenUsage,
+  TranscriptText,
+} from "./capture/transcript-model.ts";
+export {
+  readTranscriptFile,
+  transcriptsOf,
+  withToolOutcomes,
+  type DraftInputs,
+  type SessionTranscripts,
+  type TranscriptFormat,
+  type TranscriptMeta,
+  type TranscriptRead,
+  type TranscriptReader,
+} from "./capture/transcripts.ts";
+export {
+  draftSession,
+  type AgentDraftOptions,
+  type DraftSessionOptions,
+  type SessionCapture,
+} from "./commands/draft.ts";
+export {
+  publishSessions,
+  type AgentPublishOptions,
+  type PublishSessionsOptions,
+} from "./commands/publish.ts";
 export { SILENT_EXIT, type HookContext, type HookOutcome } from "./hooks/hook.ts";
 export { recordEvent, RecordHookError, type RawEventSource } from "./hooks/record.ts";
 export { hookStatePath } from "./hooks/state.ts";
@@ -93,7 +164,15 @@ export {
   MARKDOWN_GENERATED_COMMENT,
   type GeneratedFile,
 } from "./generate/marks.ts";
-export { renderTemplate, templateValues, type TemplateSource } from "./generate/template.ts";
+export {
+  recordingTemplateValues,
+  renderTemplate,
+  templateValues,
+  type RecordingFragments,
+  type RecordingTemplateSource,
+  type RecordingTerms,
+  type TemplateSource,
+} from "./generate/template.ts";
 export {
   ownStageSections,
   stageGuidesOf,
@@ -103,15 +182,19 @@ export {
 } from "./generate/workflow-text.ts";
 export { KIT_MESSAGES } from "./messages/catalog.ts";
 export type {
+  DraftMessages,
   KitErrorMessages,
   KitMessages,
+  PublishMessages,
   RecordMessages,
   StopMessages,
 } from "./messages/kit-messages.ts";
 export {
   captureDirectories,
+  findProjectId,
   locatedFromPlanned,
   locateProject,
+  newestFile,
   requireProject,
   type CaptureDirectories,
   type LocatedProject,

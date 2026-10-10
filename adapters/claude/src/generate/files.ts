@@ -5,6 +5,7 @@
 import {
   MARKDOWN_GENERATED_COMMENT,
   ownStageSections,
+  recordingTemplateValues,
   renderTemplate as renderKitTemplate,
   stageGuidesOf,
   stageTable,
@@ -12,6 +13,8 @@ import {
   workingRulesParagraphs,
   type GeneratedFile,
   type KitError,
+  type RecordingFragments,
+  type RecordingTerms,
 } from "@cyberzavod/adapter-kit";
 import type { Harness, ProjectConfig, StageGuide, StageRole, Workflow } from "@cyberzavod/core";
 import {
@@ -27,6 +30,8 @@ export interface ClaudeTemplates {
   publishRecording: string;
   recordingEditor: string;
   setup: string;
+  /** The recording texts every agent shares. */
+  recordingFragments: RecordingFragments;
 }
 
 /** Everything the project's Claude Code files are built from. */
@@ -42,6 +47,15 @@ export interface ClaudeProject {
   cli: string;
   templates: ClaudeTemplates;
 }
+
+// What the shared recording texts say differently in Claude Code: the skill call, where the skill
+// lives, and the human's words that become interventions.
+const RECORDING_TERMS: RecordingTerms = {
+  feature: "/feature",
+  publishSkill: ".claude/skills/publish-recording/SKILL.md",
+  interventionWords:
+    "an answer to a question through `AskUserQuestion` and the human's word after the automation stops",
+};
 
 const RULES_FILE = "AGENTS.md";
 const ENTRYPOINT_FILE = "CLAUDE.md";
@@ -157,14 +171,21 @@ function setupSkill(project: ClaudeProject): GeneratedFile {
 }
 
 function recordingFiles(project: ClaudeProject): GeneratedFile[] {
+  const values = recordingTemplateValues({
+    cli: project.cli,
+    capture: project.capture,
+    fragments: project.templates.recordingFragments,
+    terms: RECORDING_TERMS,
+  });
+
   return [
     {
       path: ".claude/skills/publish-recording/SKILL.md",
-      content: renderTemplate(project.templates.publishRecording, project),
+      content: renderKitTemplate(project.templates.publishRecording, values),
     },
     {
       path: ".claude/agents/recording-editor.md",
-      content: renderTemplate(project.templates.recordingEditor, project),
+      content: renderKitTemplate(project.templates.recordingEditor, values),
     },
   ];
 }

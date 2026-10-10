@@ -88,7 +88,7 @@ export const en: CliMessages = {
     },
     draft: {
       usage: "draft [<raw session log>]",
-      summary: "build a recording draft from a Claude Code session log",
+      summary: "build a recording draft from an agent session log",
       parameters: [
         {
           name: "<raw session log>",
@@ -381,7 +381,6 @@ export const en: CliMessages = {
       `unknown agent ${agent} in --agent: supported agents are ${supported}`,
     agentDiffers: ({ configured, requested }) =>
       `this project is already set up for ${configured}, not ${requested}: run ${CLI_COMMAND} disconnect first, then init --agent ${requested}`,
-    agentCommandUnavailable: ({ agent, command }) => `${command} is not available for ${agent} yet`,
     unsupportedAgent: ({ agent, supported }) =>
       `the agent “${agent}” is not supported: available are ${supported}`,
     mixedAgents: ({ agents, file }) =>

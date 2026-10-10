@@ -4,16 +4,18 @@
 // Input, output and cache-write tokens are counted. Cache reads are not counted:
 // it is the same context reread at every step, and they would inflate the counter many times over.
 
+import type {
+  AgentAssignment,
+  AgentReport,
+  ModelReply,
+  TokenUsage,
+  TranscriptText,
+} from "@cyberzavod/adapter-kit";
+
 interface Usage {
   input_tokens?: number;
   output_tokens?: number;
   cache_creation_input_tokens?: number;
-}
-
-/** A model reply in the transcript: when it came and which model replied. */
-export interface ModelReply {
-  ts: number;
-  model: string;
 }
 
 // Claude Code service replies (for example, about the session limit) are marked with the
@@ -77,12 +79,6 @@ function tokensOf(usage: Usage): number {
   );
 }
 
-/** Tokens of one model message and the time it finished. */
-export interface TokenUsage {
-  ts: number;
-  tokens: number;
-}
-
 // One model message appears in the transcript several times (in parts of the reply):
 // the last variant for each id counts, and the time is taken from the last part that has one.
 function messageUsages(transcript: string): { ts?: number; tokens: number }[] {
@@ -137,24 +133,6 @@ export function modelReplies(transcript: string): ModelReply[] {
     .map(replyOf)
     .filter((reply) => reply !== null)
     .sort((a, b) => a.ts - b.ts);
-}
-
-/** Model text in the transcript: when it was said and what it says. */
-export interface TranscriptText {
-  ts: number;
-  text: string;
-}
-
-/** A task the session gave a subagent: to a new run (`spawn`) or by a message (`message`). */
-export type AgentAssignment = { ts: number; text: string } & (
-  { via: "spawn"; agentType: string; agentId?: string } | { via: "message"; agentId: string }
-);
-
-/** A subagent run's report: what it handed back to the session, when, and who it was. */
-export interface AgentReport {
-  ts: number;
-  agentId: string;
-  text: string;
 }
 
 /** A transcript entry that has a message and a time. */

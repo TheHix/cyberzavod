@@ -1,9 +1,8 @@
-// Claude Code raw log → build recording draft.
+// Agent raw log → build recording draft.
 // Stages are inferred from the agent's actions by the tables below; a new stage sign is a new row
 // in a table.
 
 import path from "node:path";
-import { isHumanPrompt, type RawEvent } from "@cyberzavod/adapter-kit";
 import {
   FOREMAN,
   STAGES,
@@ -21,13 +20,15 @@ import type {
   DraftRun,
   MessageSource,
 } from "./draft.ts";
+import type { RawEvent } from "./raw-event.ts";
+import { isHumanPrompt } from "./service-messages.ts";
 import type {
   AgentAssignment,
   AgentReport,
   ModelReply,
   TokenUsage,
   TranscriptText,
-} from "./transcript.ts";
+} from "./transcript-model.ts";
 
 // Tools that reveal the stage.
 const TOOL_STAGES: Readonly<Record<string, Stage>> = {
@@ -35,6 +36,7 @@ const TOOL_STAGES: Readonly<Record<string, Stage>> = {
   Write: "implementation",
   MultiEdit: "implementation",
   NotebookEdit: "implementation",
+  apply_patch: "implementation",
   ExitPlanMode: "planning",
 };
 
@@ -98,7 +100,7 @@ const PARENT_SEGMENT = "..";
 const SURROUNDING_QUOTES = /^(["'])(.*)\1$/;
 
 // Subagents that reveal the stage: the built-in Plan and the /feature pipeline stations
-// from .claude/agents/.
+// from the agents' role files.
 const AGENT_STAGES: Readonly<Record<string, Stage>> = {
   Plan: "planning",
   analyst: "planning",
@@ -367,8 +369,8 @@ function agentWindowKey(
 
 // Station windows with a stage. Subagent tools come in the same session; while a subagent with its
 // own stage works, it sets the stage: make check inside the reviewer is part of review, not a
-// return to tests. Windows are tracked by agentId; a stop without a matching start (Claude Code
-// service subagents) closes nothing.
+// return to tests. Windows are tracked by agentId; a stop without a matching start (service
+// subagents) closes nothing.
 interface StationWindows {
   // Records a station start or stop; true if the set of working stations changed.
   observe(event: RawEvent): boolean;
@@ -805,7 +807,7 @@ class DraftEventCollector {
   private readonly stagesByProject = new Map<string | undefined, Stage>();
   // A station run window stretches to the end of the log until a stop comes.
   private readonly openRuns = new Map<string, DraftRun>();
-  // A station verdict comes with its stop (Claude Code terminal) or as a separate
+  // A station verdict comes with its stop (terminal) or as a separate
   // report by agent_id (desktop app). Each run is judged once; a repeated
   // run of the same agent after SendMessage is a new run with its own verdict.
   private readonly agentsStarted = new Map<string, string>();

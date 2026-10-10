@@ -18,7 +18,7 @@ import {
   type Speaker,
   type Stage,
 } from "@cyberzavod/core";
-import { ClaudeError } from "../errors.ts";
+import { KitError } from "../errors.ts";
 import { buildTimeline, eventBuilds } from "./builds.ts";
 import { findLeaks } from "./leaks.ts";
 
@@ -189,9 +189,6 @@ export interface UnfilledBuild {
   /** Empty fields in header order. */
   fields: HeaderField[];
 }
-
-// Recordings of this adapter are written by Claude Code, Anthropic's agent.
-const CLAUDE_SOURCE: RecordSource = { type: "agent", provider: "anthropic", agent: "claude" };
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -513,7 +510,7 @@ function buildMark(earlier: { build?: string }): { build?: string } {
 }
 
 function carryOverPrompt(earlier: DraftPrompt, fresh: DraftPrompt): DraftPrompt {
-  // Claude Code deletes old transcripts: a model found earlier must not be lost.
+  // Agents delete old transcripts: a model found earlier must not be lost.
   const model = fresh.model ?? earlier.model;
 
   return {
@@ -801,7 +798,7 @@ function checkNoLeaks({ data }: SessionRecord, buildId: string): void {
 
   if (leaks.length === 0) return;
 
-  throw new ClaudeError((messages) => {
+  throw new KitError((messages) => {
     const described = leaks.map(({ kind, text }) =>
       messages.errors.leakIn({ kind: messages.leakKinds[kind], text }),
     );
@@ -818,21 +815,22 @@ function checkNoLeaks({ data }: SessionRecord, buildId: string): void {
  * @param {Draft} draft Draft with the title, project, harness version,
  *   clean prompts and messages of the published build filled in.
  * @param {string} buildId Id of the published build.
+ * @param {RecordSource} source Who made the build: the agent that ran the session.
  * @returns {SessionRecord} Recording with the build `id` that passed the core format check.
  * @throws {RecordError} If the title, project, harness version, a clean prompt or a message
  *   of the build is empty or the recording does not match the core format.
  * @throws {DraftError} If there is no such build or a merged prompt has no preceding unmerged one.
- * @throws {ClaudeError} If the build has no events or the text to publish looks like an address,
+ * @throws {KitError} If the build has no events or the text to publish looks like an address,
  *   a key or a personal path.
  */
-export function publishBuild(draft: Draft, buildId: string): SessionRecord {
+export function publishBuild(draft: Draft, buildId: string, source: RecordSource): SessionRecord {
   const build = buildOf(draft, buildId);
   const owners = eventBuilds(draft);
   const events = draft.events.filter((_event, index) => owners[index] === buildId);
   const timeline = buildTimeline(events);
 
   if (timeline === undefined) {
-    throw new ClaudeError((messages) => messages.errors.buildHasNoEvents(buildId));
+    throw new KitError((messages) => messages.errors.buildHasNoEvents(buildId));
   }
 
   const tokens = totalTokens(events);
@@ -850,7 +848,7 @@ export function publishBuild(draft: Draft, buildId: string): SessionRecord {
     id: build.id,
     timestamp: new Date(Date.parse(draft.startedAt) + timeline.start).toISOString(),
     projectId: build.project,
-    source: CLAUDE_SOURCE,
+    source,
     data: {
       title: build.title,
       language: build.language,
@@ -872,11 +870,12 @@ export function publishBuild(draft: Draft, buildId: string): SessionRecord {
 /**
  * Turns all draft builds into recordings for the site; throws if any one is not ready.
  * @param {Draft} draft Draft with all builds filled in.
+ * @param {RecordSource} source Who made the builds: the agent that ran the session.
  * @returns {SessionRecord[]} Recordings in the order of the draft's builds.
  * @throws {RecordError} If a build does not match the core format.
  * @throws {DraftError} For the same reasons as `publishBuild`.
- * @throws {ClaudeError} For the same reasons as `publishBuild`.
+ * @throws {KitError} For the same reasons as `publishBuild`.
  */
-export function publishDraft(draft: Draft): SessionRecord[] {
-  return draft.builds.map((build) => publishBuild(draft, build.id));
+export function publishDraft(draft: Draft, source: RecordSource): SessionRecord[] {
+  return draft.builds.map((build) => publishBuild(draft, build.id, source));
 }

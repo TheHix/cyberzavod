@@ -12,6 +12,7 @@ const HARNESS_DIRECTORY = path.join(REPOSITORY, "harness");
 // Templates are keyed `<source>/<name>`: two adapters may have a template of the same name.
 const TEMPLATE_DIRECTORIES: Readonly<Record<string, string>> = {
   cli: path.join(REPOSITORY, "packages/cli/templates"),
+  kit: path.join(REPOSITORY, "packages/adapter-kit/templates"),
   claude: path.join(REPOSITORY, "adapters/claude/templates"),
   codex: path.join(REPOSITORY, "adapters/codex/templates"),
 };

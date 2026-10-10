@@ -49,3 +49,46 @@ export function templateValues(source: TemplateSource): Record<string, string> {
     todo: RULES_TODO_MARK,
   };
 }
+
+/** Texts the adapters share for the recording skill and the editor agent, with placeholders. */
+export interface RecordingFragments {
+  /** The recording rules: from several tasks in one session to the end of the skill. */
+  rules: string;
+  /** The editor agent's instructions, without the front matter the agent's format needs. */
+  editor: string;
+}
+
+/** What differs between agents in the shared recording texts. */
+export interface RecordingTerms {
+  /** The call of the workflow skill, `{{feature}}` in the fragments. */
+  feature: string;
+  /** The recording skill's file from the project root, `{{publishSkill}}`. */
+  publishSkill: string;
+  /** The human's words that become interventions, `{{interventionWords}}`. */
+  interventionWords: string;
+}
+
+/** What the placeholders of the recording templates are filled with. */
+export interface RecordingTemplateSource extends TemplateSource {
+  fragments: RecordingFragments;
+  terms: RecordingTerms;
+}
+
+/**
+ * Values of the placeholders of the recording skill and editor templates: those of any adapter
+ * template, the agent's terms, and the shared fragments `{{recordingRules}}` and
+ * `{{recordingEditor}}`, which are filled with the same values first.
+ * @param {RecordingTemplateSource} source The CLI command, the journal directories, the shared
+ *   fragments and the agent's terms.
+ * @returns {Record<string, string>} Values by placeholder name.
+ * @throws {KitError} If a fragment has a placeholder without a value.
+ */
+export function recordingTemplateValues(source: RecordingTemplateSource): Record<string, string> {
+  const values = { ...templateValues(source), ...source.terms };
+
+  return {
+    ...values,
+    recordingRules: renderTemplate(source.fragments.rules, values),
+    recordingEditor: renderTemplate(source.fragments.editor, values),
+  };
+}
